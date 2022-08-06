@@ -6,6 +6,8 @@ Since I'm a big fan of [Brent Ozar's](https://www.brentozar.com/) [SQL Server Fi
 ## What it runs
 
 ## Paramaters
+| Parameter | Function|
+-----------------------
 -ServerName - accepts either [hostname]\[instance] (for named instances) or just [hostname] for default instances
 -SQLLogin   - the name of the SQL login used to run the script; if not provided, the script will use integrated security
 -SQLPass    - the password for the SQL login provided via the -SQLLogin parameter, omit if -SQLLogin was not used
