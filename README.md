@@ -6,14 +6,13 @@ Since I'm a big fan of [Brent Ozar's](https://www.brentozar.com/) [SQL Server Fi
 ## What it runs
 
 ## Paramaters
-| Parameter | Mandatory | Description| Possible values | Default value|
-|-----------|-----------|------------|-----------------|--------------|
-|-ServerName| Yes | accepts either `HostName\InstanceID` (for named instances) or just `HostName` for default instances. If you provide either `?` or `Help` as a value for `-ServerName`, the script will return a brief help menu. | your SQL Server instance, `?`, `Help` | N\A|
-|-SQLLogin| the name of the SQL login used to run the script. If not provided, the script will use integrated security. | - the name of your SQL Login
-- empty |
--SQLPass    - the password for the SQL login provided via the -SQLLogin parameter, omit if -SQLLogin was not used
--IsIndepth  - Y will run a more in-depth check against the instance/database, omit for a basic check
--CheckDB    - used to provide the name of a specific database to run some of the checks against, omit to run against the whole instance
+| Parameter | Description|
+|-----------|------------|
+|-ServerName| Accepts either `HostName\InstanceID` (for named instances) or just `HostName` for default instances. If you provide either `?` or `Help` as a value for `-ServerName`, the script will return a brief help menu. | your SQL Server instance, `?`, `Help` |
+|-SQLLogin| The name of the SQL login used to run the script. If not provided, the script will use integrated security. | the name of your SQL Login, empty | empty|
+|-SQLPass | The password for the SQL login provided via the -SQLLogin parameter, omit if `-SQLLogin` was not used. |
+|-IsIndepth | Providing Y as a value will tell PSBlitz.ps1 to run a more in-depth check against the instance/database. Omit for default check. |
+|-CheckDB | Used to provide the name of a specific database against which sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock will be ran. Omit to run against the whole instance.|
 
 ## Default check vs. in-depth check
 
