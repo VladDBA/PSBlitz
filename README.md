@@ -42,6 +42,8 @@ Download the PSBlitz.zip file and extract its contents.
 
 Do not change the directory structure and file names.
 
+[*Back to top*](#header1)
+
 ## What it runs
 PSBlitz.ps1 uses slightly modified, non-stored procedure versions, of the following components 
 from [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit):
