@@ -54,6 +54,8 @@ from [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit]
 - sp_BlitzLock
 - sp_BlitzWho
 
+You can find the scripts in this repository's [Resources](/Resources) directory
+
 [*Back to top*](#header1)
 
 ## Paramaters
