@@ -4,6 +4,7 @@
 - [Intro](#Intro)
 - [What it does](#What-it-does)
 - [Prerequisites](#Prerequisites)
+- [Installation](#Installation)
 - [What it runs](#What-it-runs)
 - [Default check VS in-depth check](#Default-check-VS-in-depth-check)
 - [Output files](#Output-files)
@@ -34,6 +35,12 @@ Limitations:
 - For the time being PSBlitz.ps1 can only run against SQL Server instances, not Azure SQL DB.
 
 [*Back to top*](#header1)
+
+## Installation
+
+Download the PSBlitz.zip file and extract its contents. 
+
+Do not change the directory structure and file names.
 
 ## What it runs
 PSBlitz.ps1 uses slightly modified, non-stored procedure versions, of the following components 
