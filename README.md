@@ -1,4 +1,14 @@
 # PSBlitz
+<a name="header1"></a>
+## Navigation
+- [Intro](#Intro)
+- [What it does](#What-it-does)
+- [Prerequisites](#Prerequisites)
+- [What it runs](#What-it-runs)
+- [Default check VS in-depth check](#Default-check-VS-in-depth-check)
+
+## Intro
+
 Since I'm a big fan of [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) and I've found myself in many situations where I would have liked a quick way to easily export the output of sp_Blitz, sp_BlitzCache, sp_BlitzFirst, sp_BlitzIndex, sp_BlitzLock, and sp_BlitzWho to Excel and saving to disk execution plans identified by sp_BlitzCache and deadlock graphs from sp_BlitzLock, I've decided to put together a PowerShell script that does just that.
 
 ## What it does
@@ -39,7 +49,7 @@ from [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit]
 |`-IsIndepth` | Providing Y as a value will tell PSBlitz.ps1 to run a more in-depth check against the instance/database. Omit for default check. |
 |`-CheckDB` | Used to provide the name of a specific database against which sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock will be ran. Omit to run against the whole instance.|
 
-## Default check vs. in-depth check
+## Default check VS in-depth check
 
 - The default check will run the following:
 ```SQL
