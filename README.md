@@ -46,6 +46,7 @@ from [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit]
 sp_Blitz @CheckServerInfo = 1
 sp_BlitzFirst @ExpertMode = 1, @Seconds = 30
 sp_BlitzIndex @GetAllDatabases = 1, @Mode = 0
+sp_BlitzCache @ExpertMode = 1, @SortOrder = 'CPU'/'avg cpu'	
 sp_BlitzCache @ExpertMode = 1, @SortOrder = 'duration'/'avg duration'
 sp_BlitzWho @ExpertMode = 1
 sp_BlitzLock @StartDate = DATEADD(DAY,-30, GETDATE()), @EndDate = GETDATE()
