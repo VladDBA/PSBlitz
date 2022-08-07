@@ -6,6 +6,9 @@
 - [Prerequisites](#Prerequisites)
 - [What it runs](#What-it-runs)
 - [Default check VS in-depth check](#Default-check-VS-in-depth-check)
+- [Output files](#Output-files)
+- [Usage examples](#Usage-examples)
+- [License](/LICENSE)
 
 ## Intro
 
@@ -29,6 +32,7 @@ You don't need to have any of the sp_Blitz stored procedures present on the inst
 
 Limitations:
 - For the time being PSBlitz.ps1 can only run against SQL Server instances, not Azure SQL DB.
+[*Back to top*](#header1)
 
 ## What it runs
 PSBlitz.ps1 uses slightly modified, non-stored procedure versions, of the following components 
@@ -39,6 +43,7 @@ from [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit]
 - sp_BlitzIndex
 - sp_BlitzLock
 - sp_BlitzWho
+[*Back to top*](#header1)
 
 ## Paramaters
 | Parameter | Description|
@@ -48,6 +53,7 @@ from [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit]
 |`-SQLPass` | The password for the SQL login provided via the -SQLLogin parameter, omit if `-SQLLogin` was not used. |
 |`-IsIndepth` | Providing Y as a value will tell PSBlitz.ps1 to run a more in-depth check against the instance/database. Omit for default check. |
 |`-CheckDB` | Used to provide the name of a specific database against which sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock will be ran. Omit to run against the whole instance.|
+[*Back to top*](#header1)
 
 ## Default check VS in-depth check
 
@@ -89,8 +95,9 @@ sp_BlitzIndex @GetAllDatabases = 0, @DatabaseName = 'SomeDB', @Mode = ...
 sp_BlitzCache @ExpertMode = 1, @DatabaseName = 'SomeDB', @SortOrder = ...
 sp_BlitzLock @StartDate = DATEADD(DAY,-30, GETDATE()), @EndDate = GETDATE(), @DatabaseName = 'SomeDB'
 ```
+[*Back to top*](#header1)
 
-## Output files naming conventions and locations
+## Output files
 The output directory will be created in the PSBlitz directory where the PSBlitz.ps1 script lives.
 
 Output directory name [Instance]_[TimeStamp] for an instance-wide check, or [Instance]_[TimeStamp]_[Database] for a database-specific check.
@@ -102,7 +109,7 @@ Deadlock file naming convention - [EventDate]_[EventTime]_[RecordNumberOfDistinc
 Execution plans will be saved in the Plans directory under the output directory.
 
 Execution plans file naming convention - [SortOrder]_[RowNumber].sqlplan
-
+[*Back to top*](#header1)
 
 ## Usage examples
 You can run PSBlitz.ps1 by simply right-clicking on the script and then clicking on "Run With PowerShell" which will execute the script in interactive mode, prompting you for the required input.
@@ -138,4 +145,4 @@ Otherwise you can navigate to the directory where the script is in PowerShell an
     .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
     ```
 Note that `-ServerName` is a positional parameter, so you don't necessarily have to specify the parameter's name as long as the first thing after the script's name is the instance 
-
+[*Back to top*](#header1)
