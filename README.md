@@ -81,12 +81,17 @@ sp_BlitzLock @StartDate = DATEADD(DAY,-30, GETDATE()), @EndDate = GETDATE(), @Da
 ```
 
 ## Output files naming conventions and locations
-- The output directory will be created in the PSBlitz directory where the PSBlitz.ps1 script lives.
-- Output directory name [Instance]_[TimeStamp] for an instance-wide check, or [Instance]_[TimeStamp]_[Database] for a database-specific check.
-- Deadlocks will be saved in the Deadlocks directory under the output directory.
-- Deadlock file naming convention - [EventDate]_[EventTime]_[RecordNumberOfDistinctDeadlockGroupVictim].xdl
-- Execution plans will be saved in the Plans directory under the output directory.
-- Execution plans file naming convention - [SortOrder]_[RowNumber].sqlplan
+The output directory will be created in the PSBlitz directory where the PSBlitz.ps1 script lives.
+
+Output directory name [Instance]_[TimeStamp] for an instance-wide check, or [Instance]_[TimeStamp]_[Database] for a database-specific check.
+
+Deadlocks will be saved in the Deadlocks directory under the output directory.
+
+Deadlock file naming convention - [EventDate]_[EventTime]_[RecordNumberOfDistinctDeadlockGroupVictim].xdl
+
+Execution plans will be saved in the Plans directory under the output directory.
+
+Execution plans file naming convention - [SortOrder]_[RowNumber].sqlplan
 
 
 ## Usage examples
