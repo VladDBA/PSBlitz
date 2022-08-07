@@ -38,7 +38,7 @@ Limitations:
 
 ## Installation
 
-Download the PSBlitz.zip file and extract its contents. 
+Download the latest zip file from [Releases](https://github.com/VladDBA/PSBlitz/releases) section of the repository and extract its contents. 
 
 Do not change the directory structure and file names.
 
