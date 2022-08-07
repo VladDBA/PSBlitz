@@ -79,6 +79,15 @@ sp_BlitzCache @ExpertMode = 1, @DatabaseName = 'SomeDB', @SortOrder = ...
 sp_BlitzLock @StartDate = DATEADD(DAY,-30, GETDATE()), @EndDate = GETDATE(), @DatabaseName = 'SomeDB'
 ```
 
+## Output files naming conventions and locations
+- The output directory will be created in the PSBlitz directory where the PSBlitz.ps1 script lives.
+- Output directory name [Instance]_[TimeStamp] for an instance-wide check, or [Instance]_[TimeStamp]_[Database] for a database-specific check.
+- Deadlocks will be saved in the Deadlocks directory under the output directory.
+- Deadlock file naming convention - [EventDate]_[EventTime]_[RecordNumberOfDistinctDeadlockGroupVictim].xdl
+- Execution plans will be saved in the Plans directory under the output directory.
+- Execution plans file naming convention - [SortOrder]_[RowNumber].sqlplan
+
+
 ## Usage examples
 You can run PSBlitz.ps1 by simply right-clicking on the script and then clicking on "Run With PowerShell" which will execute the script in interactive mode, prompting you for the required input.
 
