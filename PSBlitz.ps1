@@ -74,6 +74,7 @@ SOFTWARE.
 		[string]$Help		
 	  )
 
+###Internal params
 #Version
 $Vers = "1.00"
 $VersDate = "20220801"
@@ -89,7 +90,11 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"spBlitzWho_NonSPLatest.sql")
 #Set path+name of the input Excel file
 $OrigExcelF = $ResourcesPath + "\" + $OrigExcelFName
+#Set default start row for Excel output
+$DefaultStartRow = 2
 
+##Debug - set to 1 for debugging purposes
+$Debug = 0
 
 ###Functions
 #Function to properly output hex strings like Plan Handle and SQL Handle
@@ -279,14 +284,6 @@ if([string]::IsNullOrEmpty($ServerName))
 	}
 }
 	
-###Params
-##Debug - set to 1 for debugging purposes
-$Debug = 0
-
-
-#Set default start row for Excel output
-$DefaultStartRow = 2
-
 #Set the string to replace for $CheckDB
 if(!([string]::IsNullOrEmpty($CheckDB)))
 {
