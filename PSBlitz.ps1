@@ -74,13 +74,27 @@ SOFTWARE.
 		[string]$Help		
 	  )
 
+###Internal params
 #Version
 $Vers = "1.00"
 $VersDate = "20220801"
-#Get script ptah
+#Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
 $ResourcesPath = $ScriptPath + "\Resources"
+#Set name of the input Excel file
+$OrigExcelFName = "PSBlitzOutput.xlsx"
+$ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
+	"spBlitzCache_NonSPLatest.sql", "spBlitzFirst_NonSPLatest.sql",
+	"spBlitzIndex_NonSPLatest.sql", "spBlitzLock_NonSPLatest.sql",
+	"spBlitzWho_NonSPLatest.sql")
+#Set path+name of the input Excel file
+$OrigExcelF = $ResourcesPath + "\" + $OrigExcelFName
+#Set default start row for Excel output
+$DefaultStartRow = 2
+
+##Debug - set to 1 for debugging purposes
+$Debug = 0
 
 ###Functions
 #Function to properly output hex strings like Plan Handle and SQL Handle
@@ -149,8 +163,43 @@ if(("Y", "Yes" -Contains $Help) -or ("?", "Help" -Contains $ServerName))
 	Get-PSBlitzHelp
 	Exit
 }
+
+###Validate existence of dependencies
+#Check resources path
+if(!(Test-Path $ResourcesPath )) 
+{
+	Write-Host "The Resources directory was not found in $ScriptPath!" -fore red
+	Write-Host " Make sure to download the latest release from https://github.com/VladDBA/PSBlitz/releases" -fore yellow
+	Write-Host "and properly extract the contents" -fore yellow
+	Read-Host -Prompt "Press Enter to exit."
+	Exit
+}
+#Check individual files
+$MissingFiles = @()
+foreach($Rsc in $ResourceList)
+	{
+		$FileToTest = $ResourcesPath + "\" + $Rsc
+		if(!(Test-Path $FileToTest -PathType Leaf))
+		{
+			$MissingFiles += $Rsc
+		}			
+	}
+if($MissingFiles.Count -gt 0)
+{
+	Write-Host "The following files are missing from"$ResourcesPath":" -fore red
+	foreach($MIAFl in $MissingFiles)
+	{
+		Write-Host "  $MIAFl" -fore red
+	}
+	Write-Host " Make sure to download the latest release from https://github.com/VladDBA/PSBlitz/releases" -fore yellow
+	Write-Host "and properly extract the contents" -fore yellow
+	Read-Host -Prompt "Press Enter to exit."
+	Exit
+}
+
+
 	
-##Switch to interactive mode if $ServerName is empty
+###Switch to interactive mode if $ServerName is empty
 if([string]::IsNullOrEmpty($ServerName))
 {
 	Write-Host "Running in interactive mode"
@@ -235,20 +284,6 @@ if([string]::IsNullOrEmpty($ServerName))
 	}
 }
 	
-###Params
-##Debug - set to 1 for debugging purposes
-$Debug = 0
-#Turn current date time into string for output directory name
-$sdate = get-date
-$DirDate = $sdate.ToString("yyyyMMddHHmm")
-
-#Set name of the input Excel file
-$OrigExcelFName = "PSBlitzOutput.xlsx"
-#Set path+name of the input Excel file
-$OrigExcelF = $ResourcesPath + "\" + $OrigExcelFName
-#Set default start row for Excel output
-$DefaultStartRow = 2
-
 #Set the string to replace for $CheckDB
 if(!([string]::IsNullOrEmpty($CheckDB)))
 {
@@ -348,6 +383,9 @@ if(!([string]::IsNullOrEmpty($CheckDB)))
 }
 
 ###Create directories
+#Turn current date time into string for output directory name
+$sdate = get-date
+$DirDate = $sdate.ToString("yyyyMMddHHmm")
 #Set output directory
 if(!([string]::IsNullOrEmpty($CheckDB)))
 {
@@ -356,7 +394,7 @@ if(!([string]::IsNullOrEmpty($CheckDB)))
 	$OutDir = $scriptPath + "\" + $InstName +"_"+$DirDate
 }
 #Check if output directory exists
-If(!(Test-Path $OutDir)) 
+if(!(Test-Path $OutDir)) 
 {
 	New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 }
