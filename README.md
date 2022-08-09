@@ -9,6 +9,7 @@
 - [Default check VS in-depth check](#Default-check-VS-in-depth-check)
 - [Output files](#Output-files)
 - [Usage examples](#Usage-examples)
+- [Screenshots](#Screenshots)
 - [License](/LICENSE)
 
 ## Intro
@@ -170,5 +171,11 @@ Otherwise you can navigate to the directory where the script is in PowerShell an
     .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
     ```
 Note that `-ServerName` is a positional parameter, so you don't necessarily have to specify the parameter's name as long as the first thing after the script's name is the instance 
+
+[*Back to top*](#header1)
+
+## Screenshots
+![Screenshot1](Img001.jpg)
+![Screenshot2](Img002.jpg)
 
 [*Back to top*](#header1)
