@@ -76,8 +76,8 @@ SOFTWARE.
 
 ###Internal params
 #Version
-$Vers = "1.01"
-$VersDate = "20220808"
+$Vers = "1.10"
+$VersDate = "20220813"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -102,7 +102,7 @@ function Get-HexString{
 	param (
 	[System.Array]$HexInput
 	)
-	if($HexInput -eq [System.DBNull]::Value) {
+	if($HexInput -eq [System.DBNull]::Value){
 		$HexString = ""
 	} else {
 	#Formatting value as hex and stripping extra stuff
@@ -158,16 +158,14 @@ from Brent Ozar's FirstResponderKit (https://www.brentozar.com/first-aid/):
 `n You can find the scripts in the '$ResourcesPath' directory
 "
 	}
-if(("Y", "Yes" -Contains $Help) -or ("?", "Help" -Contains $ServerName))
-{
+if(("Y", "Yes" -Contains $Help) -or ("?", "Help" -Contains $ServerName)){
 	Get-PSBlitzHelp
 	Exit
 }
 
 ###Validate existence of dependencies
 #Check resources path
-if(!(Test-Path $ResourcesPath )) 
-{
+if(!(Test-Path $ResourcesPath )){
 	Write-Host "The Resources directory was not found in $ScriptPath!" -fore red
 	Write-Host " Make sure to download the latest release from https://github.com/VladDBA/PSBlitz/releases" -fore yellow
 	Write-Host "and properly extract the contents" -fore yellow
@@ -184,8 +182,7 @@ foreach($Rsc in $ResourceList)
 			$MissingFiles += $Rsc
 		}			
 	}
-if($MissingFiles.Count -gt 0)
-{
+if($MissingFiles.Count -gt 0){
 	Write-Host "The following files are missing from"$ResourcesPath":" -fore red
 	foreach($MIAFl in $MissingFiles)
 	{
@@ -200,15 +197,13 @@ if($MissingFiles.Count -gt 0)
 
 	
 ###Switch to interactive mode if $ServerName is empty
-if([string]::IsNullOrEmpty($ServerName))
-{
+if([string]::IsNullOrEmpty($ServerName)){
 	Write-Host "Running in interactive mode"
 	$InteractiveMode = 1
 	##Instance
 	$ServerName = Read-Host -Prompt "Server"
 	#Make ServerName filename friendly and get host name 
-	if($ServerName -like "*\*")
-	{
+	if($ServerName -like "*\*"){
 		$pos = $ServerName.IndexOf("\")
 		$InstName = $ServerName.Substring($pos+1)
 		$HostName = $ServerName.Substring(0,$pos)
@@ -217,16 +212,14 @@ if([string]::IsNullOrEmpty($ServerName))
 		$HostName = $ServerName
 	}
 	#Return help menu if $ServerName is ? or Help
-	if("?", "Help" -Contains $ServerName)
-	{
+	if("?", "Help" -Contains $ServerName){
 		Get-PSBlitzHelp
 		Read-Host -Prompt "Press Enter to exit."
 		Exit
 	}
 	#Test if the host server is reachable
 	Write-Host "->Host $HostName appears to be... " -NoNewline
-	if(Test-Connection -ComputerName $HostName -Count 1 -Quiet) 
-	{
+	if(Test-Connection -ComputerName $HostName -Count 1 -Quiet){
 		Write-Host "up" -NoNewline -fore green
 		Write-Host "."
 		Write-Host "Proceeding."
@@ -245,8 +238,7 @@ if([string]::IsNullOrEmpty($ServerName))
 	$CheckDB = Read-Host -Prompt "Name of the database you want to check (leave empty for all)"
 	##SQL Login
 	$SQLLogin = Read-Host -Prompt "SQL login name (leave empty to use integrated security)"
-	if(!([string]::IsNullOrEmpty($SQLLogin)))
-	{
+	if(!([string]::IsNullOrEmpty($SQLLogin))){
 		##SQL Login pass
 		$SQLPass = Read-Host -Prompt "Password "
 	}
@@ -255,8 +247,7 @@ if([string]::IsNullOrEmpty($ServerName))
 } else {
 	$InteractiveMode = 0
 	# check if the host is reachable when in non-interactive mode
-	if($ServerName -like "*\*")
-	{
+	if($ServerName -like "*\*"){
 		$pos = $ServerName.IndexOf("\")
 		$InstName = $ServerName.Substring($pos+1)
         $HostName = $ServerName.Substring(0,$pos)
@@ -266,8 +257,7 @@ if([string]::IsNullOrEmpty($ServerName))
 	}
 	#Test if the host server is reachable
 	Write-Host "->Host $HostName appears to be... " -NoNewline
-	if(Test-Connection -ComputerName $HostName -Count 1 -Quiet) 
-	{
+	if(Test-Connection -ComputerName $HostName -Count 1 -Quiet){
 		Write-Host "up" -NoNewline -fore green
 		Write-Host "."
 		Write-Host "Proceeding."
@@ -285,16 +275,14 @@ if([string]::IsNullOrEmpty($ServerName))
 }
 	
 #Set the string to replace for $CheckDB
-if(!([string]::IsNullOrEmpty($CheckDB)))
-{
+if(!([string]::IsNullOrEmpty($CheckDB))){
 	$OldCheckDBStr = ";SET @DatabaseName = NULL;"
 	$NewCheckDBStr = ";SET @DatabaseName = '" + $CheckDB + "';" 
 }
 
 ###Define connection
 $SqlConnection = New-Object System.Data.SqlClient.SqlConnection
-if(!([string]::IsNullOrEmpty($SQLLogin))) 
-{
+if(!([string]::IsNullOrEmpty($SQLLogin))){
 	$SqlConnection.ConnectionString ="Server=$ServerName;Database=master;User Id=$SQLLogin;Password=$SQLPass"
 } else {
 	$SqlConnection.ConnectionString = "Server=$ServerName;Database=master;trusted_connection=true"
@@ -317,12 +305,10 @@ Try
 } Catch {
 	Write-Host "Cannot connect to instance $ServerName" -fore red
 	$Help = Read-Host -Prompt "Need help?[Y/N]"
-	if($Help -eq "Y")
-	{
+	if($Help -eq "Y"){
 		Get-PSBlitzHelp
 		#Don't close the window automatically if in interactive mode
-		if($InteractiveMode -eq 1)
-		{
+		if($InteractiveMode -eq 1){
 			Read-Host -Prompt "Press Enter to exit."
 			Exit
 		}
@@ -330,14 +316,12 @@ Try
 		Exit
 	}
 }
-if($ConnCheckSet.Tables[0].Rows.Count -eq 1) 
-{
+if($ConnCheckSet.Tables[0].Rows.Count -eq 1){
 	Write-Host "->Connection to $ServerName - " -NoNewLine 
 	Write-Host "Ok" -fore green
 }
 ###Test existence of value provided for $CheckDB ##not working for some reason
-if(!([string]::IsNullOrEmpty($CheckDB)))
-{
+if(!([string]::IsNullOrEmpty($CheckDB))){
 	Write-Host "Checking existence of database $CheckDB..."
 	$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
 	$DBQuery = "SELECT [name] from sys.databases WHERE [name] = '$CheckDB' AND [state] = 0;"
@@ -351,8 +335,7 @@ if(!([string]::IsNullOrEmpty($CheckDB)))
 	$SqlConnection.Close()
 	Try
 	{
-		if($CheckDBSet.Tables[0].Rows[0]["name"] -eq $CheckDB) 
-		{
+		if($CheckDBSet.Tables[0].Rows[0]["name"] -eq $CheckDB){
 			#Write-Host "->Database $CheckDB - exists on $ServerName" -fore green -ErrorAction Stop
 			Write-Host "->Database $CheckDB - " -NoNewLine -ErrorAction Stop
 			Write-Host "exists/is online" -fore green -ErrorAction Stop
@@ -360,17 +343,14 @@ if(!([string]::IsNullOrEmpty($CheckDB)))
 	} Catch {
 		Write-Host "Database $CheckDB either does not exist or is not online" -fore red
 		$InstanceWide = Read-Host -Prompt "Switch to instance-wide plan cache, index, and deadlock check?[Y/N]"
-		if($InstanceWide -eq "Y")
-		{
+		if($InstanceWide -eq "Y"){
 			$CheckDB = ""
 		} else {
 			$Help = Read-Host -Prompt "Need help?[Y/N]"
-			if($Help -eq "Y")
-			{
+			if($Help -eq "Y"){
 				Get-PSBlitzHelp
 				#Don't close the window automatically if in interactive mode
-				if($InteractiveMode -eq 1)
-				{
+				if($InteractiveMode -eq 1){
 					Read-Host -Prompt "Press Enter to exit."
 					Exit
 				}
@@ -387,34 +367,30 @@ if(!([string]::IsNullOrEmpty($CheckDB)))
 $sdate = get-date
 $DirDate = $sdate.ToString("yyyyMMddHHmm")
 #Set output directory
-if(!([string]::IsNullOrEmpty($CheckDB)))
-{
+if(!([string]::IsNullOrEmpty($CheckDB))){
 	$OutDir = $scriptPath + "\" + $InstName +"_"+ $CheckDB +"_"+ $DirDate
 } else {
 	$OutDir = $scriptPath + "\" + $InstName +"_"+$DirDate
 }
 #Check if output directory exists
-if(!(Test-Path $OutDir)) 
-{
+if(!(Test-Path $OutDir)){
 	New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 }
 #Set plan output directory
 $PlanOutDir = $OutDir + "\" + "Plans"
 #Check if plan output directory exists
-if(!(Test-Path $PlanOutDir)) 
-{
+if(!(Test-Path $PlanOutDir)){
 	New-Item -ItemType Directory -Force -Path $PlanOutDir | Out-Null
 }
 #Set deadlock graph output directory
 $XDLOutDir = $OutDir + "\" + "Deadlocks"
 #Check if deadlock graph output directory exists
-If(!(Test-Path $XDLOutDir)) {
+if(!(Test-Path $XDLOutDir)){
 	New-Item -ItemType Directory -Force -Path $XDLOutDir | Out-Null
 }
 
 ###Open Excel
-if($Debug -eq 1)
-{
+if($Debug -eq 1){
 	$ErrorActionPreference = "Continue"
 	Write-Host "Opening excel file" -fore yellow
 } else {
@@ -423,8 +399,7 @@ if($Debug -eq 1)
 }
 
 $ExcelApp = New-Object -comobject Excel.Application
-if($Debug -eq 1)
-{
+if($Debug -eq 1){
 	$ExcelApp.visible = $True
 } else {
 	$ExcelApp.visible = $False
@@ -432,16 +407,12 @@ if($Debug -eq 1)
 $ExcelFile = $ExcelApp.Workbooks.Open("$OrigExcelF")
 $ExcelApp.DisplayAlerts = $False
 
-
-###Work
-
-####################################################################
-#						sp_Blitz 
-####################################################################
+#####################################################################################
+#						sp_Blitz 													#
+#####################################################################################
 Write-Host " Runing sp_Blitz" -fore green
 [string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitz_NonSPLatest.sql")
-if($IsIndepth -eq "Y")
-{
+if($IsIndepth -eq "Y"){
 	[string]$Query = $Query -replace ";SET @CheckUserDatabaseObjects = 0;", ";SET @CheckUserDatabaseObjects = 1;"
 }
 $BlitzQuery = new-object System.Data.SqlClient.SqlCommand
@@ -469,8 +440,7 @@ $RowNum = 0
 #List of columns that should be returned from the data set
 $DataSetCols = @("Priority", "FindingsGroup", "Finding" ,"DatabaseName",
 				"Details", "URL")
-if($Debug -eq 1)
-{
+if($Debug -eq 1){
 	Write-Host " ->Writing sp_Blitz results to Excel" -fore yellow
 }
 #Loop through each Excel row
@@ -483,12 +453,13 @@ foreach($row in $BlitzTbl)
 		foreach($col in $DataSetCols)
 		{
 			#Fill Excel cell with value from the data set
-			if($col -eq "URL")
-			{
+			if($col -eq "URL"){
 				#Make URLs clickable
-				$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum),
-				$BlitzTbl.Rows[$RowNum][$col],"","Click for more info",
-				$BlitzTbl.Rows[$RowNum][$col]) | Out-Null
+				if($BlitzTbl.Rows[$RowNum][$col] -like "http*"){
+					$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 3),
+					$BlitzTbl.Rows[$RowNum][$col],"","Click for more info",
+					$BlitzTbl.Rows[$RowNum]["Finding"]) | Out-Null
+				}
 			} else {
 				$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzTbl.Rows[$RowNum][$col]
 			}
@@ -504,9 +475,9 @@ foreach($row in $BlitzTbl)
 		$ExcelColNum = 1
 	}
 
-####################################################################
-#						sp_BlitzWho
-####################################################################
+#####################################################################################
+#						sp_BlitzWho													#
+#####################################################################################
 Write-Host " Runing sp_BlitzWho" -fore green
 [string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzWho_NonSPLatest.sql")
 $BlitzWhoQuery = new-object System.Data.SqlClient.SqlCommand
@@ -526,8 +497,7 @@ $BlitzWhoTbl = $BlitzWhoSet.Tables[0]
 #Set counter used for row retrieval
 [int]$RowNum = 0
 #loop through each row
-if($Debug -eq 1)
-{
+if($Debug -eq 1){
 	Write-Host " ->Exporting execution plans" -fore yellow
 }
 foreach($row in $BlitzWhoTbl)
@@ -536,8 +506,7 @@ foreach($row in $BlitzWhoTbl)
 		Get only the column storing the execution plan data that's 
 		not NULL and write it to a file
 		#>
-		if($BlitzWhoTbl.Rows[$RowNum]["query_plan"] -ne [System.DBNull]::Value)
-			{
+		if($BlitzWhoTbl.Rows[$RowNum]["query_plan"] -ne [System.DBNull]::Value){
 				#Get session_id to append to filename
 				[string]$SessionID = $BlitzWhoTbl.Rows[$RowNum]["session_id"]
 				#Format the event date to append to file name
@@ -578,8 +547,7 @@ $DataSetCols = @("run_date", "elapsed_time", "session_id", "database_name",
  "timeout_error_count", "forced_grant_count", "workload_group_name",
  "resource_pool_name", "context_info")
 
-if($Debug -eq 1)
-{
+if($Debug -eq 1){
 	Write-Host " ->Writing sp_BlitzWho results to Excel" -fore yellow
 }
 #Loop through each Excel row
@@ -605,16 +573,15 @@ foreach($row in $BlitzWhoTbl)
 		$ExcelColNum = 1
 	}
 
-####################################################################
-#						sp_BlitzCache
-####################################################################
+#####################################################################################
+#						sp_BlitzCache												#
+#####################################################################################
 #Building a list of values for @SortOrder 
 <#
 Ony run through the other sort orders if $IsIndepth = "Y"
 otherwise just do duration and avg duration
 #>
-if($IsIndepth -eq "Y")
-{
+if($IsIndepth -eq "Y"){
 	$SortOrders = @("'CPU'","'avg cpu'","'reads'","'avg reads'",
 	"'duration'","'avg duration'","'executions'","'xpm'",
 	"'writes'","'avg writes'","'spills'","'avg spills'",
@@ -627,8 +594,7 @@ if($IsIndepth -eq "Y")
 $OldSortOrder = "'CPU'"
 [string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzCache_NonSPLatest.sql")
 #Set specific database to check if a name was provided
-if(!([string]::IsNullOrEmpty($CheckDB)))
-{
+if(!([string]::IsNullOrEmpty($CheckDB))){
 	[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 	Write-Host " Runing sp_BlitzCache for $CheckDB" -fore green
 } else {
@@ -645,12 +611,11 @@ foreach($SortOrder in $SortOrders)
 	$OldSortString = ";SELECT @SortOrder = " + $OldSortOrder
 	$NewSortString = ";SELECT @SortOrder = " + $SortOrder
 	#Replace number of records returned if sorting by recent compilations
-	if($SortOrder -eq "'recent compilations'") {
+	if($SortOrder -eq "'recent compilations'"){
 		$OldSortString = $OldSortString + ", @Top = 10;"
 		$NewSortString = $NewSortString + ", @Top = 50;"
 	}
-	if($Debug -eq 1)
-	{
+	if($Debug -eq 1){
 		Write-Host " ->Replacing $OldSortString with $NewSortString" -fore yellow
 	}		
 	
@@ -669,9 +634,8 @@ foreach($SortOrder in $SortOrders)
 	$BlitzCacheTbl = New-Object System.Data.DataTable
 	$BlitzCacheTbl = $BlitzCacheSet.Tables[0]
 	
-	##Exporting deadlock graphs to file
-	if($Debug -eq 1)
-	{
+	##Exporting execution plans to file
+	if($Debug -eq 1){
 		Write-Host " ->Exporting execution plans for $SortOrder" -fore yellow
 	}
 	#Set counter used for row retrieval
@@ -693,40 +657,31 @@ foreach($SortOrder in $SortOrders)
 	
 	#Set Excel sheet names based on $SortOrder
 	$SheetName = "sp_BlitzCache "
-	if($SortOrder -like '*CPU*') 
-	{
+	if($SortOrder -like '*CPU*'){
 		$SheetName = $SheetName + "CPU"
 	}
-	if($SortOrder -like '*reads*') 
-	{
+	if($SortOrder -like '*reads*'){
 		$SheetName = $SheetName + "Reads"
 	}
-	if($SortOrder -like '*duration*') 
-	{
+	if($SortOrder -like '*duration*'){
 		$SheetName = $SheetName + "Duration"
 	}
-	if($SortOrder -like '*executions*') 
-	{
+	if($SortOrder -like '*executions*'){
 		$SheetName = $SheetName + "Executions"
 	}
-	if($SortOrder -eq "'xpm'") 
-	{
+	if($SortOrder -eq "'xpm'"){
 		$SheetName = $SheetName + "Executions"
 	}
-	if($SortOrder -like '*writes*') 
-	{
+	if($SortOrder -like '*writes*'){
 		$SheetName = $SheetName + "Writes"
 	}
-	if($SortOrder -like '*spills*') 
-	{
+	if($SortOrder -like '*spills*'){
 		$SheetName = $SheetName + "Spills"
 	}
-	if($SortOrder -like '*memory*') 
-	{
+	if($SortOrder -like '*memory*'){
 		$SheetName = $SheetName + "Memory"
 	}
-	if($SortOrder -eq "'recent compilations'") 
-	{
+	if($SortOrder -eq "'recent compilations'"){
 		$SheetName = $SheetName + "Recent Comp"
 	}
 
@@ -736,8 +691,7 @@ foreach($SortOrder in $SortOrders)
 	#Specify at which row in the sheet to start adding the data
 	$ExcelStartRow = $DefaultStartRow
 	#$SortOrder containing avg or xpm will export data starting with row 16
-	if(($SortOrder -like '*avg*') -or ($SortOrder -eq "'xpm'"))
-	{
+	if(($SortOrder -like '*avg*') -or ($SortOrder -eq "'xpm'")){
 		$ExcelStartRow = 16
 	}
 	#Set counter used for row retrieval
@@ -759,15 +713,14 @@ foreach($SortOrder in $SortOrders)
 	"Compile memory (KB)","Plan Handle","SQL Handle","Minimum Memory Grant KB",
 	"Maximum Memory Grant KB","Minimum Used Grant KB","Maximum Used Grant KB",
 	"Average Max Memory Grant","Min Spills","Max Spills","Total Spills","Avg Spills")
-	if($Debug -eq 1)
-	{
+	if($Debug -eq 1){
 		Write-Host " ->Writing sp_BlitzCache results to sheet $SheetName" -fore yellow
 	}
 	foreach($row in $BlitzCacheTbl)
 	{
 		$SQLPlanFile = "N/A"
 		# changing the value of $SQLPlanFile only for records where execution plan info exists
-		if($BlitzCacheTbl.Rows[$RowNum]["Query Plan"] -ne [System.DBNull]::Value) {
+		if($BlitzCacheTbl.Rows[$RowNum]["Query Plan"] -ne [System.DBNull]::Value){
 			$SQLPlanFile = $FileSOrder + "_" + $SQLPlanNum + ".sqlplan"
 		}
 		#Loop through each column from $DataSetCols for curent row and retrieve data from 
@@ -775,8 +728,7 @@ foreach($SortOrder in $SortOrders)
 		{
 			
 			#Properly handling Query Hash, Plan Hash, Plan, and SQL Handle hex values 
-			if("Query Hash", "Query Plan Hash", "Plan Handle", "SQL Handle" -Contains $col)
-			{
+			if("Query Hash", "Query Plan Hash", "Plan Handle", "SQL Handle" -Contains $col){
 				$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $BlitzCacheTbl.Rows[$RowNum][$col]
 				#move to the next column
 				$ExcelColNum += 1
@@ -792,8 +744,7 @@ foreach($SortOrder in $SortOrders)
 			If the next column is the SQLPlan Name column 
 			fill it separately and then move to next column
 			#>
-			if($ExcelColNum -eq 4) 
-			{
+			if($ExcelColNum -eq 4){
 				$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $SQLPlanFIle
 				#move to the next column
 				$ExcelColNum += 1
@@ -810,15 +761,14 @@ foreach($SortOrder in $SortOrders)
 		$ExcelColNum = 1
 	}
 	$OldSortOrder = $SortOrder
-	if($Debug -eq 1)
-	{
+	if($Debug -eq 1){
 		Write-Host " ->old sort order is now $OldSortOrder" -fore yellow
 	}
 }
 
-####################################################################
-#						sp_BlitzFirst 30 seconds
-####################################################################
+#####################################################################################
+#						sp_BlitzFirst 30 seconds									#
+#####################################################################################
 Write-Host " Running sp_BlitzFirst @Seconds = 30" -fore green
 [string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzFirst_NonSPLatest.sql")
 $BlitzFirstQuery = new-object System.Data.SqlClient.SqlCommand
@@ -844,10 +794,9 @@ $ExcelColNum = 1
 #Set counter used for row retrieval
 $RowNum = 0
 
-$DataSetCols = @("Priority", "FindingsGroup", "Finding", "URL", "Details")
+$DataSetCols = @("Priority", "FindingsGroup", "Finding", "Details", "URL")
 
-if($Debug -eq 1)
-{
+if($Debug -eq 1){
 	Write-Host " ->Writing sp_BlitzFirst results to Excel" -fore yellow
 }
 #Loop through each Excel row
@@ -858,11 +807,12 @@ foreach($row in $BlitzFirstTbl)
 		foreach($col in $DataSetCols)
 		{
 			#Fill Excel cell with value from the data set
-			if($col -eq "URL")
-			{
-				$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum),
-				$BlitzFirstTbl.Rows[$RowNum][$col],"","Click for more info",
-				$BlitzFirstTbl.Rows[$RowNum][$col]) | Out-Null
+			if($col -eq "URL"){
+				if($BlitzFirstTbl.Rows[$RowNum][$col] -like "http*"){
+					$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 3),
+					$BlitzFirstTbl.Rows[$RowNum][$col],"","Click for more info",
+					$BlitzFirstTbl.Rows[$RowNum]["Finding"]) | Out-Null
+				}
 			} else {
 				$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzFirstTbl.Rows[$RowNum][$col]
 			}
@@ -878,11 +828,10 @@ foreach($row in $BlitzFirstTbl)
 		$ExcelColNum = 1
 	}
 
-####################################################################
-#						sp_BlitzFirst since startup
-####################################################################
-if($IsIndepth -eq "Y")
-{
+#####################################################################################
+#						sp_BlitzFirst since startup									#
+#####################################################################################
+if($IsIndepth -eq "Y"){
 	Write-Host " Running sp_BlitzFirst @SinceStartup = 1" -fore green
 	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzFirst_NonSPLatest.sql")
 	[string]$Query = $Query -replace ";SET @SinceStartup = 0;", ";SET @SinceStartup = 1;"
@@ -919,8 +868,7 @@ if($IsIndepth -eq "Y")
 		"Signal Wait Time (Hours)", "Percent Signal Waits", "Number of Waits",
 		"Avg ms Per Wait", "URL")
 
-	if($Debug -eq 1)
-	{
+	if($Debug -eq 1){
 		Write-Host " ->Writing sp_BlitzFirst results to sheet Wait Stats" -fore yellow
 	}
 	#Loop through each Excel row
@@ -930,14 +878,15 @@ if($IsIndepth -eq "Y")
 			# Excel cell
 			foreach($col in $DataSetCols)
 			{
-				if($col -eq "Sample Ended")
-				{
+				if($col -eq "Sample Ended"){
 					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $WaitsTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-				} elseif($col -eq "URL") {
+				} elseif($col -eq "URL"){
 					#Make URLs clickable
-					$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum),
-					$WaitsTbl.Rows[$RowNum][$col],"","Click for more info",
-					$WaitsTbl.Rows[$RowNum][$col]) | Out-Null					
+					if($WaitsTbl.Rows[$RowNum][$col] -like "http*"){
+						$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow,5),
+						$WaitsTbl.Rows[$RowNum][$col],"","Click for more info",
+						$WaitsTbl.Rows[$RowNum]["wait_type"]) | Out-Null
+					}
 				} else {
 					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $WaitsTbl.Rows[$RowNum][$col]
 				}
@@ -965,8 +914,7 @@ if($IsIndepth -eq "Y")
 	$DataSetCols = @("Pattern", "Sample Time", "Sample (seconds)", "File Name",
 		"Drive", "# Reads/Writes","MB Read/Written","Avg Stall (ms)", "file physical name",
 		"DatabaseName")
-	if($Debug -eq 1)
-	{
+	if($Debug -eq 1){
 		Write-Host " ->Writing sp_BlitzFirst results to sheet Storage" -fore yellow
 	}
 	#Loop through each Excel row
@@ -977,8 +925,7 @@ if($IsIndepth -eq "Y")
 			foreach($col in $DataSetCols)
 			{
 				#Fill Excel cell with value from the data set
-				if($col -eq "Sample Time")
-				{
+				if($col -eq "Sample Time"){
 					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StorageTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
 				} else {
 					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StorageTbl.Rows[$RowNum][$col]
@@ -1008,8 +955,7 @@ if($IsIndepth -eq "Y")
 		"FirstSampleTime", "FirstSampleValue", "LastSampleTime", "LastSampleValue",
 		"ValueDelta", "ValuePerSecond")
 
-	if($Debug -eq 1)
-	{
+	if($Debug -eq 1){
 		Write-Host " ->Writing sp_BlitzFirst results to sheet Perfmon" -fore yellow
 	}
 	#Loop through each Excel row
@@ -1020,8 +966,7 @@ if($IsIndepth -eq "Y")
 			foreach($col in $DataSetCols)
 			{
 				#Fill Excel cell with value from the data set
-				if("FirstSampleTime","LastSampleTime" -Contains $col)
-				{
+				if("FirstSampleTime","LastSampleTime" -Contains $col){
 					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $PerfmonTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
 				} else {
 					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $PerfmonTbl.Rows[$RowNum][$col]
@@ -1039,12 +984,11 @@ if($IsIndepth -eq "Y")
 		}
 }
 
-####################################################################
-#						sp_BlitzIndex
-####################################################################
+#####################################################################################
+#						sp_BlitzIndex												#
+#####################################################################################
 #Building a list of values for $Modes
-if($IsIndepth -eq "Y")
-{
+if($IsIndepth -eq "Y"){
 	$Modes = @("0", "1", "2", "4")
 } else {
 	$Modes = @("0")
@@ -1053,8 +997,7 @@ if($IsIndepth -eq "Y")
 $OldMode = ";SET @Mode = 0;"
 [string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzIndex_NonSPLatest.sql")
 #Set specific database to check if a name was provided
-if(!([string]::IsNullOrEmpty($CheckDB)))
-{
+if(!([string]::IsNullOrEmpty($CheckDB))){
 	[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 	[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
 	Write-Host " Runing sp_BlitzIndex for $CheckDB" -fore green
@@ -1086,13 +1029,27 @@ foreach($Mode in $Modes)
 	
 	#Specify worksheet
 	$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
-	if($Mode -eq "0") {
+	if($Mode -eq "0"){
 		$DataSetCols = @("Finding", "Database Name", 
 		"Details: schema.table.index(indexid)",   
 		"Definition: [Property] ColumnName {datatype maxbytes}", 
-		"Secret Columns", "Usage", "Size", "More Info", "Create TSQL") 
+		"Secret Columns", "Usage", "Size", "More Info", "Create TSQL", "URL")
+		
+		#Export sample execution plans for missing indexes (SQL Server 2019 only)
+		$RowNum = 0
+		$i = 0
+		foreach($row in $BlitzIxTbl){
+			if($BlitzIxTbl.Rows[$RowNum]["Finding"] -like "*Missing Index"){
+				$i+=1
+				if($BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] -ne [System.DBNull]::Value){
+					$BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] | Out-File -FilePath $PlanOutDir\MissingIndex_$($i).sqlplan
+					}
+			}
+			$RowNum+=1
+		}
+			
 	}
-	if($Mode -eq "1") {
+	if($Mode -eq "1"){
 		$DataSetCols = @("Database Name", "Number Objects", "All GB", 
 		"LOB GB", "Row Overflow GB", "Clustered Tables", 
 		"Clustered Tables GB", "NC Indexes", "NC Indexes GB", 
@@ -1104,7 +1061,7 @@ foreach($Mode in $Modes)
 		"Oldest Create Date", "Most Recent Create Date", 
 		"Most Recent Modify Date")
 	}
-	if($Mode -eq "2") {
+	if($Mode -eq "2"){
 		$DataSetCols = @("Database Name", "Schema Name", "Object Name", 
 		"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
 		"Object Type", "Definition: [Property] ColumnName {datatype maxbytes}", 
@@ -1124,14 +1081,13 @@ foreach($Mode in $Modes)
 		"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
 		"Create Date", "Modify Date", "More Info")
 	}
-	if($Mode -eq "4") {
+	if($Mode -eq "4"){
 		$DataSetCols = @("Finding", "Database Name", 
 		"Details: schema.table.index(indexid)",   
 		"Definition: [Property] ColumnName {datatype maxbytes}", 
-		"Secret Columns", "Usage", "Size", "More Info", "Create TSQL")
+		"Secret Columns", "Usage", "Size", "More Info", "Create TSQL", "URL")
 	}
-	#$BlitzIndexCols > $OutDir\BlitzIndexCols_$($Mode).sql
-
+	
 	#Specify at which row in the sheet to start adding the data
 	$ExcelStartRow = $DefaultStartRow
 	#Specify starting record from the data set
@@ -1140,8 +1096,7 @@ foreach($Mode in $Modes)
 	$ExcelColNum = 1
 	
 	#Loop through each Excel row
-	if($Debug -eq 1)
-	{
+	if($Debug -eq 1){
 		Write-Host " ->Writing sp_BlitzIndex results to sheet $SheetName" -fore yellow
 	}
 	foreach($row in $BlitzIxTbl)
@@ -1151,8 +1106,15 @@ foreach($Mode in $Modes)
 		# Excel cell
 		foreach($col in $DataSetCols)
 		{
-			#Fill Excel cell with value from the data set
-			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzIxTbl.Rows[$RowNum][$col]
+			if($col -eq "URL"){
+				if($BlitzIxTbl.Rows[$RowNum][$col] -like "http*"){
+					$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow,1),
+					$BlitzIxTbl.Rows[$RowNum][$col],"","Click for more info",
+					$BlitzIxTbl.Rows[$RowNum]["Finding"]) | Out-Null
+				}
+			} else {
+				$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzIxTbl.Rows[$RowNum][$col]
+			}
 			#move to the next column
 			$ExcelColNum += 1
 		}
@@ -1168,8 +1130,6 @@ foreach($Mode in $Modes)
 			Continue
 		}
 	}
-	#Remove-Variable -Name BlitzIndexCols
-	#Remove-Variable -Name TblIx
 	#Update $OldMode
 	$OldMode = $NewMode
 }
@@ -1180,16 +1140,14 @@ foreach($Mode in $Modes)
 #						sp_BlitzLock
 ####################################################################
 
-if(!([string]::IsNullOrEmpty($CheckDB)))
-{
+if(!([string]::IsNullOrEmpty($CheckDB))){
 	Write-Host " Runing sp_BlitzLock for $CheckDB" -fore green
 } else {
 	Write-Host " Runing sp_BlitzLock for all user databases" -fore green
 }
 [string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzLock_NonSPLatest.sql")
 #Set specific database to check if a name was provided
-if(!([string]::IsNullOrEmpty($CheckDB)))
-{
+if(!([string]::IsNullOrEmpty($CheckDB))){
 	[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 }
 $BlitzLockQuery = new-object System.Data.SqlClient.SqlCommand
@@ -1213,8 +1171,7 @@ $TblLockOver = $BlitzLockSet.Tables[1]
 [int]$RowNum = 0
 #Setting $i to 0
 $i = 0
-if($Debug -eq 1)
-{
+if($Debug -eq 1){
 	Write-Host " ->Exporting deadlock graphs" -fore yellow
 }
 foreach($row in $TblLockDtl)
@@ -1251,8 +1208,7 @@ $DataSetCols = @("deadlock_type", "event_date", "database_name","spid",
 				"host_name", "client_app", "wait_time", "wait_resource", 
 				"priority", "log_used", "last_tran_started", "last_batch_started",
 				"last_batch_completed",	"transaction_name")
-if($Debug -eq 1)
-{
+if($Debug -eq 1){
 	Write-Host " ->Writing sp_BlitzLock results to Excel" -fore yellow
 }
 #Loop through each Excel row
@@ -1319,8 +1275,7 @@ foreach($row in $TblLockOver)
 #						If IsIndepth <> Y delete unused sheets 
 ####################################################################
 
-if($IsIndepth -ne "Y")
-{
+if($IsIndepth -ne "Y"){
 	$IndepthSheets = @("Wait Stats", "Storage", "Perfmon", "sp_BlitzIndex 1",
 		"sp_BlitzIndex 2", "sp_BlitzIndex 4", 
 		"sp_BlitzCache Reads", "sp_BlitzCache Executions", "sp_BlitzCache Writes",
@@ -1341,11 +1296,10 @@ if($IsIndepth -ne "Y")
 
 }
 
-####################################################################
-#						Save Excel file  
-####################################################################
-if(!([string]::IsNullOrEmpty($CheckDB)))
-{
+#####################################################################################
+#						Save Excel file												#
+#####################################################################################
+if(!([string]::IsNullOrEmpty($CheckDB))){
 	$ExcelFile.SaveAs("$OutDir\PSBlitzOutput_$InstName_$CheckDB.xlsx")
 } else {
 	$ExcelFile.SaveAs("$OutDir\PSBlitzOutput_$InstName.xlsx")
@@ -1357,7 +1311,6 @@ $ExcelApp.Quit()
 [System.Runtime.Interopservices.Marshal]::ReleaseComObject($ExcelApp) | Out-Null
 Remove-Variable -Name ExcelApp
 Write-Host " "
-if(($Debug -eq 1) -or ($InteractiveMode -eq 1))
-{
+if(($Debug -eq 1) -or ($InteractiveMode -eq 1)){
 	Read-Host -Prompt "Done. Press Enter to exit."
 }
