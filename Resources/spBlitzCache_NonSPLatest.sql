@@ -79,6 +79,15 @@ IF OBJECT_ID('tempdb.dbo.##BlitzCacheProcs', 'U') IS NOT NULL
 IF OBJECT_ID('tempdb.dbo.##BlitzCacheResults', 'U') IS NOT NULL
     DROP TABLE ##BlitzCacheResults;
 
+IF OBJECT_ID('tempdb.dbo.#statements', 'U') IS NOT NULL
+    DROP TABLE #statements;
+
+IF OBJECT_ID('tempdb.dbo.#query_plan', 'U') IS NOT NULL
+    DROP TABLE #query_plan;
+
+IF OBJECT_ID('tempdb.dbo.#relop', 'U') IS NOT NULL
+    DROP TABLE #relop;
+
 /*
 Everything beyond this point is straight from sp_BlitzCache 
 without the GO at the end
