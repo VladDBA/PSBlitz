@@ -138,7 +138,7 @@ Deadlock file naming convention - `[EventDate]_[EventTime]_[RecordNumberOfDistin
 
 Execution plans will be saved in the Plans directory under the output directory.
 
-Execution plans file naming convention - `[SortOrder]_[RowNumber].sqlplan` for sp_BlitzCache, `MissingIndex_[MissingIndexNumber].sqlplan` for sp_BlitzIndex (only available in SQL Server 2019), and `RunningNow_[startdate_time]_SID[session id].sqlplan` for sp_BlitzWho
+Execution plans file naming convention - `[SortOrder]_[RowNumber].sqlplan` for sp_BlitzCache, `MissingIndex_[MissingIndexNumber].sqlplan` for sp_BlitzIndex (only available in SQL Server 2019), and `RunningNow_[startdate_time]_SID[session id].sqlplan` for sp_BlitzWho.
 
 [*Back to top*](#header1)
 
@@ -182,5 +182,7 @@ Note that `-ServerName` is a positional parameter, so you don't necessarily have
 ## Screenshots
 ![Screenshot1](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img001.jpg)
 ![Screenshot2](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img002.jpg)
+![Screenshot3](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img003.jpg)
+![Screenshot4](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img004.jpg)
 
 [*Back to top*](#header1)
