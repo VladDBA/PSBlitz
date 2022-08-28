@@ -87,7 +87,8 @@ $OrigExcelFName = "PSBlitzOutput.xlsx"
 $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"spBlitzCache_NonSPLatest.sql", "spBlitzFirst_NonSPLatest.sql",
 	"spBlitzIndex_NonSPLatest.sql", "spBlitzLock_NonSPLatest.sql",
-	"spBlitzWho_NonSPLatest.sql")
+	"spBlitzWho_NonSPLatest.sql",
+	"GetStatsAndIndexInfoForWholeDB.sql")
 #Set path+name of the input Excel file
 $OrigExcelF = $ResourcesPath + "\" + $OrigExcelFName
 #Set default start row for Excel output
