@@ -678,8 +678,8 @@ foreach($SortOrder in $SortOrders)
 	$ExcelColNum = 1
 		
 	#define column list to only get the sp_BlitzCache columns that are relevant in this case
-	$DataSetCols = @("Database","Cost","Query Text","Query Type","Warnings", "Missing Indexes",
-	"Implicit Conversion Info","# Executions","Executions / Minute","Execution Weight",
+	$DataSetCols = @("Database","Cost","Query Text","Query Type","Warnings", "Missing Indexes",	"Implicit Conversion Info", "Cached Execution Parameters",
+	"# Executions","Executions / Minute","Execution Weight",
 	"% Executions (Type)","Serial Desired Memory",
 	"Serial Required Memory","Total CPU (ms)","Avg CPU (ms)","CPU Weight","% CPU (Type)",
 	"Total Duration (ms)","Avg Duration (ms)","Duration Weight","% Duration (Type)",
