@@ -76,8 +76,8 @@ SOFTWARE.
 
 ###Internal params
 #Version
-$Vers = "2.00"
-$VersDate = "20220828"
+$Vers = "2.0.1"
+$VersDate = "20220914"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -480,7 +480,7 @@ $BlitzWhoPass += 1
 #####################################################################################
 Write-Host " Running sp_Blitz" -fore green
 [string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitz_NonSPLatest.sql")
-if($IsIndepth -eq "Y"){
+if(($IsIndepth -eq "Y") -and ([string]::IsNullOrEmpty($CheckDB))){
 	[string]$Query = $Query -replace ";SET @CheckUserDatabaseObjects = 0;", ";SET @CheckUserDatabaseObjects = 1;"
 }
 $BlitzQuery = new-object System.Data.SqlClient.SqlCommand
@@ -542,6 +542,10 @@ foreach($row in $BlitzTbl)
 		# reset Excel column number so that next row population begins with column 1
 		$ExcelColNum = 1
 	}
+
+##Cleaning up variables 
+Remove-Variable -Name BlitzTbl
+Remove-Variable -Name BlitzSet
 
 ###Collecting sp_BlitzWho data
 Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
@@ -836,6 +840,11 @@ foreach($SortOrder in $SortOrders)
 	Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop Y
 	$BlitzWhoPass += 1
 }
+##Cleaning up variables 
+Remove-Variable -Name BlitzCacheWarnTbl
+Remove-Variable -Name BlitzCacheTbl
+Remove-Variable -Name BlitzCacheSet
+
 
 #####################################################################################
 #						sp_BlitzFirst 30 seconds									#
@@ -898,6 +907,9 @@ foreach($row in $BlitzFirstTbl)
 		# reset Excel column number so that next row population begins with column 1
 		$ExcelColNum = 1
 	}
+
+Remove-Variable -Name BlitzFirstTbl
+Remove-Variable -Name BlitzFirstSet
 	
 ###Collecting sp_BlitzWho data
 Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
@@ -1062,8 +1074,11 @@ if($IsIndepth -eq "Y"){
 		Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
 		$BlitzWhoPass += 1
 }
-
-
+##Cleaning up variables
+Remove-Variable -Name WaitsTbl
+Remove-Variable -Name StorageTbl
+Remove-Variable -Name PerfmonTbl
+Remove-Variable -Name BlitzFirstSet
 
 #####################################################################################
 #						sp_BlitzIndex												#
@@ -1218,12 +1233,15 @@ foreach($Mode in $Modes)
 	Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop Y
 	$BlitzWhoPass += 1
 }
-
+##Cleaning up variables
+Remove-Variable -Name BlitzIxTbl
+Remove-Variable -Name BlitzIndexSet
 
 ####################################################################
 #						sp_BlitzLock
 ####################################################################
-
+$CurrTime = get-date
+$CurrRunTime = (New-TimeSpan -Start $StartDate -End $CurrTime).TotalMinutes
 if(!([string]::IsNullOrEmpty($CheckDB))){
 	Write-Host " Running sp_BlitzLock for $CheckDB" -fore green
 } else {
@@ -1233,6 +1251,13 @@ if(!([string]::IsNullOrEmpty($CheckDB))){
 #Set specific database to check if a name was provided
 if(!([string]::IsNullOrEmpty($CheckDB))){
 	[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
+}
+#Change date range if execution time so far > 15min
+if([Math]::Round($CurrRunTime) -gt 15){
+	$CurrMin = [Math]::Round($CurrRunTime)
+	Write-Host " ->Current execution time is $CurrMin minutes" -fore green
+	Write-Host " ->Retrieving deadlock info for the last 7 days instead of 15" -fore green
+	[string]$Query = $Query -replace "@StartDate = DATEADD(DAY,-15, GETDATE()),", "@StartDate = DATEADD(DAY,-7, GETDATE()),"
 }
 $BlitzLockQuery = new-object System.Data.SqlClient.SqlCommand
 $BlitzLockQuery.CommandText = $Query
@@ -1354,6 +1379,11 @@ foreach($row in $TblLockOver)
 		$ExcelColNum = 1
 	}
 
+##Cleaning up variables
+Remove-Variable -Name TblLockOver
+Remove-Variable -Name TblLockDtl
+Remove-Variable -Name BlitzLockSet
+
 ###Collecting sp_BlitzWho data
 Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
 $BlitzWhoPass += 1
@@ -1443,7 +1473,10 @@ if(!([string]::IsNullOrEmpty($CheckDB))){
 	Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
 	$BlitzWhoPass += 1
 }
-
+##Cleaning up variables
+Remove-Variable -Name IndexTbl
+Remove-Variable -Name StatsTbl
+Remove-Variable -Name StatsIndexSet
 
 
 #####################################################################################
@@ -1611,6 +1644,9 @@ foreach($row in $BlitzWhoTbl)
 		# reset Excel column number so that next row population begins with column 1
 		$ExcelColNum = 1
 	}
+##Cleaning up variables
+Remove-Variable -Name BlitzWhoTbl
+Remove-Variable -Name BlitzWhoSet
 
 #####################################################################################
 #						Delete unused sheets 										#
@@ -1620,8 +1656,7 @@ if($IsIndepth -ne "Y"){
 	$DeleteSheets = @("Wait Stats", "Storage", "Perfmon", "sp_BlitzIndex 1",
 		"sp_BlitzIndex 2", "sp_BlitzIndex 4", 
 		"sp_BlitzCache Reads", "sp_BlitzCache Executions", "sp_BlitzCache Writes",
-		"sp_BlitzCache Spills", "sp_BlitzCache Memory", "sp_BlitzCache Recent Comp", 
-		"Intro")
+		"sp_BlitzCache Spills", "sp_BlitzCache Mem & Recent Comp", "Intro")
 	foreach($SheetName in $DeleteSheets)
 	{
 		$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
