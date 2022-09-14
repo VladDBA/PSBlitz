@@ -101,8 +101,7 @@ sp_BlitzLock @StartDate = DATEADD(DAY,-30, GETDATE()), @EndDate = GETDATE()
 ```SQL
 sp_Blitz @CheckServerInfo = 1, @CheckUserDatabaseObjects = 1	
 sp_BlitzFirst @ExpertMode = 1, @Seconds = 30	
-sp_BlitzFirst @SinceStartup = 1
-sp_BlitzIndex @GetAllDatabases = 1, @Mode = 0	
+sp_BlitzFirst @SinceStartup = 1	
 sp_BlitzIndex @GetAllDatabases = 1, @Mode = 1	
 sp_BlitzIndex @GetAllDatabases = 1, @Mode = 2	
 sp_BlitzIndex @GetAllDatabases = 1, @Mode = 4	
