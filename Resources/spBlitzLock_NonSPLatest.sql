@@ -24,7 +24,7 @@ DECLARE     @Top INT,
 ;SET @DatabaseName = NULL;
 
 SELECT     @Top = 2147483647, 
-	@StartDate = DATEADD(DAY,-30, GETDATE()), 
+	@StartDate = DATEADD(DAY,-15, GETDATE()), 
 	@EndDate = GETDATE(), 
 	@ObjectName = NULL,
 	@StoredProcName = NULL,
