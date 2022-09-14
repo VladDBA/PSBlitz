@@ -24,7 +24,7 @@ Outputs the following to an Excel spreadsheet:
 - Instance health-related findings - from sp_Blitz
 - Index-related issues and recommendations - from sp_BlitzIndex
 - Top 10 most resource intensive queries - from sp_BlitzCache
-- Deadlock related information from the past 30 days - from sp_BlitzLock
+- Deadlock related information from the past 15 days - from sp_BlitzLock
 - Statistics details for a given database - in the case of database-specific check
 - Index Fragmentation information for a given database - in the case of database-specific check
 
@@ -94,7 +94,7 @@ sp_BlitzIndex @GetAllDatabases = 1, @Mode = 0
 sp_BlitzCache @ExpertMode = 1, @SortOrder = 'CPU'/'avg cpu'	
 sp_BlitzCache @ExpertMode = 1, @SortOrder = 'duration'/'avg duration'
 sp_BlitzWho @ExpertMode = 1
-sp_BlitzLock @StartDate = DATEADD(DAY,-30, GETDATE()), @EndDate = GETDATE()
+sp_BlitzLock @StartDate = DATEADD(DAY,-15, GETDATE()), @EndDate = GETDATE()
 ```
 
 - The in-depth check will run the following:
@@ -114,7 +114,7 @@ sp_BlitzCache @ExpertMode = 1, @SortOrder = 'memory grant'
 sp_BlitzCache @ExpertMode = 1, @SortOrder = 'recent compilations', @Top = 50	
 sp_BlitzCache @ExpertMode = 1, @SortOrder = 'spills'/'avg spills'	
 sp_BlitzWho @ExpertMode = 1	
-sp_BlitzLock @StartDate = DATEADD(DAY,-30, GETDATE()), @EndDate = GETDATE()
+sp_BlitzLock @StartDate = DATEADD(DAY,-15, GETDATE()), @EndDate = GETDATE()
 ```
 
 - Using `-CheckDB SomeDB` will modify the executions of sp_BlitzCache, sp_BlitzIndex, and sp_BlitzLock as follows:
