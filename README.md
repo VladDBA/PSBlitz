@@ -124,7 +124,7 @@ sp_BlitzLock @StartDate = DATEADD(DAY,-15, GETDATE()), @EndDate = GETDATE()
 sp_Blitz @CheckServerInfo = 1, @CheckUserDatabaseObjects = 0
 sp_BlitzIndex @GetAllDatabases = 0, @DatabaseName = 'SomeDB', @Mode = ...
 sp_BlitzCache @ExpertMode = 1, @DatabaseName = 'SomeDB', @SortOrder = ...
-sp_BlitzLock @StartDate = DATEADD(DAY,-30, GETDATE()), @EndDate = GETDATE(), @DatabaseName = 'SomeDB'
+sp_BlitzLock @StartDate = DATEADD(DAY,-15, GETDATE()), @EndDate = GETDATE(), @DatabaseName = 'SomeDB'
 ```
 - Using `-CheckDB SomeDB` will also retrieve current statistics data and index fragmentation data for said database.
 [*Back to top*](#header1)
