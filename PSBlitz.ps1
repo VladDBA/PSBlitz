@@ -76,8 +76,8 @@ SOFTWARE.
 
 ###Internal params
 #Version
-$Vers = "2.0.1"
-$VersDate = "20220914"
+$Vers = "2.0.2"
+$VersDate = "20221011"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -241,23 +241,7 @@ if([string]::IsNullOrEmpty($ServerName)){
 		Read-Host -Prompt "Press Enter to exit."
 		Exit
 	}
-	#Test if the host server is reachable
-	Write-Host "->Host $HostName appears to be... " -NoNewline
-	if(Test-Connection -ComputerName $HostName -Count 1 -Quiet){
-		Write-Host "up" -NoNewline -fore green
-		Write-Host "."
-		Write-Host "Proceeding."
-	} else {
-		Write-Host "unreachable" -NoNewline -fore red
-		Write-Host "."
-		$Help = Read-Host -Prompt "Need help?[Y/N]"
-		if($Help -eq "Y")
-		{
-			Get-PSBlitzHelp
-			Read-Host -Prompt "Press Enter to exit."
-		}
-		Exit
-	}
+
 	##Have sp_BlitzIndex, sp_BlitzCache, sp_BlitzCache executed against a specific database
 	$CheckDB = Read-Host -Prompt "Name of the database you want to check (leave empty for all)"
 	##SQL Login
@@ -278,23 +262,6 @@ if([string]::IsNullOrEmpty($ServerName)){
 	} else {
 		$InstName = $ServerName
 		$HostName = $ServerName
-	}
-	#Test if the host server is reachable
-	Write-Host "->Host $HostName appears to be... " -NoNewline
-	if(Test-Connection -ComputerName $HostName -Count 1 -Quiet){
-		Write-Host "up" -NoNewline -fore green
-		Write-Host "."
-		Write-Host "Proceeding."
-	} else {
-		Write-Host "unreachable" -NoNewline -fore red
-		Write-Host "."
-		$Help = Read-Host -Prompt "Need help?[Y/N]"
-		if($Help -eq "Y")
-		{
-			Get-PSBlitzHelp
-		}
-		#Read-Host -Prompt "Press Enter to exit."
-		Exit
 	}
 }
 	
