@@ -829,7 +829,7 @@ $BlitzFirstAdapter.Fill($BlitzFirstSet) | Out-Null
 $SqlConnection.Close()
 
 $BlitzFirstTbl = New-Object System.Data.DataTable
-$BlitzFirstTbl = $BlitzFirstSet.Tables[1]
+$BlitzFirstTbl = $BlitzFirstSet.Tables[0]
 
 
 ##Populating the "sp_BlitzFirst 30s" sheet
