@@ -84,8 +84,9 @@ IF OBJECT_ID('tempdb..#UpdatedStats') IS NOT NULL
 IF OBJECT_ID('tempdb..#TempdbOperationalStats') IS NOT NULL
 	DROP TABLE #TempdbOperationalStats;
 	
-/*Everything beyond this point is straight from sp_BlitzFirst 
-without the otuermost BEGIN and END, and without the GO at the end*/
+/*Everything beyond this point, aside from the changes at lines 313 and 4944, 
+is straight from sp_BlitzFirst without the otuermost BEGIN and END, 
+and without the GO at the end*/
 
 SET NOCOUNT ON;
 SET STATISTICS XML OFF;
@@ -309,7 +310,8 @@ BEGIN
     /* What's running right now? This is the first and last result set. */
     IF @SinceStartup = 0 AND @Seconds > 0 AND @ExpertMode = 1 AND @OutputType <> 'NONE'
     BEGIN
-		IF OBJECT_ID('master.dbo.sp_BlitzWho') IS NULL AND OBJECT_ID('dbo.sp_BlitzWho') IS NULL
+		/*IF OBJECT_ID('master.dbo.sp_BlitzWho') IS NULL AND OBJECT_ID('dbo.sp_BlitzWho') IS NULL */
+		IF OBJECT_ID('master.dbo.sp_BlitzWhoxyZ') IS NULL AND OBJECT_ID('dbo.sp_BlitzWhoxyZ') IS NULL /*Vlad - https://github.com/VladDBA/PSBlitz/issues/17*/
 		BEGIN
 			PRINT N'sp_BlitzWho is not installed in the current database_files.  You can get a copy from http://FirstResponderKit.org';
 		END;
@@ -4939,7 +4941,8 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
     /* What's running right now? This is the first and last result set. */
     IF @SinceStartup = 0 AND @Seconds > 0 AND @ExpertMode = 1 AND @OutputType <> 'NONE'
     BEGIN
-		IF OBJECT_ID('master.dbo.sp_BlitzWho') IS NULL AND OBJECT_ID('dbo.sp_BlitzWho') IS NULL
+		/*IF OBJECT_ID('master.dbo.sp_BlitzWho') IS NULL AND OBJECT_ID('dbo.sp_BlitzWho') IS NULL */
+		IF OBJECT_ID('master.dbo.sp_BlitzWhoxyZ') IS NULL AND OBJECT_ID('dbo.sp_BlitzWhoxyZ') IS NULL /*Vlad - https://github.com/VladDBA/PSBlitz/issues/17*/
 		BEGIN
 			PRINT N'sp_BlitzWho is not installed in the current database_files.  You can get a copy from http://FirstResponderKit.org';
 		END;
