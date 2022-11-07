@@ -78,7 +78,7 @@ You can find the scripts in this repository's [Resources](/Resources) directory
 ## Paramaters
 | Parameter | Description|
 |-----------|------------|
-|`-ServerName`| Accepts either `HostName\InstanceID` (for named instances) or just `HostName` for default instances. If you provide either `?` or `Help` as a value for `-ServerName`, the script will return a brief help menu. | your SQL Server instance, `?`, `Help` |
+|`-ServerName`| Accepts either `HostName\InstanceID` (for named instances), `HostName,Port` when using a port number instead of an instance ID, or just `HostName` for default instances. If you provide either `?` or `Help` as a value for `-ServerName`, the script will return a brief help menu. | your SQL Server instance, `?`, `Help` |
 |`-SQLLogin`| The name of the SQL login used to run the script. If not provided, the script will use integrated security. | the name of your SQL Login, empty | empty|
 |`-SQLPass` | The password for the SQL login provided via the -SQLLogin parameter, omit if `-SQLLogin` was not used. |
 |`-IsIndepth` | Providing Y as a value will tell PSBlitz.ps1 to run a more in-depth check against the instance/database. Omit for default check. |
@@ -158,23 +158,27 @@ Otherwise you can navigate to the directory where the script is in PowerShell an
     .\PSBlitz.ps1 Help
     ```
 2. Run it against the whole instance (named instance SQL01), with default checks via integrated security
-    ```PowerSHell
+    ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01
     ```
-3. Run it against the whole instance, with in-depth checks via integrated security
+3. Run it against the whole instance listening on port 1443 on host Server01, with default checks via integrated security
+    ```PowerShell
+    .\PSBlitz.ps1 Server01,1443
+    ```
+4. Run it against the whole instance, with in-depth checks via integrated security
     ```PowerSHell
     .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y
     ```
-4. Run it with in-depth checks, limit sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only, via integrated security
-    ```PowerSHell
+5. Run it with in-depth checks, limit sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only, via integrated security
+    ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y -CheckDB YourDatabase
     ```
-5. Run it against the whole instance, with default checks via SQL login and password
-    ```PowerSHell
+6. Run it against the whole instance, with default checks via SQL login and password
+    ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01 -SQLLogin DBA1 -SQLPass SuperSecurePassword
     ```
-6. Run it against a default instance residing on Server02, with in-depth checks via SQL login and password, while limmiting sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only
-    ```PowerSHell
+7. Run it against a default instance residing on Server02, with in-depth checks via SQL login and password, while limmiting sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only
+    ```PowerShell
     .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
     ```
 Note that `-ServerName` is a positional parameter, so you don't necessarily have to specify the parameter's name as long as the first thing after the script's name is the instance 
