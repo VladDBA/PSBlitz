@@ -14,16 +14,19 @@ or
 2. Run it against the whole instance (named instance SQL01), with default checks via integrated security
 .\PSBlitz.ps1 Server01\SQL01
 
-3. Run it against the whole instance, with in-depth checks via integrated security
+3. Run it against the whole instance listening on port 1443 on host Server01, with default checks via integrated security
+.\PSBlitz.ps1 Server01,1443
+
+4. Run it against the whole instance, with in-depth checks via integrated security
 .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y
 
-4. Run it with in-depth checks, limit sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only, via integrated security
+5. Run it with in-depth checks, limit sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only, via integrated security
 .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y -CheckDB YourDatabase
 
-5. Run it against the whole instance, with default checks via SQL login and password
+6. Run it against the whole instance, with default checks via SQL login and password
 .\PSBlitz.ps1 Server01\SQL01 -SQLLogin DBA1 -SQLPass SuperSecurePassword
 
-6. Run it against a default instance residing on Server02, with in-depth checks via SQL login and password, while limmiting sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only
+7. Run it against a default instance residing on Server02, with in-depth checks via SQL login and password, while limmiting sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only
 .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
 
 Note that -ServerName is a positional parameter, so you don't necessarily have to specify the parameter's name as long as the first thing after the script's name is the instance or a question mark 
@@ -61,7 +64,7 @@ SOFTWARE.
 [cmdletbinding()]
    param(
 	[Parameter(Position=0,Mandatory=$False)]
-		[string]$ServerName,
+		[string[]]$ServerName,
 	[Parameter(Mandatory=$False)]
 		[string]$SQLLogin,
 	[Parameter(Mandatory=$False)]
@@ -76,8 +79,8 @@ SOFTWARE.
 
 ###Internal params
 #Version
-$Vers = "2.0.4"
-$VersDate = "20221026"
+$Vers = "2.0.5"
+$VersDate = "20221108"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -127,10 +130,12 @@ function Get-PSBlitzHelp{
 	Write-Host "`n######	PSBlitz		######`n Version $Vers - $VersDate
 	`n Updates/more info: https://github.com/VladDBA/PSBlitz
 	`n######	Parameters	######
--ServerName	- accepts either [hostname]\[instance] (for named instances) or just [hostname] for default instances
--SQLLogin	- the name of the SQL login used to run the script; if not provided, the script will use 
-		integrated security
--SQLPass	- the password for the SQL login provided via the -SQLLogin parameter, omit if -SQLLogin was not used
+-ServerName	- accepts either [hostname]\[instance] (for named instances), 
+		[hostname,port], or just [hostname] for default instances
+-SQLLogin	- the name of the SQL login used to run the script; if not provided, 
+		the script will use integrated security
+-SQLPass	- the password for the SQL login provided via the -SQLLogin parameter,
+		omit if -SQLLogin was not used
 -IsIndepth	- Y will run a more in-depth check against the instance/database, omit for a basic check
 -CheckDB	- used to provide the name of a specific database to run some of the checks against, 
 		omit to run against the whole instance
@@ -138,9 +143,11 @@ function Get-PSBlitzHelp{
 You can either run the script directly in PowerShell from its directory:
  Run it against the whole instance (named instance SQL01), with default checks via integrated security"
 	Write-Host ".\PSBlitz.ps1 Server01\SQL01" -fore green
+	Write-Host "`n Run it against an instance listening on port 1443 on Server01"
+	Write-Host ".\PSBlitz.ps1 Server01,1443" -fore green
 	Write-Host "`n Run it against a default instance installed on Server01"
 	Write-Host ".\PSBlitz.ps1 Server01" -fore green
-	Write-Host "`n Run it against the whole instance , with in-depth checks via integrated security"
+	Write-Host "`n Run it against the whole instance, with in-depth checks via integrated security"
 	Write-Host ".\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y" -fore green
 	Write-Host "`n Run it with in-depth checks, limit sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to 
 YourDatabase only, via integrated security"
@@ -180,7 +187,9 @@ function Run-BlitzWho{
 	$BlitzWhoCommand.ExecuteNonQuery() | Out-Null
 	$SqlConnection.Close()
 }
-	
+###Convert $ServerName from array to string 
+[string]$ServerName = $ServerName -join ","
+
 ###Return help if requested during execution
 if(("Y", "Yes" -Contains $Help) -or ("?", "Help" -Contains $ServerName)){
 	Get-PSBlitzHelp
@@ -226,12 +235,19 @@ if([string]::IsNullOrEmpty($ServerName)){
 	$InteractiveMode = 1
 	##Instance
 	$ServerName = Read-Host -Prompt "Server"
-	#Make ServerName filename friendly and get host name 
+	#Make ServerName filename friendly and get host name
+	if($ServerName -like "*`"*"){
+		$ServerName = $ServerName -replace "`"",""
+	}
 	if($ServerName -like "*\*"){
 		$pos = $ServerName.IndexOf("\")
 		$InstName = $ServerName.Substring($pos+1)
 		$HostName = $ServerName.Substring(0,$pos)
-	} else {
+	} elseif($ServerName -like "*,*"){
+		$pos = $ServerName.IndexOf(",")
+		$HostName = $ServerName.Substring(0,$pos)
+		$InstName = $ServerName -replace ",", "-"
+	} else	{
 		$InstName = $ServerName
 		$HostName = $ServerName
 	}
@@ -254,12 +270,15 @@ if([string]::IsNullOrEmpty($ServerName)){
 	$IsIndepth = Read-Host -Prompt "Perform an in-depth check?[Y/N]"
 } else {
 	$InteractiveMode = 0
-	# check if the host is reachable when in non-interactive mode
 	if($ServerName -like "*\*"){
 		$pos = $ServerName.IndexOf("\")
 		$InstName = $ServerName.Substring($pos+1)
-        $HostName = $ServerName.Substring(0,$pos)
-	} else {
+		$HostName = $ServerName.Substring(0,$pos)
+	} elseif($ServerName -like "*,*"){
+		$pos = $ServerName.IndexOf(",")
+		$HostName = $ServerName.Substring(0,$pos)
+		$InstName = $ServerName -replace ",", "-"
+	} else	{
 		$InstName = $ServerName
 		$HostName = $ServerName
 	}
@@ -513,6 +532,9 @@ foreach($row in $BlitzTbl)
 ##Cleaning up variables 
 Remove-Variable -Name BlitzTbl
 Remove-Variable -Name BlitzSet
+
+##Saving file 
+$ExcelFile.Save()
 
 ###Collecting sp_BlitzWho data
 Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
@@ -806,6 +828,9 @@ foreach($SortOrder in $SortOrders)
 	#Collecting sp_BlitzWho data
 	Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop Y
 	$BlitzWhoPass += 1
+	
+	##Saving file 
+	$ExcelFile.Save()
 }
 ##Cleaning up variables 
 Remove-Variable -Name BlitzCacheWarnTbl
@@ -874,6 +899,8 @@ foreach($row in $BlitzFirstTbl)
 		# reset Excel column number so that next row population begins with column 1
 		$ExcelColNum = 1
 	}
+##Saving file 
+$ExcelFile.Save()
 
 Remove-Variable -Name BlitzFirstTbl
 Remove-Variable -Name BlitzFirstSet
@@ -956,6 +983,8 @@ if($IsIndepth -eq "Y"){
 			$ExcelColNum = 1
 		}
 
+	##Saving file 
+	$ExcelFile.Save()
 	## populating the "Storage" sheet
 	$ExcelSheet = $ExcelFile.Worksheets.Item("Storage")
 	#Specify at which row in the sheet to start adding the data
@@ -994,8 +1023,10 @@ if($IsIndepth -eq "Y"){
 			$RowNum += 1
 			# reset Excel column number so that next row population begins with column 1
 			$ExcelColNum = 1
-		}	
-
+		}
+	
+	##Saving file 
+	$ExcelFile.Save()
 	## populating the "Perfmon" sheet
 	$ExcelSheet = $ExcelFile.Worksheets.Item("Perfmon")
 	#Specify at which row in the sheet to start adding the data
@@ -1041,6 +1072,9 @@ if($IsIndepth -eq "Y"){
 		Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
 		$BlitzWhoPass += 1
 }
+##Saving file 
+$ExcelFile.Save()
+
 ##Cleaning up variables
 Remove-Variable -Name WaitsTbl
 Remove-Variable -Name StorageTbl
@@ -1199,6 +1233,9 @@ foreach($Mode in $Modes)
 	###Collecting sp_BlitzWho data
 	Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop Y
 	$BlitzWhoPass += 1
+	
+	##Saving file 
+	$ExcelFile.Save()
 }
 ##Cleaning up variables
 Remove-Variable -Name BlitzIxTbl
@@ -1310,6 +1347,8 @@ foreach($row in $TblLockDtl)
 		$ExcelColNum = 1
 	}
 
+##Saving file 
+$ExcelFile.Save()
 	
 ## populating the "sp_BlitzLock Overview" sheet
 $ExcelSheet = $ExcelFile.Worksheets.Item("sp_BlitzLock Overview")
@@ -1345,6 +1384,9 @@ foreach($row in $TblLockOver)
 		# reset Excel column number so that next row population begins with column 1
 		$ExcelColNum = 1
 	}
+
+##Saving file 
+$ExcelFile.Save()
 
 ##Cleaning up variables
 Remove-Variable -Name TblLockOver
@@ -1440,6 +1482,10 @@ if(!([string]::IsNullOrEmpty($CheckDB))){
 	Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
 	$BlitzWhoPass += 1
 }
+
+##Saving file 
+$ExcelFile.Save()
+
 ##Cleaning up variables
 Remove-Variable -Name IndexTbl
 Remove-Variable -Name StatsTbl
@@ -1611,6 +1657,8 @@ foreach($row in $BlitzWhoTbl)
 		# reset Excel column number so that next row population begins with column 1
 		$ExcelColNum = 1
 	}
+##Saving file 
+$ExcelFile.Save()
 ##Cleaning up variables
 Remove-Variable -Name BlitzWhoTbl
 Remove-Variable -Name BlitzWhoSet
