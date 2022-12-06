@@ -1,4 +1,4 @@
-USE [..PDBlitzReplace..];
+USE [..PSBlitzReplace..];
 
 SET NOCOUNT ON;
 
