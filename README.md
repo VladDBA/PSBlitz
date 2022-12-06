@@ -19,9 +19,11 @@ Since I'm a big fan of [Brent Ozar's](https://www.brentozar.com/) [SQL Server Fi
 ## What it does
 
 Outputs the following to an Excel spreadsheet:
+- Instance information
 - Wait stats - from sp_BlitzFirst
 - Currently running queries - from sp_BlitzWho
 - Instance health-related findings - from sp_Blitz
+- tempdb size and usage information per object and session
 - Index-related issues and recommendations - from sp_BlitzIndex
 - Top 10 most resource intensive queries - from sp_BlitzCache
 - Deadlock related information from the past 15 days - from sp_BlitzLock
@@ -71,7 +73,12 @@ from [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit]
 - sp_BlitzLock
 - sp_BlitzWho
 
-You can find the scripts in this repository's [Resources](/Resources) directory
+Aside from the above scripts, PSBlitz also runs the following scripts to return sp_BlitzWho data, instance and resource information, as well as TempDB usage:
+- GetBlitzWhoData.sql
+- GetInstanceInfo.sql
+- GetTempDBUsageInfo.sql
+
+You can find the all the scripts in the repository's [Resources](/Resources) directory
 
 [*Back to top*](#header1)
 
@@ -140,7 +147,10 @@ Deadlock file naming convention - `[EventDate]_[EventTime]_[RecordNumberOfDistin
 
 Execution plans will be saved in the Plans directory under the output directory.
 
-Execution plans file naming convention - `[SortOrder]_[RowNumber].sqlplan` for sp_BlitzCache, `MissingIndex_[MissingIndexNumber].sqlplan` for sp_BlitzIndex (only available in SQL Server 2019), and `RunningNow_[startdate_time]_SID[session id].sqlplan` for sp_BlitzWho.
+Execution plans file naming convention:
+ - for plans obtained through sp_BlitzCache - `[SortOrder]_[RowNumber].sqlplan`.
+ - for plans obtained through sp_BlitzIndex (only available in SQL Server 2019) - `MissingIndex_[MissingIndexNumber].sqlplan`.
+ - for plans obtained through sp_BlitzWho - `RunningNow_[SPID]_[start_time]_[query_plan_hash].sqlplan`. If no query plan hash is returned by sp_BlitzWho, then 0x00 will be used.
 
 [*Back to top*](#header1)
 
@@ -161,9 +171,9 @@ Otherwise you can navigate to the directory where the script is in PowerShell an
     ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01
     ```
-3. Run it against the whole instance listening on port 1443 on host Server01, with default checks via integrated security
+3. Run it against the whole instance listening on port 1433 on host Server01, with default checks via integrated security
     ```PowerShell
-    .\PSBlitz.ps1 Server01,1443
+    .\PSBlitz.ps1 Server01,1433
     ```
 4. Run it against the whole instance, with in-depth checks via integrated security
     ```PowerSHell

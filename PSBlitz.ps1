@@ -14,8 +14,8 @@ or
 2. Run it against the whole instance (named instance SQL01), with default checks via integrated security
 .\PSBlitz.ps1 Server01\SQL01
 
-3. Run it against the whole instance listening on port 1443 on host Server01, with default checks via integrated security
-.\PSBlitz.ps1 Server01,1443
+3. Run it against the whole instance listening on port 1433 on host Server01, with default checks via integrated security
+.\PSBlitz.ps1 Server01,1433
 
 4. Run it against the whole instance, with in-depth checks via integrated security
 .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y
@@ -79,8 +79,8 @@ SOFTWARE.
 
 ###Internal params
 #Version
-$Vers = "2.0.5"
-$VersDate = "20221108"
+$Vers = "2.1.0"
+$VersDate = "20221206"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -91,7 +91,9 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"spBlitzCache_NonSPLatest.sql", "spBlitzFirst_NonSPLatest.sql",
 	"spBlitzIndex_NonSPLatest.sql", "spBlitzLock_NonSPLatest.sql",
 	"spBlitzWho_NonSPLatest.sql",
-	"GetStatsAndIndexInfoForWholeDB.sql")
+	"GetStatsAndIndexInfoForWholeDB.sql",
+	"GetBlitzWhoData.sql", "GetInstanceInfo.sql",
+	"GetTempDBUsageInfo.sql")
 #Set path+name of the input Excel file
 $OrigExcelF = $ResourcesPath + "\" + $OrigExcelFName
 #Set default start row for Excel output
@@ -143,8 +145,8 @@ function Get-PSBlitzHelp{
 You can either run the script directly in PowerShell from its directory:
  Run it against the whole instance (named instance SQL01), with default checks via integrated security"
 	Write-Host ".\PSBlitz.ps1 Server01\SQL01" -fore green
-	Write-Host "`n Run it against an instance listening on port 1443 on Server01"
-	Write-Host ".\PSBlitz.ps1 Server01,1443" -fore green
+	Write-Host "`n Run it against an instance listening on port 1433 on Server01"
+	Write-Host ".\PSBlitz.ps1 Server01,1433" -fore green
 	Write-Host "`n Run it against a default instance installed on Server01"
 	Write-Host ".\PSBlitz.ps1 Server01" -fore green
 	Write-Host "`n Run it against the whole instance, with in-depth checks via integrated security"
@@ -169,7 +171,7 @@ from Brent Ozar's FirstResponderKit (https://www.brentozar.com/first-aid/):
 "
 }
 #Function to execute sp_BlitzWho
-function Run-BlitzWho{
+function Invoke-BlitzWho{
 	param (
 	[string]$BlitzWhoQuery,
 	[string]$IsInLoop
@@ -187,6 +189,19 @@ function Run-BlitzWho{
 	$BlitzWhoCommand.ExecuteNonQuery() | Out-Null
 	$SqlConnection.Close()
 }
+
+#Function to properly format XML contents for deadlock graphs and execution plans
+function Format-XML {
+	[CmdletBinding()]
+	Param ([Parameter(ValueFromPipeline=$true,Mandatory=$true)][string]$XMLContent)
+	$XMLDoc = New-Object -TypeName System.Xml.XmlDocument
+	$XMLDoc.LoadXml($XMLContent)
+	$SW = New-Object System.IO.StringWriter
+	$Writer = New-Object System.Xml.XmlTextwriter($SW)
+	$Writer.Formatting = [System.XML.Formatting]::Indented
+	$XMLDoc.WriteContentTo($Writer)
+	$SW.ToString()
+  }
 ###Convert $ServerName from array to string 
 [string]$ServerName = $ServerName -join ","
 
@@ -202,7 +217,7 @@ if(!(Test-Path $ResourcesPath )){
 	Write-Host "The Resources directory was not found in $ScriptPath!" -fore red
 	Write-Host " Make sure to download the latest release from https://github.com/VladDBA/PSBlitz/releases" -fore yellow
 	Write-Host "and properly extract the contents" -fore yellow
-	Read-Host -Prompt "Press Enter to exit."
+	Read-Host -Prompt "Press Enter to close this window."
 	Exit
 }
 #Check individual files
@@ -223,7 +238,7 @@ if($MissingFiles.Count -gt 0){
 	}
 	Write-Host " Make sure to download the latest release from https://github.com/VladDBA/PSBlitz/releases" -fore yellow
 	Write-Host "and properly extract the contents" -fore yellow
-	Read-Host -Prompt "Press Enter to exit."
+	Read-Host -Prompt "Press Enter to close this window."
 	Exit
 }
 
@@ -254,7 +269,7 @@ if([string]::IsNullOrEmpty($ServerName)){
 	#Return help menu if $ServerName is ? or Help
 	if("?", "Help" -Contains $ServerName){
 		Get-PSBlitzHelp
-		Read-Host -Prompt "Press Enter to exit."
+		Read-Host -Prompt "Press Enter to close this window."
 		Exit
 	}
 
@@ -291,11 +306,12 @@ if(!([string]::IsNullOrEmpty($CheckDB))){
 }
 
 ###Define connection
+$AppName = "PSBlitz " + $Vers
 $SqlConnection = New-Object System.Data.SqlClient.SqlConnection
 if(!([string]::IsNullOrEmpty($SQLLogin))){
-	$SqlConnection.ConnectionString ="Server=$ServerName;Database=master;User Id=$SQLLogin;Password=$SQLPass"
+	$SqlConnection.ConnectionString ="Server=$ServerName;Database=master;User Id=$SQLLogin;Password=$SQLPass;Application Name=$AppName"
 } else {
-	$SqlConnection.ConnectionString = "Server=$ServerName;Database=master;trusted_connection=true"
+	$SqlConnection.ConnectionString = "Server=$ServerName;Database=master;trusted_connection=true;Application Name=$AppName"
 }
 
 ###Test connection to instance
@@ -319,7 +335,7 @@ Try
 		Get-PSBlitzHelp
 		#Don't close the window automatically if in interactive mode
 		if($InteractiveMode -eq 1){
-			Read-Host -Prompt "Press Enter to exit."
+			Read-Host -Prompt "Press Enter to close this window."
 			Exit
 		}
 	} else {
@@ -347,10 +363,10 @@ if(!([string]::IsNullOrEmpty($CheckDB))){
 	{
 		if($CheckDBSet.Tables[0].Rows[0]["name"] -eq $CheckDB){
 			Write-Host "->Database $CheckDB - " -NoNewLine -ErrorAction Stop
-			Write-Host "exists/is online" -fore green -ErrorAction Stop
+			Write-Host "is online" -fore green -ErrorAction Stop
 		}
 	} Catch {
-		Write-Host "Database $CheckDB either does not exist or is not online" -fore red
+		Write-Host "Database $CheckDB either does not exist or is offline" -fore red
 		$InstanceWide = Read-Host -Prompt "Switch to instance-wide plan cache, index, and deadlock check?[Y/N]"
 		if($InstanceWide -eq "Y"){
 			$CheckDB = ""
@@ -360,7 +376,7 @@ if(!([string]::IsNullOrEmpty($CheckDB))){
 				Get-PSBlitzHelp
 				#Don't close the window automatically if in interactive mode
 				if($InteractiveMode -eq 1){
-					Read-Host -Prompt "Press Enter to exit."
+					Read-Host -Prompt "Press Enter to close this window."
 					Exit
 				}
 			} else {
@@ -400,9 +416,9 @@ if(!(Test-Path $XDLOutDir)){
 
 ###Set output Excel name and destination
 if(!([string]::IsNullOrEmpty($CheckDB))){
-	$OutExcelFName = "PSBlitzOutput_$InstName_$CheckDB.xlsx"
+	$OutExcelFName = "Active_$InstName_$CheckDB.xlsx"
 } else {
-	$OutExcelFName = "PSBlitzOutput_$InstName.xlsx"
+	$OutExcelFName = "Active_$InstName.xlsx"
 }
 $OutExcelF = $OutDir + "\" +$OutExcelFName
 
@@ -435,6 +451,24 @@ if($Debug -eq 1){
 $ExcelFile = $ExcelApp.Workbooks.Open("$OutExcelF")
 $ExcelApp.DisplayAlerts = $False
 
+###Check instance uptime
+$UptimeQuery = new-object System.Data.SqlClient.SqlCommand
+	$Query = "SELECT CAST(DATEDIFF(HH, [sqlserver_start_time], GETDATE()) / 24.00 AS NUMERIC(23, 2)) AS [uptime_days]	"
+	$Query = $Query + "`nFROM [sys].[dm_os_sys_info];"
+	$UptimeQuery.CommandText = $Query
+	$UptimeQuery.Connection = $SqlConnection
+	$UptimeQuery.CommandTimeout = 100
+	$UptimeAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+	$UptimeAdapter.SelectCommand = $UptimeQuery
+	$UptimeSet = new-object System.Data.DataSet
+	$UptimeAdapter.Fill($UptimeSet) | Out-Null
+	$SqlConnection.Close()
+	if($UptimeSet.Tables[0].Rows[0]["uptime_days"] -lt 7.00){
+		[string]$DaysUp = $UptimeSet.Tables[0].Rows[0]["uptime_days"]
+		Write-Host "Warning: Instance uptime is less than 7 days - $DaysUp" -Fore Red
+		Write-Host "->Diagnostics data might not be reliable with less than 7 days of uptime." -Fore Red
+	}
+
 #####################################################################################
 #						Check start													#
 #####################################################################################
@@ -458,7 +492,114 @@ Write-Host $("-"* 80)
 ###Execution start time
 $StartDate = get-date
 ###Collecting first pass of sp_BlitzWho data
-Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
+Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
+$BlitzWhoPass += 1
+
+#####################################################################################
+#						Instance Info												#
+#####################################################################################
+Write-Host " Retrieving instance information" -fore Green
+[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetInstanceInfo.sql")
+$InstanceInfoQuery = new-object System.Data.SqlClient.SqlCommand
+$InstanceInfoQuery.CommandText = $Query
+$InstanceInfoQuery.Connection = $SqlConnection
+$InstanceInfoQuery.CommandTimeout = 600
+$InstanceInfoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+$InstanceInfoAdapter.SelectCommand = $InstanceInfoQuery
+$InstanceInfoSet = new-object System.Data.DataSet
+$InstanceInfoAdapter.Fill($InstanceInfoSet) | Out-Null
+$SqlConnection.Close()
+
+$InstanceInfoTbl = New-Object System.Data.DataTable
+$InstanceInfoTbl = $InstanceInfoSet.Tables[0]
+$ResourceInfoTbl = New-Object System.Data.DataTable
+$ResourceInfoTbl = $InstanceInfoSet.Tables[1]
+
+###Populating the "Instance Info" sheet
+$ExcelSheet = $ExcelFile.Worksheets.Item("Instance Info")
+##Instance Info section
+#Specify at which row in the sheet to start adding the data
+$ExcelStartRow = 3
+#Specify with which column in the sheet to start
+$ExcelColNum = 1
+#Set counter used for row retrieval
+$RowNum = 0
+
+#List of columns that should be returned from the data set
+$DataSetCols = @("machine_name", "instance_name", "product_version", "patch_level", "edition",
+"is_clustered", "always_on_enabled", "instance_last_startup", "uptime_days")
+
+if($Debug -eq 1){
+	Write-Host " ->Writing instance info to Excel" -fore yellow
+}
+#Loop through each Excel row
+foreach($row in $InstanceInfoTbl)
+	{
+		<#
+		Loop through each data set column of current row and fill the corresponding 
+		Excel cell
+		#>
+		foreach($col in $DataSetCols)
+		{			
+			#Fill Excel cell with value from the data set
+			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $InstanceInfoTbl.Rows[$RowNum][$col]
+			$ExcelColNum += 1
+		}
+			
+		#move to the next row in the spreadsheet
+		$ExcelStartRow += 1
+		#move to the next row in the data set
+		$RowNum += 1
+		# reset Excel column number so that next row population begins with column 1
+		$ExcelColNum = 1
+	}
+
+##Resource Info section
+#Specify at which row in the sheet to start adding the data
+$ExcelStartRow = 8
+#Specify with which column in the sheet to start
+$ExcelColNum = 1
+#Set counter used for row retrieval
+$RowNum = 0
+
+#List of columns that should be returned from the data set
+$DataSetCols = @("logical_cpu_cores", "physical_cpu_cores", "physical_memory_GB", "max_server_memory_GB", "target_server_memory_GB",
+"total_memory_used_GB")
+
+if($Debug -eq 1){
+	Write-Host " ->Writing resource info to Excel" -fore yellow
+}
+#Loop through each Excel row
+foreach($row in $ResourceInfoTbl)
+	{
+		<#
+		Loop through each data set column of current row and fill the corresponding 
+		Excel cell
+		#>
+		foreach($col in $DataSetCols)
+		{			
+			#Fill Excel cell with value from the data set
+			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ResourceInfoTbl.Rows[$RowNum][$col]
+			$ExcelColNum += 1
+		}
+			
+		#move to the next row in the spreadsheet
+		$ExcelStartRow += 1
+		#move to the next row in the data set
+		$RowNum += 1
+		# reset Excel column number so that next row population begins with column 1
+		$ExcelColNum = 1
+	}
+
+##Cleaning up variables 
+Remove-Variable -Name ResourceInfoTbl
+Remove-Variable -Name InstanceInfoTbl
+Remove-Variable -Name InstanceInfoSet
+
+##Saving file 
+$ExcelFile.Save()
+
+Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
 $BlitzWhoPass += 1
 
 #####################################################################################
@@ -537,7 +678,7 @@ Remove-Variable -Name BlitzSet
 $ExcelFile.Save()
 
 ###Collecting sp_BlitzWho data
-Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
+Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
 $BlitzWhoPass += 1
 
 #####################################################################################
@@ -618,7 +759,7 @@ foreach($SortOrder in $SortOrders)
 		$i+=1
 		#Get only the column storing the execution plan data that's not NULL and write it to a file
 		if($BlitzCacheTbl.Rows[$RowNum]["Query Plan"] -ne [System.DBNull]::Value){
-			$BlitzCacheTbl.Rows[$RowNum]["Query Plan"] | Out-File -FilePath $PlanOutDir\$($FileSOrder)_$($i).sqlplan
+			$BlitzCacheTbl.Rows[$RowNum]["Query Plan"] | Format-XML | Set-Content -Path $PlanOutDir\$($FileSOrder)_$($i).sqlplan -Force
 			}		
 		#Increment row retrieval counter
 		$RowNum+=1
@@ -826,7 +967,7 @@ foreach($SortOrder in $SortOrders)
 	}
 	
 	#Collecting sp_BlitzWho data
-	Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop Y
+	Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop Y
 	$BlitzWhoPass += 1
 	
 	##Saving file 
@@ -906,7 +1047,7 @@ Remove-Variable -Name BlitzFirstTbl
 Remove-Variable -Name BlitzFirstSet
 	
 ###Collecting sp_BlitzWho data
-Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
+Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
 $BlitzWhoPass += 1
 
 #####################################################################################
@@ -1069,7 +1210,7 @@ if($IsIndepth -eq "Y"){
 		}
 		
 		###Collecting sp_BlitzWho data
-		Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
+		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
 		$BlitzWhoPass += 1
 }
 ##Saving file 
@@ -1139,7 +1280,7 @@ foreach($Mode in $Modes)
 			if($BlitzIxTbl.Rows[$RowNum]["Finding"] -like "*Missing Index"){
 				$i+=1
 				if($BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] -ne [System.DBNull]::Value){
-					$BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] | Out-File -FilePath $PlanOutDir\MissingIndex_$($i).sqlplan
+					$BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] | Format-XML | Set-Content -Path $PlanOutDir\MissingIndex_$($i).sqlplan -Force
 					}
 			}
 			$RowNum+=1
@@ -1231,7 +1372,7 @@ foreach($Mode in $Modes)
 	$OldMode = $NewMode
 	
 	###Collecting sp_BlitzWho data
-	Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop Y
+	Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop Y
 	$BlitzWhoPass += 1
 	
 	##Saving file 
@@ -1299,7 +1440,7 @@ foreach($row in $TblLockDtl)
 		#format the event date to append to file name
 		$DLDate = $TblLockDtl.Rows[$RowNum]["event_date"].ToString("yyyyMMdd_HHmmss")
 		#write .xdl file
-		$TblLockDtl.Rows[$RowNum]["deadlock_graph"] | Out-File -FilePath $XDLOutDir\$($DLDate)_$($i).xdl
+		$TblLockDtl.Rows[$RowNum]["deadlock_graph"] | Format-XML | Set-Content -Path $XDLOutDir\$($DLDate)_$($i).xdl -Force
 	}
 	#Increment row retrieval counter
 	$RowNum+=1
@@ -1394,7 +1535,7 @@ Remove-Variable -Name TblLockDtl
 Remove-Variable -Name BlitzLockSet
 
 ###Collecting sp_BlitzWho data
-Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
+Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
 $BlitzWhoPass += 1
 
 
@@ -1407,7 +1548,7 @@ if(!([string]::IsNullOrEmpty($CheckDB))){
 	
 	Write-Host " Getting stats and index info for $CheckDB" -fore green
 	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetStatsAndIndexInfoForWholeDB.sql")
-	[string]$Query = $Query -replace "..PDBlitzReplace.." , $CheckDB
+	[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
 	
 	$StatsIndexQuery = new-object System.Data.SqlClient.SqlCommand
 	$StatsIndexQuery.CommandText = $Query
@@ -1479,7 +1620,7 @@ if(!([string]::IsNullOrEmpty($CheckDB))){
 	}
 	
 	###Collecting sp_BlitzWho data
-	Run-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
+	Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
 	$BlitzWhoPass += 1
 }
 
@@ -1497,59 +1638,17 @@ Remove-Variable -Name StatsIndexSet
 #####################################################################################
 
 Write-Host " Retrieving sp_BlitzWho data" -fore green
+
+[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetBlitzWhoData.sql")
+[string]$Query = $Query -replace "..BlitzWhoOut.." , $BlitzWhoOut
 if(!([string]::IsNullOrEmpty($CheckDB))){
-	[string]$Query = "SET NOCOUNT ON;`nSELECT [CheckDate], `n[elapsed_time], `n[session_id], `n[database_name], [query_text], `n[query_plan], `n[query_cost], `n[status], `n[cached_parameter_info], 
-	[wait_info], `n[top_session_waits], `n[blocking_session_id], 
-	[open_transaction_count], `n[is_implicit_transaction], 
-	[nt_domain], `n[host_name], `n[login_name], `n[nt_user_name], 
-	[program_name], `n[fix_parameter_sniffing], `n[client_interface_name], 
-	[login_time], `n[start_time], `n[request_time], `n[request_cpu_time], 
-	[request_logical_reads], `n[request_writes], `n[request_physical_reads], 
-	[session_cpu], `n[session_logical_reads], `n[session_physical_reads], 
-	[session_writes], `n[tempdb_allocations_mb], `n[memory_usage], 
-	[estimated_completion_time], `n[percent_complete], `n[deadlock_priority], 
-	[transaction_isolation_level], `n[degree_of_parallelism], `n[grant_time], 
-	[requested_memory_kb], `n[grant_memory_kb], `n[is_request_granted], 
-	[required_memory_kb], `n[query_memory_grant_used_memory_kb], 
-	[ideal_memory_kb], `n[is_small], `n[timeout_sec], `n[resource_semaphore_id], 
-	[wait_order], `n[wait_time_ms], `n[next_candidate_for_memory_grant], 
-	[target_memory_kb], `n[max_target_memory_kb], 
-	[total_memory_kb], `n[available_memory_kb], `n[granted_memory_kb], 
-	[query_resource_semaphore_used_memory_kb], `n[grantee_count], 
-	[waiter_count], `n[timeout_error_count], `n[forced_grant_count], 
-	[workload_group_name], `n[resource_pool_name], `n[context_info] 
-	FROM [tempdb].[dbo].[$BlitzWhoOut]
-	WHERE [database_name] = '$CheckDB';
-	`nIF OBJECT_ID('tempdb.dbo.$BlitzWhoOut') IS NOT NULL`nDROP TABLE [tempdb].[dbo].[$BlitzWhoOut];"
-} else {
-	[string]$Query = "SET NOCOUNT ON;`nSELECT [CheckDate], `n[elapsed_time], `n[session_id], `n[database_name], 
-	[query_text], `n[query_plan], `n[query_cost], `n[status], `n[cached_parameter_info], 
-	[wait_info], `n[top_session_waits], `n[blocking_session_id], 
-	[open_transaction_count], `n[is_implicit_transaction], 
-	[nt_domain], `n[host_name], `n[login_name], `n[nt_user_name], 
-	[program_name], `n[fix_parameter_sniffing], `n[client_interface_name], 
-	[login_time], `n[start_time], `n[request_time], `n[request_cpu_time], 
-	[request_logical_reads], `n[request_writes], `n[request_physical_reads], 
-	[session_cpu], `n[session_logical_reads], `n[session_physical_reads], 
-	[session_writes], `n[tempdb_allocations_mb], `n[memory_usage], 
-	[estimated_completion_time], `n[percent_complete], `n[deadlock_priority], 
-	[transaction_isolation_level], `n[degree_of_parallelism], `n[grant_time], 
-	[requested_memory_kb], `n[grant_memory_kb], `n[is_request_granted], 
-	[required_memory_kb], `n[query_memory_grant_used_memory_kb], 
-	[ideal_memory_kb], `n[is_small], `n[timeout_sec], `n[resource_semaphore_id], 
-	[wait_order], `n[wait_time_ms], `n[next_candidate_for_memory_grant], 
-	[target_memory_kb], `n[max_target_memory_kb], 
-	[total_memory_kb], `n[available_memory_kb], `n[granted_memory_kb], 
-	[query_resource_semaphore_used_memory_kb], `n[grantee_count], 
-	[waiter_count], `n[timeout_error_count], `n[forced_grant_count], 
-	[workload_group_name], `n[resource_pool_name], `n[context_info] 
-	FROM [tempdb].[dbo].[$BlitzWhoOut];
-	`nIF OBJECT_ID('tempdb.dbo.$BlitzWhoOut') IS NOT NULL`nDROP TABLE [tempdb].[dbo].[$BlitzWhoOut];"
+	[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
 }
+
 $BlitzWhoSelect = new-object System.Data.SqlClient.SqlCommand
 $BlitzWhoSelect.CommandText = $Query
 $BlitzWhoSelect.Connection = $SqlConnection
-$BlitzWhoSelect.CommandTimeout = 200
+$BlitzWhoSelect.CommandTimeout = 600
 $BlitzWhoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
 $BlitzWhoAdapter.SelectCommand = $BlitzWhoSelect
 $BlitzWhoSet = new-object System.Data.DataSet
@@ -1559,6 +1658,9 @@ $SqlConnection.Close()
 $BlitzWhoTbl = New-Object System.Data.DataTable
 $BlitzWhoTbl = $BlitzWhoSet.Tables[0]
 
+$BlitzWhoAggTbl = New-Object System.Data.DataTable
+$BlitzWhoAggTbl = $BlitzWhoSet.Tables[1]
+
 ##Exporting execution plans to file
 #Set counter used for row retrieval
 [int]$RowNum = 0
@@ -1566,19 +1668,17 @@ $BlitzWhoTbl = $BlitzWhoSet.Tables[0]
 if($Debug -eq 1){
 	Write-Host " ->Exporting execution plans" -fore yellow
 }
-foreach($row in $BlitzWhoTbl)
+foreach($row in $BlitzWhoAggTbl)
 	{
 		<#
 		Get only the column storing the execution plan data that's 
 		not NULL and write it to a file
 		#>
-		if($BlitzWhoTbl.Rows[$RowNum]["query_plan"] -ne [System.DBNull]::Value){
+		if($BlitzWhoAggTbl.Rows[$RowNum]["query_plan"] -ne [System.DBNull]::Value){
 				#Get session_id to append to filename
-				[string]$SessionID = $BlitzWhoTbl.Rows[$RowNum]["session_id"]
-				#Format the start_time to append to file name
-				$RunDate = $BlitzWhoTbl.Rows[$RowNum]["start_time"].ToString("yyyyMMdd_HHmmss")
+				[string]$SQLPlanFile = $BlitzWhoAggTbl.Rows[$RowNum]["sqlplan_file"]
 				#Write execution plan to file
-				$BlitzWhoTbl.Rows[$RowNum]["query_plan"] | Out-File -FilePath $PlanOutDir\RunningNow_$($RunDate)_SID$($SessionID).sqlplan
+				$BlitzWhoAggTbl.Rows[$RowNum]["query_plan"] | Format-XML | Set-Content -Path $PlanOutDir\$($SQLPlanFile) -Force
 			}		
 		#Increment row retrieval counter
 		$RowNum+=1
@@ -1595,8 +1695,8 @@ $RowNum = 0
 
 #List of columns that should be returned from the data set
 $DataSetCols = @("CheckDate", "elapsed_time", "session_id", "database_name", 
- "query_text", "query_cost", "status", "cached_parameter_info", "wait_info",
- "top_session_waits",
+ "query_text", "query_cost", "sqlplan_file", "status", 
+ "cached_parameter_info", "wait_info", "top_session_waits",
  "blocking_session_id", "open_transaction_count", "is_implicit_transaction",
  "nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
  "fix_parameter_sniffing", "client_interface_name", "login_time", "start_time",
@@ -1626,13 +1726,7 @@ foreach($row in $BlitzWhoTbl)
 		#>
 		foreach($col in $DataSetCols)
 		{
-			$SQLPlanFile = "-- N/A --"
-			#Changing the value of $SQLPlanFile only for records where execution plan exists
-			if($BlitzWhoTbl.Rows[$RowNum]["query_plan"] -ne [System.DBNull]::Value){
-				[string]$SessionID = $BlitzWhoTbl.Rows[$RowNum]["session_id"]
-				$RunDate = $BlitzWhoTbl.Rows[$RowNum]["start_time"].ToString("yyyyMMdd_HHmmss")
-				$SQLPlanFile = "RunningNow_"+ $RunDate + "_SID" + $SessionID + ".sqlplan"
-			}
+			
 			#Fill Excel cell with value from the data set
 			if($col -eq "CheckDate"){
 				$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
@@ -1640,14 +1734,71 @@ foreach($row in $BlitzWhoTbl)
 				$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoTbl.Rows[$RowNum][$col]
 			}
 			$ExcelColNum += 1
-			<# 
-			If the next column is the SQLPlan Name column 
-			fill it separately and then move to next column
-			#>
-			if($ExcelColNum -eq 7){
-				$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $SQLPlanFIle
+		}
+			
+		#move to the next row in the spreadsheet
+		$ExcelStartRow += 1
+		#move to the next row in the data set
+		$RowNum += 1
+		# reset Excel column number so that next row population begins with column 1
+		$ExcelColNum = 1
+	}
+##Saving file 
+$ExcelFile.Save()
+
+##Populating the "sp_BlitzWho Aggregate" sheet
+$ExcelSheet = $ExcelFile.Worksheets.Item("sp_BlitzWho Aggregate")
+#Specify at which row in the sheet to start adding the data
+$ExcelStartRow = $DefaultStartRow
+#Specify with which column in the sheet to start
+$ExcelColNum = 1
+#Set counter used for row retrieval
+$RowNum = 0
+
+#List of columns that should be returned from the data set
+$DataSetCols = @("start_time", "elapsed_time", "session_id", "database_name", 
+ "query_text", "outer_command","query_cost", "sqlplan_file", "status", 
+ "cached_parameter_info", "wait_info", "top_session_waits",
+ "blocking_session_id", "open_transaction_count", "is_implicit_transaction",
+ "nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
+ "fix_parameter_sniffing", "client_interface_name", "login_time", 
+ "request_time", "request_cpu_time", "request_logical_reads", "request_writes",
+ "request_physical_reads", "session_cpu", "session_logical_reads",
+ "session_physical_reads", "session_writes", "tempdb_allocations_mb", 
+ "memory_usage", "estimated_completion_time", "percent_complete", 
+ "deadlock_priority", "transaction_isolation_level", "degree_of_parallelism",
+ "grant_time", "requested_memory_kb", "grant_memory_kb", "is_request_granted",
+ "required_memory_kb", "query_memory_grant_used_memory_kb", "ideal_memory_kb",
+ "is_small", "timeout_sec", "resource_semaphore_id", "wait_order", "wait_time_ms",
+ "next_candidate_for_memory_grant", "target_memory_kb", "max_target_memory_kb",
+ "total_memory_kb", "available_memory_kb", "granted_memory_kb",
+ "query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
+ "timeout_error_count", "forced_grant_count", "workload_group_name",
+ "resource_pool_name", "context_info", "query_hash", "query_plan_hash")
+
+if($Debug -eq 1){
+	Write-Host " ->Writing sp_BlitzWho aggregate results to Excel" -fore yellow
+}
+#Loop through each Excel row
+foreach($row in $BlitzWhoAggTbl)
+	{
+		<#
+		Loop through each data set column of current row and fill the corresponding 
+		Excel cell
+		#>
+		foreach($col in $DataSetCols)
+		{			
+			#Fill Excel cell with value from the data set
+			#Properly handling Query Hash and Plan Hash hex values 
+			if("query_hash", "query_plan_hash" -Contains $col){
+				$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $BlitzWhoAggTbl.Rows[$RowNum][$col]
+				#move to the next column
 				$ExcelColNum += 1
+				#move to the top of the loop
+				Continue
 			}
+			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoAggTbl.Rows[$RowNum][$col]
+			$ExcelColNum += 1
 		}
 			
 		#move to the next row in the spreadsheet
@@ -1661,7 +1812,161 @@ foreach($row in $BlitzWhoTbl)
 $ExcelFile.Save()
 ##Cleaning up variables
 Remove-Variable -Name BlitzWhoTbl
+Remove-Variable -Name BlitzWhoAggTbl
 Remove-Variable -Name BlitzWhoSet
+
+#####################################################################################
+#						TempDB usage info	 										#
+#####################################################################################
+Write-Host " Retrieving TempDB usage data" -fore green
+[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetTempDBUsageInfo.sql")
+$TempDBSelect = new-object System.Data.SqlClient.SqlCommand
+$TempDBSelect.CommandText = $Query
+$TempDBSelect.Connection = $SqlConnection
+$TempDBSelect.CommandTimeout = 600
+$TempDBAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+$TempDBAdapter.SelectCommand = $TempDBSelect
+$TempDBSet = new-object System.Data.DataSet
+$TempDBAdapter.Fill($TempDBSet) | Out-Null
+$SqlConnection.Close()
+
+$TempDBTbl = New-Object System.Data.DataTable
+$TempDBTbl = $TempDBSet.Tables[0]
+
+$TempTabTbl = New-Object System.Data.DataTable
+$TempTabTbl = $TempDBSet.Tables[1]
+
+$TempDBSessTbl = New-Object System.Data.DataTable
+$TempDBSessTbl = $TempDBSet.Tables[2]
+
+###Populating the "TempDB" sheet
+$ExcelSheet = $ExcelFile.Worksheets.Item("TempDB")
+##TempDB space usage section
+#Specify at which row in the sheet to start adding the data
+$ExcelStartRow = 3
+#Specify with which column in the sheet to start
+$ExcelColNum = 1
+#Set counter used for row retrieval
+$RowNum = 0
+
+#List of columns that should be returned from the data set
+$DataSetCols = @("data_files", "total_size_MB", "free_space_MB", "percent_free", "internal_objects_MB",
+"user_objects_MB", "version_store_MB")
+
+if($Debug -eq 1){
+	Write-Host " ->Writing TempDB space usage results to Excel" -fore yellow
+}
+#Loop through each Excel row
+foreach($row in $TempDBTbl)
+	{
+		<#
+		Loop through each data set column of current row and fill the corresponding 
+		Excel cell
+		#>
+		foreach($col in $DataSetCols)
+		{			
+			#Fill Excel cell with value from the data set
+			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TempDBTbl.Rows[$RowNum][$col]
+			$ExcelColNum += 1
+		}
+			
+		#move to the next row in the spreadsheet
+		$ExcelStartRow += 1
+		#move to the next row in the data set
+		$RowNum += 1
+		# reset Excel column number so that next row population begins with column 1
+		$ExcelColNum = 1
+	}
+
+##Temp tables section
+#Specify at which row in the sheet to start adding the data
+$ExcelStartRow = 8
+#Specify with which column in the sheet to start
+$ExcelColNum = 1
+#Set counter used for row retrieval
+$RowNum = 0
+
+#List of columns that should be returned from the data set
+$DataSetCols = @("table_name", "rows", "used_space_MB", "reserved_space_MB")
+
+if($Debug -eq 1){
+	Write-Host " ->Writing temp table results to Excel" -fore yellow
+}
+#Loop through each Excel row
+foreach($row in $TempTabTbl)
+	{
+		<#
+		Loop through each data set column of current row and fill the corresponding 
+		Excel cell
+		#>
+		foreach($col in $DataSetCols)
+		{
+			#Fill Excel cell with value from the data set
+			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TempTabTbl.Rows[$RowNum][$col]
+			$ExcelColNum += 1
+		}
+			
+		#move to the next row in the spreadsheet
+		$ExcelStartRow += 1
+		#move to the next row in the data set
+		$RowNum += 1
+		# reset Excel column number so that next row population begins with column 1
+		$ExcelColNum = 1
+	}
+
+
+##TempDB session usage section
+#Specify at which row in the sheet to start adding the data
+$ExcelStartRow = 8
+#Specify with which column in the sheet to start
+$ExcelColNum = 6
+#Set counter used for row retrieval
+$RowNum = 0
+
+#List of columns that should be returned from the data set
+$DataSetCols = @("session_id", "request_id", "database", "total_allocation_user_objects_MB",
+"net_allocation_user_objects_MB", "total_allocation_internal_objects_MB", "net_allocation_internal_objects_MB",
+"total_allocation_MB", "net_allocation_MB", "query_text", "query_hash", "query_plan_hash")
+
+if($Debug -eq 1){
+	Write-Host " ->Writing sessions using TempDB results to Excel" -fore yellow
+}
+#Loop through each Excel row
+foreach($row in $TempDBSessTbl)
+	{
+		<#
+		Loop through each data set column of current row and fill the corresponding 
+		Excel cell
+		#>
+		foreach($col in $DataSetCols)
+		{			
+			#Fill Excel cell with value from the data set
+			#Properly handling Query Hash and Plan Hash hex values 
+			if("query_hash", "query_plan_hash" -Contains $col){
+				$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $TempDBSessTbl.Rows[$RowNum][$col]
+				#move to the next column
+				$ExcelColNum += 1
+				#move to the top of the loop
+				Continue
+			}
+			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TempDBSessTbl.Rows[$RowNum][$col]
+			$ExcelColNum += 1
+		}
+			
+		#move to the next row in the spreadsheet
+		$ExcelStartRow += 1
+		#move to the next row in the data set
+		$RowNum += 1
+		# reset Excel column number so that next row population begins with column 1
+		$ExcelColNum = 6
+	}
+##Saving file 
+$ExcelFile.Save()
+##Cleaning up variables
+Remove-Variable -Name TempDBSessTbl
+Remove-Variable -Name TempTabTbl
+Remove-Variable -Name TempDBTbl
+Remove-Variable -Name TempDBSet
 
 #####################################################################################
 #						Delete unused sheets 										#
@@ -1733,7 +2038,14 @@ $ExcelFile.Close()
 $ExcelApp.Quit()
 [System.Runtime.Interopservices.Marshal]::ReleaseComObject($ExcelApp) | Out-Null
 Remove-Variable -Name ExcelApp
+###Rename output file 
+if(!([string]::IsNullOrEmpty($CheckDB))){
+	$OutExcelFName = "PSBlitzOutput_$InstName_$CheckDB.xlsx"
+} else {
+	$OutExcelFName = "PSBlitzOutput_$InstName.xlsx"
+}
+Rename-Item -Path $OutExcelF -NewName $OutExcelFName
 Write-Host " "
 if(($Debug -eq 1) -or ($InteractiveMode -eq 1)){
-	Read-Host -Prompt "Done. Press Enter to exit."
+	Read-Host -Prompt "Done. Press Enter to close this window."
 }
