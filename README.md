@@ -150,7 +150,7 @@ Execution plans will be saved in the Plans directory under the output directory.
 Execution plans file naming convention:
  - for plans obtained through sp_BlitzCache - `[SortOrder]_[RowNumber].sqlplan`.
  - for plans obtained through sp_BlitzIndex (only available in SQL Server 2019) - `MissingIndex_[MissingIndexNumber].sqlplan`.
- - for plans obtained through sp_BlitzWho - `RunningNow_[SPID]_[start_time]_[query_plan_hash].sqlplan`, if no query plan hash is returned by sp_BlitzWho, then 0x00 will be used.
+ - for plans obtained through sp_BlitzWho - `RunningNow_[SPID]_[start_time]_[query_plan_hash].sqlplan`. If no query plan hash is returned by sp_BlitzWho, then 0x00 will be used.
 
 [*Back to top*](#header1)
 
