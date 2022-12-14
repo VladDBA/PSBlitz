@@ -84,7 +84,7 @@ IF OBJECT_ID('tempdb..#UpdatedStats') IS NOT NULL
 IF OBJECT_ID('tempdb..#TempdbOperationalStats') IS NOT NULL
 	DROP TABLE #TempdbOperationalStats;
 	
-/*Everything beyond this point, aside from the changes at lines 313 and 4944, 
+/*Everything beyond this point, aside from the changes at lines 313 and 4960, 
 is straight from sp_BlitzFirst without the otuermost BEGIN and END, 
 and without the GO at the end*/
 
@@ -92,7 +92,7 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-SELECT @Version = '8.11', @VersionDate = '20221013';
+SELECT @Version = '8.12', @VersionDate = '20221213';
 
 IF(@VersionCheckMode = 1)
 BEGIN
@@ -311,7 +311,7 @@ BEGIN
     IF @SinceStartup = 0 AND @Seconds > 0 AND @ExpertMode = 1 AND @OutputType <> 'NONE'
     BEGIN
 		/*IF OBJECT_ID('master.dbo.sp_BlitzWho') IS NULL AND OBJECT_ID('dbo.sp_BlitzWho') IS NULL */
-		IF OBJECT_ID('master.dbo.sp_BlitzWhoxyZ') IS NULL AND OBJECT_ID('dbo.sp_BlitzWhoxyZ') IS NULL /*Vlad - https://github.com/VladDBA/PSBlitz/issues/17*/
+		IF OBJECT_ID('master.dbo.sp_BlitzWhoxyZ0') IS NULL AND OBJECT_ID('dbo.sp_BlitzWhoxyZ0') IS NULL /*Vlad - https://github.com/VladDBA/PSBlitz/issues/17*/
 		BEGIN
 			PRINT N'sp_BlitzWho is not installed in the current database_files.  You can get a copy from http://FirstResponderKit.org';
 		END;
@@ -1178,7 +1178,7 @@ BEGIN
            @StockDetailsFooter = @StockDetailsFooter + @LineFeed + ' -- ?>';
 
     /* Get the instance name to use as a Perfmon counter prefix. */
-    IF SERVERPROPERTY('EngineEdition') = 5 /*CAST(SERVERPROPERTY('edition') AS VARCHAR(100)) = 'SQL Azure'*/
+    IF SERVERPROPERTY('EngineEdition') IN (5, 8) /*CAST(SERVERPROPERTY('edition') AS VARCHAR(100)) = 'SQL Azure'*/
         SELECT TOP 1 @ServiceName = LEFT(object_name, (CHARINDEX(':', object_name) - 1))
         FROM sys.dm_os_performance_counters;
     ELSE
@@ -2563,7 +2563,23 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                                     ;
 
 			IF SERVERPROPERTY('EngineEdition') <> 5 /*SERVERPROPERTY('Edition') <> 'SQL Azure'*/
-	            EXEC sp_MSforeachdb @StringToExecute;
+			BEGIN
+				BEGIN TRY
+					EXEC sp_MSforeachdb @StringToExecute;
+				END TRY
+				BEGIN CATCH
+					IF (ERROR_NUMBER() = 1222)
+					BEGIN
+						INSERT INTO #UpdatedStats(HowToStopIt, RowsForSorting)
+						SELECT HowToStopIt = N'No information could be retrieved as the lock timeout was exceeded while iterating databases,' +
+											 N' this is likely due to an Index operation in Progress', -1;
+					END
+					ELSE
+					BEGIN
+						THROW;
+					END
+				END CATCH
+			END
 			ELSE
 				EXEC(@StringToExecute);
 
@@ -4942,7 +4958,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
     IF @SinceStartup = 0 AND @Seconds > 0 AND @ExpertMode = 1 AND @OutputType <> 'NONE'
     BEGIN
 		/*IF OBJECT_ID('master.dbo.sp_BlitzWho') IS NULL AND OBJECT_ID('dbo.sp_BlitzWho') IS NULL */
-		IF OBJECT_ID('master.dbo.sp_BlitzWhoxyZ') IS NULL AND OBJECT_ID('dbo.sp_BlitzWhoxyZ') IS NULL /*Vlad - https://github.com/VladDBA/PSBlitz/issues/17*/
+		IF OBJECT_ID('master.dbo.sp_BlitzWhoxyZ0') IS NULL AND OBJECT_ID('dbo.sp_BlitzWhoxyZ') IS NULL /*Vlad - https://github.com/VladDBA/PSBlitz/issues/17*/
 		BEGIN
 			PRINT N'sp_BlitzWho is not installed in the current database_files.  You can get a copy from http://FirstResponderKit.org';
 		END;
