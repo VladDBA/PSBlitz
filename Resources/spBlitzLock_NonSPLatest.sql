@@ -9,7 +9,7 @@ DECLARE     @Top INT,
 	@AppName NVARCHAR(256),
 	@HostName NVARCHAR(256),
 	@LoginName NVARCHAR(256),
-	@EventSessionPath VARCHAR(256),
+	@EventSessionName sysname,
 	@VictimsOnly BIT,
 	@Debug BIT, 
 	@Help BIT,
@@ -19,7 +19,8 @@ DECLARE     @Top INT,
 	@OutputDatabaseName NVARCHAR(256),
     @OutputSchemaName NVARCHAR(256),
     @OutputTableName NVARCHAR(256),
-    @ExportToExcel BIT;
+    @ExportToExcel BIT,
+	@TargetSessionType sysname;
 
 ;SET @DatabaseName = NULL;
 
@@ -31,7 +32,7 @@ SELECT     @Top = 2147483647,
 	@AppName = NULL,
 	@HostName = NULL,
 	@LoginName = NULL,
-	@EventSessionPath = 'system_health*.xel',
+	@EventSessionName = N'system_health',
 	@VictimsOnly = 0,
 	@Debug = 0, 
 	@Help = 0,
@@ -41,7 +42,8 @@ SELECT     @Top = 2147483647,
 	@OutputDatabaseName = NULL ,
     @OutputSchemaName = 'dbo' ,  --ditto as below
     @OutputTableName = 'BlitzLock',  --put a standard here no need to check later in the script
-    @ExportToExcel = 1
+    @ExportToExcel = 1,
+	@TargetSessionType = NULL;
 
 /*Temp table cleanup*/
 IF OBJECT_ID('tempdb..#t') IS NOT NULL
@@ -56,6 +58,22 @@ IF OBJECT_ID('tempdb..#agent_job') IS NOT NULL
 	DROP TABLE #agent_job;
 IF OBJECT_ID('tempdb..#deadlock_results') IS NOT NULL
 	DROP TABLE #deadlock_results;
+IF OBJECT_ID('tempdb..#x') IS NOT NULL
+	DROP TABLE #x;
+IF OBJECT_ID('tempdb..#deadlock_data') IS NOT NULL
+	DROP TABLE #deadlock_data;
+IF OBJECT_ID('tempdb..#deadlock_findings') IS NOT NULL
+	DROP TABLE #deadlock_findings;
+IF OBJECT_ID('tempdb..#xml') IS NOT NULL
+	DROP TABLE #xml;
+IF OBJECT_ID('tempdb..#dd') IS NOT NULL
+	DROP TABLE #dd;
+IF OBJECT_ID('tempdb..#deadlock_stack') IS NOT NULL
+	DROP TABLE #deadlock_stack;
+IF OBJECT_ID('tempdb..#deadlock_resource') IS NOT NULL
+	DROP TABLE #deadlock_resource;
+IF OBJECT_ID('tempdb..#deadlocks') IS NOT NULL
+	DROP TABLE #deadlocks;
 
 /*
 Everything beyond this point is straight from sp_BlitzLock 
@@ -3292,7 +3310,7 @@ without the otuermost BEGIN and END and with the dr.deadlock_graph column still 
                     CASE
                         @ExportToExcel
                         WHEN 1
-                        THEN N',
+                        THEN N'
 						dr.deadlock_graph' /*Vlad - returning dr.deadlock_graph anyway*/
                         ELSE N'
                 dr.deadlock_graph'
