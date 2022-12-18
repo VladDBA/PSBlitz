@@ -1802,181 +1802,194 @@ finally {
 		Write-Host " Script execution was interrupted." -Fore yellow
 		Write-Host " Finishing up..." -Fore yellow
 	}
-		
-	Write-Host " Retrieving sp_BlitzWho data" -fore green
-		
-	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetBlitzWhoData.sql")
-	[string]$Query = $Query -replace "..BlitzWhoOut.." , $BlitzWhoOut
-	if(!([string]::IsNullOrEmpty($CheckDB))){
-		[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
-	}
-	#####################################################################################
-	#						sp_BlitzWho													#
-	#####################################################################################
-
-	$BlitzWhoSelect = new-object System.Data.SqlClient.SqlCommand
-	$BlitzWhoSelect.CommandText = $Query
-	$BlitzWhoSelect.Connection = $SqlConnection
-	$BlitzWhoSelect.CommandTimeout = 600
-	$BlitzWhoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-	$BlitzWhoAdapter.SelectCommand = $BlitzWhoSelect
-	$BlitzWhoSet = new-object System.Data.DataSet
-	$BlitzWhoAdapter.Fill($BlitzWhoSet) | Out-Null
-	$SqlConnection.Close()
-
-	$BlitzWhoTbl = New-Object System.Data.DataTable
-	$BlitzWhoTbl = $BlitzWhoSet.Tables[0]
-
-	$BlitzWhoAggTbl = New-Object System.Data.DataTable
-	$BlitzWhoAggTbl = $BlitzWhoSet.Tables[1]
-
-	##Exporting execution plans to file
-	#Set counter used for row retrieval
-	[int]$RowNum = 0
-	#loop through each row
-	if($Debug -eq 1){
-		Write-Host " ->Exporting execution plans" -fore yellow
-	}
-	foreach($row in $BlitzWhoAggTbl){
-		<#
-		Get only the column storing the execution plan data that's 
-		not NULL and write it to a file
-		#>
-		if($BlitzWhoAggTbl.Rows[$RowNum]["query_plan"] -ne [System.DBNull]::Value){
-			#Get session_id to append to filename
-			[string]$SQLPlanFile = $BlitzWhoAggTbl.Rows[$RowNum]["sqlplan_file"]
-			#Write execution plan to file
-			$BlitzWhoAggTbl.Rows[$RowNum]["query_plan"] | Format-XML | Set-Content -Path $PlanOutDir\$($SQLPlanFile) -Force
-		}		
-		#Increment row retrieval counter
-		$RowNum+=1
-	}
-
-	##Populating the "sp_BlitzWho" sheet
-	$ExcelSheet = $ExcelFile.Worksheets.Item("sp_BlitzWho")
-	#Specify at which row in the sheet to start adding the data
-	$ExcelStartRow = $DefaultStartRow
-	#Specify with which column in the sheet to start
-	$ExcelColNum = 1
-	#Set counter used for row retrieval
-	$RowNum = 0
-
-	#List of columns that should be returned from the data set
-	$DataSetCols = @("CheckDate", "elapsed_time", "session_id", "database_name", 
- 	"query_text", "query_cost", "sqlplan_file", "status", 
- 	"cached_parameter_info", "wait_info", "top_session_waits",
- 	"blocking_session_id", "open_transaction_count", "is_implicit_transaction",
- 	"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
- 	"fix_parameter_sniffing", "client_interface_name", "login_time", "start_time",
- 	"request_time", "request_cpu_time", "request_logical_reads", "request_writes",
-	"request_physical_reads", "session_cpu", "session_logical_reads",
- 	"session_physical_reads", "session_writes", "tempdb_allocations_mb", 
- 	"memory_usage", "estimated_completion_time", "percent_complete", 
- 	"deadlock_priority", "transaction_isolation_level", "degree_of_parallelism",
- 	"grant_time", "requested_memory_kb", "grant_memory_kb", "is_request_granted",
- 	"required_memory_kb", "query_memory_grant_used_memory_kb", "ideal_memory_kb",
- 	"is_small", "timeout_sec", "resource_semaphore_id", "wait_order", "wait_time_ms",
- 	"next_candidate_for_memory_grant", "target_memory_kb", "max_target_memory_kb",
- 	"total_memory_kb", "available_memory_kb", "granted_memory_kb",
- 	"query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
- 	"timeout_error_count", "forced_grant_count", "workload_group_name",
- 	"resource_pool_name", "context_info")
-
-	if($Debug -eq 1){
-		Write-Host " ->Writing sp_BlitzWho results to Excel" -fore yellow
-	}
-	#Loop through each Excel row
-	foreach($row in $BlitzWhoTbl){
-		<#
-		Loop through each data set column of current row and fill the corresponding 
-		Excel cell
-		#>
-		foreach($col in $DataSetCols){
-			#Fill Excel cell with value from the data set
-			if($col -eq "CheckDate"){
-				$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-			} else {
-				$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoTbl.Rows[$RowNum][$col]
-			}
-			$ExcelColNum += 1
+	try {
+		if($TryCompleted -eq "N"){
+		Write-Host	" Attempting to retrieve sp_BlitzWho data" -fore green
+		} else {
+			Write-Host " Retrieving sp_BlitzWho data" -fore green
 		}
-			
-		#move to the next row in the spreadsheet
-		$ExcelStartRow += 1
-		#move to the next row in the data set
-		$RowNum += 1
-		# reset Excel column number so that next row population begins with column 1
+		
+		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetBlitzWhoData.sql")
+		[string]$Query = $Query -replace "..BlitzWhoOut.." , $BlitzWhoOut
+		if(!([string]::IsNullOrEmpty($CheckDB))){
+			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
+		}
+		#####################################################################################
+		#						sp_BlitzWho													#
+		#####################################################################################
+
+		$BlitzWhoSelect = new-object System.Data.SqlClient.SqlCommand
+		$BlitzWhoSelect.CommandText = $Query
+		$BlitzWhoSelect.Connection = $SqlConnection
+		$BlitzWhoSelect.CommandTimeout = 600
+		$BlitzWhoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+		$BlitzWhoAdapter.SelectCommand = $BlitzWhoSelect
+		$BlitzWhoSet = new-object System.Data.DataSet
+		$BlitzWhoAdapter.Fill($BlitzWhoSet) | Out-Null
+		$SqlConnection.Close()
+
+		$BlitzWhoTbl = New-Object System.Data.DataTable
+		$BlitzWhoTbl = $BlitzWhoSet.Tables[0]
+
+		$BlitzWhoAggTbl = New-Object System.Data.DataTable
+		$BlitzWhoAggTbl = $BlitzWhoSet.Tables[1]
+
+		##Exporting execution plans to file
+		#Set counter used for row retrieval
+		[int]$RowNum = 0
+		#loop through each row
+		if($Debug -eq 1){
+			Write-Host " ->Exporting execution plans" -fore yellow
+		}
+		foreach($row in $BlitzWhoAggTbl){
+			<#
+			Get only the column storing the execution plan data that's 
+			not NULL and write it to a file
+			#>
+			if($BlitzWhoAggTbl.Rows[$RowNum]["query_plan"] -ne [System.DBNull]::Value){
+				#Get session_id to append to filename
+				[string]$SQLPlanFile = $BlitzWhoAggTbl.Rows[$RowNum]["sqlplan_file"]
+				#Write execution plan to file
+				$BlitzWhoAggTbl.Rows[$RowNum]["query_plan"] | Format-XML | Set-Content -Path $PlanOutDir\$($SQLPlanFile) -Force
+			}		
+			#Increment row retrieval counter
+			$RowNum+=1
+		}
+
+		##Populating the "sp_BlitzWho" sheet
+		$ExcelSheet = $ExcelFile.Worksheets.Item("sp_BlitzWho")
+		#Specify at which row in the sheet to start adding the data
+		$ExcelStartRow = $DefaultStartRow
+		#Specify with which column in the sheet to start
 		$ExcelColNum = 1
-	}
-	##Saving file 
-	$ExcelFile.Save()
+		#Set counter used for row retrieval
+		$RowNum = 0
 
-	##Populating the "sp_BlitzWho Aggregate" sheet
-	$ExcelSheet = $ExcelFile.Worksheets.Item("sp_BlitzWho Aggregate")
-	#Specify at which row in the sheet to start adding the data
-	$ExcelStartRow = $DefaultStartRow
-	#Specify with which column in the sheet to start
-	$ExcelColNum = 1
-	#Set counter used for row retrieval
-	$RowNum = 0
+		#List of columns that should be returned from the data set
+		$DataSetCols = @("CheckDate", "elapsed_time", "session_id", "database_name", 
+ 		"query_text", "query_cost", "sqlplan_file", "status", 
+ 		"cached_parameter_info", "wait_info", "top_session_waits",
+ 		"blocking_session_id", "open_transaction_count", "is_implicit_transaction",
+ 		"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
+ 		"fix_parameter_sniffing", "client_interface_name", "login_time", "start_time",
+ 		"request_time", "request_cpu_time", "request_logical_reads", "request_writes",
+		"request_physical_reads", "session_cpu", "session_logical_reads",
+ 		"session_physical_reads", "session_writes", "tempdb_allocations_mb", 
+ 		"memory_usage", "estimated_completion_time", "percent_complete", 
+ 		"deadlock_priority", "transaction_isolation_level", "degree_of_parallelism",
+ 		"grant_time", "requested_memory_kb", "grant_memory_kb", "is_request_granted",
+ 		"required_memory_kb", "query_memory_grant_used_memory_kb", "ideal_memory_kb",
+ 		"is_small", "timeout_sec", "resource_semaphore_id", "wait_order", "wait_time_ms",
+ 		"next_candidate_for_memory_grant", "target_memory_kb", "max_target_memory_kb",
+ 		"total_memory_kb", "available_memory_kb", "granted_memory_kb",
+ 		"query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
+ 		"timeout_error_count", "forced_grant_count", "workload_group_name",
+ 		"resource_pool_name", "context_info")
 
-	#List of columns that should be returned from the data set
-	$DataSetCols = @("start_time", "elapsed_time", "session_id", "database_name", 
-	 "query_text", "outer_command","query_cost", "sqlplan_file", "status", 
-	 "cached_parameter_info", "wait_info", "top_session_waits",
-	 "blocking_session_id", "open_transaction_count", "is_implicit_transaction",
-	 "nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
-	 "fix_parameter_sniffing", "client_interface_name", "login_time", 
-	 "request_time", "request_cpu_time", "request_logical_reads", "request_writes",
-	 "request_physical_reads", "session_cpu", "session_logical_reads",
-	 "session_physical_reads", "session_writes", "tempdb_allocations_mb", 
-	 "memory_usage", "estimated_completion_time", "percent_complete", 
-	 "deadlock_priority", "transaction_isolation_level", "degree_of_parallelism",
-	 "grant_time", "requested_memory_kb", "grant_memory_kb", "is_request_granted",
-	 "required_memory_kb", "query_memory_grant_used_memory_kb", "ideal_memory_kb",
-	 "is_small", "timeout_sec", "resource_semaphore_id", "wait_order", "wait_time_ms",
-	 "next_candidate_for_memory_grant", "target_memory_kb", "max_target_memory_kb",
-	 "total_memory_kb", "available_memory_kb", "granted_memory_kb",
-	 "query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
-	 "timeout_error_count", "forced_grant_count", "workload_group_name",
-	 "resource_pool_name", "context_info", "query_hash", "query_plan_hash")
-
-	if($Debug -eq 1){
-		Write-Host " ->Writing sp_BlitzWho aggregate results to Excel" -fore yellow
-	}
-	#Loop through each Excel row
-	foreach($row in $BlitzWhoAggTbl){
-		<#
-		Loop through each data set column of current row and fill the corresponding 
-		Excel cell
-		#>
-		foreach($col in $DataSetCols){
-			#Fill Excel cell with value from the data set
-			#Properly handling Query Hash and Plan Hash hex values 
-			if("query_hash", "query_plan_hash" -Contains $col){
-				$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $BlitzWhoAggTbl.Rows[$RowNum][$col]
-				#move to the next column
+		if($Debug -eq 1){
+			Write-Host " ->Writing sp_BlitzWho results to Excel" -fore yellow
+		}
+		#Loop through each Excel row
+		foreach($row in $BlitzWhoTbl){
+			<#
+			Loop through each data set column of current row and fill the corresponding 
+			Excel cell
+			#>
+			foreach($col in $DataSetCols){
+				#Fill Excel cell with value from the data set
+				if($col -eq "CheckDate"){
+					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+				} else {
+					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoTbl.Rows[$RowNum][$col]
+				}
 				$ExcelColNum += 1
-				#move to the top of the loop
-				Continue
 			}
-			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoAggTbl.Rows[$RowNum][$col]
-			$ExcelColNum += 1
+
+			#move to the next row in the spreadsheet
+			$ExcelStartRow += 1
+			#move to the next row in the data set
+			$RowNum += 1
+			# reset Excel column number so that next row population begins with column 1
+			$ExcelColNum = 1
 		}
-			
-		#move to the next row in the spreadsheet
-		$ExcelStartRow += 1
-		#move to the next row in the data set
-		$RowNum += 1
-		# reset Excel column number so that next row population begins with column 1
+		##Saving file 
+		$ExcelFile.Save()
+
+		##Populating the "sp_BlitzWho Aggregate" sheet
+		$ExcelSheet = $ExcelFile.Worksheets.Item("sp_BlitzWho Aggregate")
+		#Specify at which row in the sheet to start adding the data
+		$ExcelStartRow = $DefaultStartRow
+		#Specify with which column in the sheet to start
 		$ExcelColNum = 1
+		#Set counter used for row retrieval
+		$RowNum = 0
+
+		#List of columns that should be returned from the data set
+		$DataSetCols = @("start_time", "elapsed_time", "session_id", "database_name", 
+		 "query_text", "outer_command","query_cost", "sqlplan_file", "status", 
+		 "cached_parameter_info", "wait_info", "top_session_waits",
+		 "blocking_session_id", "open_transaction_count", "is_implicit_transaction",
+		 "nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
+		 "fix_parameter_sniffing", "client_interface_name", "login_time", 
+		 "request_time", "request_cpu_time", "request_logical_reads", "request_writes",
+		 "request_physical_reads", "session_cpu", "session_logical_reads",
+		 "session_physical_reads", "session_writes", "tempdb_allocations_mb", 
+		 "memory_usage", "estimated_completion_time", "percent_complete", 
+		 "deadlock_priority", "transaction_isolation_level", "degree_of_parallelism",
+		 "grant_time", "requested_memory_kb", "grant_memory_kb", "is_request_granted",
+		 "required_memory_kb", "query_memory_grant_used_memory_kb", "ideal_memory_kb",
+		 "is_small", "timeout_sec", "resource_semaphore_id", "wait_order", "wait_time_ms",
+		 "next_candidate_for_memory_grant", "target_memory_kb", "max_target_memory_kb",
+		 "total_memory_kb", "available_memory_kb", "granted_memory_kb",
+		 "query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
+		 "timeout_error_count", "forced_grant_count", "workload_group_name",
+		 "resource_pool_name", "context_info", "query_hash", "query_plan_hash")
+
+		if($Debug -eq 1){
+			Write-Host " ->Writing sp_BlitzWho aggregate results to Excel" -fore yellow
+		}
+		#Loop through each Excel row
+		foreach($row in $BlitzWhoAggTbl){
+			<#
+			Loop through each data set column of current row and fill the corresponding 
+			Excel cell
+			#>
+			foreach($col in $DataSetCols){
+				#Fill Excel cell with value from the data set
+				#Properly handling Query Hash and Plan Hash hex values 
+				if("query_hash", "query_plan_hash" -Contains $col){
+					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $BlitzWhoAggTbl.Rows[$RowNum][$col]
+					#move to the next column
+					$ExcelColNum += 1
+					#move to the top of the loop
+					Continue
+				}
+				$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoAggTbl.Rows[$RowNum][$col]
+				$ExcelColNum += 1
+			}
+
+			#move to the next row in the spreadsheet
+			$ExcelStartRow += 1
+			#move to the next row in the data set
+			$RowNum += 1
+			# reset Excel column number so that next row population begins with column 1
+			$ExcelColNum = 1
+		}
+		##Saving file 
+		$ExcelFile.Save()
+		##Cleaning up variables
+		Remove-Variable -Name BlitzWhoTbl
+		Remove-Variable -Name BlitzWhoAggTbl
+		Remove-Variable -Name BlitzWhoSet
+		if($TryCompleted -eq "N"){
+		Write-Host	" sp_BlitzWho data has been retrieved." -fore green
+		}		
 	}
-	##Saving file 
-	$ExcelFile.Save()
-	##Cleaning up variables
-	Remove-Variable -Name BlitzWhoTbl
-	Remove-Variable -Name BlitzWhoAggTbl
-	Remove-Variable -Name BlitzWhoSet
+
+	Catch{
+		Write-Host " Failed to retrieve sp_BlitzWho data." -fore red
+		Write-Host " Saving output file." -fore green
+	}
 
 	#####################################################################################
 	#						Delete unused sheets 										#
