@@ -22,44 +22,35 @@ FROM   [sys].[dm_os_sys_info];
 
 
 /*Get resource info*/
-/*If running on SQL Server 2016 SP1 or lower, don't retrieve physical_cpu_cores*/
-IF ( (SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT)) = 13
-     AND (SELECT CAST(SERVERPROPERTY('ProductLevel') AS NVARCHAR(128))) IN ( N'RTM', N'SP1' ) )
-    OR ( (SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT)) < 13 )
-  BEGIN
-      SELECT [cpu_count]                                                     AS [logical_cpu_cores],
-             '-- N/A --'                                                           AS [physical_cpu_cores],
-             CAST(ROUND(( [physical_memory_kb] / 1024.0 / 1024 ), 1) AS INT) AS [physical_memory_GB],
-             (SELECT CAST(CAST([value_in_use] AS INT) / 1024.0 AS DECIMAL(15, 2))
-              FROM   [sys].[configurations]
-              WHERE  [name] = N'max server memory (MB)')                     AS [max_server_memory_GB],
-             (SELECT TOP(1) CAST([cntr_value] / 1024.0 / 1024 AS DECIMAL(15, 2))
-              FROM   [sys].[dm_os_performance_counters]
-              WHERE  [object_name] LIKE N'%Memory Manager%'
-                     AND [counter_name] LIKE N'Target Server Memory (KB)%'
-              ORDER  BY [cntr_value] DESC)                                   AS [target_server_memory_GB],
-             (SELECT TOP(1) CAST([cntr_value] / 1024.0 / 1024 AS DECIMAL(15, 2))
-              FROM   [sys].[dm_os_performance_counters]
-              WHERE  [object_name] LIKE N'%Memory Manager%'
-                     AND [counter_name] LIKE N'Total Server Memory (KB)%')   AS [total_memory_used_GB]
-      FROM   [sys].[dm_os_sys_info];
-  END;
-ELSE
-  BEGIN
-      SELECT [cpu_count]                                                   AS [logical_cpu_cores],
-             ( [socket_count] * [cores_per_socket] )                       AS [physical_cpu_cores],
-             CAST(ROUND(( physical_memory_kb / 1024.0 / 1024 ), 1) AS INT) AS [physical_memory_GB],
-             (SELECT CAST(CAST([value_in_use] AS INT) / 1024.0 AS DECIMAL(15, 2))
-              FROM   [sys].[configurations]
-              WHERE  [name] = N'max server memory (MB)')                   AS [max_server_memory_GB],
-             (SELECT TOP(1) CAST([cntr_value] / 1024.0 / 1024 AS DECIMAL(15, 2))
-              FROM   [sys].[dm_os_performance_counters]
-              WHERE  [object_name] LIKE N'%Memory Manager%'
-                     AND [counter_name] LIKE N'Target Server Memory (KB)%'
-              ORDER  BY [cntr_value] DESC)                                 AS [target_server_memory_GB],
-             (SELECT TOP(1) CAST([cntr_value] / 1024.0 / 1024 AS DECIMAL(15, 2))
-              FROM   [sys].[dm_os_performance_counters]
-              WHERE  [object_name] LIKE N'%Memory Manager%'
-                     AND [counter_name] LIKE N'Total Server Memory (KB)%') AS [total_memory_used_GB]
-      FROM   [sys].[dm_os_sys_info];
-  END; 
+DECLARE @SQL NVARCHAR(MAX);
+DECLARE @LineFeed NVARCHAR(5);
+
+SET @LineFeed = CHAR(13) + CHAR(10);
+
+SELECT @SQL = N'SELECT [cpu_count] AS [logical_cpu_cores],' 
++ @LineFeed + CASE 
+				WHEN /*If running on SQL Server 2016 SP1 or lower, don't retrieve physical_cpu_cores*/ 
+					(CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) = 13
+					AND CAST(SERVERPROPERTY('ProductLevel') AS NVARCHAR(128)) IN ( N'RTM', N'SP1' )) 
+					OR CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) < 13  
+				THEN N'''-- N/A --'''
+				ELSE N'( [socket_count] * [cores_per_socket] )'
+			END +N' AS [physical_cpu_cores],'
++ @LineFeed + N'CAST(ROUND(( [physical_memory_kb] / 1024.0 / 1024 ), 1) AS INT) AS [physical_memory_GB],'
++ @LineFeed + N'(SELECT CAST(CAST([value_in_use] AS INT) / 1024.0 AS DECIMAL(15, 2))' 
++ @LineFeed + N'FROM   [sys].[configurations]'
++ @LineFeed + N'WHERE  [name] = N''max server memory (MB)'')                     AS [max_server_memory_GB],'
++ @LineFeed + N'(SELECT TOP(1) CAST([cntr_value] / 1024.0 / 1024 AS DECIMAL(15, 2))'
++ @LineFeed + N'FROM   [sys].[dm_os_performance_counters]'
++ @LineFeed + N'WHERE  [object_name] LIKE N''%Memory Manager%'''
++ @LineFeed + N'AND [counter_name] LIKE N''Target Server Memory (KB)%'''
++ @LineFeed + N'ORDER  BY [cntr_value] DESC) AS [target_server_memory_GB],'
++ @LineFeed + N'(SELECT TOP(1) CAST([cntr_value] / 1024.0 / 1024 AS DECIMAL(15, 2))'
++ @LineFeed + N'FROM   [sys].[dm_os_performance_counters]'
++ @LineFeed + N'WHERE  [object_name] LIKE N''%Memory Manager%'''
++ @LineFeed + N'AND [counter_name] LIKE N''Total Server Memory (KB)%'')   AS [total_memory_used_GB]'
++ @LineFeed + N'FROM   [sys].[dm_os_sys_info];'
+
+BEGIN
+EXEC(@SQL);
+END;

@@ -1843,7 +1843,7 @@ without the otuermost BEGIN and END and with the dr.deadlock_graph column still 
                 N'S',
                 N'IS'
             )
-        AND (dow.database_id = @DatabaseName OR @DatabaseName IS NULL)
+        AND (dow.database_id = @DatabaseId OR @DatabaseName IS NULL)
         AND (dow.event_date >= @StartDate OR @StartDate IS NULL)
         AND (dow.event_date < @EndDate OR @EndDate IS NULL)
         AND (dow.object_name = @ObjectName OR @ObjectName IS NULL)
@@ -1886,7 +1886,7 @@ without the otuermost BEGIN and END and with the dr.deadlock_graph column still 
                 N' deadlock(s).'
         FROM #deadlock_owner_waiter AS dow
         WHERE 1 = 1
-        AND (dow.database_id = @DatabaseName OR @DatabaseName IS NULL)
+        AND (dow.database_id = @DatabaseId OR @DatabaseName IS NULL)
         AND (dow.event_date >= @StartDate OR @StartDate IS NULL)
         AND (dow.event_date < @EndDate OR @EndDate IS NULL)
         AND (dow.object_name = @ObjectName OR @ObjectName IS NULL)
@@ -1925,7 +1925,7 @@ without the otuermost BEGIN and END and with the dr.deadlock_graph column still 
                 N' deadlock(s).'
         FROM #deadlock_owner_waiter AS dow
         WHERE 1 = 1
-        AND (dow.database_id = @DatabaseName OR @DatabaseName IS NULL)
+        AND (dow.database_id = @DatabaseId OR @DatabaseName IS NULL)
         AND (dow.event_date >= @StartDate OR @StartDate IS NULL)
         AND (dow.event_date < @EndDate OR @EndDate IS NULL)
         AND (dow.object_name = @ObjectName OR @ObjectName IS NULL)
@@ -1970,7 +1970,7 @@ without the otuermost BEGIN and END and with the dr.deadlock_graph column still 
                 N' deadlock(s).'
         FROM #deadlock_owner_waiter AS dow
         WHERE 1 = 1
-        AND (dow.database_id = @DatabaseName OR @DatabaseName IS NULL)
+        AND (dow.database_id = @DatabaseId OR @DatabaseName IS NULL)
         AND (dow.event_date >= @StartDate OR @StartDate IS NULL)
         AND (dow.event_date < @EndDate OR @EndDate IS NULL)
         AND (dow.object_name = @ObjectName OR @ObjectName IS NULL)
@@ -2296,7 +2296,7 @@ without the otuermost BEGIN and END and with the dr.deadlock_graph column still 
           ON dow.owner_id = ds.id
           AND dow.event_date = ds.event_date
         WHERE 1 = 1
-        AND (dow.database_id = @DatabaseName OR @DatabaseName IS NULL)
+        AND (dow.database_id = @DatabaseId OR @DatabaseName IS NULL)
         AND (dow.event_date >= @StartDate OR @StartDate IS NULL)
         AND (dow.event_date < @EndDate OR @EndDate IS NULL)
         AND (dow.object_name = @StoredProcName OR @StoredProcName IS NULL)
@@ -2352,7 +2352,7 @@ without the otuermost BEGIN and END and with the dr.deadlock_graph column still 
               ON dow.owner_id = ds.id
               AND dow.event_date = ds.event_date
             WHERE ds.proc_name <> N'adhoc'
-            AND (dow.database_id = @DatabaseName OR @DatabaseName IS NULL)
+            AND (dow.database_id = @DatabaseId OR @DatabaseName IS NULL)
             AND (dow.event_date >= @StartDate OR @StartDate IS NULL)
             AND (dow.event_date < @EndDate OR @EndDate IS NULL)
             AND (dow.object_name = @StoredProcName OR @StoredProcName IS NULL)
@@ -2428,7 +2428,7 @@ without the otuermost BEGIN and END and with the dr.deadlock_graph column still 
                   ON  s.database_id = dow.database_id
                   AND s.partition_id = dow.associatedObjectId
                 WHERE 1 = 1
-                AND (dow.database_id = @DatabaseName OR @DatabaseName IS NULL)
+                AND (dow.database_id = @DatabaseId OR @DatabaseName IS NULL)
                 AND (dow.event_date >= @StartDate OR @StartDate IS NULL)
                 AND (dow.event_date < @EndDate OR @EndDate IS NULL)
                 AND (dow.object_name = @ObjectName OR @ObjectName IS NULL)

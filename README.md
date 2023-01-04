@@ -27,8 +27,8 @@ Outputs the following to an Excel spreadsheet:
 - Index-related issues and recommendations - from sp_BlitzIndex
 - Top 10 most resource intensive queries - from sp_BlitzCache
 - Deadlock related information from the past 15 days - from sp_BlitzLock
-- Statistics details for a given database - in the case of database-specific check
-- Index Fragmentation information for a given database - in the case of database-specific check
+- Statistics details for a given database - in the case of database-specific check or if a database accounts for at least 2/3 of the sp_BlitzCache data
+- Index Fragmentation information for a given database - in the case of database-specific check or if a database accounts for at least 2/3 of the sp_BlitzCache data
 
 Note: If the execution of PSBlitz took longer than 15 minutes up until the call to sp_BlitzLock, the timeframe for sp_BlitzLock will be narrowed down to the last 7 days in order to keep execution time within a reasonable amount.
 
