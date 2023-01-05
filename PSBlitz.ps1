@@ -1632,8 +1632,9 @@ try {
 	#Change date range if execution time so far > 15min
 	if([Math]::Round($CurrRunTime) -gt 15){
 		$CurrMin = [Math]::Round($CurrRunTime)
-		Write-Host " ->Current execution time is $CurrMin minutes" -fore green
-		Write-Host " ->Retrieving deadlock info for the last 7 days instead of 15" -fore green
+		Write-Host ""
+		Write-Host " ->Current execution time is $CurrMin minutes"
+		Write-Host " ->Retrieving deadlock info for the last 7 days instead of 15... " -NoNewLine
 		[string]$Query = $Query -replace "@StartDate = DATEADD(DAY,-15, GETDATE()),", "@StartDate = DATEADD(DAY,-7, GETDATE()),"
 	}
 	$BlitzLockQuery = new-object System.Data.SqlClient.SqlCommand
