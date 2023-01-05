@@ -92,7 +92,7 @@ WHERE  [database_name] = CASE
                          END;
 
 /*Aggregate output*/
-;WITH AGG ( ID, [session_id], [query_hash], start_time, [TotalExecTime])
+;WITH agg ( ID, [session_id], [query_hash], start_time, [TotalExecTime])
      AS (SELECT MAX(ID),
                 [session_id],
                 [query_hash],
