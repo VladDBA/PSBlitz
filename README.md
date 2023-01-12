@@ -199,7 +199,6 @@ Note that `-ServerName` is a positional parameter, so you don't necessarily have
 ![GIF](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/GIF_000.gif)
 ![Screenshot1](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img001.png)
 ![Screenshot2](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img002.png)
-![Screenshot3](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img003.png)
 ![Screenshot4](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img004.png)
 
 [*Back to top*](#header1)
