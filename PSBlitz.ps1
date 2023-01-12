@@ -79,8 +79,8 @@ SOFTWARE.
 
 ###Internal params
 #Version
-$Vers = "2.2.2"
-$VersDate = "20230105"
+$Vers = "2.2.3"
+$VersDate = "20230112"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -1789,7 +1789,7 @@ try {
 		[int]$TwoThirdsBlitzCache = [Math]::Floor([decimal]($BlitzCacheRecs / 1.5))
 		[string]$DBName = $DBArray | Group -NoElement | Sort Count | % Name | Select -Last 1
 		[int]$DBCount = $DBArray | Group -NoElement | Sort Count | % Count | Select -Last 1
-		if($DBCount -ge $TwoThirdsBlitzCache){
+		if(($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --")){
 			Write-Host " $DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
 			Write-Host " ->" -NoNewLine
 			[string]$CheckDB = $DBName
