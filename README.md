@@ -196,6 +196,7 @@ Note that `-ServerName` is a positional parameter, so you don't necessarily have
 [*Back to top*](#header1)
 
 ## Screenshots
+![GIF](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/GIF_000.gif)
 ![Screenshot1](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img001.jpg)
 ![Screenshot2](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img002.jpg)
 ![Screenshot3](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img003.jpg)
