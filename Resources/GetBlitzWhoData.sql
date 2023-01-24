@@ -2,7 +2,7 @@ SET NOCOUNT ON;
 
 /*Create supporting index*/
 CREATE NONCLUSTERED INDEX [IX_AGG]
-  ON [tempdb].[dbo].[..BlitzWhoOut..] ([database_name], [start_time], [query_hash], [session_id], [elapsed_time] );
+  ON [tempdb].[dbo].[BlitzWho_..BlitzWhoOut..] ([database_name], [start_time], [query_hash], [session_id], [elapsed_time] );
 
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
@@ -85,11 +85,12 @@ SELECT [CheckDate],
        [workload_group_name],
        [resource_pool_name],
        [context_info]
-FROM   [tempdb].[dbo].[..BlitzWhoOut..]
+FROM   [tempdb].[dbo].[BlitzWho_..BlitzWhoOut..]
 WHERE  [database_name] = CASE
                            WHEN @DatabaseName = N'..PSBlitzReplace..' THEN [database_name]
                            ELSE @DatabaseName
-                         END;
+                         END
+AND [program_name] NOT LIKE N'PSBlitz%';
 
 /*Aggregate output*/
 ;WITH agg ( ID, [session_id], [query_hash], start_time, [TotalExecTime])
@@ -98,11 +99,12 @@ WHERE  [database_name] = CASE
                 [query_hash],
                 [start_time],
                 MAX([elapsed_time]) AS [TotalExecTime]
-         FROM   [tempdb].[dbo].[..BlitzWhoOut..]
+         FROM   [tempdb].[dbo].[BlitzWho_..BlitzWhoOut..]
          WHERE  [database_name] = CASE
                                     WHEN @DatabaseName = N'..PSBlitzReplace..' THEN [database_name]
                                     ELSE @DatabaseName
                                   END
+		AND [program_name] NOT LIKE N'PSBlitz%'
          GROUP  BY [session_id],
                    [query_hash],
                    [start_time])
@@ -183,13 +185,17 @@ SELECT [agg].[start_time],
        [who].[context_info],
        [agg].[query_hash],
        [who].[query_plan_hash]
-FROM   [tempdb].[dbo].[..BlitzWhoOut..] [who]
+FROM   [tempdb].[dbo].[BlitzWho_..BlitzWhoOut..] [who]
        INNER JOIN [agg]
                ON [who].[ID] = [agg].ID
 ORDER  BY [elapsed_time] DESC;
 
 /*Cleanup*/
-IF OBJECT_ID(N'tempdb.dbo...BlitzWhoOut..', N'U') IS NOT NULL
+IF OBJECT_ID(N'tempdb.dbo.BlitzWho_..BlitzWhoOut..', N'U') IS NOT NULL
   BEGIN
-      DROP TABLE [tempdb].[dbo].[..BlitzWhoOut..];
+      DROP TABLE [tempdb].[dbo].[BlitzWho_..BlitzWhoOut..];
+  END;
+IF OBJECT_ID(N'tempdb.dbo.BlitzWhoOutFlag_..BlitzWhoOut..', N'U') IS NOT NULL
+  BEGIN
+      DROP TABLE [tempdb].[dbo].[BlitzWhoOutFlag_..BlitzWhoOut..];
   END;

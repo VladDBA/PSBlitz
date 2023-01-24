@@ -4,7 +4,8 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 SELECT SERVERPROPERTY('MachineName')                                                       AS [machine_name],
        ISNULL(CAST(SERVERPROPERTY('InstanceName') AS NVARCHAR(100)), '(default instance)') AS [instance_name],
        SERVERPROPERTY('ProductVersion')                                                    AS [product_version],
-       SERVERPROPERTY('ProductLevel')                                                      AS [patch_level],
+       SERVERPROPERTY('ProductLevel')                                                      AS [product_level],
+	   SERVERPROPERTY('ProductUpdateLevel')                                                AS [patch_level],
        SERVERPROPERTY('Edition')                                                           AS [edition],
        CASE
          WHEN SERVERPROPERTY('IsClustered') = 1 THEN 'Yes'
