@@ -21,7 +21,7 @@ FROM   [tempdb].[sys].[partitions] AS [prt]
        INNER JOIN [tempdb].[sys].[tables] AS [tb]
                ON [pst].[object_id] = [tb].[object_id]
 /*Ignoring current BlitzWho output table*/			   
-WHERE [tb].[name] <> N'..PSBlitzReplace..'
+WHERE [tb].[name] <> N'BlitzWho_..PSBlitzReplace..'
 ORDER  BY [reserved_space_MB] DESC;
 
 SELECT TOP(30) [tsu].[session_id],
