@@ -84,7 +84,7 @@ IF OBJECT_ID('tempdb..#UpdatedStats') IS NOT NULL
 IF OBJECT_ID('tempdb..#TempdbOperationalStats') IS NOT NULL
 	DROP TABLE #TempdbOperationalStats;
 	
-/*Everything beyond this point, aside from the changes at lines 313 and 4960, 
+/*Everything beyond this point, aside from the changes at lines 313 and 4961, 
 is straight from sp_BlitzFirst without the otuermost BEGIN and END, 
 and without the GO at the end*/
 
@@ -92,7 +92,7 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-SELECT @Version = '8.12', @VersionDate = '20221213';
+SELECT @Version = '8.13', @VersionDate = '20230215';
 
 IF(@VersionCheckMode = 1)
 BEGIN
@@ -132,7 +132,7 @@ https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit/
 
 MIT License
 
-Copyright (c) 2021 Brent Ozar Unlimited
+Copyright (c) Brent Ozar Unlimited
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -2340,8 +2340,9 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
 				  CROSS APPLY sys.dm_exec_query_plan(r.plan_handle) AS qp ';
 
 				IF EXISTS (SELECT * FROM sys.all_objects WHERE name = 'dm_exec_query_statistics_xml')
-					SET @StringToExecute = @StringToExecute + N' OUTER APPLY sys.dm_exec_query_statistics_xml(s.session_id) qs_live ';
-				  
+				/* GitHub #3210 */
+					SET @StringToExecute = N'
+                   SET LOCK_TIMEOUT 1000 ' + @StringToExecute + N' OUTER APPLY sys.dm_exec_query_statistics_xml(s.session_id) qs_live ';
 				  
 				SET @StringToExecute = @StringToExecute + N';
 

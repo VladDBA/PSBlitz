@@ -70,7 +70,7 @@ without the GO at the end
 	SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 	
 
-	SELECT @Version = '8.12', @VersionDate = '20221213';
+	SELECT @Version = '8.13', @VersionDate = '20230215';
 	SET @OutputType = UPPER(@OutputType);
 
     IF(@VersionCheckMode = 1)
@@ -125,9 +125,9 @@ without the GO at the end
 	tigertoolbox and are provided under the MIT license:
 	https://github.com/Microsoft/tigertoolbox
 	
-	All other copyrights for sp_Blitz are held by Brent Ozar Unlimited, 2021.
+	All other copyrights for sp_Blitz are held by Brent Ozar Unlimited.
 
-	Copyright (c) 2021 Brent Ozar Unlimited
+	Copyright (c) Brent Ozar Unlimited
 
 	Permission is hereby granted, free of charge, to any person obtaining a copy
 	of this software and associated documentation files (the "Software"), to deal

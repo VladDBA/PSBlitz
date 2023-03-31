@@ -89,8 +89,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "2.3.0"
-$VersDate = "20230124"
+$Vers = "2.3.1"
+$VersDate = "20230331"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
