@@ -15,6 +15,7 @@
 ## Intro
 
 Since I'm a big fan of [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) and I've found myself in many situations where I would have liked a quick way to easily export the output of sp_Blitz, sp_BlitzCache, sp_BlitzFirst, sp_BlitzIndex, sp_BlitzLock, and sp_BlitzWho to Excel, as well as saving to disk the execution plans identified by sp_BlitzCache and deadlock graphs from sp_BlitzLock, I've decided to put together a PowerShell script that does just that.
+As of version 3.0.0, PSBlitz is also capable of exporting the report to HTML making Excel/Office no longer a hard requirement for running PSBlitz.
 
 ## What it does
 
@@ -43,7 +44,7 @@ Exports the following files:
     ```PowerShell
     Unblock-File .\PSBlitz.ps1
     ```
-2. Excel needs to be installed for the output to Excel to actually work.
+2. If you want the report to be in Excel format, then the MS OFfice suite needs to be installed on the machine where you're executing PSBlitz, otherwise use the HTML format.
 3. Sufficient permissions to query DMVs, server state, and get database objects' definitions.
 
 This should be ran from your workstation and not from the instance's host itself (why would you have the MS Word suite installed on a database server anyway?)
@@ -91,6 +92,8 @@ You can find the all the scripts in the repository's [Resources](/Resources) dir
 |`-IsIndepth` | Providing Y as a value will tell PSBlitz.ps1 to run a more in-depth check against the instance/database. Omit for default check. |
 |`-CheckDB` | Used to provide the name of a specific database against which sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock will be ran. Omit to run against the whole instance.|
 |`-OutputDir`| Used to provide a path where the output directory should be saved to. Defaults to PSBlitz.ps1's directory if not specified or a non-existent path is provided.|
+|`-ToHTML`| Providing Y as a value will tell PSBlitz.ps1 to output the report as HTML instead of an Excel file. This is perfect when running PSBlitz from a machine that doesn't have Office installed.|
+|`-ZipOutput`| Providing Y as a value will tell PSBlitz.ps1 to also create a zip archive of the output files.|
 |`-BlitzWhoDelay` | Used to sepcify the number of seconds between each sp_BlitzWho execution. Defaults to 10 if not specified.|
 |`-ConnTimeout`| Can be used to increased the timeout limit in seconds for connecting to SQL Server. Defaults to 15 seconds if not specified.|
 |`-MaxTimeout`| Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. Defaults to 800 (13.3 minutes)|
@@ -164,6 +167,7 @@ Execution plans file naming convention:
 
 ## Usage examples
 You can run PSBlitz.ps1 by simply right-clicking on the script and then clicking on "Run With PowerShell" which will execute the script in interactive mode, prompting you for the required input.
+Note that parameters like `-DebugMode` and `-OutputDir` are only available in command line mode.
 
 Otherwise you can navigate to the directory where the script is in PowerShell and execute it by providing parameters and appropriate values.
 - Examples:
@@ -206,6 +210,10 @@ Otherwise you can navigate to the directory where the script is in PowerShell an
 9. Run the same command as above, but increase execution timeout for sp_BlitzIndex, stats and index info retrieval, while also increasing delay between sp_BlitzWHo executions as well as getting more verbose console output and saving the output directory to C:\temp
     ```PowerShell
     .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase -MaxTimeout 1200 -BlitzWhoDelay 20 -DebugInfo -OutputDir C:\Temp
+    ```
+10. Run PSBlitz but return the report as HTML instead of XLSX while also creating a zip archive of the output files.
+    ```PowerShell
+    .\PSBlitz.ps1 Server01\SQL01 -ToHTML Y -ZipOutput Y 
     ```
 Note that `-ServerName` is a positional parameter, so you don't necessarily have to specify the parameter's name as long as the first thing after the script's name is the instance 
 
