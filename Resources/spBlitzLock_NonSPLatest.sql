@@ -1,4 +1,7 @@
-/*sp_BlitzLock non-stored procedure*/
+/*
+sp_BlitzLock non-stored procedure
+Part of https://github.com/VladDBA/PSBlitz
+*/
 
 DECLARE     @Top INT, 
 	@DatabaseName NVARCHAR(256),
@@ -84,7 +87,7 @@ without the otuermost BEGIN and END and with the dr.deadlock_graph column still 
     SET NOCOUNT, XACT_ABORT ON;
     SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-    SELECT @Version = '8.13', @VersionDate = '20230215';
+    SELECT @Version = '8.14', @VersionDate = '20230420';
 
     IF @VersionCheckMode = 1
     BEGIN
@@ -954,12 +957,13 @@ without the otuermost BEGIN and END and with the dr.deadlock_graph column still 
             SELECT
                 deadlock_xml =
                     TRY_CAST(fx.event_data AS xml)
-            FROM sys.fn_xe_file_target_read_file('system_health*.xel', NULL, NULL, NULL) AS fx
+            FROM sys.fn_xe_file_target_read_file(N'system_health*.xel', NULL, NULL, NULL) AS fx
             LEFT JOIN #t AS t
               ON 1 = 1
+			WHERE fx.object_name = N'xml_deadlock_report'
         ) AS xml
         CROSS APPLY xml.deadlock_xml.nodes('/event') AS e(x)
-        WHERE e.x.exist('@name[ . = "xml_deadlock_report"]') = 1
+        WHERE 1 = 1
         AND   e.x.exist('@timestamp[. >= sql:variable("@StartDate")]') = 1
         AND   e.x.exist('@timestamp[. <  sql:variable("@EndDate")]') = 1
         OPTION(RECOMPILE);
