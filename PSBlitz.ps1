@@ -93,8 +93,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "3.0.0"
-$VersDate = "20230411"
+$Vers = "3.0.1"
+$VersDate = "20230421"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -729,6 +729,30 @@ if (!(Test-Path $XDLOutDir)) {
 	New-Item -ItemType Directory -Force -Path $XDLOutDir | Out-Null
 }
 
+#Initiate Excel app here
+if ($ToHTML -ne "Y") {
+	###Open Excel
+	if ($DebugInfo) {
+		$ErrorActionPreference = "Continue"
+		Write-Host "Opening excel file" -fore yellow
+	}
+	else {
+		#Do not display the occasional "out of memory" errors
+		$ErrorActionPreference = "SilentlyContinue"
+	}
+
+	try {
+		$ExcelApp = New-Object -comobject Excel.Application	-ErrorAction Stop	
+	}
+	catch {
+		Write-Host "Could not open Excel." -fore Red
+		Write-Host "->Switching to HTML output."
+		$ToHTML = "Y"
+		$ErrorActionPreference = "Continue"
+	}
+	
+}
+
 if ($ToHTML -eq "Y") {
 	#Set HTML files output directory
 	$HTMLOutDir = $OutDir + "\" + "HTMLFiles"
@@ -793,23 +817,12 @@ else {
 	Copy-Item $OrigExcelF  -Destination $OutExcelF
 }
 #Set output table for sp_BlitzWho
-#$BlitzWhoOut = "BlitzWho_" + $DirDate
 #Set replace strings
 $OldBlitzWhoOut = "@OutputTableName = 'BlitzWho_..PSBlitzReplace..',"
 $NewBlitzWhoOut = "@OutputTableName = 'BlitzWho_$DirDate',"
 
 if ($ToHTML -ne "Y") {
-	###Open Excel
-	if ($DebugInfo) {
-		$ErrorActionPreference = "Continue"
-		Write-Host "Opening excel file" -fore yellow
-	}
-	else {
-		#Do not display the occasional "out of memory" errors
-		$ErrorActionPreference = "SilentlyContinue"
-	}
-
-	$ExcelApp = New-Object -comobject Excel.Application
+	###Open Excel FIle
 	if ($DebugInfo) {
 		$ExcelApp.visible = $True
 	}
