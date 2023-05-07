@@ -93,8 +93,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "3.0.1"
-$VersDate = "20230421"
+$Vers = "3.1.0"
+$VersDate = "20230507"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -781,10 +781,12 @@ if ($ToHTML -eq "Y") {
 		font-weight: bold;
 		padding: 5px;
 		text-align: center;
-	}
-	td, th {
 		border: 1px solid black;
+	}
+	td {
 		padding: 5px;
+		border: 1px solid black;
+		vertical-align: top;
 	}
 	td:first-child {
 		font-weight: bold;
@@ -976,10 +978,10 @@ try {
     </head>
     <body>
 <h1>$HtmlTabName</h1>
-<h2>Instance information</h2>
+<h2 style="text-align: center;">Instance information</h2>
 $htmlTable1
 <b>
-<h2>Resource information</h2>
+<h2 style="text-align: center;">Resource information</h2>
 $htmlTable2
 </body>
 </html>
@@ -1166,16 +1168,38 @@ $htmlTable2
 </head>
 <body>
 <h1>$HtmlTabName</h1>
-<h2>TempDB space usage</h2>
+<h2 style="text-align: center;">TempDB space usage</h2>
 $htmlTable1
 <br>
-<h2>Top 30 temp tables by reserved space</h2>
+<h2 style="text-align: center;">Top 30 temp tables by reserved space</h2>
+"@
+			if($TempTabTbl.Rows.Count -gt 0){
+				$html += @"
 $htmlTable2
 <br>
-<h2>Top 30 sessions using TempDB by total allocation</h2>
-$htmlTable3
-</body>
-</html>
+"@
+			} else {
+				$html += @"
+				<p style="text-align: center;">No temp tables found.</p>
+				<br>
+"@
+			}
+			$html += @"
+			<h2 style="text-align: center;">Top 30 sessions using TempDB by total allocation</h2>
+"@
+			if($TempDBSessTbl.Rows.Count -gt 0 ){
+				$html += @"
+				$htmlTable3
+"@
+			} else {
+				$html += @"
+				<p style="text-align: center;">No sessions were using tempdb at this time.</p>
+				<br>
+"@
+			}
+			$html += @"
+			</body>
+			</html>
 "@
 
 			if ($DebugInfo) {
@@ -1911,6 +1935,7 @@ $htmlTable
 			if ($DebugInfo) {
 				Write-Host " - $RunTime seconds" -Fore Yellow
 			}
+			$PreviousOutcome = $StepOutcome
 			$StepOutcome = "Success"
 		}
 	 Catch {
@@ -1953,7 +1978,6 @@ $htmlTable
 				}
 			}
 
-			##Export data to Excel
 			#Set Excel sheet names based on $SortOrder
 			$SheetName = "sp_BlitzCache "
 			if ($SortOrder -like '*CPU*') {
@@ -1985,10 +2009,12 @@ $htmlTable
 				$SheetName = $SheetName -replace "sp_BlitzCache ", ""
 				$BlitzCacheTbl.Columns.Add("SQLPlan File", [string]) | Out-Null
 				$RowNum = 0
+				$i = 0
 			
 				foreach ($row in $BlitzCacheTbl) {
 					if ($BlitzCacheTbl.Rows[$RowNum]["Query Plan"] -ne [System.DBNull]::Value) {
-						$SQLPlanFile = $FileSOrder + "_" + $RowNum + ".sqlplan"
+						$i += 1
+						$SQLPlanFile = $FileSOrder + "_" + $i + ".sqlplan"
 					
 					}
 					else { $SQLPlanFile = "-- N/A --" }
@@ -1998,7 +2024,11 @@ $htmlTable
 				if ($DebugInfo) {
 					Write-Host " ->Converting sp_BlitzCache output to HTML" -fore yellow
 				}
-				$htmlTable1 = $BlitzCacheTbl | Select-Object "Database", "Cost", "Query Text", "SQLPlan File", "Query Type", "Warnings", 
+				$htmlTable1 = $BlitzCacheTbl | Select-Object "Database", "Cost", 
+				@{Name = "Query"; Expression = { ($_."SQLPlan File").Replace('.sqlplan', '.query') } },
+				#"Query Text", 
+				"SQLPlan File", 
+				"Query Type", "Warnings", 
 				@{Name = "Missing Indexes"; Expression = { $_."Missing Indexes".Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },	
 				@{Name = "Implicit Conversion Info"; Expression = { $_."Implicit Conversion Info".Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
 				@{Name = "Cached Execution Parameters"; Expression = { $_."Cached Execution Parameters".Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
@@ -2022,9 +2052,22 @@ $htmlTable
 				"Maximum Memory Grant KB", "Minimum Used Grant KB", "Maximum Used Grant KB",
 				"Average Max Memory Grant", "Min Spills", "Max Spills", "Total Spills", "Avg Spills" | ConvertTo-Html -As Table -Fragment
 				$htmlTable1 = $htmlTable1 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+				$QExt = '.query'
+				$AnchorRegex = "$FileSOrder(_\d+)$QExt"
+				$AnchorURL = '<a href="#$&">$&</a>'
+				$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
 		
 				$htmlTable2 = $BlitzCacheWarnTbl | Select-Object "Priority", "FindingsGroup", "Finding", "Details", "URL" | ConvertTo-Html -As Table -Fragment
 				$htmlTable2 = $htmlTable2 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+
+				$htmlTable3 = $BlitzCacheTbl | Select-Object @{Name = "Query"; Expression = { ($_."SQLPlan File").Replace('.sqlplan', '.query') } }, 
+				"Query Text" | ConvertTo-Html -As Table -Fragment
+				$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
+				$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
+				#$AnchorURL = '<td id="#$&">$&'
+				$htmlTable3 = $htmlTable3 -replace $AnchorRegex, $AnchorURL
+
+
 		
 				#pairing up related tables in the same HTML file
 				if ("'CPU'", "'Reads'", "'Duration'", "'Executions'", "'Writes'",
@@ -2040,38 +2083,84 @@ $htmlTable
 					$HtmlFileName = "BlitzCache_$HtmlFileName.html"
 					$HtmlTabName2 = $SortOrder -replace "'", ""
 					$html = $HTMLPre + @"
-<title>$HtmlTabName</title>
-</head>
-<body>
-<h1>$HtmlTabName</h1>
-<br>
-<h2>Top 10 Queries by $HtmlTabName2</h2>
-$htmlTable1
-<br>
-<h2>Warnings Explained</h2>
-$htmlTable2
-<br>        
-				
+					<title>$HtmlTabName</title>
+					</head>
+					<body>
+					<h1 id="top">$HtmlTabName</h1>
+					<br>
+					<h2>Top 10 Queries by $HtmlTabName2</h2>
+					<p><a href="#Queries1">Jump to query text</a></p>
+					$htmlTable1
+					<br>
+					<h2>Warnings Explained</h2>
+					$htmlTable2
+					<p><a href="#top">Jump to top</a></p>
+					<br>
+
 "@
+
+					$html2 = @"
+					<h2 id="Queries1">Query text for $HtmlTabName2</h2>
+					$htmlTable3
+					<p><a href="#top">Jump to top</a></p>
+					<br>
+
+"@
+					$FirstHalf = "Done"
+					$SecondHalf = "NotDone"
+
 				}
 		
 				#adding the second half of each html page and writing to file
 				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'")) {
 					$HtmlTabName2 = $SortOrder -replace "'", ""
+					#Add heading if first half of the table failed
+					if ($PreviousOutcome -eq "Failure") {
+						$html = $HTMLPre
+						$html2 = @"
+						<br>
+"@
+					}
 					$html += @"
 				<h2>Top 10 Queries by $HtmlTabName2</h2>
+				<p><a href="#Queries2">Jump to query text</a></p>
 				$htmlTable1
 				<br>
 				<h2>Warnings Explained</h2>
 				$htmlTable2
-				</body>
-				</html>
+				<p><a href="#top">Jump to top</a></p>
+
 "@
+
+					$html2 += @"
+					<h2 id="Queries2">Query text for $HtmlTabName2</h2>					
+					$htmlTable3
+					<p><a href="#top">Jump to top</a></p>
+"@
+					#putting it all together
+					$html += $html2 + @"
+					<br>
+					</body>
+					</html>
+"@
+					$SecondHalf = "Done"
+					$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\$HtmlFileName"
 				}
 				if ($DebugInfo) {
 					Write-Host " ->Writing HTML file." -fore yellow
 				}
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\$HtmlFileName"
+				#Only writing the file here if this is the first half
+				if (($FirstHalf -eq "Done") -and ($SecondHalf -eq "NotDone")) {
+					$html3 = $html + $html2 + @"
+					<br>
+					</body>
+					</html>
+"@
+					$html3 | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\$HtmlFileName"
+				}
+
+
+
 			}
 			else {
 				#Specify worksheet
@@ -2080,7 +2169,7 @@ $htmlTable2
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = 3
 				#$SortOrder containing avg or xpm will export data starting with row 16
-				if (($SortOrder -like '*avg*') -or ($SortOrder -eq "'xpm'") -or ($SortOrder -eq "'recent compilations'")) {
+				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'")) {
 					$ExcelStartRow = 17
 				}
 				#Set counter used for row retrieval
@@ -2402,16 +2491,24 @@ $htmlTable2
 				}
 		
 				$html = $HTMLPre + @"
-<title>$HtmlTabName</title>
-</head>
-<body>
-<h1>$HtmlTabName</h1>
-<br>
-$htmlTable 
-<br>
-</body>
-</html>
+				<title>$HtmlTabName</title>
+				</head>
+				<body>
+				<h1 id="top">$HtmlTabName</h1>
+				<br>
+				$htmlTable 
+				<br>
 "@
+				if ($Mode -ne "1") {
+					$html += @"
+					<p><a href="#top">Jump to top</a></p>
+"@
+				}
+				$html += @"
+				</body>
+				</html>
+"@
+
 				if ($DebugInfo) {
 					Write-Host " ->Writing HTML file." -fore yellow
 				} 
@@ -2590,170 +2687,177 @@ $htmlTable
 
 		$TblLockDtl = $BlitzLockSet.Tables[0]
 		$TblLockOver = $BlitzLockSet.Tables[1]
-
-		##Exporting deadlock graphs to file
-		#Set counter used for row retrieval
-		[int]$RowNum = 0
-		#Setting $i to 0
-		$i = 0
-		if ($DebugInfo) {
-			Write-Host " ->Exporting deadlock graphs (if any)" -fore yellow
+		[int]$RowsReturned = $TblLockDtl.Rows.Count
+		if ($RowsReturned -eq 0) {
+			Write-Host " ->No deadlocks found."
 		}
-		foreach ($row in $TblLockDtl) {
-			#Increment file name counter
-			$i += 1
-			<#
+		if ($RowsReturned -gt 0) {
+			##Exporting deadlock graphs to file
+			#Set counter used for row retrieval
+			[int]$RowNum = 0
+			#Setting $i to 0
+			$i = 0
+			if ($DebugInfo) {
+				Write-Host " ->Exporting deadlock graphs (if any)" -fore yellow
+			}
+			foreach ($row in $TblLockDtl) {
+				#Increment file name counter
+				$i += 1
+				<#
 			Get only the column storing the deadlock graph data that's not NULL, limit to one export per event by filtering for VICTIM, and write it to a file
 			#>
-			if (($TblLockDtl.Rows[$RowNum]["deadlock_graph"] -ne [System.DBNull]::Value) -and ($TblLockDtl.Rows[$RowNum]["deadlock_group"] -like "*VICTIM*")) {
-				#format the event date to append to file name
-				$DLDate = $TblLockDtl.Rows[$RowNum]["event_date"].ToString("yyyyMMdd_HHmmss")
-				#write .xdl file
-				$TblLockDtl.Rows[$RowNum]["deadlock_graph"] | Format-XML | Set-Content -Path $XDLOutDir\$($DLDate)_$($i).xdl -Force
+				if (($TblLockDtl.Rows[$RowNum]["deadlock_graph"] -ne [System.DBNull]::Value) -and ($TblLockDtl.Rows[$RowNum]["deadlock_group"] -like "*VICTIM*")) {
+					#format the event date to append to file name
+					$DLDate = $TblLockDtl.Rows[$RowNum]["event_date"].ToString("yyyyMMdd_HHmmss")
+					#write .xdl file
+					$TblLockDtl.Rows[$RowNum]["deadlock_graph"] | Format-XML | Set-Content -Path $XDLOutDir\$($DLDate)_$($i).xdl -Force
+				}
+				#Increment row retrieval counter
+				$RowNum += 1
 			}
-			#Increment row retrieval counter
-			$RowNum += 1
-		}
 		
-		if ($ToHTML -eq "Y") {
-			if ($DebugInfo) {
-				Write-Host " ->Converting sp_BlitzLock output to HTML" -fore yellow
-			}
-			$HtmlTabName = "Deadlocks"
-			$htmlTable1 = $TblLockOver | Select-Object @{Name = "Database"; Expression = { $_."database_name" } }, 
-			@{Name = "Object"; Expression = { $_."object_name" } }, 
-			@{Name = "Finding Group"; Expression = { $_."finding_group" } }, 
-			@{Name = "Finding"; Expression = { $_."finding" } } | Where-Object "database_name" -NotLike "sp_BlitzLock*" | ConvertTo-Html -As Table -Fragment
+			if ($ToHTML -eq "Y") {
+				if ($DebugInfo) {
+					Write-Host " ->Converting sp_BlitzLock output to HTML" -fore yellow
+				}
+				$HtmlTabName = "Deadlocks"
+				$htmlTable1 = $TblLockOver | Select-Object @{Name = "Database"; Expression = { $_."database_name" } }, 
+				@{Name = "Object"; Expression = { $_."object_name" } }, 
+				@{Name = "Finding Group"; Expression = { $_."finding_group" } }, 
+				@{Name = "Finding"; Expression = { $_."finding" } } | Where-Object "database_name" -NotLike "sp_BlitzLock*" | ConvertTo-Html -As Table -Fragment
 			
-			$htmlTable2 = $TblLockDtl | Select-Object @{Name = "Type"; Expression = { $_."deadlock_type" } }, 
-			@{Name = "Event Date"; Expression = { ($_."event_date").ToString("yyyy-MM-dd HH:mm:ss") } },
-			@{Name = "Database"; Expression = { $_."database_name" } }, 
-			@{Name = "SPID"; Expression = { $_."spid" } },
-			@{Name = "Deadlock Group"; Expression = { $_."deadlock_group" } }, 
-			@{Name = "Query"; Expression = { $_."query" } }, 
-			@{Name = "Object Names"; Expression = { $_."object_names" } }, 
-			@{Name = "Isolation Level"; Expression = { $_."isolation_level" } },
-			@{Name = "Owner Mode"; Expression = { $_."owner_mode" } }, 
-			@{Name = "Waiter Mode"; Expression = { $_."waiter_mode" } }, 
-			@{Name = "Tran Count"; Expression = { $_."transaction_count" } }, 
-			@{Name = "Login"; Expression = { $_."login_name" } },
-			@{Name = "Host Name"; Expression = { $_."host_name" } }, 
-			@{Name = "Client App"; Expression = { $_."client_app" } }, 
-			@{Name = "Wait Time"; Expression = { $_."wait_time" } }, 
-			@{Name = "Wait Resource"; Expression = { $_."wait_resource" } }, 
-			@{Name = "Priority"; Expression = { $_."priority" } }, 
-			@{Name = "Log Used"; Expression = { $_."log_used" } }, 
-			@{Name = "Last Tran Start"; Expression = { ($_."last_tran_started").ToString("yyyy-MM-dd HH:mm:ss") } }, 
-			@{Name = "Last Batch Start"; Expression = { ($_."last_batch_started").ToString("yyyy-MM-dd HH:mm:ss") } },
-			@{Name = "Last Batch Completed"; Expression = { ($_."last_batch_completed").ToString("yyyy-MM-dd HH:mm:ss") } },	
-			@{Name = "Tran Name"; Expression = { $_."transaction_name" } } | ConvertTo-Html -As Table -Fragment
+				$htmlTable2 = $TblLockDtl | Select-Object @{Name = "Type"; Expression = { $_."deadlock_type" } }, 
+				@{Name = "Event Date"; Expression = { ($_."event_date").ToString("yyyy-MM-dd HH:mm:ss") } },
+				@{Name = "Database"; Expression = { $_."database_name" } }, 
+				@{Name = "SPID"; Expression = { $_."spid" } },
+				@{Name = "Deadlock Group"; Expression = { $_."deadlock_group" } }, 
+				@{Name = "Query"; Expression = { $_."query" } }, 
+				@{Name = "Object Names"; Expression = { $_."object_names" } }, 
+				@{Name = "Isolation Level"; Expression = { $_."isolation_level" } },
+				@{Name = "Owner Mode"; Expression = { $_."owner_mode" } }, 
+				@{Name = "Waiter Mode"; Expression = { $_."waiter_mode" } }, 
+				@{Name = "Tran Count"; Expression = { $_."transaction_count" } }, 
+				@{Name = "Login"; Expression = { $_."login_name" } },
+				@{Name = "Host Name"; Expression = { $_."host_name" } }, 
+				@{Name = "Client App"; Expression = { $_."client_app" } }, 
+				@{Name = "Wait Time"; Expression = { $_."wait_time" } }, 
+				@{Name = "Wait Resource"; Expression = { $_."wait_resource" } }, 
+				@{Name = "Priority"; Expression = { $_."priority" } }, 
+				@{Name = "Log Used"; Expression = { $_."log_used" } }, 
+				@{Name = "Last Tran Start"; Expression = { ($_."last_tran_started").ToString("yyyy-MM-dd HH:mm:ss") } }, 
+				@{Name = "Last Batch Start"; Expression = { ($_."last_batch_started").ToString("yyyy-MM-dd HH:mm:ss") } },
+				@{Name = "Last Batch Completed"; Expression = { ($_."last_batch_completed").ToString("yyyy-MM-dd HH:mm:ss") } },	
+				@{Name = "Tran Name"; Expression = { $_."transaction_name" } } | ConvertTo-Html -As Table -Fragment
 		
 		
-			$html = $HTMLPre + @"
+				$html = $HTMLPre + @"
 		<title>$HtmlTabName</title>
 		</head>
 		<body>
 		<h1>$HtmlTabName</h1>
-		<h2>Deadlock Overview</h2>
+		<h2 style="text-align: center;">Deadlock Overview</h2>
 		$htmlTable1
 		<br>
-		<h2>Deadlock Details</h2>
+		<h2 style="text-align: center;">Deadlock Details</h2>
 		$htmlTable2
 		</body>
 		</html>
 "@
-			if ($DebugInfo) {
-				Write-Host " ->Writing HTML file." -fore yellow
-			}			
-			$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\BlitzLock.html"
-		}
-		else {
-			## populating the "sp_BlitzLock Details" sheet
-			$ExcelSheet = $ExcelFile.Worksheets.Item("sp_BlitzLock Details")
-			#Specify at which row in the sheet to start adding the data
-			$ExcelStartRow = $DefaultStartRow
-			#Specify with which column in the sheet to start
-			$ExcelColNum = 1
-			#Set counter used for row retrieval
-			$RowNum = 0
-
-			#List of columns that should be returned from the data set
-			$DataSetCols = @("deadlock_type", "event_date", "database_name", "spid",
-				"deadlock_group", "query", "object_names", "isolation_level",
-				"owner_mode", "waiter_mode", "transaction_count", "login_name",
-				"host_name", "client_app", "wait_time", "wait_resource", 
-				"priority", "log_used", "last_tran_started", "last_batch_started",
-				"last_batch_completed",	"transaction_name")
-			if ($DebugInfo) {
-				Write-Host " ->Writing sp_BlitzLock Details to Excel" -fore yellow
+				if ($DebugInfo) {
+					Write-Host " ->Writing HTML file." -fore yellow
+				}
+				if ($TblLockDtl.Rows.Count -gt 0) {
+					$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\BlitzLock.html"
+				}
 			}
-			#Loop through each Excel row
-			foreach ($row in $TblLockDtl) {
-				<#
+			else {
+				## populating the "sp_BlitzLock Details" sheet
+				$ExcelSheet = $ExcelFile.Worksheets.Item("sp_BlitzLock Details")
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = $DefaultStartRow
+				#Specify with which column in the sheet to start
+				$ExcelColNum = 1
+				#Set counter used for row retrieval
+				$RowNum = 0
+
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("deadlock_type", "event_date", "database_name", "spid",
+					"deadlock_group", "query", "object_names", "isolation_level",
+					"owner_mode", "waiter_mode", "transaction_count", "login_name",
+					"host_name", "client_app", "wait_time", "wait_resource", 
+					"priority", "log_used", "last_tran_started", "last_batch_started",
+					"last_batch_completed",	"transaction_name")
+				if ($DebugInfo) {
+					Write-Host " ->Writing sp_BlitzLock Details to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $TblLockDtl) {
+					<#
 				Loop through each data set column of current row and fill the corresponding 
 				 Excel cell
 				 #>
-				foreach ($col in $DataSetCols) {
-					#Fill Excel cell with value from the data set
-					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TblLockDtl.Rows[$RowNum][$col]
-					#move to the next column
-					$ExcelColNum += 1
+					foreach ($col in $DataSetCols) {
+						#Fill Excel cell with value from the data set
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TblLockDtl.Rows[$RowNum][$col]
+						#move to the next column
+						$ExcelColNum += 1
+					}
+
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 1
+					$ExcelColNum = 1
 				}
 
-				#move to the next row in the spreadsheet
-				$ExcelStartRow += 1
-				#move to the next row in the data set
-				$RowNum += 1
-				# reset Excel column number so that next row population begins with column 1
+				##Saving file 
+				$ExcelFile.Save()
+
+				## populating the "sp_BlitzLock Overview" sheet
+				$ExcelSheet = $ExcelFile.Worksheets.Item("sp_BlitzLock Overview")
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = $DefaultStartRow
+				#Specify with which column in the sheet to start
 				$ExcelColNum = 1
-			}
+				#Set counter used for row retrieval
+				$RowNum = 0
 
-			##Saving file 
-			$ExcelFile.Save()
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("database_name", "object_name", "finding_group", "finding")
 
-			## populating the "sp_BlitzLock Overview" sheet
-			$ExcelSheet = $ExcelFile.Worksheets.Item("sp_BlitzLock Overview")
-			#Specify at which row in the sheet to start adding the data
-			$ExcelStartRow = $DefaultStartRow
-			#Specify with which column in the sheet to start
-			$ExcelColNum = 1
-			#Set counter used for row retrieval
-			$RowNum = 0
-
-			#List of columns that should be returned from the data set
-			$DataSetCols = @("database_name", "object_name", "finding_group", "finding")
-
-			if ($DebugInfo) {
-				Write-Host " ->Writing sp_BlitzLock Overview to Excel" -fore yellow
-			}
-			#Loop through each Excel row
-			foreach ($row in $TblLockOver) {
-				<#
+				if ($DebugInfo) {
+					Write-Host " ->Writing sp_BlitzLock Overview to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $TblLockOver) {
+					<#
 				Loop through each data set column of current row and fill the corresponding 
 				 Excel cell
 				 #>
-				foreach ($col in $DataSetCols) {
-					#Fill Excel cell with value from the data set
-					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TblLockOver.Rows[$RowNum][$col]
-					#move to the next column
-					$ExcelColNum += 1
+					foreach ($col in $DataSetCols) {
+						#Fill Excel cell with value from the data set
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TblLockOver.Rows[$RowNum][$col]
+						#move to the next column
+						$ExcelColNum += 1
+					}
+
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 1
+					$ExcelColNum = 1
 				}
 
-				#move to the next row in the spreadsheet
-				$ExcelStartRow += 1
-				#move to the next row in the data set
-				$RowNum += 1
-				# reset Excel column number so that next row population begins with column 1
-				$ExcelColNum = 1
+				##Saving file 
+				$ExcelFile.Save()
 			}
-
-			##Saving file 
-			$ExcelFile.Save()
+			##Cleaning up variables
+			Remove-Variable -Name TblLockOver
+			Remove-Variable -Name TblLockDtl
+			Remove-Variable -Name BlitzLockSet
 		}
-		##Cleaning up variables
-		Remove-Variable -Name TblLockOver
-		Remove-Variable -Name TblLockDtl
-		Remove-Variable -Name BlitzLockSet
 	}
 
 	if ($JobStatus -ne "Running") {
@@ -3100,7 +3204,8 @@ finally {
 			$htmlTable = $BlitzWhoTbl | Select-Object @{Name = "CheckDate"; Expression = { ($_."CheckDate").ToString("yyyy-MM-dd HH:mm:ss") } }, 
 			"elapsed_time", 
 			"session_id", "database_name", 
-			"query_text", "query_cost", "sqlplan_file", "status", 
+			#"query_text", 
+			"query_cost", "sqlplan_file", "status", 
 			"cached_parameter_info", "wait_info", "top_session_waits",
 			"blocking_session_id", "open_transaction_count", "is_implicit_transaction",
 			"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
@@ -3142,10 +3247,27 @@ finally {
 			if ($DebugInfo) {
 				Write-Host " ->Converting sp_BlitzWho aggregate output to HTML" -fore yellow
 			}
+
+			$BlitzWhoAggTbl.Columns.Add("Query", [string]) | Out-Null
+			$RowNum = 0
+			$i = 0
+			
+			foreach ($row in $BlitzWhoAggTbl) {
+				if ($BlitzWhoAggTbl.Rows[$RowNum]["query_text"] -ne [System.DBNull]::Value) {
+					$i += 1
+					$QueryName = "RunningNow_" + $i + ".query"
+					
+				}
+				else { $SQLPlanFile = "-- N/A --" }
+				$BlitzWhoAggTbl.Rows[$RowNum]["Query"] = $QueryName
+				$RowNum += 1
+			}
 			$HtmlTabName = "Aggregated Session Activity"
-			$htmlTable = $BlitzWhoTbl | Select-Object @{Name = "start_time"; Expression = { ($_."start_time").ToString("yyyy-MM-dd HH:mm:ss") } }, 
+			$htmlTable = $BlitzWhoAggTbl | Select-Object @{Name = "start_time"; Expression = { ($_."start_time").ToString("yyyy-MM-dd HH:mm:ss") } }, 
 			"elapsed_time", "session_id", "database_name", 
-			"query_text", "outer_command", "query_cost", "sqlplan_file", "status", 
+			#"query_text", 
+			"Query",
+			"outer_command", "query_cost", "sqlplan_file", "status", 
 			"cached_parameter_info", "wait_info", "top_session_waits",
 			"blocking_session_id", "open_transaction_count", "is_implicit_transaction",
 			"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
@@ -3158,8 +3280,8 @@ finally {
 			"memory_usage", 
 			"estimated_completion_time", 
 			"percent_complete", 
-			"deadlock_priority", "transaction_isolation_level", "degree_of_parallelism",
-			@{Name = "grant_time"; Expression = { ($_."grant_time").ToString("yyyy-MM-dd HH:mm:ss") } }, 
+			"deadlock_priority", "transaction_isolation_level", "degree_of_parallelism", 
+			"grant_time",
 			"requested_memory_kb", "grant_memory_kb", "is_request_granted",
 			"required_memory_kb", "query_memory_grant_used_memory_kb", "ideal_memory_kb",
 			"is_small", "timeout_sec", "resource_semaphore_id", "wait_order", "wait_time_ms",
@@ -3170,13 +3292,33 @@ finally {
 			"resource_pool_name", "context_info", 
 			@{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } },
 			@{Name = "query_plan_hash"; Expression = { Get-HexString -HexInput $_."query_plan_hash" } } | ConvertTo-Html -As Table -Fragment
+			$QExt = '.query'
+			$FileSOrder = "RunningNow"
+			$AnchorRegex = "$FileSOrder(_\d+)$QExt"
+			$AnchorURL = '<a href="#$&">$&</a>'
+			$htmlTable = $htmlTable -replace $AnchorRegex, $AnchorURL
+
+			$htmlTable1 = $BlitzWhoAggTbl | Select-Object "Query", 
+			"query_text" | Where-Object { $_."query_text" -ne [System.DBNull]::Value } | ConvertTo-Html -As Table -Fragment
+			$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
+			$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
+			$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
+
 			$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
 				</head>
 				<body>
-			<h1>$HtmlTabName</h1>
+			<h1 id="top">$HtmlTabName</h1>
+			<p><a href="#Queries">Jump to query text</a></p>
 			<br>
 			$htmlTable 
+			<p><a href="#top">Jump to top</a></p>
+			<br>
+			<h1 id="Queries">Query text</h1>
+			<br>
+			$htmlTable1
+			<br>
+			<p><a href="#top">Jump to top</a></p>
 			<br>
 			</body>
 			</html>
@@ -3447,7 +3589,6 @@ body {
 "@
 
 		# Get all HTML files in the same directory as the index.html file and create a row in the table for each file.
-
 		
 		$HtmlFiles = Get-ChildItem -Path $HTMLOutDir -Filter *.html | Sort-Object CreationTime
 		foreach ($File in $HtmlFiles) {
