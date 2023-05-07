@@ -93,8 +93,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "3.1.0"
-$VersDate = "20230507"
+$Vers = "3.1.1"
+$VersDate = "20230508"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -631,8 +631,10 @@ if ($ConnCheckSet.Tables[0].Rows.Count -eq 1) {
 if (!([string]::IsNullOrEmpty($CheckDB))) {
 	Write-Host "Checking existence of database $CheckDB..."
 	$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
-	$DBQuery = "SELECT [name] from sys.databases WHERE [name] = '$CheckDB' AND [state] = 0;"
+	$DBQuery = "SELECT [name] from sys.databases WHERE [name] = @DBName AND [state] = 0;"
 	$CheckDBQuery.CommandText = $DBQuery
+	$CheckDBQuery.Parameters.Add("@DBName", [Data.SQLDBType]::NVarChar, 256) | Out-Null
+	$CheckDBQuery.Parameters["@DBName"].Value = $CheckDB
 	$CheckDBQuery.Connection = $SqlConnection
 	$CheckDBQuery.CommandTimeout = 100
 	$CheckDBAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
@@ -647,7 +649,7 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 		}
 	}
  Catch {
-		Write-Host "Database $CheckDB either does not exist or is offline" -fore red
+		Write-Host "->Database $CheckDB either does not exist or is offline" -fore red
 		$InstanceWide = Read-Host -Prompt "Switch to instance-wide plan cache, index, and deadlock check?[Y/N]"
 		if ($InstanceWide -eq "Y") {
 			$CheckDB = ""
