@@ -47,7 +47,7 @@ SELECT
     @SkipPartitions = 0,
     @SkipStatistics = 1,
 	@ShowColumnstoreOnly = 0, /* Will show only the Row Group and Segment details for a table with a columnstore index. */
-    @BringThePain = 0,
+    @BringThePain = 1,
     @IgnoreDatabases = NULL, /* Comma-delimited list of databases you want to skip */
     @ThresholdMB = 250, /* Number of megabytes that an object must be before we include it in basic results */
 	@OutputType = 'TABLE' ,
@@ -73,15 +73,15 @@ SELECT
 		DROP TABLE #index_includes;	
 
 /*
-Everything beyond this point is straight from sp_BlitzIndex 
-without the GO at the end
+Everything beyond this point is straight from sp_BlitzIndex except for the commented block 
+between lines 6188 and 6196 and without the GO at the end
 */
 
 SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-SELECT @Version = '8.14', @VersionDate = '20230420';
+SELECT @Version = '8.15', @VersionDate = '20230613';
 SET @OutputType  = UPPER(@OutputType);
 
 IF(@VersionCheckMode = 1)
@@ -6185,7 +6185,7 @@ BEGIN
 			OPTION (RECOMPILE);
   				END;
 
-
+				/*
 				IF  (@BringThePain = 1
 				AND @DatabaseName IS NOT NULL
 				AND @GetAllDatabases = 0)
@@ -6193,6 +6193,7 @@ BEGIN
 				BEGIN
 					EXEC sp_BlitzCache @SortOrder = 'sp_BlitzIndex', @DatabaseName = @DatabaseName, @BringThePain = 1, @QueryFilter = 'statement', @HideSummary = 1;        
 				END;
+				*/
 
 			END;
 

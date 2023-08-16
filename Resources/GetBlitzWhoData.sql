@@ -10,7 +10,7 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
 DECLARE @DatabaseName NVARCHAR(128);
 
-SET @DatabaseName = N'..PSBlitzReplace..';
+SET @DatabaseName = N'';
 
 /*Standard output*/
 SELECT [CheckDate],
@@ -89,7 +89,7 @@ SELECT [CheckDate],
        [context_info]
 FROM   [tempdb].[dbo].[BlitzWho_..BlitzWhoOut..]
 WHERE  [database_name] = CASE
-                           WHEN @DatabaseName = N'..PSBlitzReplace..' THEN [database_name]
+                           WHEN @DatabaseName = N'' THEN [database_name]
                            ELSE @DatabaseName
                          END
 AND [program_name] NOT LIKE N'PSBlitz%';
@@ -103,7 +103,7 @@ AND [program_name] NOT LIKE N'PSBlitz%';
                 MAX([elapsed_time]) AS [TotalExecTime]
          FROM   [tempdb].[dbo].[BlitzWho_..BlitzWhoOut..]
          WHERE  [database_name] = CASE
-                                    WHEN @DatabaseName = N'..PSBlitzReplace..' THEN [database_name]
+                                    WHEN @DatabaseName = N'' THEN [database_name]
                                     ELSE @DatabaseName
                                   END
 		AND [program_name] NOT LIKE N'PSBlitz%'

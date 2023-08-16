@@ -41,7 +41,7 @@ N'SELECT DB_NAME() AS [database],'
 + @LineFeed + CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) > 11
 				THEN N'AND [stat].[is_incremental] = 0'
 				ELSE N'' END /*limit to non-incremental stats only */
-+ @LineFeed + N'AND [sp].[rows] >= 1000'			/*only get tables with 1k rows or more*/
++ @LineFeed + N'AND [sp].[rows] >= 10000'			/*only get tables with 10k rows or more*/
 + CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) > 11
 				THEN + @LineFeed + N'UNION'
 + @LineFeed + N'SELECT DB_NAME() AS [database],'
@@ -79,38 +79,10 @@ N'SELECT DB_NAME() AS [database],'
 + @LineFeed + N'WHERE'
 + @LineFeed + N'[obj].[type] IN ( ''U'', ''V'' )'		/*limit objects to tables and potentially indexed views*/
 + @LineFeed + N'AND [stat].[is_incremental] = 1'	/*limit to incremental stats only */
-+ @LineFeed + N'AND [sip].[rows] >= 1000'			/*only get tables with 1k rows or more*/
++ @LineFeed + N'AND [sip].[rows] >= 10000'			/*only get tables with 10k rows or more*/
 + @LineFeed + N'ORDER BY [modified_percent] DESC;'
 ELSE ';'
 END
 BEGIN
 	EXEC(@SQL);
 END
-
-/*Index Fragmentation Info*/
-
-SELECT DB_NAME()											AS [database],
-       SCHEMA_NAME([obj].[schema_id]) + '.' + [obj].[name]	AS [object_name],
-       [obj].[type_desc]									AS [object_type],
-       [ix].[name]											AS [index_name],
-	   [ips].[index_type_desc]								AS [index_type],
-       CAST([ips].[avg_fragmentation_in_percent] AS 
-		DECIMAL(5,2))										AS [avg_frag_percent],
-       [ips].[page_count],
-	   [ips].[record_count]
-FROM   [sys].[dm_db_index_physical_stats](DB_ID(),
-                                      NULL,
-                                      NULL,
-                                      NULL,
-                                      'SAMPLED') AS [ips]
-       INNER JOIN [sys].[objects] AS [obj]
-               ON [ips].[object_id] = [obj].[object_id]
-       INNER JOIN [sys].[indexes] AS [ix]
-               ON [ix].[object_id] = [ips].[object_id]
-                  AND [ips].[index_id] = [ix].[index_id]
-WHERE
-  [ips].[database_id] = DB_ID()
-  AND [ix].[name] IS NOT NULL
-  AND [ips].[avg_fragmentation_in_percent] > 0
-ORDER  BY
-  [ips].[avg_fragmentation_in_percent] DESC;
