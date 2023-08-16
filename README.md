@@ -19,7 +19,7 @@ As of version 3.0.0, PSBlitz is also capable of exporting the report to HTML mak
 
 ## What it does
 
-Outputs the following to an Excel spreadsheet:
+Outputs the following to an Excel spreadsheet or to an HTML report:
 - Instance information
 - Wait stats - from sp_BlitzFirst
 - Currently running queries - from sp_BlitzWho
@@ -74,10 +74,14 @@ from [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit]
 - sp_BlitzLock
 - sp_BlitzWho
 
-Aside from the above scripts, PSBlitz also runs the following scripts to return sp_BlitzWho data, instance and resource information, as well as TempDB usage:
+Aside from the above scripts, PSBlitz also runs the following scripts to return sp_BlitzWho data, instance and resource information, TempDB usage,
+opened transactions, statistics and index fragmentation info:
 - GetBlitzWhoData.sql
 - GetInstanceInfo.sql
 - GetTempDBUsageInfo.sql
+- GetOpenTransactions.sql
+- GetIndexInfoForWholeDB.sql
+- GetStatsInfoForWholeDB.sql
 
 You can find the all the scripts in the repository's [Resources](/Resources) directory
 
@@ -179,39 +183,43 @@ Otherwise you can navigate to the directory where the script is in PowerShell an
     ```PowerShell
     .\PSBlitz.ps1 Help
     ```
-2. Run it against the whole instance (named instance SQL01), with default checks via integrated security
+    or (recommended for detailed help info)
+   ```PowerShell
+   Get-Help .\PSBlitz.ps1 -Full
+   ```
+3. Run it against the whole instance (named instance SQL01), with default checks via integrated security
     ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01
     ```
-3. Run it against the whole instance listening on port 1433 on host Server01, with default checks via integrated security
+4. Run it against the whole instance listening on port 1433 on host Server01, with default checks via integrated security
     ```PowerShell
     .\PSBlitz.ps1 Server01,1433
     ```
-4. Run it against the whole instance, with in-depth checks via integrated security
+5. Run it against the whole instance, with in-depth checks via integrated security
     ```PowerSHell
     .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y
     ```
-5. Run it against the whole instance, with in-depth checks via integrated security, and have sp_BlitzWho execute every 5 seconds
+6. Run it against the whole instance, with in-depth checks via integrated security, and have sp_BlitzWho execute every 5 seconds
     ```PowerSHell
     .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y -BlitzWhoDelay 5
     ```
-6. Run it with in-depth checks, limit sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only, via integrated security
+7. Run it with in-depth checks, limit sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only, via integrated security
     ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y -CheckDB YourDatabase
     ```
-7. Run it against the whole instance, with default checks via SQL login and password
+8. Run it against the whole instance, with default checks via SQL login and password
     ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01 -SQLLogin DBA1 -SQLPass SuperSecurePassword
     ```
-8. Run it against a default instance residing on Server02, with in-depth checks via SQL login and password, while limmiting sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only
+9. Run it against a default instance residing on Server02, with in-depth checks via SQL login and password, while limmiting sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only
     ```PowerShell
     .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
     ```
-9. Run the same command as above, but increase execution timeout for sp_BlitzIndex, stats and index info retrieval, while also increasing delay between sp_BlitzWHo executions as well as getting more verbose console output and saving the output directory to C:\temp
+10. Run the same command as above, but increase execution timeout for sp_BlitzIndex, stats and index info retrieval, while also increasing delay between sp_BlitzWHo executions as well as getting more verbose console output and saving the output directory to C:\temp
     ```PowerShell
     .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase -MaxTimeout 1200 -BlitzWhoDelay 20 -DebugInfo -OutputDir C:\Temp
     ```
-10. Run PSBlitz but return the report as HTML instead of XLSX while also creating a zip archive of the output files.
+11. Run PSBlitz but return the report as HTML instead of XLSX while also creating a zip archive of the output files.
     ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01 -ToHTML Y -ZipOutput Y 
     ```
