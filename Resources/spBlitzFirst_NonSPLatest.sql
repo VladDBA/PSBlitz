@@ -52,7 +52,7 @@ DECLARE
     @OutputType = 'TABLE',
     @OutputServerName = NULL,
     @OutputDatabaseName = NULL,
-	@OutputResultSets = N'BlitzWho_Start|Findings|FileStats|PerfmonStats|WaitStats|BlitzCache|BlitzWho_End' ,
+	@OutputResultSets = N'Findings|FileStats|PerfmonStats|WaitStats' ,
     @OutputSchemaName = NULL,
     @OutputTableName = NULL,
     @OutputTableNameFileStats = NULL,
@@ -88,15 +88,15 @@ IF OBJECT_ID('tempdb..#UpdatedStats') IS NOT NULL
 IF OBJECT_ID('tempdb..#TempdbOperationalStats') IS NOT NULL
 	DROP TABLE #TempdbOperationalStats;
 	
-/*Everything beyond this point, aside from the changes at lines 315 and 4973, 
-is straight from sp_BlitzFirst without the otuermost BEGIN and END, 
-and without the GO at the end*/
+/*Everything beyond this point, aside from the changes at lines 317 and 4975, 
+is straight from sp_BlitzFirst without the GO at the end*/
 
+BEGIN
 SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-SELECT @Version = '8.14', @VersionDate = '20230420';
+SELECT @Version = '8.15', @VersionDate = '20230613';
 
 IF(@VersionCheckMode = 1)
 BEGIN
@@ -4984,3 +4984,4 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
     END; /* IF @SinceStartup = 0 AND @Seconds > 0 AND @ExpertMode = 1 AND @OutputType <> 'NONE'   -   What's running right now? This is the first and last result set. */
 
 END; /* IF @LogMessage IS NULL */
+END; /* ELSE IF @OutputType = 'SCHEMA' */

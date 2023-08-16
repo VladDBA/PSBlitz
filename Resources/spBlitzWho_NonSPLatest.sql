@@ -53,12 +53,13 @@ DECLARE
 	@SortOrder = N'elapsed time'
 
 
-/* Everything from here down is straight out of sp_BlitzWho without the GO at the end  and without the block that creates the view at line 344*/
+/* Everything from here down is straight out of sp_BlitzWho without 
+the GO at the end  and without the block that creates the view at line 346*/
 	SET NOCOUNT ON;
 	SET STATISTICS XML OFF;
 	SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 	
-	SELECT @Version = '8.14', @VersionDate = '20230420';
+	SELECT @Version = '8.15', @VersionDate = '20230613';
     
 	IF(@VersionCheckMode = 1)
 	BEGIN
