@@ -1577,7 +1577,8 @@ $htmlTable2
 		[int]$RowsReturned = $AcTranTbl.Rows.Count
 		if ($RowsReturned -le 0) {
 			Write-Host " ->No open transactions found."
-		} else {
+		}
+		else {
 			if ($ToHTML -eq "Y") {
 
 				$tableName = "Open transaction info"
@@ -2735,7 +2736,10 @@ $htmlTable
 				##Saving file 
 				$ExcelFile.Save()
 			}	
-		
+			##Cleaning up variables 
+			Remove-Variable -Name BlitzCacheWarnTbl
+			Remove-Variable -Name BlitzCacheTbl
+			Remove-Variable -Name BlitzCacheSet
 
 		}
 
@@ -2750,10 +2754,7 @@ $htmlTable
 		}
 
 	}
-	##Cleaning up variables 
-	Remove-Variable -Name BlitzCacheWarnTbl
-	Remove-Variable -Name BlitzCacheTbl
-	Remove-Variable -Name BlitzCacheSet
+	
 
 
 	#####################################################################################
@@ -3100,7 +3101,8 @@ $htmlTable
 		[int]$RowsReturned = $TblLockDtl.Rows.Count
 		if ($RowsReturned -le 0) {
 			Write-Host " ->No deadlocks found."
-		} else {
+		}
+		else {
 			##Exporting deadlock graphs to file
 			#Set counter used for row retrieval
 			[int]$RowNum = 0
@@ -3468,7 +3470,8 @@ $htmlTable
 				[int]$RowsReturned = $IndexTbl.Rows.Count
 				if ($RowsReturned -le 0) {
 					Write-Host " ->No rows returned."
-				} else {
+				}
+				else {
 
 					if ($ToHTML -eq "Y") {
 				
@@ -3662,7 +3665,8 @@ finally {
 		[int]$RowsReturned = $BlitzWhoTbl.Rows.Count
 		if ($RowsReturned -le 0) {
 			Write-Host " ->No active sessions found."
-		} else {
+		}
+		else {
 			##Exporting execution plans to file
 			#Set counter used for row retrieval
 			[int]$RowNum = 0
