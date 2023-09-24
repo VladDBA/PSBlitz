@@ -57,10 +57,10 @@ N'SELECT DB_NAME() AS [database],'
 + @LineFeed + N'INNER JOIN [sys].[objects] AS [obj]'
 + @LineFeed + N'ON [stat].[object_id] = [obj].[object_id]'
 + @LineFeed + N'WHERE'
-+ @LineFeed + N'[obj].[type] IN ( ''U'', ''V'' )'		/*limit objects to tables and potentially indexed views*/
++ @LineFeed + N'[obj].[type] IN ( ''U'', ''V'' )'	/*limit objects to tables and potentially indexed views*/
 + @LineFeed + CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) > 11
 				THEN N'AND [stat].[is_incremental] = 0'
-				ELSE N'' END /*limit to non-incremental stats only */
+				ELSE N'' END						/*limit to non-incremental stats only */
 + @LineFeed + N'AND [sp].[rows] >= ' + CAST(@MinRecords AS NVARCHAR(10))
 + CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) > 11
 				THEN + @LineFeed + N'UNION'
@@ -110,7 +110,7 @@ N'SELECT DB_NAME() AS [database],'
 + @LineFeed + N'INNER JOIN [sys].[objects] AS [obj]'
 + @LineFeed + N'ON [stat].[object_id] = [obj].[object_id]'
 + @LineFeed + N'WHERE'
-+ @LineFeed + N'[obj].[type] IN ( ''U'', ''V'' )'		/*limit objects to tables and potentially indexed views*/
++ @LineFeed + N'[obj].[type] IN ( ''U'', ''V'' )'	/*limit objects to tables and potentially indexed views*/
 + @LineFeed + N'AND [stat].[is_incremental] = 1'	/*limit to incremental stats only */
 + @LineFeed + N'AND [sip].[rows] >= ' + CAST(@MinRecords AS NVARCHAR(10))
 + @LineFeed + N'ORDER BY [modified_percent] DESC OPTION(RECOMPILE);'
