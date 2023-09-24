@@ -1,5 +1,6 @@
 /*
-	Part of PSBlitz - https://github.com/VladDBA/PSBlitz 
+	Part of PSBlitz - https://github.com/VladDBA/PSBlitz
+	License - https://github.com/VladDBA/PSBlitz/blob/main/LICENSE
 */
 USE [..PSBlitzReplace..];
 SET NOCOUNT ON;
@@ -7,7 +8,10 @@ SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 DECLARE @SQL NVARCHAR(MAX);
 DECLARE @LineFeed NVARCHAR(5);
+DECLARE @MinRecords INT;
 SET @LineFeed = CHAR(13) + CHAR(10);
+
+SET @MinRecords = 10000;
 
 SELECT @SQL = 
 N'SELECT DB_NAME() AS [database],'
@@ -57,7 +61,7 @@ N'SELECT DB_NAME() AS [database],'
 + @LineFeed + CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) > 11
 				THEN N'AND [stat].[is_incremental] = 0'
 				ELSE N'' END /*limit to non-incremental stats only */
-+ @LineFeed + N'AND [sp].[rows] >= 10000'			/*only get tables with 10k rows or more*/
++ @LineFeed + N'AND [sp].[rows] >= ' + CAST(@MinRecords AS NVARCHAR(10))
 + CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) > 11
 				THEN + @LineFeed + N'UNION'
 + @LineFeed + N'SELECT DB_NAME() AS [database],'
@@ -108,7 +112,7 @@ N'SELECT DB_NAME() AS [database],'
 + @LineFeed + N'WHERE'
 + @LineFeed + N'[obj].[type] IN ( ''U'', ''V'' )'		/*limit objects to tables and potentially indexed views*/
 + @LineFeed + N'AND [stat].[is_incremental] = 1'	/*limit to incremental stats only */
-+ @LineFeed + N'AND [sip].[rows] >= 10000'			/*only get tables with 10k rows or more*/
++ @LineFeed + N'AND [sip].[rows] >= ' + CAST(@MinRecords AS NVARCHAR(10))
 + @LineFeed + N'ORDER BY [modified_percent] DESC OPTION(RECOMPILE);'
 				ELSE 
 				+ @LineFeed + N'ORDER BY [modified_percent] DESC OPTION(RECOMPILE);'
