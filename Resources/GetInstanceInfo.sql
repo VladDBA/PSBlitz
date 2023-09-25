@@ -88,7 +88,7 @@ BEGIN
 END;
 
 /*Get connection info*/
-SELECT TOP 10 [d].[name]                                                       AS [DatabaseName],
+SELECT TOP 10 [d].[name]                                                       AS [Database],
               COUNT([s].[status])                                              AS [ConnectionsCount],
               RTRIM(LTRIM([s].[login_name]))                                   AS [LoginName],
               ISNULL([s].[host_name], N'N/A')                                  AS [ClientHostName],
