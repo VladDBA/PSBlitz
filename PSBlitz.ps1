@@ -72,8 +72,9 @@
  Copyright for sp_Blitz, sp_BlitzCache, sp_BlitzFirst, sp_BlitzIndex, 
  sp_BlitzLock, and sp_BlitzWho is held by Brent Ozar Unlimited under MIT licence:
  SQL Server First Responder Kit - https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit
- Copyright for PSBlitz.ps1 is held by Vlad Drumea, 2023 as described below.
- Copyright (c) 2023 Vlad Drumea
+ Copyright for PSBlitz.ps1, GetStatsInfoForWholeDB.sql, GetOpenTransactions.sql, 
+ GetIndexInfoForWholeDB.sql, GetInstanceInfo.sql, and GetTempDBUsageInfo.sql 
+ is held by Vlad Drumea, 2023 as described below.
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -222,8 +223,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "3.3.0"
-$VersDate = "20230831"
+$Vers = "3.3.1"
+$VersDate = "20230927"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -1104,6 +1105,8 @@ try {
 		$InstanceInfoTbl = $InstanceInfoSet.Tables[0]
 		$ResourceInfoTbl = New-Object System.Data.DataTable
 		$ResourceInfoTbl = $InstanceInfoSet.Tables[1]
+		$ConnectionsInfoTbl = New-Object System.Data.DataTable
+		$ConnectionsInfoTbl = $InstanceInfoSet.Tables[2]
 		
 		if ($ToHTML -eq "Y") {
 			if ($DebugInfo) {
@@ -1119,9 +1122,15 @@ try {
 			@{Name = "Patch Level"; Expression = { $_."patch_level" } },
 			@{Name = "Edition"; Expression = { $_."edition" } }, 
 			@{Name = "Is Clustered?"; Expression = { $_."is_clustered" } }, 
-			@{Name = "Is AlwaysOnAG?"; Expression = { $_."always_on_enabled" } }, 
+			@{Name = "Is AlwaysOnAG?"; Expression = { $_."always_on_enabled" } },
+			@{Name = "FILESTREAM Access Level"; Expression = { $_."filestream_access_level" } },
+			@{Name = "Tempdb Metadata Memory Optimized"; Expression = { $_."mem_optimized_tempdb_metadata" } },
+			@{Name = "Fulltext Instaled"; Expression = { $_."fulltext_installed" } },
+			@{Name = "Instance Collation"; Expression = { $_."instance_collation" } },
+			@{Name = "Process ID"; Expression = { $_."process_id" } },
 			@{Name = "Last Startup"; Expression = { $_."instance_last_startup" } },
 			@{Name = "Uptime (days)"; Expression = { $_."uptime_days" } },
+			@{Name = "Client Connections"; Expression = { $_."client_connections" } },
 			"Estimated Response Latency (Sec)" | ConvertTo-Html -As Table -Fragment
 
 			if ($DebugInfo) {
@@ -1132,7 +1141,22 @@ try {
 			@{Name = "Physical memory GB"; Expression = { $_."physical_memory_GB" } }, 
 			@{Name = "Max Server Memory GB"; Expression = { $_."max_server_memory_GB" } }, 
 			@{Name = "Target Server Memory GB"; Expression = { $_."target_server_memory_GB" } },
-			@{Name = "Total Memory Used GB"; Expression = { $_."total_memory_used_GB" } } | ConvertTo-Html -As Table -Fragment
+			@{Name = "Total Memory Used GB"; Expression = { $_."total_memory_used_GB" } },
+			@{Name = "Process physical memory low"; Expression = { $_."proc_physical_memory_low" } },
+			@{Name = "Process virtual memory low"; Expression = { $_."proc_virtual_memory_low" } }  | ConvertTo-Html -As Table -Fragment
+
+			if ($DebugInfo) {
+				Write-Host " ->Converting connections info to HTML" -fore yellow
+			}    
+			$htmlTable3 = $ConnectionsInfoTbl | Select-Object  "Database", 
+			@{Name = "Connections Count"; Expression = { $_."ConnectionsCount" } }, 
+			@{Name = "Login Name"; Expression = { $_."LoginName" } }, 
+			@{Name = "Client Hostname"; Expression = { $_."ClientHostName" } }, 
+			@{Name = "Client IP"; Expression = { $_."ClientIP" } },
+			@{Name = "Protocol"; Expression = { $_."ProtocolUsed" } },
+			@{Name = "Oldest Connection Time"; Expression = { $_."OldestConnectionTime" } },
+			@{Name = "Program"; Expression = { $_."Program" }}  | ConvertTo-Html -As Table -Fragment
+
 			$HtmlTabName = "Instance Overview"
 			$html = $HTMLPre + @"
     <title>$HtmlTabName</title>
@@ -1144,6 +1168,9 @@ $htmlTable1
 <b>
 <h2 style="text-align: center;">Resource information</h2>
 $htmlTable2
+<b>
+<h2 style="text-align: center;">Top 10 clients by connections</h2>
+$htmlTable3
 </body>
 </html>
 "@
@@ -1165,8 +1192,9 @@ $htmlTable2
 
 			#List of columns that should be returned from the data set
 			$DataSetCols = @("machine_name", "instance_name", "product_version", "product_level",
-				"patch_level", "edition", "is_clustered", "always_on_enabled", "instance_last_startup",
-				"uptime_days", "net_latency")
+				"patch_level", "edition", "is_clustered", "always_on_enabled","filestream_access_level",
+				"mem_optimized_tempdb_metadata", "fulltext_installed", "instance_collation", "process_id",
+				 "instance_last_startup", "uptime_days", "client_connections", "net_latency")
 
 			if ($DebugInfo) {
 				Write-Host " ->Writing instance info to Excel" -fore yellow
@@ -1206,7 +1234,7 @@ $htmlTable2
 
 			#List of columns that should be returned from the data set
 			$DataSetCols = @("logical_cpu_cores", "physical_cpu_cores", "physical_memory_GB", "max_server_memory_GB", "target_server_memory_GB",
-				"total_memory_used_GB")
+				"total_memory_used_GB", "proc_physical_memory_low", "proc_virtual_memory_low")
 
 			if ($DebugInfo) {
 				Write-Host " ->Writing resource info to Excel" -fore yellow
@@ -1231,6 +1259,46 @@ $htmlTable2
 				$ExcelColNum = 1
 			}
 
+			##Top 10 clients by connections section
+			#Specify at which row in the sheet to start adding the data
+			$ExcelStartRow = 14
+			#Specify with which column in the sheet to start
+			$ExcelColNum = 1
+			#Set counter used for row retrieval
+			$RowNum = 0
+
+			#List of columns that should be returned from the data set
+			$DataSetCols = @("Database", "ConnectionsCount", "LoginName", "ClientHostName", "ClientIP", "ProtocolUsed", 
+			"OldestConnectionTime", "Program")
+
+			if ($DebugInfo) {
+				Write-Host " ->Writing Top 10 clients by connections to Excel" -fore yellow
+			}
+			#Loop through each Excel row
+			foreach ($row in $ConnectionsInfoTbl) {
+				<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+				foreach ($col in $DataSetCols) {			
+					#Fill Excel cell with value from the data set
+					if ("OldestConnectionTime" -contains $col) {
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+					}
+					else {
+					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col]
+					}
+					$ExcelColNum += 1
+				}
+
+				#move to the next row in the spreadsheet
+				$ExcelStartRow += 1
+				#move to the next row in the data set
+				$RowNum += 1
+				# reset Excel column number so that next row population begins with column 1
+				$ExcelColNum = 1
+			}
+
 			##Saving file 
 			$ExcelFile.Save()
 		}
@@ -1238,6 +1306,7 @@ $htmlTable2
 		Remove-Variable -Name ResourceInfoTbl
 		Remove-Variable -Name InstanceInfoTbl
 		Remove-Variable -Name InstanceInfoSet
+		Remove-Variable -Name ConnectionsInfoTbl
 	}
 
 	if ($JobStatus -ne "Running") {
@@ -3523,8 +3592,14 @@ $htmlTable
 				@{Name = "Modifications Count"; Expression = { $_."modification_counter" } },
 				@{Name = "Modified %"; Expression = { $_."modified_percent" } },
 				@{Name = "Steps"; Expression = { $_."steps" } },
+				@{Name = "Incremental"; Expression = { $_."incremental" } },
+				@{Name = "Temporary"; Expression = { $_."temporary" } },
+				@{Name = "With NORECOMPUTE"; Expression = { $_."no_recompute"} },
+				@{Name = "Persisted Sample"; Expression = { $_."persisted_sample"} },
+				@{Name = "Persisted Sample %"; Expression = { $_."persisted_sample_percent"} },
 				@{Name = "Partitioned"; Expression = { $_."partitioned" } },
-				@{Name = "Partition No."; Expression = { $_."partition_number" } } | ConvertTo-Html -As Table -Fragment
+				@{Name = "Partition No."; Expression = { $_."partition_number" } },
+				@{Name = "Get Stats Details"; Expression = { $_."get_details" } } | ConvertTo-Html -As Table -Fragment
 				$HtmlTabName = "Statistics info for $CheckDB"
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
@@ -3550,7 +3625,9 @@ $htmlTable
 				$DataSetCols = @("database", "object_name", "object_type", "stats_name", "origin", 
 					"filter_definition", "last_updated", "rows", "unfiltered_rows", 
 					"rows_sampled", "sample_percent", "modification_counter", 
-					"modified_percent", "steps", "partitioned", "partition_number")
+					"modified_percent", "incremental", "temporary", "no_recompute", "persisted_sample",
+					"persisted_sample_percent", "steps", "partitioned", "partition_number",
+					"get_details")
 
 				if ($DebugInfo) {
 					Write-Host " ->Writing Stats results to sheet Statistics Info" -fore yellow
