@@ -110,4 +110,4 @@ GROUP  BY [d].[database_id],
           [c].[net_transport],
           [s].[program_name]
 ORDER  BY [ConnectionsCount] DESC
-OPTION(RECOMPILE); 
+OPTION(RECOMPILE);
