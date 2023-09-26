@@ -1,10 +1,17 @@
+/*
+	Part of PSBlitz - https://github.com/VladDBA/PSBlitz
+	License - https://github.com/VladDBA/PSBlitz/blob/main/LICENSE
+*/
 USE [..PSBlitzReplace..];
 SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 DECLARE @SQL NVARCHAR(MAX);
 DECLARE @LineFeed NVARCHAR(5);
+DECLARE @MinRecords INT;
 SET @LineFeed = CHAR(13) + CHAR(10);
+
+SET @MinRecords = 10000;
 
 SELECT @SQL = 
 N'SELECT DB_NAME() AS [database],'
@@ -12,8 +19,10 @@ N'SELECT DB_NAME() AS [database],'
 + @LineFeed + N'+ [obj].[name] AS [object_name],'
 + @LineFeed + N'[obj].[type_desc] AS [object_type],'
 + @LineFeed + N'[stat].[name] AS [stats_name],'
-+ @LineFeed + N'CASE WHEN [stat].[auto_created] = 1 THEN ''Auto-Created'''
-+ @LineFeed + N'WHEN [stat].[auto_created] = 1 THEN ''User-Created'''
++ @LineFeed + N'CASE WHEN [stat].[auto_created] = 1 '
++ N'AND [stat].[user_created] = 0 THEN ''Auto-Created'''
++ @LineFeed + N'WHEN [stat].[user_created] = 1 '
++ N'AND [stat].[auto_created] = 0 THEN ''User-Created'''
 + @LineFeed + N'  ELSE ''Index'' END AS [origin],'
 + @LineFeed + N'[stat].[filter_definition],'
 + @LineFeed + N'[sp].[last_updated],'
@@ -29,19 +38,30 @@ N'SELECT DB_NAME() AS [database],'
 + @LineFeed + N'ELSE (CAST(CAST([sp].[modification_counter] AS FLOAT)' 
 + @LineFeed + N'/ CAST([sp].[rows] AS FLOAT)' 
 + @LineFeed + N'* 100.00 AS DECIMAL(38,2))) END AS [modified_percent],'
++ @LineFeed + N'CASE WHEN [stat].[is_incremental] = 1 THEN ''Yes'''
++ @LineFeed + N'ELSE ''No'' END AS [incremental],'
++ @LineFeed + N'CASE WHEN [stat].[is_temporary] = 1 THEN ''Yes'''
++ @LineFeed + N'ELSE ''No'' END AS [temporary],'
++ @LineFeed + N'CASE WHEN [stat].[no_recompute] = 1 THEN ''Yes'''
++ @LineFeed + N'ELSE ''No'' END AS [no_recompute],'
++ @LineFeed + N'CASE WHEN [stat].[has_persisted_sample]  = 1 THEN ''Yes'''
++ @LineFeed + N'ELSE ''No'' END AS [persisted_sample],'
++ @LineFeed + N'[sp].[persisted_sample_percent],'
 + @LineFeed + N'ISNULL([sp].[steps],0) AS [steps],'
 + @LineFeed + N'''No'' AS [partitioned], 1 AS [partition_number]' 
++ @LineFeed + N',''DBCC SHOW_STATISTICS ("''+SCHEMA_NAME([obj].[schema_id])+N''.'''
++'+[obj].[name]+N''", ''+[stat].[name]+N'');'' AS [get_details]'
 + @LineFeed + N'FROM   [sys].[stats] AS [stat]'
 + @LineFeed + N'CROSS APPLY [sys].[dm_db_stats_properties]([stat].[object_id],'
 + @LineFeed + N'[stat].[stats_id]) AS [sp]'
 + @LineFeed + N'INNER JOIN [sys].[objects] AS [obj]'
 + @LineFeed + N'ON [stat].[object_id] = [obj].[object_id]'
 + @LineFeed + N'WHERE'
-+ @LineFeed + N'[obj].[type] IN ( ''U'', ''V'' )'		/*limit objects to tables and potentially indexed views*/
++ @LineFeed + N'[obj].[type] IN ( ''U'', ''V'' )'	/*limit objects to tables and potentially indexed views*/
 + @LineFeed + CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) > 11
 				THEN N'AND [stat].[is_incremental] = 0'
-				ELSE N'' END /*limit to non-incremental stats only */
-+ @LineFeed + N'AND [sp].[rows] >= 10000'			/*only get tables with 10k rows or more*/
+				ELSE N'' END						/*limit to non-incremental stats only */
++ @LineFeed + N'AND [sp].[rows] >= ' + CAST(@MinRecords AS NVARCHAR(10))
 + CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) > 11
 				THEN + @LineFeed + N'UNION'
 + @LineFeed + N'SELECT DB_NAME() AS [database],'
@@ -49,9 +69,11 @@ N'SELECT DB_NAME() AS [database],'
 + @LineFeed + N'+ [obj].[name] AS [object_name],'
 + @LineFeed + N'[obj].[type_desc] AS [object_type],'
 + @LineFeed + N'[stat].[name] AS [stats_name],'
-+ @LineFeed + N'CASE WHEN [stat].[auto_created] = 1 THEN ''Auto-Created'''
-+ @LineFeed + N'WHEN [stat].[auto_created] = 1 THEN ''User-Created'''
-+ @LineFeed + N'ELSE ''Index'' END AS [origin],'
++ @LineFeed + N'CASE WHEN [stat].[auto_created] = 1 '
++ N'AND [stat].[user_created] = 0 THEN ''Auto-Created'''
++ @LineFeed + N'WHEN [stat].[user_created] = 1 '
++ N'AND [stat].[auto_created] = 0 THEN ''User-Created'''
++ @LineFeed + N'  ELSE ''Index'' END AS [origin],'
 + @LineFeed + N'[stat].[filter_definition],'
 + @LineFeed + N'[sip].[last_updated],'
 + @LineFeed + N'ISNULL([sip].[rows],0) AS [rows],'
@@ -68,21 +90,33 @@ N'SELECT DB_NAME() AS [database],'
 + @LineFeed + N'/ CAST([sip].[rows] AS FLOAT)'
 + @LineFeed + N'* 100.00 AS DECIMAL(5,2)))'
 + @LineFeed + N'END AS [modified_percent],'
++ @LineFeed + N'CASE WHEN [stat].[is_incremental] = 1 THEN ''Yes'' '
++ @LineFeed + N'ELSE ''No'' END AS [incremental],'
++ @LineFeed + N'CASE WHEN [stat].[is_temporary] = 1 THEN ''Yes'' '
++ @LineFeed + N'ELSE ''No'' END AS [temporary],'
++ @LineFeed + N'CASE WHEN [stat].[no_recompute] = 1 THEN ''Yes'''
++ @LineFeed + N'ELSE ''No'' END AS [no_recompute],'
++ @LineFeed + N'CASE WHEN [stat].[has_persisted_sample]  = 1 THEN ''Yes'''
++ @LineFeed + N'ELSE ''No'' END AS [persisted_sample],'
++ @LineFeed + N'0 AS [persisted_sample_percent],'
 + @LineFeed + N'ISNULL([sip].[steps],0) AS [steps],'
 + @LineFeed + N'''Yes'' AS [partitioned],'
 + @LineFeed + N'[sip].[partition_number]'
++ @LineFeed + N',''DBCC SHOW_STATISTICS ("''+SCHEMA_NAME([obj].[schema_id])+N''.'''
++'+[obj].[name]+N''", ''+[stat].[name]+N'');'' AS [get_details]'
 + @LineFeed + N'FROM [sys].[stats] AS [stat]'
 + @LineFeed + N'CROSS APPLY [sys].[dm_db_incremental_stats_properties]([stat].[object_id],'
 + @LineFeed + N'[stat].[stats_id]) AS [sip]'
 + @LineFeed + N'INNER JOIN [sys].[objects] AS [obj]'
 + @LineFeed + N'ON [stat].[object_id] = [obj].[object_id]'
 + @LineFeed + N'WHERE'
-+ @LineFeed + N'[obj].[type] IN ( ''U'', ''V'' )'		/*limit objects to tables and potentially indexed views*/
++ @LineFeed + N'[obj].[type] IN ( ''U'', ''V'' )'	/*limit objects to tables and potentially indexed views*/
 + @LineFeed + N'AND [stat].[is_incremental] = 1'	/*limit to incremental stats only */
-+ @LineFeed + N'AND [sip].[rows] >= 10000'			/*only get tables with 10k rows or more*/
-+ @LineFeed + N'ORDER BY [modified_percent] DESC;'
-ELSE ';'
-END
++ @LineFeed + N'AND [sip].[rows] >= ' + CAST(@MinRecords AS NVARCHAR(10))
++ @LineFeed + N'ORDER BY [modified_percent] DESC OPTION(RECOMPILE);'
+				ELSE 
+				+ @LineFeed + N'ORDER BY [modified_percent] DESC OPTION(RECOMPILE);'
+END;
 BEGIN
 	EXEC(@SQL);
-END
+END;
