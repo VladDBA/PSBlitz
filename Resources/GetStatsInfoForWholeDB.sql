@@ -44,9 +44,15 @@ N'SELECT DB_NAME() AS [database],'
 + @LineFeed + N'ELSE ''No'' END AS [temporary],'
 + @LineFeed + N'CASE WHEN [stat].[no_recompute] = 1 THEN ''Yes'''
 + @LineFeed + N'ELSE ''No'' END AS [no_recompute],'
-+ @LineFeed + N'CASE WHEN [stat].[has_persisted_sample]  = 1 THEN ''Yes'''
-+ @LineFeed + N'ELSE ''No'' END AS [persisted_sample],'
-+ @LineFeed + N'[sp].[persisted_sample_percent],'
++ CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) >= 15
+  THEN @LineFeed + N'CASE WHEN [stat].[has_persisted_sample]  = 1 THEN ''Yes'''
+  + @LineFeed + N'ELSE ''No'' END AS [persisted_sample],'
+  ELSE @LineFeed + N'''only available for 2019 and above'' AS [persisted_sample],'
+END
++ CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) >= 13 THEN 
+  @LineFeed + N'[sp].[persisted_sample_percent],'
+  ELSE @LineFeed + N'0 AS [persisted_sample_percent],'
+END
 + @LineFeed + N'ISNULL([sp].[steps],0) AS [steps],'
 + @LineFeed + N'''No'' AS [partitioned], 1 AS [partition_number]' 
 + @LineFeed + N',''DBCC SHOW_STATISTICS ("''+SCHEMA_NAME([obj].[schema_id])+N''.'''
@@ -96,8 +102,11 @@ N'SELECT DB_NAME() AS [database],'
 + @LineFeed + N'ELSE ''No'' END AS [temporary],'
 + @LineFeed + N'CASE WHEN [stat].[no_recompute] = 1 THEN ''Yes'''
 + @LineFeed + N'ELSE ''No'' END AS [no_recompute],'
-+ @LineFeed + N'CASE WHEN [stat].[has_persisted_sample]  = 1 THEN ''Yes'''
-+ @LineFeed + N'ELSE ''No'' END AS [persisted_sample],'
++ CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) >= 15
+  THEN @LineFeed + N'CASE WHEN [stat].[has_persisted_sample]  = 1 THEN ''Yes'''
+  + @LineFeed + N'ELSE ''No'' END AS [persisted_sample],'
+  ELSE @LineFeed + N'''only available for 2019 and above'' AS [persisted_sample],'
+END
 + @LineFeed + N'0 AS [persisted_sample_percent],'
 + @LineFeed + N'ISNULL([sip].[steps],0) AS [steps],'
 + @LineFeed + N'''Yes'' AS [partitioned],'
