@@ -8,12 +8,15 @@
 
     Instance information
     Wait stats - from sp_BlitzFirst
+	Currently opened transactions (if any)
     Currently running queries - from sp_BlitzWho
     Instance health-related findings - from sp_Blitz
     tempdb size and usage information per object and session
     Index-related issues and recommendations - from sp_BlitzIndex
     Top 10 most resource intensive queries - from sp_BlitzCache
     Deadlock related information from the past 15 days - from sp_BlitzLock
+	Information about all databases and their files or for a single database in 
+	case of a database-specific check
     Statistics details for a given database - in the case of database-specific check or if a database 
 	accounts for at least 2/3 of the sp_BlitzCache data
     Index Fragmentation information for a given database - in the case of database-specific check or if 
@@ -43,11 +46,14 @@
     sp_BlitzWho
  
  Aside from the above scripts, PSBlitz also runs the following scripts to return sp_BlitzWho data, instance and resource 
- information, as well as TempDB usage:
+ information, index fragmentation and stats info, database and database files info, as well as TempDB usage:
 
+    GetDbInfo.sql
     GetBlitzWhoData.sql
     GetInstanceInfo.sql
     GetTempDBUsageInfo.sql
+	GetStatsInfoForWholeDB.sql
+	GetIndexInfoForWholeDB.sql
 
  Prerequisites 
     
@@ -223,8 +229,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "3.3.1"
-$VersDate = "20230927"
+$Vers = "3.4.0"
+$VersDate = "20231012"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -237,7 +243,8 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"spBlitzWho_NonSPLatest.sql",
 	"GetBlitzWhoData.sql", "GetInstanceInfo.sql",
 	"GetTempDBUsageInfo.sql", "GetOpenTransactions.sql",
-	"GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql")
+	"GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql",
+	"GetDbInfo.sql")
 #Set path+name of the input Excel file
 $OrigExcelF = $ResourcesPath + "\" + $OrigExcelFName
 #Set default start row for Excel output
@@ -421,6 +428,22 @@ function Format-XML {
 	$SW.ToString()
 }
 
+#Function to format exception messages
+function Format-ExceptionMsg {
+	[string]$ErrorMessage = Get-Error -Newest 1 | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty Message
+	#Get SQL related error info
+	[string]$SQLErrNo = Get-Error -Newest 1 | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Number
+	[string]$SQLErrLev = Get-Error -Newest 1 | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Class
+	[string]$SQLErrState = Get-Error -Newest 1 | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty State
+	[string]$SQLErrLineNo = Get-Error -Newest 1 | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty LineNumber
+	[string]$SQLErrMsg = Get-Error -Newest 1 | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Message
+	if (!([string]::IsNullOrEmpty($SQLErrNo))) {
+		Write-Output "MSg $SQLErrNo, Level $SQLErrLev, State $SQLErrState, Line $SQLErrLineNo `n $SQLErrMsg"
+	}
+ else {
+		Write-Output $ErrorMessage
+	}
+}
 #Function to return error messages in the catch block
 function Invoke-ErrMsg {
 	$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
@@ -430,24 +453,54 @@ function Invoke-ErrMsg {
 		if ($DebugInfo) {
 			Write-Host " - $RunTime seconds" -Fore Yellow
 		}
+		$OutErr = Format-ExceptionMsg
+		Write-Host "  $OutErr" -fore Red	
 	}
- elseif ($RunTime -ge $ConnTimeout) {
+ <#elseif ($RunTime -ge $ConnTimeout) {
 		Write-Host @RedXConnTimeout
 		if ($DebugInfo) {
 			Write-Host " - $RunTime seconds" -Fore Yellow
 		}
-	}
+		
+	}#>
  else {
 		Write-Host @RedX
 		if ($DebugInfo) {
 			Write-Host " - $RunTime seconds" -Fore Yellow
 		}
+		$OutErr = Format-ExceptionMsg
+		Write-Host "  $OutErr" -fore Red		
 	}
 }
 
 function Get-ExecTime {
 	$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-	return [Math]::Round($StepRunTime, 2)
+	[string]$StepDUration = [Math]::Round($StepRunTime, 2).ToString()
+	Write-Output $StepDUration
+}
+function Add-LogRow {
+	[CmdletBinding()]
+	Param ([
+		Parameter(Position = 0, Mandatory = $true)]
+		[string]$StepName,
+		[Parameter(Position = 1, Mandatory = $true)]
+		[string]$StepStatus
+	)
+	$ExecTime = Get-ExecTime
+	$ErrMsg = Format-ExceptionMsg
+	$LogRow = $LogTbl.NewRow()
+	$LogRow.Step = $StepName
+	$LogRow.StartDate = $StepStart.ToString("yyyy-MM-dd HH:mm:ss")
+	$LogRow.EndDate = $StepEnd.ToString("yyyy-MM-dd HH:mm:ss")
+	$LogRow.Duration = $ExecTime
+	$LogRow.Outcome = $StepStatus
+	if ($StepStatus -eq "Failure") {
+		$LogRow.ErrorMsg = $ErrMsg
+	}
+ else {
+		$LogRow.ErrorMsg = ""
+	}
+	$LogTbl.Rows.Add($LogRow)
 }
 
 ###Job preparation
@@ -595,8 +648,6 @@ if ($MissingFiles.Count -gt 0) {
 	Exit
 }
 
-
-	
 ###Switch to interactive mode if $ServerName is empty
 if ([string]::IsNullOrEmpty($ServerName)) {
 	Write-Host "Running in interactive mode"
@@ -1014,6 +1065,14 @@ if ($UptimeSet.Tables[0].Rows[0]["uptime_days"] -lt 7.00) {
 	Write-Host "->Diagnostics data might not be reliable with less than 7 days of uptime." -Fore Red
 }
 
+###Create log table
+$LogTbl = New-Object System.Data.DataTable
+$LogTbl.Columns.Add("Step", [string]) | Out-Null
+$LogTbl.Columns.Add("StartDate", [string]) | Out-Null
+$LogTbl.Columns.Add("EndDate", [string]) | Out-Null
+$LogTbl.Columns.Add("Duration", [string]) | Out-Null
+$LogTbl.Columns.Add("Outcome", [string]) | Out-Null
+$LogTbl.Columns.Add("ErrorMsg", [string]) | Out-Null
 
 #####################################################################################
 #						Check start													#
@@ -1093,11 +1152,13 @@ try {
 			Write-Host " - $RunTime seconds" -Fore Yellow
 		}
 		$StepOutcome = "Success"
+		Add-LogRow "Instance Info" $StepOutcome
 	}
  Catch {
 		$StepEnd = get-date
 		Invoke-ErrMsg
 		$StepOutcome = "Failure"
+		Add-LogRow "Instance Info" $StepOutcome
 	}
 		
 	if ($StepOutcome -eq "Success") {
@@ -1143,7 +1204,10 @@ try {
 			@{Name = "Target Server Memory GB"; Expression = { $_."target_server_memory_GB" } },
 			@{Name = "Total Memory Used GB"; Expression = { $_."total_memory_used_GB" } },
 			@{Name = "Process physical memory low"; Expression = { $_."proc_physical_memory_low" } },
-			@{Name = "Process virtual memory low"; Expression = { $_."proc_virtual_memory_low" } }  | ConvertTo-Html -As Table -Fragment
+			@{Name = "Process virtual memory low"; Expression = { $_."proc_virtual_memory_low" } },
+			@{Name = "Available Physical Memory GB"; Expression = { $_."available_physical_memory_GB" } },
+			@{Name = "OS Memory State"; Expression = { $_."os_memory_state" } },
+			"CTP",	"MAXDOP" | ConvertTo-Html -As Table -Fragment
 
 			if ($DebugInfo) {
 				Write-Host " ->Converting connections info to HTML" -fore yellow
@@ -1155,7 +1219,7 @@ try {
 			@{Name = "Client IP"; Expression = { $_."ClientIP" } },
 			@{Name = "Protocol"; Expression = { $_."ProtocolUsed" } },
 			@{Name = "Oldest Connection Time"; Expression = { $_."OldestConnectionTime" } },
-			@{Name = "Program"; Expression = { $_."Program" }}  | ConvertTo-Html -As Table -Fragment
+			@{Name = "Program"; Expression = { $_."Program" } }  | ConvertTo-Html -As Table -Fragment
 
 			$HtmlTabName = "Instance Overview"
 			$html = $HTMLPre + @"
@@ -1192,9 +1256,9 @@ $htmlTable3
 
 			#List of columns that should be returned from the data set
 			$DataSetCols = @("machine_name", "instance_name", "product_version", "product_level",
-				"patch_level", "edition", "is_clustered", "always_on_enabled","filestream_access_level",
+				"patch_level", "edition", "is_clustered", "always_on_enabled", "filestream_access_level",
 				"mem_optimized_tempdb_metadata", "fulltext_installed", "instance_collation", "process_id",
-				 "instance_last_startup", "uptime_days", "client_connections", "net_latency")
+				"instance_last_startup", "uptime_days", "client_connections", "net_latency")
 
 			if ($DebugInfo) {
 				Write-Host " ->Writing instance info to Excel" -fore yellow
@@ -1234,7 +1298,7 @@ $htmlTable3
 
 			#List of columns that should be returned from the data set
 			$DataSetCols = @("logical_cpu_cores", "physical_cpu_cores", "physical_memory_GB", "max_server_memory_GB", "target_server_memory_GB",
-				"total_memory_used_GB", "proc_physical_memory_low", "proc_virtual_memory_low")
+				"total_memory_used_GB", "proc_physical_memory_low", "proc_virtual_memory_low", "available_physical_memory_GB", "os_memory_state" , "CTP", "MAXDOP")
 
 			if ($DebugInfo) {
 				Write-Host " ->Writing resource info to Excel" -fore yellow
@@ -1269,7 +1333,7 @@ $htmlTable3
 
 			#List of columns that should be returned from the data set
 			$DataSetCols = @("Database", "ConnectionsCount", "LoginName", "ClientHostName", "ClientIP", "ProtocolUsed", 
-			"OldestConnectionTime", "Program")
+				"OldestConnectionTime", "Program")
 
 			if ($DebugInfo) {
 				Write-Host " ->Writing Top 10 clients by connections to Excel" -fore yellow
@@ -1286,7 +1350,7 @@ $htmlTable3
 						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
 					}
 					else {
-					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col]
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col]
 					}
 					$ExcelColNum += 1
 				}
@@ -1340,11 +1404,13 @@ $htmlTable3
 			Write-Host " - $RunTime seconds" -Fore Yellow
 		}
 		$StepOutcome = "Success"
+		Add-LogRow "TempDB Info" $StepOutcome
 	}
  Catch {
 		$StepEnd = get-date
 		Invoke-ErrMsg
 		$StepOutcome = "Failure"
+		Add-LogRow "TempDB Info" $StepOutcome
 	}
 		
 	if ($StepOutcome -eq "Success") {
@@ -1636,11 +1702,13 @@ $htmlTable2
 			Write-Host " - $RunTime seconds" -Fore Yellow
 		}
 		$StepOutcome = "Success"
+		Add-LogRow "Open Transacion Info" $StepOutcome
 	}
  Catch {
 		$StepEnd = get-date
 		Invoke-ErrMsg
 		$StepOutcome = "Failure"
+		Add-LogRow "Open Transacion Info" $StepOutcome
 	}
 	if ($StepOutcome -eq "Success") {
 		$AcTranTbl = New-Object System.Data.DataTable
@@ -1804,6 +1872,170 @@ $htmlTable3
 
 
 	#####################################################################################
+	#						Database info												#
+	#####################################################################################
+	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetDbInfo.sql")	
+	if (!([string]::IsNullOrEmpty($CheckDB))) {
+		Write-Host " Getting database info for $CheckDB... " -NoNewLine
+		[string]$Query = $Query -replace "SET @DatabaseName = N'';", "SET @DatabaseName = N'$CheckDB';"
+	}
+	else {
+		Write-Host " Getting database info... " -NoNewLine
+	}
+	$CmdTimeout = 600
+	$DBInfoQuery = new-object System.Data.SqlClient.SqlCommand
+	$DBInfoQuery.CommandText = $Query
+	$DBInfoQuery.Connection = $SqlConnection
+	$DBInfoQuery.CommandTimeout = $CmdTimeout
+	$DBInfoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+	$DBInfoAdapter.SelectCommand = $DBInfoQuery
+	$DBInfoSet = new-object System.Data.DataSet
+	Try {
+		$StepStart = get-date
+		$DBInfoAdapter.Fill($DBInfoSet) | Out-Null -ErrorAction Stop
+		$SqlConnection.Close()
+		$StepEnd = get-date
+		Write-Host @GreenCheck
+		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
+		$RunTime = [Math]::Round($StepRunTime, 2)
+		if ($DebugInfo) {
+			Write-Host " - $RunTime seconds" -Fore Yellow
+		}
+		$StepOutcome = "Success"
+		Add-LogRow "Database Info" $StepOutcome
+	}
+ Catch {
+		$StepEnd = get-date
+		Invoke-ErrMsg
+		$StepOutcome = "Failure"
+		Add-LogRow "Database Info" $StepOutcome
+	}
+	if ($StepOutcome -eq "Success") {
+		$DBInfoTbl = New-Object System.Data.DataTable
+		$DBInfoTbl = $DBInfoSet.Tables[0]
+		$DBFileInfoTbl = New-Object System.Data.DataTable
+		$DBFileInfoTbl = $DBInfoSet.Tables[1]
+
+		if ($ToHTML -eq "Y") {
+			$tableName = "Database Info"
+			if ($DebugInfo) {
+				Write-Host " ->Converting Database Info results to HTML" -fore yellow
+			}
+			$htmlTable = $DBInfoTbl | Select-Object "Database", "DatabaseState", "DataFiles", "DataFilesSizeGB", "LogFiles",
+			"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
+			"DatabaseSizeGB", "CompatibilityLevel", "Collation", "SnapshotIsolationState", "ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
+			"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn" | ConvertTo-Html -As Table -Fragment
+
+			$htmlTable1 = $DBFileInfoTbl | Select-Object  "Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
+			"MaxFileSizeGB", "GrowthIncrement" | ConvertTo-Html -As Table -Fragment
+
+			$html = $HTMLPre + @"
+<title>$tableName</title>
+</head>
+<body>
+<h1 id="top" style="text-align: center;">$tableName</h1>
+$htmlTable
+<p style="text-align: center;"><a href="#top">Jump to top</a></p>
+<br>
+<h2 style="text-align: center;">Database Files Info</h2>
+$htmlTable1
+<p style="text-align: center;"><a href="#top">Jump to top</a></p>
+</body>
+</html>
+"@
+			if ($DebugInfo) {
+				Write-Host " ->Writing HTML file." -fore yellow
+			} 
+			$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\DatabaseInfo.html"
+		} else {
+			##Populating the "Database Info" sheet with the database files data first because 
+			#it's narrower and leaves room to fit some of the database info
+			$ExcelSheet = $ExcelFile.Worksheets.Item("Database Info")
+			#Specify at which row in the sheet to start adding the data
+			$ExcelStartRow = 3
+			#Specify with which column in the sheet to start
+			$ExcelColNum = 1
+			#Set counter used for row retrieval
+			$RowNum = 0
+
+			#List of columns that should be returned from the data set
+			$DataSetCols = @("Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
+			"MaxFileSizeGB", "GrowthIncrement")
+			if ($DebugInfo) {
+				Write-Host " ->Writing Database Files Info results to Excel" -fore yellow
+			}
+			#Loop through each Excel row
+			foreach ($row in $DBFileInfoTbl) {
+				<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+				foreach ($col in $DataSetCols) {
+					#Fill Excel cell with value from the data set
+					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBFileInfoTbl.Rows[$RowNum][$col]
+					
+					#move to the next column
+					$ExcelColNum += 1
+				}
+				#move to the next row in the spreadsheet
+				$ExcelStartRow += 1
+				#move to the next row in the data set
+				$RowNum += 1
+				# reset Excel column number so that next row population begins with column 1
+				$ExcelColNum = 1
+			}
+
+			##Populating the "Database Info" sheet with the database data
+			#Specify at which row in the sheet to start adding the data
+			$ExcelStartRow = 3
+			#Specify with which column in the sheet to start
+			$ExcelColNum = 11
+			#Set counter used for row retrieval
+			$RowNum = 0
+
+			#List of columns that should be returned from the data set
+			$DataSetCols = @("Database", "DatabaseState", "DataFiles", "DataFilesSizeGB", "LogFiles",
+			"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
+			"DatabaseSizeGB", "CompatibilityLevel", "Collation", "SnapshotIsolationState", 
+			"ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
+			"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn")
+			if ($DebugInfo) {
+				Write-Host " ->Writing Database Info results to Excel" -fore yellow
+			}
+			#Loop through each Excel row
+			foreach ($row in $DBInfoTbl) {
+				<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+				foreach ($col in $DataSetCols) {
+					#Fill Excel cell with value from the data set
+					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
+					
+					#move to the next column
+					$ExcelColNum += 1
+				}
+				#move to the next row in the spreadsheet
+				$ExcelStartRow += 1
+				#move to the next row in the data set
+				$RowNum += 1
+				# reset Excel column number so that next row population begins with column 11
+				$ExcelColNum = 11
+			}
+
+			##Saving file 
+			$ExcelFile.Save()
+		}
+		Remove-Variable -Name DBInfoTbl
+		Remove-Variable -Name DBFileInfoTbl
+		Remove-Variable -Name DBInfoSet
+	}
+
+	if ($JobStatus -ne "Running") {
+		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
+		$BlitzWhoPass += 1
+	}
+	#####################################################################################
 	#						sp_Blitz 													#
 	#####################################################################################
 	Write-Host " Running sp_Blitz... " -NoNewLine
@@ -1831,11 +2063,13 @@ $htmlTable3
 			Write-Host " - $RunTime seconds" -Fore Yellow
 		}
 		$StepOutcome = "Success"
+		Add-LogRow "sp_Blitz" $StepOutcome
 	}
  Catch {
 		$StepEnd = get-date
 		Invoke-ErrMsg
 		$StepOutcome = "Failure"
+		Add-LogRow "sp_Blitz" $StepOutcome
 	}
 		
 	if ($StepOutcome -eq "Success") {
@@ -1952,11 +2186,13 @@ $htmlTable
 			Write-Host " - $RunTime seconds" -Fore Yellow
 		}
 		$StepOutcome = "Success"
+		Add-LogRow "sp_BlitzFirst 30 seconds" $StepOutcome
 	}
  Catch {
 		$StepEnd = get-date
 		Invoke-ErrMsg
 		$StepOutcome = "Failure"
+		Add-LogRow "sp_BlitzFirst 30 seconds" $StepOutcome
 	}
 		
 	if ($StepOutcome -eq "Success") {
@@ -2068,11 +2304,13 @@ $htmlTable
 				Write-Host " - $RunTime seconds" -Fore Yellow
 			}
 			$StepOutcome = "Success"
+			Add-LogRow "sp_BlitzFirst since startup" $StepOutcome
 		}
 	 Catch {
 			$StepEnd = get-date
 			Invoke-ErrMsg
 			$StepOutcome = "Failure"
+			Add-LogRow "sp_BlitzFirst since startup" $StepOutcome
 		}
 			
 		if ($StepOutcome -eq "Success") {
@@ -2402,11 +2640,13 @@ $htmlTable
 			}
 			$PreviousOutcome = $StepOutcome
 			$StepOutcome = "Success"
+			Add-LogRow "sp_BlitzCache $SortOrder" $StepOutcome
 		}
 	 Catch {
 			$StepEnd = get-date
 			Invoke-ErrMsg
 			$StepOutcome = "Failure"
+			Add-LogRow "sp_BlitzCache $SortOrder" $StepOutcome
 		}
 			
 		if ($StepOutcome -eq "Success") {
@@ -2877,11 +3117,13 @@ $htmlTable
 				Write-Host " - $RunTime seconds" -Fore Yellow
 			}
 			$StepOutcome = "Success"
+			Add-LogRow "sp_BlitzIndex mode $Mode" $StepOutcome
 		}
 	 Catch {
 			$StepEnd = get-date
 			Invoke-ErrMsg
 			$StepOutcome = "Failure"
+			Add-LogRow "sp_BlitzIndex mode $Mode" $StepOutcome
 		}
 			
 		if ($StepOutcome -eq "Success") {
@@ -3101,6 +3343,7 @@ $htmlTable
 				##Saving file 
 				$ExcelFile.Save()
 			}
+			Remove-Variable -Name BlitzIxTbl
 		}
 		#Update $OldMode
 		$OldMode = $NewMode
@@ -3111,7 +3354,6 @@ $htmlTable
 		}
 	}
 	##Cleaning up variables
-	Remove-Variable -Name BlitzIxTbl
 	Remove-Variable -Name BlitzIndexSet
 
 	####################################################################
@@ -3158,11 +3400,13 @@ $htmlTable
 			Write-Host " - $RunTime seconds" -Fore Yellow
 		}
 		$StepOutcome = "Success"
+		Add-LogRow "sp_BlitzLock" $StepOutcome
 	}
  Catch {
 		$StepEnd = get-date
 		Invoke-ErrMsg
 		$StepOutcome = "Failure"
+		Add-LogRow "sp_BlitzLock" $StepOutcome
 	}
 		
 	if ($StepOutcome -eq "Success") {
@@ -3520,7 +3764,7 @@ $htmlTable
 
 	<#
 		if no specific database name has been provided, check BlitzCache results for any database that
-		might account for 2/3 of the all the records returned by BlitzCache
+		might account for 2/3 of all the records returned by BlitzCache
 	#>
 	if ([string]::IsNullOrEmpty($CheckDB)) {
 		[int]$TwoThirdsBlitzCache = [Math]::Floor([decimal]($BlitzCacheRecs / 1.5))
@@ -3562,11 +3806,13 @@ $htmlTable
 				Write-Host " - $RunTime seconds" -Fore Yellow
 			}
 			$StepOutcome = "Success"
+			Add-LogRow "Stats Info" $StepOutcome
 		}
 	 Catch {
 			$StepEnd = get-date
 			Invoke-ErrMsg
 			$StepOutcome = "Failure"
+			Add-LogRow "Stats Info" $StepOutcome
 		}
 			
 		if ($StepOutcome -eq "Success") {
@@ -3594,9 +3840,9 @@ $htmlTable
 				@{Name = "Steps"; Expression = { $_."steps" } },
 				@{Name = "Incremental"; Expression = { $_."incremental" } },
 				@{Name = "Temporary"; Expression = { $_."temporary" } },
-				@{Name = "With NORECOMPUTE"; Expression = { $_."no_recompute"} },
-				@{Name = "Persisted Sample"; Expression = { $_."persisted_sample"} },
-				@{Name = "Persisted Sample %"; Expression = { $_."persisted_sample_percent"} },
+				@{Name = "With NORECOMPUTE"; Expression = { $_."no_recompute" } },
+				@{Name = "Persisted Sample"; Expression = { $_."persisted_sample" } },
+				@{Name = "Persisted Sample %"; Expression = { $_."persisted_sample_percent" } },
 				@{Name = "Partitioned"; Expression = { $_."partitioned" } },
 				@{Name = "Partition No."; Expression = { $_."partition_number" } },
 				@{Name = "Get Stats Details"; Expression = { $_."get_details" } } | ConvertTo-Html -As Table -Fragment
@@ -3687,11 +3933,13 @@ $htmlTable
 				Write-Host " - $RunTime seconds" -Fore Yellow
 			}
 			$StepOutcome = "Success"
+			Add-LogRow "Index Info" $StepOutcome
 		}
 	 Catch {
 			$StepEnd = get-date
 			Invoke-ErrMsg
 			$StepOutcome = "Failure"
+			Add-LogRow "Index Info" $StepOutcome
 		}
 			
 		if ($StepOutcome -eq "Success") {
@@ -3819,9 +4067,9 @@ finally {
 			$CreatFlagTblCommand = new-object System.Data.SqlClient.SqlCommand
 			$CreatFlagTblCommand.CommandText = $CreatFlagTbl
 			$CreatFlagTblCommand.CommandTimeout = 30
-			$SqlConnection.Open()
-			$CreatFlagTblCommand.Connection = $SqlConnection
 			Try {
+				$SqlConnection.Open() | Out-Null -ErrorAction Stop
+				$CreatFlagTblCommand.Connection = $SqlConnection
 				$CreatFlagTblCommand.ExecuteNonQuery() | Out-Null -ErrorAction Stop
 				$SqlConnection.Close()
 				$FlagCreated = "Y"
@@ -3892,11 +4140,13 @@ finally {
 			Write-Host " - $RunTime seconds" -Fore Yellow
 		}
 		$StepOutcome = "Success"
+		Add-LogRow "Return sp_BlitzWho" $StepOutcome
 	}
  Catch {
 		$StepEnd = get-date
 		Invoke-ErrMsg
 		$StepOutcome = "Failure"
+		Add-LogRow "Return sp_BlitzWho" $StepOutcome
 	}
 		
 	if ($StepOutcome -eq "Success") {
@@ -4234,6 +4484,36 @@ finally {
 				$ExcelSheet.Delete()
 			}
 		}
+
+		##Insert log data in Excel
+		##Populating the "ExecutionLog" sheet
+		$ExcelSheet = $ExcelFile.Worksheets.Item("ExecutionLog")
+		#Specify at which row in the sheet to start adding the data
+		$ExcelStartRow = $DefaultStartRow
+		#Specify with which column in the sheet to start
+		$ExcelColNum = 1
+		#Set counter used for row retrieval
+		$RowNum = 0
+		$DataSetCols = @("Step", "StartDate", "EndDate", "Duration", "Outcome", "ErrorMsg")
+		if ($DebugInfo) {
+			Write-Host " ->Writing Execution Log to Excel" -fore yellow
+		}
+		#Loop through each Excel row
+		foreach ($row in $LogTbl) {
+
+			foreach ($col in $DataSetCols) {
+				$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $LogTbl.Rows[$RowNum][$col]
+				$ExcelColNum += 1
+			}
+			#move to the next row in the spreadsheet
+			$ExcelStartRow += 1
+			#move to the next row in the data set
+			$RowNum += 1
+			# reset Excel column number so that next row population begins with column 1
+			$ExcelColNum = 1
+		}
+		##Saving file 
+		$ExcelFile.Save()
 	}
 
 	#####################################################################################
@@ -4260,8 +4540,24 @@ finally {
 	$ExecTime = $ExecTime.Substring(0, $ExecTime.IndexOf('.'))
 	if ($ToHTML -eq "Y") {
 		if ($DebugInfo) {
-			Write-Host " ->Generating index page." -fore yellow
+			Write-Host " ->Generating index and execution log pages." -fore yellow
 		} 
+		$HtmlTabName = "PSBlitz Execution Log"
+		$htmlTable = $LogTbl | Select-Object "Step", "StartDate", "EndDate", 
+		@{Name = "Duration (Seconds)"; Expression = { $_."Duration" } }, "Outcome", "ErrorMsg" | ConvertTo-Html -As Table -Fragment
+		$html = $HTMLPre + @"
+						<title>$HtmlTabName</title>
+						</head>
+						<body>
+						<h1 id="top">$HtmlTabName</h1>
+		<br>
+						$htmlTable 
+		<br>
+						</body>
+						</html>
+"@ 
+		$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\ExecutionLog.html"
+		
 		$IndexContent = @"
 				<!DOCTYPE html>
 				<html>
@@ -4330,8 +4626,7 @@ finally {
 				</tr>
 "@
 
-		# Build an HTML file that acts as the index pointing to all the HTML files that make up the report
-		
+		# Build an HTML file that acts as the index pointing to all the HTML files that make up the report	
 		$HtmlFiles = Get-ChildItem -Path $HTMLOutDir -Filter *.html | Sort-Object CreationTime
 		foreach ($File in $HtmlFiles) {
 			$AdditionalInfo = ""
@@ -4476,6 +4771,22 @@ finally {
 				$Description = "Information about the deadlocks recorded in the default extended events session."
 				$AdditionalInfo = "Outputs deadlock graphs as .xdl files."
 			}
+			elseif ($File.Name -like "ExecutionLog*") {
+				$QuerySource = ""
+				$Description = "Log for the current run of PSBlitz."
+				$AdditionalInfo = "Contains step status and any error messages that might have been thrown"
+			}
+			elseif ($File.Name -like "DatabaseInfo*") {
+				$QuerySource = "sys.databases, sys.master_files, sys.database_files, sys.dm_db_log_info"
+				$Description = "Database info and database files info for "
+				if (!([string]::IsNullOrEmpty($CheckDB))) {
+					$Description += "$CheckDB."
+				}
+				else {
+					$Description += "all databases on the instance."
+				}
+				$AdditionalInfo = ""
+			}
 			$IndexContent += "<tr><td><a href='$RelativePath' target='_blank'>$($File.Name.Replace('.html',''))</a></td><td>$QuerySource</td><td>$Description</td><td>$AdditionalInfo</td></tr>"
 		}
 
@@ -4537,6 +4848,7 @@ finally {
 	}
 	Write-Host " "
 	Write-Host $("-" * 80)
+
 	if (($DebugInfo) -or ($InteractiveMode -eq 1)) {
 		Read-Host -Prompt "Done. Press Enter to close this window."
 	}
