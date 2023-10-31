@@ -118,3 +118,83 @@ GROUP  BY [d].[database_id],
           [s].[program_name]
 ORDER  BY [ConnectionsCount] DESC
 OPTION(RECOMPILE);
+
+DECLARE @InstanceLevelOption INT;
+
+/*Get the instance-level configuration*/
+SELECT @InstanceLevelOption = CAST([value_in_use] AS INT)
+FROM   sys.configurations
+WHERE  [name] = N'user options';
+
+;
+WITH OPTCTE
+     AS (SELECT Options.id,
+                Options.[Option],
+                Options.[Description],
+                ROW_NUMBER()
+                  OVER (
+                    PARTITION BY 1
+                    ORDER BY id) AS bitNum
+         FROM   (VALUES (1,
+                'DISABLE_DEF_CNST_CHK',
+                'Controls interim or deferred constraint checking. - obsolete and should not be on!'),
+                        (2,
+                'IMPLICIT_TRANSACTIONS',
+                'Controls whether a transaction is started implicitly when a statement is executed.'),
+                        (4,
+                'CURSOR_CLOSE_ON_COMMIT',
+                'Controls behavior of cursors after a commit operation has been performed.'),
+                        (8,
+                'ANSI_WARNINGS',
+                'Controls truncation and NULL in aggregate warnings.'),
+                        (16,
+                'ANSI_PADDING',
+                'Controls padding of fixed-length variables.'),
+                        (32,
+                'ANSI_NULLS',
+                'Controls NULL handling when using equality operators.'),
+                        (64,
+                'ARITHABORT',
+                'Terminates a query when an overflow or divide-by-zero error occurs during query execution.'),
+                        (128,
+                'ARITHIGNORE',
+                'Returns NULL when an overflow or divide-by-zero error occurs during a query.'),
+                        (256,
+                'QUOTED_IDENTIFIER',
+                'Differentiates between single and double quotation marks when evaluating an expression.'),
+                        (512,
+                'NOCOUNT',
+                'Turns off the message returned at the end of each statement that states how many rows were affected.'),
+                        (1024,
+                'ANSI_NULL_DFLT_ON',
+                'Alters the session''s behavior to use ANSI compatibility for nullability. New columns defined without explicit nullability are defined to allow nulls.'),
+                        (2048,
+                'ANSI_NULL_DFLT_OFF',
+                'Alters the session''s behavior not to use ANSI compatibility for nullability. New columns defined without explicit nullability do not allow nulls.'),
+                        (4096,
+                'CONCAT_NULL_YIELDS_NULL',
+                'Returns NULL when concatenating a NULL value with a string.'),
+                        (8192,
+                'NUMERIC_ROUNDABORT',
+                'Generates an error when a loss of precision occurs in an expression.'),
+                        (16384,
+                'XACT_ABORT',
+                'Rolls back a transaction if a Transact-SQL statement raises a run-time error.') ) AS Options(id, [Option], [Description]))
+SELECT [Option],
+       CASE
+         WHEN ( @@OPTIONS & id ) = id THEN 'ON'
+         ELSE 'OFF'
+       END AS SessionSetting,
+       CASE
+         WHEN ( @InstanceLevelOption & id ) = id THEN 'ON'
+         ELSE 'OFF'
+       END AS InstanceSetting,
+       [Description],
+       CASE
+         WHEN [Description] LIKE '%obsolete%' THEN ''
+         ELSE 'https://learn.microsoft.com/en-us/sql/t-sql/statements/set-'
+              + LOWER(REPLACE([Option], '_', '-'))
+              + '-transact-sql'
+       END AS [URL]
+FROM   OPTCTE
+OPTION(RECOMPILE);
