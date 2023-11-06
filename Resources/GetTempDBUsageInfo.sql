@@ -1,6 +1,6 @@
 /*
-	Part of PSBlitz - https://github.com/VladDBA/PSDBInfo
-	License - https://github.com/VladDBA/PSDBInfo/blob/main/LICENSE
+	Part of PSBlitz - https://github.com/VladDBA/PSBlitz
+	License - https://github.com/VladDBA/PSBlitz/blob/main/LICENSE
 */
 SET NOCOUNT ON;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;

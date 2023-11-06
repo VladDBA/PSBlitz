@@ -1,6 +1,6 @@
 /*
-	Part of PSBlitz - https://github.com/VladDBA/PSDBInfo
-	License - https://github.com/VladDBA/PSDBInfo/blob/main/LICENSE
+	Part of PSBlitz - https://github.com/VladDBA/PSBlitz
+	License - https://github.com/VladDBA/PSBlitz/blob/main/LICENSE
 */
 SET NOCOUNT ON;
 SET STATISTICS XML OFF;
@@ -130,7 +130,7 @@ SELECT DB_NAME(f.database_id)                                     AS [Database],
        f.[physical_name]                                          AS [FilePhysicalName],
        f.[type_desc]                                              AS [FileType],
        state_desc                                                 AS [State],
-       CAST(( f.size * 8 / 1024.00 / 1204.00 ) AS DECIMAL(15, 3)) AS SizeGB,
+       CAST(( f.size * 8 / 1024.00 / 1024.00 ) AS DECIMAL(15, 3)) AS [SizeGB],
        CASE
          WHEN [max_size] = 0
                OR [growth] = 0 THEN 'File autogrowth is disabled'
