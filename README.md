@@ -109,7 +109,7 @@ You can find the all the scripts in the repository's [Resources](/Resources) dir
 |`-ZipOutput`| Providing Y as a value will tell PSBlitz.ps1 to also create a zip archive of the output files.|
 |`-BlitzWhoDelay` | Used to sepcify the number of seconds between each sp_BlitzWho execution. Defaults to 10 if not specified.|
 |`-ConnTimeout`| Can be used to increased the timeout limit in seconds for connecting to SQL Server. Defaults to 15 seconds if not specified.|
-|`-MaxTimeout`| Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. Defaults to 800 (13.3 minutes)|
+|`-MaxTimeout`| Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. Defaults to 1000 (16.6 minutes)|
 |`-DebugInfo`| Switch used to get more information for debugging and troubleshooting purposes.|
 
 [*Back to top*](#header1)
