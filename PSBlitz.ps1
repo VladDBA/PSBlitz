@@ -229,7 +229,9 @@ param(
 	[Parameter(Mandatory = $False)]
 	[string]$ToHTML = "N",
 	[Parameter(Mandatory = $False)]
-	[string]$ZipOutput = "N"
+	[string]$ZipOutput = "N",
+	[Parameter(Mandatory = $False)]
+	[int]$CacheTop = 10
 )
 
 ###Internal params
@@ -1017,6 +1019,12 @@ if ($ToHTML -ne "Y") {
 		$ErrorActionPreference = "Continue"
 	}
 	
+}
+
+if(($ToHTML -ne "Y") -and ($CacheTop -ne 10)){
+	Write-Host " Output type is Excel, but -CacheTop was specified with a value <> 10  - th aren't compatible."
+	Write-Host " -> Switching -CacheTop back to 10"
+	$CacheTop = 10
 }
 
 if ($ToHTML -eq "Y") {
@@ -2720,8 +2728,11 @@ $htmlTable
 		$NewSortString = ";SELECT @SortOrder = " + $SortOrder
 		#Replace number of records returned if sorting by recent compilations
 		if ($SortOrder -eq "'recent compilations'") {
-			$OldSortString = $OldSortString + ", @Top = 10;"
+			$OldSortString = $OldSortString + ", @Top = $CacheTop;"
 			$NewSortString = $NewSortString + ", @Top = 50;"
+		} elseif (($CacheTop -ne 10) -and ($SortOrder -eq "'CPU'")){
+			$OldSortString = $OldSortString + ", @Top = 10;"
+			$NewSortString = $NewSortString + ", @Top = $CacheTop;"
 		}
 		if ($DebugInfo) {
 			Write-Host " ->Replacing $OldSortString with $NewSortString" -fore yellow
@@ -2920,7 +2931,7 @@ $htmlTable
 					<body>
 					<h1 id="top">$HtmlTabName</h1>
 					<br>
-					<h2>Top 10 Queries by $HtmlTabName2</h2>
+					<h2>Top $CacheTop Queries by $HtmlTabName2</h2>
 					<p><a href="#Queries1">Jump to query text</a></p>
 					$htmlTable1
 					<br>
@@ -2956,7 +2967,7 @@ $htmlTable
 					if($SortOrder -eq "'Recent Compilations'"){
 						$TopCount = "50"
 					} else {
-						$TopCount = "10"
+						$TopCount = "$CacheTop"
 					}
 					$html += @"
 				<h2>Top $TopCount Queries by $HtmlTabName2</h2>
@@ -5216,14 +5227,14 @@ finally {
 				$SortOrder = $SortOrder.Replace('.html', '')
 				$AdditionalInfo = "Outputs execution plans as .sqlplan files."
 				if ($SortOrder -eq "Mem_Recent_Comp") {
-					$QuerySource = "sp_BlitzCache @SortOrder = 'memory grant'/'recent compilations'"
+					$QuerySource = "sp_BlitzCache @SortOrder = 'memory grant', @Top = $CacheTop/'recent compilations' , @Top = 50;"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
 					}
 					else {
 						$QuerySource += "; "
 					}
-					$Description = "Contains the top 10 queries sorted by memory grant size, and the top 50 most recently compiled queries"
+					$Description = "Contains the top $CacheTop queries sorted by memory grant size, and the top 50 most recently compiled queries"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$Description += " for $CheckDB."
 					}
@@ -5232,14 +5243,14 @@ finally {
 					}
 				}
 				else {
-					$QuerySource = "sp_BlitzCache @SortOrder = '$SortOrder'/'avg $SortOrder'"
+					$QuerySource = "sp_BlitzCache , @Top = $CacheTop, @SortOrder = '$SortOrder'/'avg $SortOrder'"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
 					}
 					else {
 						$QuerySource += "; "
 					}
-					$Description = "Contains the top 10 queries sorted by $SortOrder and Average $SortOrder"
+					$Description = "Contains the top $CacheTop queries sorted by $SortOrder and Average $SortOrder"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$Description += " for $CheckDB."
 					}
