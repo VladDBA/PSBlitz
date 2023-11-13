@@ -142,7 +142,7 @@
  Can be used to increased the timeout limit in seconds for connecting to SQL Server. Defaults to 15 seconds if not specified.
 
 .PARAMETER MaxTimeout
- Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. Defaults to 800 (13.3 minutes)
+ Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. Defaults to 1000 (16.6 minutes)
 
 .PARAMETER DebugInfo
  Switch used to get more information for debugging and troubleshooting purposes.
@@ -221,7 +221,7 @@ param(
 	[Parameter(Mandatory = $False)]
 	[switch]$DebugInfo,
 	[Parameter(Mandatory = $False)]
-	[int]$MaxTimeout = 800,
+	[int]$MaxTimeout = 1000,
 	[Parameter(Mandatory = $False)]
 	[int]$ConnTimeout = 15,
 	[Parameter(Mandatory = $False)]
@@ -234,8 +234,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "3.5.0"
-$VersDate = "20231031"
+$Vers = "3.6.0"
+$VersDate = "20231113"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -355,7 +355,7 @@ function Get-PSBlitzHelp {
 -BlitzWhoDelay	- used to sepcify the number of seconds between each sp_BlitzWho execution.
 		Defaults to 10 if not specified
 -MaxTimeout		- can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info
-		retrieval. Defaults to 800 (13.3 minutes)
+		retrieval. Defaults to 1000 (16.6 minutes)
 -ConnTimeout	- used to increased the timeout limit in seconds for connecting to SQL Server.
 		Defaults to 15 seconds if not specified
 -DebugInfo		- switch used to get more information for debugging and troubleshooting purposes.
@@ -644,6 +644,7 @@ $MainScriptblock = {
 			Write-Output $OutMsg
 			#Write-Host "  $OutErr" -fore Red
 		}
+		$SqlConnection.Dispose()
 	}
 	else {
 		$OutMsg = " ->Successful runs: $SuccessCount"
@@ -658,6 +659,7 @@ $MainScriptblock = {
 			#Write-Host ""
 			Write-Output $OutMsg
 		}
+		$SqlConnection.Dispose()
 	}
 }
 
@@ -1143,7 +1145,7 @@ try {
 	Write-Host " check for $ServerName" 
 	Write-Host $("-" * 80)
 
-	if (($DebugInfo) -and ($MaxTimeout -ne 800)) {
+	if (($DebugInfo) -and ($MaxTimeout -ne 1000)) {
 		Write-Host " ->MaxTimeout has been set to $MaxTimeout"
 	}
 
@@ -1166,7 +1168,7 @@ try {
 			Write-Host ""
 		}
 		$JobError = $Job | Select-Object -ExpandProperty Error
-		Add-LogRow "sp_BlitzWho background process" $JobStatus $JobError
+		Add-LogRow "Start sp_BlitzWho background process" $JobStatus $JobError
 		Write-Host " ->Switching to foreground execution."
 		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
 		$BlitzWhoPass += 1
@@ -1176,7 +1178,7 @@ try {
 		if ($DebugInfo) {
 			Write-Host ""
 		}
-		Add-LogRow "sp_BlitzWho background process" $JobStatus
+		Add-LogRow "Start sp_BlitzWho background process" $JobStatus
 		Write-Host " ->sp_BlitzWho will collect data every $BlitzWhoDelay seconds."
 
 	}
@@ -1823,6 +1825,26 @@ $htmlTable2
 			Add-LogRow "->Open Transacion Info" $StepOutcome
 		}
 		else {
+			##Exporting execution plans to file
+			#Set counter used for row retrieval
+			[int]$RowNum = 0
+			$i = 0
+			#loop through each row
+			if ($DebugInfo) {
+				Write-Host " ->Exporting execution plans" -fore yellow
+			}
+			foreach ($row in $AcTranTbl) {
+				$i += 1
+				if ($AcTranTbl.Rows[$RowNum]["current_plan"] -ne [System.DBNull]::Value) {
+					[string]$SQLPlanFile = $AcTranTbl.Rows[$RowNum]["current_plan_file"]
+					$AcTranTbl.Rows[$RowNum]["current_plan"] | Format-XML | Set-Content -Path $PlanOutDir\$($SQLPlanFile) -Force
+				}
+				if ($AcTranTbl.Rows[$RowNum]["most_recent_plan"] -ne [System.DBNull]::Value) {
+					[string]$SQLPlanFile = $AcTranTbl.Rows[$RowNum]["most_recent_plan_file"]
+					$AcTranTbl.Rows[$RowNum]["most_recent_plan"] | Format-XML | Set-Content -Path $PlanOutDir\$($SQLPlanFile) -Force
+				}
+				$RowNum += 1
+			}
 			if ($ToHTML -eq "Y") {
 
 				$tableName = "Open transaction info"
@@ -1833,32 +1855,10 @@ $htmlTable2
 					Write-Host " ->Converting active transaction info to HTML" -fore yellow
 				}
 
-				$AcTranTbl.Columns.Add("current_query", [string]) | Out-Null
-				$AcTranTbl.Columns.Add("most_recent_query", [string]) | Out-Null
-				$RowNum = 0
-				$i = 0
-				$ri = 0
-		
-				foreach ($row in $AcTranTbl) {
-					if ($AcTranTbl.Rows[$RowNum]["current_sql"] -ne [System.DBNull]::Value) {
-						$i += 1
-						$CurrQueryName = "Current_" + $i + ".query"
 				
-					}
-					else { $CurrQueryName = "" }
-					if ($AcTranTbl.Rows[$RowNum]["most_recent_sql"] -ne [System.DBNull]::Value) {
-						$ri += 1
-						$RecQueryName = "MostRecent_" + $ri + ".query"
-					}
-					else { $RecQueryName = "" }
-					$AcTranTbl.Rows[$RowNum]["current_query"] = $CurrQueryName
-					$AcTranTbl.Rows[$RowNum]["most_recent_query"] = $RecQueryName
-					$RowNum += 1
-				}
-
 				$htmlTable1 = $AcTranTbl | Select-Object @{Name = "time_of_check"; Expression = { ($_."time_of_check").ToString("yyyy-MM-dd HH:mm:ss") } },
 				"database_name", "session_id", "blocking_session_id",
-				"current_query", "most_recent_query", "wait_type",
+				"current_query", "current_plan_file", "most_recent_query", "most_recent_plan_file", "wait_type",
 				"wait_time_seconds", "wait_resource", "command",
 				"session_status", "current_reuqest_status", "transaction_name",
 			 "open_transaction_count",
@@ -1923,10 +1923,11 @@ $htmlTable3
 				$ExcelColNum = 1
 				#Set counter used for row retrieval
 				$RowNum = 0
+				$SQLPlanNum = 1
 
 				#List of columns that should be returned from the data set
 				$DataSetCols = @("time_of_check", "database_name", "session_id", "blocking_session_id"
-					, "current_sql", "most_recent_sql", "wait_type"
+					, "current_sql", "current_plan_file", "most_recent_sql", "most_recent_plan_file", "wait_type"
 					, "wait_time_seconds", "command", "session_status", "current_reuqest_status", "transaction_name"
 					, "open_transaction_count", "transaction_begin_time", "transaction_type", "transaction_state"
 					, "request_start_time", "request_end_time", "active_request_elapsed_seconds"
@@ -1940,6 +1941,7 @@ $htmlTable3
 				Loop through each data set column of current row and fill the corresponding 
 				Excel cell
 				#>
+					
 					foreach ($col in $DataSetCols) {
 						if ("time_of_check", "transaction_begin_time" -contains $col) {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $AcTranTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
@@ -1954,6 +1956,7 @@ $htmlTable3
 
 					#move to the next row in the spreadsheet
 					$ExcelStartRow += 1
+					$SQLPlanNum += 1
 					#move to the next row in the data set
 					$RowNum += 1
 					# reset Excel column number so that next row population begins with column 1
@@ -2784,8 +2787,10 @@ $htmlTable
 			##Add database names to array
 			if ([string]::IsNullOrEmpty($CheckDB)) {
 				foreach ($row in $BlitzCacheTbl."Database") {
-					$DBArray.Add($row) | Out-Null
-					$BlitzCacheRecs += 1
+					if ($row -ne [System.DBNull]::Value) {
+						$DBArray.Add($row) | Out-Null
+						$BlitzCacheRecs += 1
+					}
 				}
 			}
 
@@ -2948,8 +2953,13 @@ $htmlTable
 						<br>
 "@
 					}
+					if($SortOrder -eq "'Recent Compilations'"){
+						$TopCount = "50"
+					} else {
+						$TopCount = "10"
+					}
 					$html += @"
-				<h2>Top 10 Queries by $HtmlTabName2</h2>
+				<h2>Top $TopCount Queries by $HtmlTabName2</h2>
 				<p><a href="#Queries2">Jump to query text</a></p>
 				$htmlTable1
 				<br>
@@ -3178,8 +3188,29 @@ $htmlTable
 	#						sp_BlitzQueryStore											#
 	#####################################################################################
 
+	<#
+		if no specific database name has been provided, check BlitzCache results for any database that
+		might account for 2/3 of all the records returned by BlitzCache
+	#>
+	if ([string]::IsNullOrEmpty($CheckDB)) {
+		[int]$TwoThirdsBlitzCache = [Math]::Floor([decimal]($BlitzCacheRecs / 1.5))
+		[string]$DBName = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Name | Select-Object -Last 1
+		[int]$DBCount = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Count | Select-Object -Last 1
+		if (($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --")) {
+			Write-Host " $DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
+			Write-Host " ->" -NoNewLine
+			$StepStart = get-date
+			[string]$CheckDB = $DBName
+			$DBSwitched = "Y"
+			$StepEnd = get-date
+			Add-LogRow "CheckDB value" "Switched" "$DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
+		}
+		
+	}
+
 	##Check if DB is eligible for sp_BlitzQueryStore first
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
+		Write-Host " Checking if $CheckDB is eligible for sp_BlizQueryStore..."
 		$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
 		$DBQuery = @" 
 		IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSION')), 4)) < 13 )
@@ -3490,13 +3521,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						}
 
 						#move to the next row in the spreadsheet
-					$ExcelStartRow += 1
-					#move to the next row in the data set
-					$RowNum += 1
-					#Move to the next sqlplan file
-					$SQLPlanNum += 1
-					# reset Excel column number so that next row population begins with column 1
-					$ExcelColNum = 7
+						$ExcelStartRow += 1
+						#move to the next row in the data set
+						$RowNum += 1
+						#Move to the next sqlplan file
+						$SQLPlanNum += 1
+						# reset Excel column number so that next row population begins with column 1
+						$ExcelColNum = 7
 					}
 					
 				}
@@ -3508,6 +3539,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 
 			}
 
+		}
+		if ($DBSwitched -eq "Y") {
+			$StepStart = get-date
+			$CheckDB = ""
+			$StepEnd = Get-Date
+			Add-LogRow "CheckDB value" "Switched" "Switched back to empty from $DBName"
 		}
 	}
 	if ($JobStatus -ne "Running") {
@@ -4220,8 +4257,11 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		if (($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --")) {
 			Write-Host " $DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
 			Write-Host " ->" -NoNewLine
+			$StepStart = get-date
 			[string]$CheckDB = $DBName
 			$DBSwitched = "Y"
+			$StepEnd = get-date
+			Add-LogRow "CheckDB value" "Switched" "$DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
 		}
 		
 	}
@@ -4380,13 +4420,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Write-Host " - $RunTime seconds" -Fore Yellow
 			}
 			$StepOutcome = "Success"
-			Add-LogRow "Index Info" $StepOutcome
+			Add-LogRow "Index Frag Info" $StepOutcome
 		}
 	 Catch {
 			$StepEnd = get-date
 			Invoke-ErrMsg
 			$StepOutcome = "Failure"
-			Add-LogRow "Index Info" $StepOutcome
+			Add-LogRow "Index Frag Info" $StepOutcome
 		}
 			
 		if ($StepOutcome -eq "Success") {
@@ -4396,17 +4436,27 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			if ($IndexTbl.Columns[0].ColumnName -eq "xlocked") {
 				$RowNum = 0
 				Write-Host " ->Exclusive lock detected on table(s):"
+				$LockedTabList = ""
+				$LockedTabLogMsg = "Exclusive locks on table(s):"
 				foreach ($row in $IndexTbl) {
 					$LockedTab = $IndexTbl.Rows[$RowNum]["object_name"]
 					Write-Host "  - $LockedTab"
+					if ($RowNum -eq 0) { 
+						$LockedTabList += "$LockedTab" 
+					}
+					else {
+						$LockedTabList += ", $LockedTab"
+					}
 					$RowNum += 1
 				}
 				Write-Host " ->Index fragmentation check has been skipped."
+				Add-LogRow "->Index Frag Info" "Skipped" "$LockedTabLogMsg $LockedTabList"
 			}
 			else {
 				[int]$RowsReturned = $IndexTbl.Rows.Count
 				if ($RowsReturned -le 0) {
 					Write-Host " ->No rows returned."
+					Add-LogRow "->Index Frag Info" "Skipped" "No rows returned."
 				}
 				else {
 
@@ -4482,7 +4532,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		}
 
 		if ($DBSwitched -eq "Y") {
+			$StepStart = get-date
 			$CheckDB = ""
+			$StepEnd = Get-Date
+			Add-LogRow "CheckDB value" "Switched" "Switched back to empty from $DBName"
 		}
 	}
 
@@ -4914,6 +4967,7 @@ finally {
 		Remove-Variable -Name BlitzWhoAggTbl
 		Remove-Variable -Name BlitzWhoSet
 	}
+	$SqlConnection.Close()
 	$SqlConnection.Dispose()
 
 	#####################################################################################
@@ -5022,7 +5076,12 @@ finally {
 						</html>
 "@ 
 		$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\ExecutionLog.html"
-		
+		if (!([string]::IsNullOrEmpty($CheckDB))) {
+			$DbPortion = "- database-specific check: $CheckDB"
+		}
+		else {
+			$DbPortion = "- instance-wide check"
+		}
 		$IndexContent = @"
 				<!DOCTYPE html>
 				<html>
@@ -5063,7 +5122,7 @@ finally {
 				<title>PSBlitz Output For $InstName</title>
 				</head>
 				<body>
-    <h1>PSBlitz Output For $InstName</h1>
+    <h1>PSBlitz Output For $InstName $DbPortion</h1>
     <table>
 				<tr>
 				<th>Generated With</th>
@@ -5323,4 +5382,7 @@ finally {
 	if (($DebugInfo) -or ($InteractiveMode -eq 1)) {
 		Read-Host -Prompt "Done. Press Enter to close this window."
 	}
+	$SqlConnection.Close()
+	$SqlConnection.Dispose()
+	Remove-Variable -Name SqlConnection
 }
