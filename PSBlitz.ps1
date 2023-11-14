@@ -124,6 +124,10 @@
  Used to provide the name of a specific database against which sp_BlitzIndex, sp_BlitzCache, 
  and sp_BlitzLock will be ran. Omit to run against the whole instance.
 
+.PARAMETER CacheTop
+ Used to specify if more/less than the default top 10 queries should be returned for the 
+ sp_BlitzCache step. Only works for HTML output (-ToHTM Y).
+
 .PARAMETER OutputDir
  Used to provide a path where the output directory should be saved to. Defaults to PSBlitz.ps1's directory 
  if not specified or a non-existent path is provided.
@@ -237,7 +241,7 @@ param(
 ###Internal params
 #Version
 $Vers = "3.6.0"
-$VersDate = "20231113"
+$VersDate = "20231114"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -356,6 +360,8 @@ function Get-PSBlitzHelp {
 -ZipOutput		- Y to also create a zip archive of the output files.
 -BlitzWhoDelay	- used to sepcify the number of seconds between each sp_BlitzWho execution.
 		Defaults to 10 if not specified
+-CacheTop       - used to specify if more/less than the default top 10 queries should be returned 
+        for the sp_BlitzCache step. Only works for HTML output (-ToHTM Y).
 -MaxTimeout		- can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info
 		retrieval. Defaults to 1000 (16.6 minutes)
 -ConnTimeout	- used to increased the timeout limit in seconds for connecting to SQL Server.
@@ -1022,8 +1028,9 @@ if ($ToHTML -ne "Y") {
 }
 
 if(($ToHTML -ne "Y") -and ($CacheTop -ne 10)){
-	Write-Host " Output type is Excel, but -CacheTop was specified with a value <> 10  - th aren't compatible."
-	Write-Host " -> Switching -CacheTop back to 10"
+	Write-Host " Output type is Excel, but -CacheTop was specified with a value <> 10." -Fore Red
+	Write-Host " ->These two options aren't compatible."
+	Write-Host " ->Switching -CacheTop back to 10"
 	$CacheTop = 10
 }
 
@@ -2731,6 +2738,8 @@ $htmlTable
 			$OldSortString = $OldSortString + ", @Top = $CacheTop;"
 			$NewSortString = $NewSortString + ", @Top = 50;"
 		} elseif (($CacheTop -ne 10) -and ($SortOrder -eq "'CPU'")){
+			#Since we're only reading the script once and then using it from memory, 
+			#we only have to change @Top once if it's not the default
 			$OldSortString = $OldSortString + ", @Top = 10;"
 			$NewSortString = $NewSortString + ", @Top = $CacheTop;"
 		}
@@ -3259,18 +3268,19 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$CheckDBAdapter.Fill($CheckDBSet) | Out-Null -ErrorAction Stop
 			$SqlConnection.Close()
 			if ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "Yes") {
-				Write-Host " Database $CheckDB - " -NoNewLine -ErrorAction Stop
+				Write-Host " ->$CheckDB - " -NoNewLine -ErrorAction Stop
 				Write-Host "is eligible for sp_BlizQueryStore" -ErrorAction Stop
 				$CheckQueryStore = 'Y'
 			}
 			else {
 				$StepEnd = Get-Date
-				Write-Host " Database $CheckDB - is not eligible for sp_BlizQueryStore"
+				Write-Host " ->$CheckDB - is not eligible for sp_BlizQueryStore"
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" "$CheckDB is not eligible"
 			}
 		}
 		Catch {
 			$CheckQueryStore = 'N'
+			Invoke-ErrMsg
 			$StepEnd = Get-Date
 			Add-LogRow "sp_BlitzQueryStore precheck" "Failure"
 
