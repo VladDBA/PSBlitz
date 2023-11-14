@@ -16,7 +16,7 @@ IF OBJECT_ID(N'tempdb.dbo.#FSFiles', N'U') IS NOT NULL
 CREATE TABLE #FSFiles
   (  [DatabaseID]    [SMALLINT] NULL,
      [FSFilesCount]  [INT] NULL,
-     [FSFilesSizeGB] [NUMERIC](15, 3) NULL);
+     [FSFilesSizeGB] [NUMERIC](23, 3) NULL);
 
 /*Cursor to get FILESTREAM files and their sizes for databases that use FS*/
 DECLARE @DBName  NVARCHAR(128),
@@ -41,7 +41,7 @@ WHILE @@FETCH_STATUS = 0
 	  INSERT INTO #FSFiles ([DatabaseID],[FSFilesCount],[FSFilesSizeGB])
 	  SELECT DB_ID(),
        COUNT([type]),
-       CAST(SUM([size] * 8 / 1024.00 / 1024.00) AS NUMERIC(15, 3)) 
+       CAST(SUM(CAST([size] AS BIGINT) * 8 / 1024.00 / 1024.00) AS NUMERIC(23, 3)) 
        FROM sys.database_files
 	   WHERE  [type] = 2
 	   GROUP  BY [type];';
@@ -60,21 +60,21 @@ SELECT d.[name]                          AS [Database],
              ELSE 0
            END)                          AS [DataFiles],
        CAST(SUM(CASE
-                  WHEN f.[type] = 0 THEN ( f.size * 8 / 1024.00 / 1024.00 )
+                  WHEN f.[type] = 0 THEN ( CAST(f.size AS BIGINT) * 8 / 1024.00 / 1024.00 )
                   ELSE 0.00
-                END) AS NUMERIC(15, 3))  AS [DataFilesSizeGB],
+                END) AS NUMERIC(23, 3))  AS [DataFilesSizeGB],
        SUM(CASE
              WHEN f.[type] = 1 THEN 1
              ELSE 0
            END)                          AS [LogFiles],
        CAST(SUM(CASE
-                  WHEN f.[type] = 1 THEN ( f.size * 8 / 1024.00 / 1024.00 )
+                  WHEN f.[type] = 1 THEN ( CAST(f.size AS BIGINT) * 8 / 1024.00 / 1024.00 )
                   ELSE 0.00
-                END) AS NUMERIC(15, 3))  AS [LogFilesSizeGB],
+                END) AS NUMERIC(23, 3))  AS [LogFilesSizeGB],
        l.[VirtualLogFiles],
        ISNULL(fs.FSFilesCount, 0)        AS [FILESTREAMContainers],
        ISNULL(fs.FSFilesSizeGB, 0.000)   AS [FSContainersSizeGB],
-       CAST(SUM(f.size * 8 / 1024.00 / 1024.00) AS NUMERIC(15, 3))
+       CAST(SUM(CAST(f.size AS BIGINT) * 8 / 1024.00 / 1024.00) AS NUMERIC(23, 3))
        + ISNULL(fs.FSFilesSizeGB, 0.000) AS [DatabaseSizeGB],
 	   d.[compatibility_level] AS [CompatibilityLevel],
        d.[collation_name] AS [Collation],
@@ -130,17 +130,17 @@ SELECT DB_NAME(f.database_id)                                     AS [Database],
        f.[physical_name]                                          AS [FilePhysicalName],
        f.[type_desc]                                              AS [FileType],
        state_desc                                                 AS [State],
-       CAST(( f.size * 8 / 1024.00 / 1024.00 ) AS DECIMAL(15, 3)) AS [SizeGB],
+       CAST(( CAST(f.size AS BIGINT) * 8 / 1024.00 / 1024.00 ) AS NUMERIC(23, 3)) AS [SizeGB],
        CASE
          WHEN [max_size] = 0
                OR [growth] = 0 THEN 'File autogrowth is disabled'
          WHEN [max_size] = -1
               AND [growth] > 0 THEN 'Unlimited'
-         WHEN [max_size] > 0 THEN CAST(CAST (CAST([max_size] AS BIGINT) * 8 / 1024.00 / 1024.00 AS NUMERIC(15, 3)) AS VARCHAR(20))
+         WHEN [max_size] > 0 THEN CAST(CAST (CAST([max_size] AS BIGINT) * 8 / 1024.00 / 1024.00 AS NUMERIC(23, 3)) AS VARCHAR(20))
        END                                                        AS [MaxFileSizeGB],
        CASE
          WHEN [is_percent_growth] = 1 THEN CAST([growth] AS NVARCHAR(2)) + N' %'
-         WHEN [is_percent_growth] = 0 THEN CAST(CAST(CAST([growth] AS BIGINT)*8/1024.00/1024.00 AS NUMERIC(15, 3)) AS VARCHAR(20))
+         WHEN [is_percent_growth] = 0 THEN CAST(CAST(CAST([growth] AS BIGINT)*8/1024.00/1024.00 AS NUMERIC(23, 3)) AS VARCHAR(20))
                                            + ' GB'
        END                                                        AS [GrowthIncrement]
 FROM   sys.master_files AS f
