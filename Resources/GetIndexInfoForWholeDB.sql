@@ -1,3 +1,7 @@
+/*
+	Part of PSBlitz - https://github.com/VladDBA/PSBlitz
+	License - https://github.com/VladDBA/PSBlitz/blob/main/LICENSE
+*/
 /*Index Fragmentation Info*/
 USE [..PSBlitzReplace..];
 

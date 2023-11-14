@@ -104,12 +104,13 @@ You can find the all the scripts in the repository's [Resources](/Resources) dir
 |`-SQLPass` | The password for the SQL login provided via the -SQLLogin parameter, omit if `-SQLLogin` was not used. |
 |`-IsIndepth` | Providing Y as a value will tell PSBlitz.ps1 to run a more in-depth check against the instance/database. Omit for default check. |
 |`-CheckDB` | Used to provide the name of a specific database against which sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock will be ran. Omit to run against the whole instance.|
+|`-CacheTop`| Used to specify if more/less than the default top 10 queries should be returned for the sp_BlitzCache step. Only works for HTML output (`-ToHTM Y`). Has no effect on the `recent compilations` sort order.|
 |`-OutputDir`| Used to provide a path where the output directory should be saved to. Defaults to PSBlitz.ps1's directory if not specified or a non-existent path is provided.|
 |`-ToHTML`| Providing Y as a value will tell PSBlitz.ps1 to output the report as HTML instead of an Excel file. This is perfect when running PSBlitz from a machine that doesn't have Office installed.|
 |`-ZipOutput`| Providing Y as a value will tell PSBlitz.ps1 to also create a zip archive of the output files.|
 |`-BlitzWhoDelay` | Used to sepcify the number of seconds between each sp_BlitzWho execution. Defaults to 10 if not specified.|
 |`-ConnTimeout`| Can be used to increased the timeout limit in seconds for connecting to SQL Server. Defaults to 15 seconds if not specified.|
-|`-MaxTimeout`| Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. Defaults to 800 (13.3 minutes)|
+|`-MaxTimeout`| Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. Defaults to 1000 (16.6 minutes)|
 |`-DebugInfo`| Switch used to get more information for debugging and troubleshooting purposes.|
 
 [*Back to top*](#header1)
@@ -173,16 +174,18 @@ Execution plans will be saved in the Plans directory under the output directory.
 
 Execution plans file naming convention:
  - for plans obtained through sp_BlitzCache - `[SortOrder]_[RowNumber].sqlplan`.
- - for plans obtained through sp_BlitzIndex (only available in SQL Server 2019) - `MissingIndex_[MissingIndexNumber].sqlplan`.
+ - for plans obtained through sp_BlitzIndex (only available in SQL Server 2019 and above) - `MissingIndex_[MissingIndexNumber].sqlplan`.
+ - for plans obtained through the open transactions check - `OpenTranCurrent_[SPID].sqlplan` and/or `OpenTranRecent_[SPID].sqlplan`.
+ - for plans obtained through sp_BlitzQueryStore - `QueryStore_[RowNumber].sqlplan`
  - for plans obtained through sp_BlitzWho - `RunningNow_[SPID]_[start_time]_[query_plan_hash].sqlplan`. If no query plan hash is returned by sp_BlitzWho, then 0x00 will be used.
 
 [*Back to top*](#header1)
 
 ## Usage examples
 You can run PSBlitz.ps1 by simply right-clicking on the script and then clicking on "Run With PowerShell" which will execute the script in interactive mode, prompting you for the required input.
-Note that parameters like `-DebugMode` and `-OutputDir` are only available in command line mode.
+Note that parameters like `-DebugMode`, `-OutputDir`, `-CacheTop`, and `-MaxTimeout` are only available in command line mode.
 
-Otherwise you can navigate to the directory where the script is in PowerShell and execute it by providing parameters and appropriate values.
+Otherwise you can navigate in PowerShell to the directory where the script is and execute it by providing parameters and appropriate values.
 - Examples:
 1. Print the help menu
     ```PowerShell
@@ -192,7 +195,7 @@ Otherwise you can navigate to the directory where the script is in PowerShell an
     ```PowerShell
     .\PSBlitz.ps1 Help
     ```
-    or (recommended for detailed help info)
+    or (recommended for detailed and well-structured help info)
    ```PowerShell
    Get-Help .\PSBlitz.ps1 -Full
    ```

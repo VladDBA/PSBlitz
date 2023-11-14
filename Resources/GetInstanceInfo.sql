@@ -121,20 +121,20 @@ OPTION(RECOMPILE);
 
 DECLARE @InstanceLevelOption INT;
 
-/*Get the instance-level configuration*/
+/*Get SET options from both session and instance*/
 SELECT @InstanceLevelOption = CAST([value_in_use] AS INT)
 FROM   sys.configurations
 WHERE  [name] = N'user options';
 
 ;
 WITH OPTCTE
-     AS (SELECT Options.id,
+     AS (SELECT Options.[id],
                 Options.[Option],
                 Options.[Description],
                 ROW_NUMBER()
                   OVER (
                     PARTITION BY 1
-                    ORDER BY id) AS bitNum
+                    ORDER BY id) AS [bitNum]
          FROM   (VALUES (1,
                 'DISABLE_DEF_CNST_CHK',
                 'Controls interim or deferred constraint checking. - obsolete and should not be on!'),
@@ -179,16 +179,16 @@ WITH OPTCTE
                 'Generates an error when a loss of precision occurs in an expression.'),
                         (16384,
                 'XACT_ABORT',
-                'Rolls back a transaction if a Transact-SQL statement raises a run-time error.') ) AS Options(id, [Option], [Description]))
+                'Rolls back a transaction if a Transact-SQL statement raises a run-time error.') ) AS Options([id], [Option], [Description]))
 SELECT [Option],
        CASE
          WHEN ( @@OPTIONS & id ) = id THEN 'ON'
          ELSE 'OFF'
-       END AS SessionSetting,
+       END AS [SessionSetting],
        CASE
          WHEN ( @InstanceLevelOption & id ) = id THEN 'ON'
          ELSE 'OFF'
-       END AS InstanceSetting,
+       END AS [InstanceSetting],
        [Description],
        CASE
          WHEN [Description] LIKE '%obsolete%' THEN ''
