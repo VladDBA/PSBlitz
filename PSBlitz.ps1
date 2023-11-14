@@ -241,7 +241,7 @@ param(
 ###Internal params
 #Version
 $Vers = "3.6.0"
-$VersDate = "20231114"
+$VersDate = "20231115"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -1465,12 +1465,15 @@ $htmlTable4
 				#>
 				foreach ($col in $DataSetCols) {			
 					#Fill Excel cell with value from the data set
-					if ("OldestConnectionTime" -contains $col) {
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $SessOptTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+					if ($col -eq "URL"){
+					if ($SessOptTbl.Rows[$RowNum][$col] -like "http*") {
+						$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 10),
+						$SessOptTbl.Rows[$RowNum][$col], "", "Click for more info",
+						$SessOptTbl.Rows[$RowNum]["Option"]) | Out-Null
 					}
-					else {
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $SessOptTbl.Rows[$RowNum][$col]
-					}
+				 } else { 
+					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $SessOptTbl.Rows[$RowNum][$col]
+				 }
 					$ExcelColNum += 1
 				}
 
@@ -2938,23 +2941,23 @@ $htmlTable
 					<title>$HtmlTabName</title>
 					</head>
 					<body>
-					<h1 id="top">$HtmlTabName</h1>
+					<h1 id="top" style="text-align: center;">$HtmlTabName</h1>
 					<br>
-					<h2>Top $CacheTop Queries by $HtmlTabName2</h2>
-					<p><a href="#Queries1">Jump to query text</a></p>
+					<h2 style="text-align: center;">Top $CacheTop Queries by $HtmlTabName2</h2>
+					<p style="text-align: center;"><a href="#Queries1">Jump to query text</a></p>
 					$htmlTable1
 					<br>
-					<h2>Warnings Explained</h2>
+					<h2 style="text-align: center;">Warnings Explained</h2>
 					$htmlTable2
-					<p><a href="#top">Jump to top</a></p>
+					<p style="text-align: center;"><a href="#top">Jump to top</a></p>
 					<br>
 
 "@
 
 					$html2 = @"
-					<h2 id="Queries1">Query text for $HtmlTabName2</h2>
+					<h2 id="Queries1" style="text-align: center;">Query text for $HtmlTabName2</h2>
 					$htmlTable3
-					<p><a href="#top">Jump to top</a></p>
+					<p style="text-align: center;"><a href="#top">Jump to top</a></p>
 					<br>
 
 "@
@@ -2979,20 +2982,20 @@ $htmlTable
 						$TopCount = "$CacheTop"
 					}
 					$html += @"
-				<h2>Top $TopCount Queries by $HtmlTabName2</h2>
-				<p><a href="#Queries2">Jump to query text</a></p>
+				<h2 style="text-align: center;">Top $TopCount Queries by $HtmlTabName2</h2>
+				<p style="text-align: center;"><a href="#Queries2">Jump to query text</a></p>
 				$htmlTable1
 				<br>
-				<h2>Warnings Explained</h2>
+				<h2 style="text-align: center;">Warnings Explained</h2>
 				$htmlTable2
-				<p><a href="#top">Jump to top</a></p>
+				<p style="text-align: center;"><a href="#top">Jump to top</a></p>
 
 "@
 
 					$html2 += @"
-					<h2 id="Queries2">Query text for $HtmlTabName2</h2>					
+					<h2 id="Queries2" style="text-align: center;">Query text for $HtmlTabName2</h2>					
 					$htmlTable3
-					<p><a href="#top">Jump to top</a></p>
+					<p style="text-align: center;"><a href="#top">Jump to top</a></p>
 "@
 					#putting it all together
 					$html += $html2 + @"
