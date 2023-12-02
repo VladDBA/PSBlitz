@@ -4788,7 +4788,7 @@ finally {
 						$QueryName = "RunningNow_" + $i + ".query"
 					
 					}
-					else { $SQLPlanFile = "-- N/A --" }
+					else { $QueryName= "-- N/A --" }
 					$BlitzWhoAggTbl.Rows[$RowNum]["Query"] = $QueryName
 					$RowNum += 1
 				}
@@ -5297,7 +5297,7 @@ finally {
 					$QuerySource += "; "
 				}
 				if ($File.Name -like "BlitzWho_Agg*") {
-					$Description = "Aggregate of all the sp_BlitzWho passes."
+					$Description = "Aggregate of all the sp_BlitzWho passes sorted by duration descending."
 					$AdditionalInfo = "Outputs execution plans as .sqlplan files."
 				}
 				else {
