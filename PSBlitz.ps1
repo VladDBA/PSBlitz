@@ -3659,14 +3659,20 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		
 				if ("0", "4" -Contains $Mode) {
 					#Export sample execution plans for missing indexes (SQL Server 2019 only)
+					#Since we're already looping through the result set here, might as well add and
+					#populate the plan file name column here
+					$BlitzIxTbl.Columns.Add("Sample Plan File", [string]) | Out-Null
 					$RowNum = 0
 					$i = 0
 					foreach ($row in $BlitzIxTbl) {
 						if ($BlitzIxTbl.Rows[$RowNum]["Finding"] -like "*Missing Index") {
+							$SQLPlanFile = "--N/A--"
 							$i += 1
 							if ($BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] -ne [System.DBNull]::Value) {
-								$BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] | Format-XML | Set-Content -Path $PlanOutDir\MissingIndex_$($i).sqlplan -Force
+								$SQLPlanFile = "MissingIndex_$i.sqlplan"
+								$BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] | Format-XML | Set-Content -Path "$PlanOutDir\$SQLPlanFile" -Force
 							}
+							$BlitzIxTbl.Rows[$RowNum]["Sample Plan File"] = $SQLPlanFile
 						}
 						$RowNum += 1
 					}					
@@ -3678,7 +3684,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$htmlTable = $BlitzIxTbl | Select-Object "Priority", "Finding", "Database Name", 
 					"Details: schema.table.index(indexid)",   
 					"Definition", 
-					"Secret Columns", "Usage", "Size", "More Info", "Create TSQL", "URL" | Where-Object "Finding" -NotLike "sp_BlitzIndex*" | ConvertTo-Html -As Table -Fragment
+					"Secret Columns", "Usage", "Size", "More Info", "Create TSQL", "Sample Plan File", "URL" | Where-Object "Finding" -NotLike "sp_BlitzIndex*" | ConvertTo-Html -As Table -Fragment
 		
 					$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
 				}
@@ -3756,7 +3762,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$DataSetCols = @("Priority", "Finding", "Database Name", 
 						"Details: schema.table.index(indexid)",   
 						"Definition: [Property] ColumnName {datatype maxbytes}", 
-						"Secret Columns", "Usage", "Size", "More Info", "Create TSQL", "URL")
+						"Secret Columns", "Usage", "Size", "More Info", "Create TSQL", "URL", "Sample Plan File")
 
 					#Export sample execution plans for missing indexes (SQL Server 2019 only)
 					$RowNum = 0
