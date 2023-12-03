@@ -240,8 +240,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "3.6.0"
-$VersDate = "20231115"
+$Vers = "3.6.1"
+$VersDate = "20231203"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -1027,7 +1027,7 @@ if ($ToHTML -ne "Y") {
 	
 }
 
-if(($ToHTML -ne "Y") -and ($CacheTop -ne 10)){
+if (($ToHTML -ne "Y") -and ($CacheTop -ne 10)) {
 	Write-Host " Output type is Excel, but -CacheTop was specified with a value <> 10." -Fore Red
 	Write-Host " ->These two options aren't compatible."
 	Write-Host " ->Switching -CacheTop back to 10"
@@ -1145,6 +1145,11 @@ $LogTbl.Columns.Add("ErrorMsg", [string]) | Out-Null
 #####################################################################################
 #						Check start													#
 #####################################################################################
+$StepStart = get-date
+$StepEnd = Get-Date
+$ParametersUsed = "IsIndepth:$IsIndepth; CheckDB:$CheckDB; BlitzWhoDelay:$BlitzWhoDelay; MaxTimeout:$MaxTimeout"
+$ParametersUsed += "; ConnTimeout:$ConnTimeout; CacheTop:$CacheTop"
+Add-LogRow "Check start" "Started" $ParametersUsed
 try {
 	###Set completion flag
 	$TryCompleted = "N"
@@ -1465,14 +1470,15 @@ $htmlTable4
 				#>
 				foreach ($col in $DataSetCols) {			
 					#Fill Excel cell with value from the data set
-					if ($col -eq "URL"){
-					if ($SessOptTbl.Rows[$RowNum][$col] -like "http*") {
-						$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 10),
-						$SessOptTbl.Rows[$RowNum][$col], "", "Click for more info",
-						$SessOptTbl.Rows[$RowNum]["Option"]) | Out-Null
-					}
-				 } else { 
-					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $SessOptTbl.Rows[$RowNum][$col]
+					if ($col -eq "URL") {
+						if ($SessOptTbl.Rows[$RowNum][$col] -like "http*") {
+							$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 10),
+								$SessOptTbl.Rows[$RowNum][$col], "", "Click for more info",
+								$SessOptTbl.Rows[$RowNum]["Option"]) | Out-Null
+						}
+				 }
+					else { 
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $SessOptTbl.Rows[$RowNum][$col]
 				 }
 					$ExcelColNum += 1
 				}
@@ -2740,7 +2746,8 @@ $htmlTable
 		if ($SortOrder -eq "'recent compilations'") {
 			$OldSortString = $OldSortString + ", @Top = $CacheTop;"
 			$NewSortString = $NewSortString + ", @Top = 50;"
-		} elseif (($CacheTop -ne 10) -and ($SortOrder -eq "'CPU'")){
+		}
+		elseif (($CacheTop -ne 10) -and ($SortOrder -eq "'CPU'")) {
 			#Since we're only reading the script once and then using it from memory, 
 			#we only have to change @Top once if it's not the default
 			$OldSortString = $OldSortString + ", @Top = 10;"
@@ -2976,9 +2983,10 @@ $htmlTable
 						<br>
 "@
 					}
-					if($SortOrder -eq "'Recent Compilations'"){
+					if ($SortOrder -eq "'Recent Compilations'") {
 						$TopCount = "50"
-					} else {
+					}
+					else {
 						$TopCount = "$CacheTop"
 					}
 					$html += @"
@@ -3635,7 +3643,29 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		if ($StepOutcome -eq "Success") {
 			$BlitzIxTbl = New-Object System.Data.DataTable
 			$BlitzIxTbl = $BlitzIndexSet.Tables[0]
-			
+			if ("0", "4" -Contains $Mode) {
+				#Export sample execution plans for missing indexes (SQL Server 2019 only)
+				#Since we're already looping through the result set here, might as well add and
+				#populate the plan file name column here
+				if ($DebugInfo) {
+					Write-Host " ->Exporting missing index sample execution plans (if any)" -fore yellow
+				}
+				$BlitzIxTbl.Columns.Add("Sample Plan File", [string]) | Out-Null
+				$RowNum = 0
+				$i = 0
+				foreach ($row in $BlitzIxTbl) {
+					if ($BlitzIxTbl.Rows[$RowNum]["Finding"] -like "*Missing Index") {
+						$SQLPlanFile = "--N/A--"
+						$i += 1
+						if ($BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] -ne [System.DBNull]::Value) {
+							$SQLPlanFile = "MissingIndex_$i.sqlplan"
+							$BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] | Format-XML | Set-Content -Path "$PlanOutDir\$SQLPlanFile" -Force
+						}
+						$BlitzIxTbl.Rows[$RowNum]["Sample Plan File"] = $SQLPlanFile
+					}
+					$RowNum += 1
+				}
+			}
 			if ($ToHTML -eq "Y") {
 				if ($DebugInfo) {
 					Write-Host " ->Converting sp_BlitzIndex output to HTML" -fore yellow
@@ -3657,25 +3687,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				}
 		
 		
-				if ("0", "4" -Contains $Mode) {
-					#Export sample execution plans for missing indexes (SQL Server 2019 only)
-					#Since we're already looping through the result set here, might as well add and
-					#populate the plan file name column here
-					$BlitzIxTbl.Columns.Add("Sample Plan File", [string]) | Out-Null
-					$RowNum = 0
-					$i = 0
-					foreach ($row in $BlitzIxTbl) {
-						if ($BlitzIxTbl.Rows[$RowNum]["Finding"] -like "*Missing Index") {
-							$SQLPlanFile = "--N/A--"
-							$i += 1
-							if ($BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] -ne [System.DBNull]::Value) {
-								$SQLPlanFile = "MissingIndex_$i.sqlplan"
-								$BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] | Format-XML | Set-Content -Path "$PlanOutDir\$SQLPlanFile" -Force
-							}
-							$BlitzIxTbl.Rows[$RowNum]["Sample Plan File"] = $SQLPlanFile
-						}
-						$RowNum += 1
-					}					
+				if ("0", "4" -Contains $Mode) {					
 					<#Renaming a column because apparently Select-Object and ConvertTo-HTML can't deal with curly braces or the long column name 
 					or whatever regardless of how I try to escape them
 					and it's 2AM and I'm done with trying to find elegant ways around this
@@ -3762,21 +3774,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$DataSetCols = @("Priority", "Finding", "Database Name", 
 						"Details: schema.table.index(indexid)",   
 						"Definition: [Property] ColumnName {datatype maxbytes}", 
-						"Secret Columns", "Usage", "Size", "More Info", "Create TSQL", "URL", "Sample Plan File")
-
-					#Export sample execution plans for missing indexes (SQL Server 2019 only)
-					$RowNum = 0
-					$i = 0
-					foreach ($row in $BlitzIxTbl) {
-						if ($BlitzIxTbl.Rows[$RowNum]["Finding"] -like "*Missing Index") {
-							$i += 1
-							if ($BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] -ne [System.DBNull]::Value) {
-								$BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] | Format-XML | Set-Content -Path $PlanOutDir\MissingIndex_$($i).sqlplan -Force
-							}
-						}
-						$RowNum += 1
-					}
-
+						"Secret Columns", "Usage", "Size", "More Info", "Create TSQL", "Sample Plan File", "URL")
 				}
 				elseif ($Mode -eq "1") {
 					$DataSetCols = @("Database Name", "Number Objects", "All GB", 
@@ -3846,7 +3844,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$RowNum += 1
 					# reset Excel column number so that next row population begins with column 1
 					$ExcelColNum = 1
-					#Exit this loop if $RowNum = 10000
+					#Exit this loop if $RowNum > 10000
 					if ($RowNum -eq 10001) {
 						Continue
 					}
@@ -4794,7 +4792,7 @@ finally {
 						$QueryName = "RunningNow_" + $i + ".query"
 					
 					}
-					else { $QueryName= "-- N/A --" }
+					else { $QueryName = "-- N/A --" }
 					$BlitzWhoAggTbl.Rows[$RowNum]["Query"] = $QueryName
 					$RowNum += 1
 				}
@@ -5003,6 +5001,9 @@ finally {
 	#####################################################################################
 	#						Delete unused sheets 										#
 	#####################################################################################
+	$StepStart = get-date
+	$StepEnd = Get-Date
+	Add-LogRow "Check end" "Finished"
 
 	if ($ToHTML -ne "Y") {
 		if ($IsIndepth -ne "Y") {
@@ -5093,7 +5094,8 @@ finally {
 		} 
 		$HtmlTabName = "PSBlitz Execution Log"
 		$htmlTable = $LogTbl | Select-Object "Step", "StartDate", "EndDate", 
-		@{Name = "Duration (Seconds)"; Expression = { $_."Duration" } }, "Outcome", "ErrorMsg" | ConvertTo-Html -As Table -Fragment
+		@{Name = "Duration (Seconds)"; Expression = { $_."Duration" } }, "Outcome", 
+		@{Name = "Message"; Expression = { $_."ErrorMsg" } } | ConvertTo-Html -As Table -Fragment
 		$html = $HTMLPre + @"
 						<title>$HtmlTabName</title>
 						</head>
@@ -5228,7 +5230,7 @@ finally {
 				else {
 					$QuerySource += ", @GetAllDatabases = 1; "
 				}
-				$AdditionalInfo = "Output limited to 10k records"
+				$AdditionalInfo = ""
 				if (($File.Name -like "BlitzIndex_0*") -or ($File.Name -like "BlitzIndex_4*")) {
 					$Description = "Index-related diagnosis outlining high-value missing indexes, duplicate or almost duplicate indexes, indexes with more writes than reads, etc."
 					$AdditionalInfo += "; for SQL Server 2019 - will output execution plans as .sqlplan files"
