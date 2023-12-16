@@ -1,6 +1,10 @@
+/*
+	Part of PSBlitz - https://github.com/VladDBA/PSBlitz
+	License - https://github.com/VladDBA/PSBlitz/blob/main/LICENSE
+*/
+
 SET NOCOUNT ON;
 SET STATISTICS XML OFF;
-SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
 /*Create supporting index*/
 CREATE NONCLUSTERED INDEX [IX_AGG]

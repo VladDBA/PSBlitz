@@ -33,8 +33,14 @@ DECLARE
 	@ShowSleepingSPIDs  = 0,
 	@ExpertMode = 1,
 	@Debug = 0,
-	@OutputDatabaseName = 'tempdb',
-	@OutputSchemaName = 'dbo',
+	@OutputDatabaseName = CASE WHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure' 
+								AND SERVERPROPERTY('EngineEdition') IN (5, 6)
+								THEN CAST(DB_NAME() AS NVARCHAR(256))
+								ELSE N'tempdb'END,
+	@OutputSchemaName = CASE WHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure'
+								AND SERVERPROPERTY('EngineEdition') IN (5, 6)
+								THEN CAST(SCHEMA_NAME() AS NVARCHAR(256))
+								ELSE N'dbo'END,
 	@OutputTableName = 'BlitzWho_..PSBlitzReplace..',
 	@OutputTableRetentionDays  = 3,
 	@MinElapsedSeconds = 0,

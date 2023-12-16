@@ -567,8 +567,13 @@ $InitScriptBlock = {
 			[string]$FlagTblDt
 		)
 		$CheckFlagTblQuery = new-object System.Data.SqlClient.SqlCommand
-		$FlagTblQuery = "SELECT CASE `nWHEN OBJECT_ID(N'tempdb.dbo.BlitzWhoOutFlag_$FlagTblDt', N'U') "
-		$FlagTblQuery = $FlagTblQuery + "IS NOT NULL THEN 'Y' `nELSE 'N' `nEND AS [FlagFound];"
+		$FlagTblQuery = "DECLARE @FlagTable NVARCHAR(300); `n SELECT @FlagTable = CASE "
+		$FlagTblQuery += "WHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128)) = N'SQL Azure' "
+		$FlagTblQuery += "`nAND SERVERPROPERTY('EngineEdition') IN (5, 6) "
+		$FlagTblQuery += "`nTHEN  N'BlitzWhoOutFlag_$FlagTblDt' ELSE "
+		$FlagTblQuery += "`nN'tempdb.dbo.BlitzWhoOutFlag_$FlagTblDt' END; "
+		$FlagTblQuery += "`nSELECT CASE WHEN OBJECT_ID(@FlagTable, N'U') IS NOT NULL "
+		$FlagTblQuery += "`nTHEN 'Y' ELSE 'N' END AS [FlagFound];"
 		$CheckFlagTblQuery.CommandText = $FlagTblQuery
 		$CheckFlagTblQuery.Connection = $SqlConnection
 		$CheckFlagTblQuery.CommandTimeout = 30
@@ -587,7 +592,11 @@ $InitScriptBlock = {
 		}
 		if ($IsFlagTbl -eq "Y") {
 			$CleanupCommand = new-object System.Data.SqlClient.SqlCommand
-			$Cleanup = "DROP TABLE tempdb.dbo.BlitzWhoOutFlag_$FlagTblDt;"
+			$Cleanup = "DECLARE @SQL NVARCHAR(400);`nSELECT @SQL = N'DROP TABLE '+ CASE "
+			$Cleanup += "`nWHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure' "
+			$Cleanup += "`nAND SERVERPROPERTY('EngineEdition') IN (5, 6) "
+			$Cleanup += "`nTHEN N'[BlitzWhoOutFlag_$FlagTblDt];' "
+			$Cleanup += "`nELSE N'[tempdb].[dbo].[BlitzWhoOutFlag_$FlagTblDt];' `nEND; `nEXEC(@SQL);"
 			$CleanupCommand.CommandText = $Cleanup
 			$CleanupCommand.CommandTimeout = 20
 			$SqlConnection.Open()
@@ -707,13 +716,15 @@ if ($MissingFiles.Count -gt 0) {
 	Read-Host -Prompt "Press Enter to close this window."
 	Exit
 }
-
+$IsAzureSQLDB = $false
 ###Switch to interactive mode if $ServerName is empty
 if ([string]::IsNullOrEmpty($ServerName)) {
 	Write-Host "Running in interactive mode"
 	$InteractiveMode = 1
 	##Instance
-	$ServerName = Read-Host -Prompt "Server"
+	while ([string]::IsNullOrEmpty($ServerName)) {
+		$ServerName = Read-Host -Prompt "Server"
+	}
 	#Make ServerName filename friendly and get host name
 	if ($ServerName -like "*`"*") {
 		$ServerName = $ServerName -replace "`"", ""
@@ -722,6 +733,36 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 		$pos = $ServerName.IndexOf("\")
 		$InstName = $ServerName.Substring($pos + 1)
 		$HostName = $ServerName.Substring(0, $pos)
+	}
+	#Azure SQL DB 
+	elseif ($ServerName -like "*database.windows.net*") {
+		$IsAzureSQLDB = $true
+		#let's strip "tcp: first just in case"
+		if ($ServerName -like "tcp:*") {
+			$TCPStripped = $true
+			$ServerName = $ServerName -replace "tcp:", ""
+		}
+		#get the database name if it was provided
+		if ($ServerName -like "*:*") {
+			$pos = $ServerName.IndexOf(":")
+			[string]$ASDBName = $ServerName.Substring($pos + 1)
+			$ServerName = $ServerName.Substring(0, $pos)
+		}
+		#Get the hostname
+		if ($ServerName -like "*,*") {
+			$pos = $ServerName.IndexOf(",")
+			$HostName = $ServerName.Substring(0, $pos)		
+		}
+		else {
+			$HostName = $ServerName
+		}
+	
+		$InstName = $HostName
+
+		#slap tcp: back on because why not
+		if ($TCPStripped) {
+			$ServerName = "tcp:$ServerName"
+		}
 	}
  elseif ($ServerName -like "*,*") {
 		$pos = $ServerName.IndexOf(",")
@@ -754,13 +795,21 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 		Exit
 	}
 
-	##Have sp_BlitzIndex, sp_BlitzCache, sp_BlitzLock executed against a specific database
-	$CheckDB = Read-Host -Prompt "Name of the database you want to check (leave empty for all)"
+	if ($IsAzureSQLDB) {
+		#get the database name if not provided
+		while ([string]::IsNullOrEmpty($ASDBName)) {
+			$ASDBName = Read-Host "Name of the Azure SQL DB database (cannot be empty)"
+		}
+	}
+ else {
+		##Have sp_BlitzIndex, sp_BlitzCache, sp_BlitzLock executed against a specific database
+		$CheckDB = Read-Host -Prompt "Name of the database you want to check (leave empty for all)"
+	}
 	##SQL Login
 	$SQLLogin = Read-Host -Prompt "SQL login name (leave empty to use integrated security)"
 	if (!([string]::IsNullOrEmpty($SQLLogin))) {
 		##SQL Login pass
-		$SQLPass = Read-Host -Prompt "Password "
+		$SecSQLPass = Read-Host -Prompt "Password " -AsSecureString
 	}
 	##Indepth check 
 	$IsIndepth = Read-Host -Prompt "Perform an in-depth check?[Y/N]"
@@ -784,15 +833,57 @@ else {
 		$InstName = $ServerName.Substring($pos + 1)
 		$HostName = $ServerName.Substring(0, $pos)
 	}
- elseif ($ServerName -like "*,*") {
+ #Azure SQL DB 
+ elseif ($ServerName -like "*database.windows.net*") {
+		$IsAzureSQLDB = $true
+		#let's strip "tcp: first just in case"
+		if ($ServerName -like "tcp:*") {
+			$TCPStripped = $true
+			$ServerName = $ServerName -replace "tcp:", ""
+		}
+		#get the database name if it was provided
+		if ($ServerName -like "*:*") {
+			$pos = $ServerName.IndexOf(":")
+			[string]$ASDBName = $ServerName.Substring($pos + 1)
+			$ServerName = $ServerName.Substring(0, $pos)
+		}
+		#Get the hostname
+		if ($ServerName -like "*,*") {
+			$pos = $ServerName.IndexOf(",")
+			$HostName = $ServerName.Substring(0, $pos)		
+		}
+		else {
+			$HostName = $ServerName
+		}
+	
+		$InstName = $HostName
+
+		#slap tcp: back on because why not
+		if ($TCPStripped) {
+			$ServerName = "tcp:$ServerName"
+		}
+	}
+	elseif ($ServerName -like "*,*") {
 		$pos = $ServerName.IndexOf(",")
 		$HostName = $ServerName.Substring(0, $pos)
 		$InstName = $ServerName -replace ",", "-"
 	}
- else	{
+	else	{
 		$InstName = $ServerName
 		$HostName = $ServerName
 	}
+}
+
+#If Azure SQL DB make sure database name is provided even in script mode
+while (($IsAzureSQLDB) -and ($InteractiveMode -eq 0) -and ([string]::IsNullOrEmpty($ASDBName))) {
+	Write-Host "Azure SQL DB instance was passed for ServerName, but database name was not provided." -Fore red
+	$ASDBName = Read-Host "Name of the Azure SQL DB database (cannot be empty)"
+}
+
+#Convert the secure password to plain text for SqlConnection
+if (($InteractiveMode -eq 1) -and (!([string]::IsNullOrEmpty($SQLLogin))) ) {
+	$BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecSQLPass)
+	$SQLPass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
 }
 	
 #Set the string to replace for $CheckDB
@@ -805,10 +896,20 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 $AppName = "PSBlitz " + $Vers
 $SqlConnection = New-Object System.Data.SqlClient.SqlConnection
 if (!([string]::IsNullOrEmpty($SQLLogin))) {
-	$ConnString = "Server=$ServerName;Database=master;User Id=$SQLLogin;Password=$SQLPass;Connection Timeout=$ConnTimeout;Application Name=$AppName"
+	if ($IsAzureSQLDB) {
+		$ConnString = "Server=$ServerName;Database=$ASDBName;User Id=$SQLLogin;Password=$SQLPass;Connection Timeout=$ConnTimeout;Application Name=$AppName"
+	}
+ else {
+		$ConnString = "Server=$ServerName;Database=master;User Id=$SQLLogin;Password=$SQLPass;Connection Timeout=$ConnTimeout;Application Name=$AppName"
+	}
 }
 else {
-	$ConnString = "Server=$ServerName;Database=master;trusted_connection=true;Connection Timeout=$ConnTimeout;Application Name=$AppName"
+	if ($IsAzureSQLDB) {
+		$ConnString = "Server=$ServerName;Database=$ASDBName;trusted_connection=true;Connection Timeout=$ConnTimeout;Application Name=$AppName"
+	}
+ else {
+		$ConnString = "Server=$ServerName;Database=master;trusted_connection=true;Connection Timeout=$ConnTimeout;Application Name=$AppName"
+	}
 }
 $SqlConnection.ConnectionString = $ConnString
 
@@ -816,7 +917,7 @@ $SqlConnection.ConnectionString = $ConnString
 [int]$CmdTimeout = 100
 Write-Host "Testing connection to instance $ServerName... " -NoNewLine
 $ConnCheckQuery = new-object System.Data.SqlClient.SqlCommand
-$Query = "SELECT GETDATE();"
+$Query = "SELECT TRY_CAST(SERVERPROPERTY('Edition') AS NVARCHAR(50));"
 $ConnCheckQuery.CommandText = $Query
 $ConnCheckQuery.Connection = $SqlConnection
 $ConnCheckQuery.CommandTimeout = $CmdTimeout
@@ -1207,109 +1308,116 @@ try {
 	#####################################################################################
 	#						Instance Info												#
 	#####################################################################################
-	Write-Host " Retrieving instance information... " -NoNewLine
-	$CmdTimeout = 600
-	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetInstanceInfo.sql")
-	$InstanceInfoQuery = new-object System.Data.SqlClient.SqlCommand
-	$InstanceInfoQuery.CommandText = $Query
-	$InstanceInfoQuery.Connection = $SqlConnection
-	$InstanceInfoQuery.CommandTimeout = $CmdTimeout
-	$InstanceInfoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-	$InstanceInfoAdapter.SelectCommand = $InstanceInfoQuery
-	$InstanceInfoSet = new-object System.Data.DataSet
-	try {
+	if ($IsAzureSQLDB) {
 		$StepStart = get-date
-		$InstanceInfoAdapter.Fill($InstanceInfoSet) | Out-Null -ErrorAction Stop
-		$SqlConnection.Close()
 		$StepEnd = get-date
-		Write-Host @GreenCheck
-		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-		$RunTime = [Math]::Round($StepRunTime, 2)
-		if ($DebugInfo) {
-			Write-Host " - $RunTime seconds" -Fore Yellow
+		Write-Host " Azure SQL DB - skipping instance info."
+		Add-LogRow "Instance Info" "Skipped" "Azure SQL DB"
+	}
+ else {
+		Write-Host " Retrieving instance information... " -NoNewLine
+		$CmdTimeout = 600
+		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetInstanceInfo.sql")
+		$InstanceInfoQuery = new-object System.Data.SqlClient.SqlCommand
+		$InstanceInfoQuery.CommandText = $Query
+		$InstanceInfoQuery.Connection = $SqlConnection
+		$InstanceInfoQuery.CommandTimeout = $CmdTimeout
+		$InstanceInfoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+		$InstanceInfoAdapter.SelectCommand = $InstanceInfoQuery
+		$InstanceInfoSet = new-object System.Data.DataSet
+		try {
+			$StepStart = get-date
+			$InstanceInfoAdapter.Fill($InstanceInfoSet) | Out-Null -ErrorAction Stop
+			$SqlConnection.Close()
+			$StepEnd = get-date
+			Write-Host @GreenCheck
+			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
+			$RunTime = [Math]::Round($StepRunTime, 2)
+			if ($DebugInfo) {
+				Write-Host " - $RunTime seconds" -Fore Yellow
+			}
+			$StepOutcome = "Success"
+			Add-LogRow "Instance Info" $StepOutcome
 		}
-		$StepOutcome = "Success"
-		Add-LogRow "Instance Info" $StepOutcome
-	}
- Catch {
-		$StepEnd = get-date
-		Invoke-ErrMsg
-		$StepOutcome = "Failure"
-		Add-LogRow "Instance Info" $StepOutcome
-	}
+		Catch {
+			$StepEnd = get-date
+			Invoke-ErrMsg
+			$StepOutcome = "Failure"
+			Add-LogRow "Instance Info" $StepOutcome
+		}
 		
-	if ($StepOutcome -eq "Success") {
-		$InstanceInfoTbl = New-Object System.Data.DataTable
-		$InstanceInfoTbl = $InstanceInfoSet.Tables[0]
-		$ResourceInfoTbl = New-Object System.Data.DataTable
-		$ResourceInfoTbl = $InstanceInfoSet.Tables[1]
-		$ConnectionsInfoTbl = New-Object System.Data.DataTable
-		$ConnectionsInfoTbl = $InstanceInfoSet.Tables[2]
-		$SessOptTbl = New-Object System.Data.DataTable
-		$SessOptTbl = $InstanceInfoSet.Tables[3]
+		if ($StepOutcome -eq "Success") {
+			$InstanceInfoTbl = New-Object System.Data.DataTable
+			$InstanceInfoTbl = $InstanceInfoSet.Tables[0]
+			$ResourceInfoTbl = New-Object System.Data.DataTable
+			$ResourceInfoTbl = $InstanceInfoSet.Tables[1]
+			$ConnectionsInfoTbl = New-Object System.Data.DataTable
+			$ConnectionsInfoTbl = $InstanceInfoSet.Tables[2]
+			$SessOptTbl = New-Object System.Data.DataTable
+			$SessOptTbl = $InstanceInfoSet.Tables[3]
 		
-		if ($ToHTML -eq "Y") {
-			if ($DebugInfo) {
-				Write-Host " ->Converting instance info to HTML" -fore yellow
-			}
-			$InstanceInfoTbl.Columns.Add("Estimated Response Latency (Sec)", [decimal]) | Out-Null
-			$InstanceInfoTbl.Rows[0]["Estimated Response Latency (Sec)"] = $ConnTest
+			if ($ToHTML -eq "Y") {
+				if ($DebugInfo) {
+					Write-Host " ->Converting instance info to HTML" -fore yellow
+				}
+				$InstanceInfoTbl.Columns.Add("Estimated Response Latency (Sec)", [decimal]) | Out-Null
+				$InstanceInfoTbl.Rows[0]["Estimated Response Latency (Sec)"] = $ConnTest
 
-			$htmlTable1 = $InstanceInfoTbl | Select-Object  @{Name = "Machine Name"; Expression = { $_."machine_name" } },
-			@{Name = "Instance Name"; Expression = { $_."instance_name" } }, 
-			@{Name = "Version"; Expression = { $_."product_version" } }, 
-			@{Name = "Product Level"; Expression = { $_."product_level" } },
-			@{Name = "Patch Level"; Expression = { $_."patch_level" } },
-			@{Name = "Edition"; Expression = { $_."edition" } }, 
-			@{Name = "Is Clustered?"; Expression = { $_."is_clustered" } }, 
-			@{Name = "Is AlwaysOnAG?"; Expression = { $_."always_on_enabled" } },
-			@{Name = "FILESTREAM Access Level"; Expression = { $_."filestream_access_level" } },
-			@{Name = "Tempdb Metadata Memory Optimized"; Expression = { $_."mem_optimized_tempdb_metadata" } },
-			@{Name = "Fulltext Instaled"; Expression = { $_."fulltext_installed" } },
-			@{Name = "Instance Collation"; Expression = { $_."instance_collation" } },
-			@{Name = "Process ID"; Expression = { $_."process_id" } },
-			@{Name = "Last Startup"; Expression = { $_."instance_last_startup" } },
-			@{Name = "Uptime (days)"; Expression = { $_."uptime_days" } },
-			@{Name = "Client Connections"; Expression = { $_."client_connections" } },
-			"Estimated Response Latency (Sec)" | ConvertTo-Html -As Table -Fragment
+				$htmlTable1 = $InstanceInfoTbl | Select-Object  @{Name = "Machine Name"; Expression = { $_."machine_name" } },
+				@{Name = "Instance Name"; Expression = { $_."instance_name" } }, 
+				@{Name = "Version"; Expression = { $_."product_version" } }, 
+				@{Name = "Product Level"; Expression = { $_."product_level" } },
+				@{Name = "Patch Level"; Expression = { $_."patch_level" } },
+				@{Name = "Edition"; Expression = { $_."edition" } }, 
+				@{Name = "Is Clustered?"; Expression = { $_."is_clustered" } }, 
+				@{Name = "Is AlwaysOnAG?"; Expression = { $_."always_on_enabled" } },
+				@{Name = "FILESTREAM Access Level"; Expression = { $_."filestream_access_level" } },
+				@{Name = "Tempdb Metadata Memory Optimized"; Expression = { $_."mem_optimized_tempdb_metadata" } },
+				@{Name = "Fulltext Instaled"; Expression = { $_."fulltext_installed" } },
+				@{Name = "Instance Collation"; Expression = { $_."instance_collation" } },
+				@{Name = "Process ID"; Expression = { $_."process_id" } },
+				@{Name = "Last Startup"; Expression = { $_."instance_last_startup" } },
+				@{Name = "Uptime (days)"; Expression = { $_."uptime_days" } },
+				@{Name = "Client Connections"; Expression = { $_."client_connections" } },
+				"Estimated Response Latency (Sec)" | ConvertTo-Html -As Table -Fragment
 
-			if ($DebugInfo) {
-				Write-Host " ->Converting resource info to HTML" -fore yellow
-			}    
-			$htmlTable2 = $ResourceInfoTbl | Select-Object  @{Name = "Logical Cores"; Expression = { $_."logical_cpu_cores" } }, 
-			@{Name = "Physical Cores"; Expression = { $_."physical_cpu_cores" } }, 
-			@{Name = "Physical memory GB"; Expression = { $_."physical_memory_GB" } }, 
-			@{Name = "Max Server Memory GB"; Expression = { $_."max_server_memory_GB" } }, 
-			@{Name = "Target Server Memory GB"; Expression = { $_."target_server_memory_GB" } },
-			@{Name = "Total Memory Used GB"; Expression = { $_."total_memory_used_GB" } },
-			@{Name = "Process physical memory low"; Expression = { $_."proc_physical_memory_low" } },
-			@{Name = "Process virtual memory low"; Expression = { $_."proc_virtual_memory_low" } },
-			@{Name = "Available Physical Memory GB"; Expression = { $_."available_physical_memory_GB" } },
-			@{Name = "OS Memory State"; Expression = { $_."os_memory_state" } },
-			"CTP",	"MAXDOP" | ConvertTo-Html -As Table -Fragment
+				if ($DebugInfo) {
+					Write-Host " ->Converting resource info to HTML" -fore yellow
+				}    
+				$htmlTable2 = $ResourceInfoTbl | Select-Object  @{Name = "Logical Cores"; Expression = { $_."logical_cpu_cores" } }, 
+				@{Name = "Physical Cores"; Expression = { $_."physical_cpu_cores" } }, 
+				@{Name = "Physical memory GB"; Expression = { $_."physical_memory_GB" } }, 
+				@{Name = "Max Server Memory GB"; Expression = { $_."max_server_memory_GB" } }, 
+				@{Name = "Target Server Memory GB"; Expression = { $_."target_server_memory_GB" } },
+				@{Name = "Total Memory Used GB"; Expression = { $_."total_memory_used_GB" } },
+				@{Name = "Process physical memory low"; Expression = { $_."proc_physical_memory_low" } },
+				@{Name = "Process virtual memory low"; Expression = { $_."proc_virtual_memory_low" } },
+				@{Name = "Available Physical Memory GB"; Expression = { $_."available_physical_memory_GB" } },
+				@{Name = "OS Memory State"; Expression = { $_."os_memory_state" } },
+				"CTP",	"MAXDOP" | ConvertTo-Html -As Table -Fragment
 
-			if ($DebugInfo) {
-				Write-Host " ->Converting connections info to HTML" -fore yellow
-			}    
-			$htmlTable3 = $ConnectionsInfoTbl | Select-Object  "Database", 
-			@{Name = "Connections Count"; Expression = { $_."ConnectionsCount" } }, 
-			@{Name = "Login Name"; Expression = { $_."LoginName" } }, 
-			@{Name = "Client Hostname"; Expression = { $_."ClientHostName" } }, 
-			@{Name = "Client IP"; Expression = { $_."ClientIP" } },
-			@{Name = "Protocol"; Expression = { $_."ProtocolUsed" } },
-			@{Name = "Oldest Connection Time"; Expression = { $_."OldestConnectionTime" } },
-			@{Name = "Program"; Expression = { $_."Program" } }  | ConvertTo-Html -As Table -Fragment
+				if ($DebugInfo) {
+					Write-Host " ->Converting connections info to HTML" -fore yellow
+				}    
+				$htmlTable3 = $ConnectionsInfoTbl | Select-Object  "Database", 
+				@{Name = "Connections Count"; Expression = { $_."ConnectionsCount" } }, 
+				@{Name = "Login Name"; Expression = { $_."LoginName" } }, 
+				@{Name = "Client Hostname"; Expression = { $_."ClientHostName" } }, 
+				@{Name = "Client IP"; Expression = { $_."ClientIP" } },
+				@{Name = "Protocol"; Expression = { $_."ProtocolUsed" } },
+				@{Name = "Oldest Connection Time"; Expression = { $_."OldestConnectionTime" } },
+				@{Name = "Program"; Expression = { $_."Program" } }  | ConvertTo-Html -As Table -Fragment
 
-			if ($DebugInfo) {
-				Write-Host " ->Converting session level options info to HTML" -fore yellow
-			}
+				if ($DebugInfo) {
+					Write-Host " ->Converting session level options info to HTML" -fore yellow
+				}
 
-			$htmlTable4 = $SessOptTbl | Select-Object "Option", "SessionSetting", "InstanceSetting", "Description", "URL" | ConvertTo-Html -As Table -Fragment
-			$htmlTable4 = $htmlTable4 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+				$htmlTable4 = $SessOptTbl | Select-Object "Option", "SessionSetting", "InstanceSetting", "Description", "URL" | ConvertTo-Html -As Table -Fragment
+				$htmlTable4 = $htmlTable4 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
 
 
-			$HtmlTabName = "Instance Overview"
-			$html = $HTMLPre + @"
+				$HtmlTabName = "Instance Overview"
+				$html = $HTMLPre + @"
     <title>$HtmlTabName</title>
     </head>
     <body>
@@ -1328,178 +1436,179 @@ $htmlTable4
 </body>
 </html>
 "@
-			if ($DebugInfo) {
-				Write-Host " ->Writing HTML file." -fore yellow
-			} 			
-			$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\InstanceInfo.html"
-		}
-		else {
-			###Populating the "Instance Info" sheet
-			$ExcelSheet = $ExcelFile.Worksheets.Item("Instance Info")
-			##Instance Info section
-			#Specify at which row in the sheet to start adding the data
-			$ExcelStartRow = 3
-			#Specify with which column in the sheet to start
-			$ExcelColNum = 1
-			#Set counter used for row retrieval
-			$RowNum = 0
-
-			#List of columns that should be returned from the data set
-			$DataSetCols = @("machine_name", "instance_name", "product_version", "product_level",
-				"patch_level", "edition", "is_clustered", "always_on_enabled", "filestream_access_level",
-				"mem_optimized_tempdb_metadata", "fulltext_installed", "instance_collation", "process_id",
-				"instance_last_startup", "uptime_days", "client_connections", "net_latency")
-
-			if ($DebugInfo) {
-				Write-Host " ->Writing instance info to Excel" -fore yellow
+				if ($DebugInfo) {
+					Write-Host " ->Writing HTML file." -fore yellow
+				} 			
+				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\InstanceInfo.html"
 			}
-			#Loop through each Excel row
-			foreach ($row in $InstanceInfoTbl) {
-				<#
-				Loop through each data set column of current row and fill the corresponding 
-				Excel cell
-				#>
-				foreach ($col in $DataSetCols) {			
-					#Fill Excel cell with value from the data set
-					if ($col -eq "net_latency") {
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnTest
-					}
-					else {
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $InstanceInfoTbl.Rows[$RowNum][$col]
-					}
-					$ExcelColNum += 1
-				}
-
-				#move to the next row in the spreadsheet
-				$ExcelStartRow += 1
-				#move to the next row in the data set
-				$RowNum += 1
-				# reset Excel column number so that next row population begins with column 1
+			else {
+				###Populating the "Instance Info" sheet
+				$ExcelSheet = $ExcelFile.Worksheets.Item("Instance Info")
+				##Instance Info section
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = 3
+				#Specify with which column in the sheet to start
 				$ExcelColNum = 1
-			}
+				#Set counter used for row retrieval
+				$RowNum = 0
 
-			##Resource Info section
-			#Specify at which row in the sheet to start adding the data
-			$ExcelStartRow = 8
-			#Specify with which column in the sheet to start
-			$ExcelColNum = 1
-			#Set counter used for row retrieval
-			$RowNum = 0
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("machine_name", "instance_name", "product_version", "product_level",
+					"patch_level", "edition", "is_clustered", "always_on_enabled", "filestream_access_level",
+					"mem_optimized_tempdb_metadata", "fulltext_installed", "instance_collation", "process_id",
+					"instance_last_startup", "uptime_days", "client_connections", "net_latency")
 
-			#List of columns that should be returned from the data set
-			$DataSetCols = @("logical_cpu_cores", "physical_cpu_cores", "physical_memory_GB", "max_server_memory_GB", "target_server_memory_GB",
-				"total_memory_used_GB", "proc_physical_memory_low", "proc_virtual_memory_low", "available_physical_memory_GB", "os_memory_state" , "CTP", "MAXDOP")
-
-			if ($DebugInfo) {
-				Write-Host " ->Writing resource info to Excel" -fore yellow
-			}
-			#Loop through each Excel row
-			foreach ($row in $ResourceInfoTbl) {
-				<#
-				Loop through each data set column of current row and fill the corresponding 
-				Excel cell
-				#>
-				foreach ($col in $DataSetCols) {			
-					#Fill Excel cell with value from the data set
-					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ResourceInfoTbl.Rows[$RowNum][$col]
-					$ExcelColNum += 1
+				if ($DebugInfo) {
+					Write-Host " ->Writing instance info to Excel" -fore yellow
 				}
-
-				#move to the next row in the spreadsheet
-				$ExcelStartRow += 1
-				#move to the next row in the data set
-				$RowNum += 1
-				# reset Excel column number so that next row population begins with column 1
-				$ExcelColNum = 1
-			}
-
-			##Top 10 clients by connections section
-			#Specify at which row in the sheet to start adding the data
-			$ExcelStartRow = 14
-			#Specify with which column in the sheet to start
-			$ExcelColNum = 1
-			#Set counter used for row retrieval
-			$RowNum = 0
-
-			#List of columns that should be returned from the data set
-			$DataSetCols = @("Database", "ConnectionsCount", "LoginName", "ClientHostName", "ClientIP", "ProtocolUsed", 
-				"OldestConnectionTime", "Program")
-
-			if ($DebugInfo) {
-				Write-Host " ->Writing Top 10 clients by connections to Excel" -fore yellow
-			}
-			#Loop through each Excel row
-			foreach ($row in $ConnectionsInfoTbl) {
-				<#
+				#Loop through each Excel row
+				foreach ($row in $InstanceInfoTbl) {
+					<#
 				Loop through each data set column of current row and fill the corresponding 
 				Excel cell
 				#>
-				foreach ($col in $DataSetCols) {			
-					#Fill Excel cell with value from the data set
-					if ("OldestConnectionTime" -contains $col) {
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-					}
-					else {
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col]
-					}
-					$ExcelColNum += 1
-				}
-
-				#move to the next row in the spreadsheet
-				$ExcelStartRow += 1
-				#move to the next row in the data set
-				$RowNum += 1
-				# reset Excel column number so that next row population begins with column 1
-				$ExcelColNum = 1
-			}
-
-			#Session level options
-			$ExcelStartRow = 14
-			$ExcelColNum = 10
-			$RowNum = 0
-
-			$DataSetCols = @("Option", "SessionSetting", "InstanceSetting", "Description", "URL")
-			if ($DebugInfo) {
-				Write-Host " ->Writing Session level options to Excel" -fore yellow
-			}
-			#Loop through each Excel row
-			foreach ($row in $SessOptTbl) {
-				<#
-				Loop through each data set column of current row and fill the corresponding 
-				Excel cell
-				#>
-				foreach ($col in $DataSetCols) {			
-					#Fill Excel cell with value from the data set
-					if ($col -eq "URL") {
-						if ($SessOptTbl.Rows[$RowNum][$col] -like "http*") {
-							$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 10),
-								$SessOptTbl.Rows[$RowNum][$col], "", "Click for more info",
-								$SessOptTbl.Rows[$RowNum]["Option"]) | Out-Null
+					foreach ($col in $DataSetCols) {			
+						#Fill Excel cell with value from the data set
+						if ($col -eq "net_latency") {
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnTest
 						}
-				 }
-					else { 
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $SessOptTbl.Rows[$RowNum][$col]
-				 }
-					$ExcelColNum += 1
+						else {
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $InstanceInfoTbl.Rows[$RowNum][$col]
+						}
+						$ExcelColNum += 1
+					}
+
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 1
+					$ExcelColNum = 1
 				}
 
-				#move to the next row in the spreadsheet
-				$ExcelStartRow += 1
-				#move to the next row in the data set
-				$RowNum += 1
-				# reset Excel column number so that next row population begins with column 1
-				$ExcelColNum = 10
-			}
+				##Resource Info section
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = 8
+				#Specify with which column in the sheet to start
+				$ExcelColNum = 1
+				#Set counter used for row retrieval
+				$RowNum = 0
 
-			##Saving file 
-			$ExcelFile.Save()
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("logical_cpu_cores", "physical_cpu_cores", "physical_memory_GB", "max_server_memory_GB", "target_server_memory_GB",
+					"total_memory_used_GB", "proc_physical_memory_low", "proc_virtual_memory_low", "available_physical_memory_GB", "os_memory_state" , "CTP", "MAXDOP")
+
+				if ($DebugInfo) {
+					Write-Host " ->Writing resource info to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $ResourceInfoTbl) {
+					<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+					foreach ($col in $DataSetCols) {			
+						#Fill Excel cell with value from the data set
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ResourceInfoTbl.Rows[$RowNum][$col]
+						$ExcelColNum += 1
+					}
+
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 1
+					$ExcelColNum = 1
+				}
+
+				##Top 10 clients by connections section
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = 14
+				#Specify with which column in the sheet to start
+				$ExcelColNum = 1
+				#Set counter used for row retrieval
+				$RowNum = 0
+
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("Database", "ConnectionsCount", "LoginName", "ClientHostName", "ClientIP", "ProtocolUsed", 
+					"OldestConnectionTime", "Program")
+
+				if ($DebugInfo) {
+					Write-Host " ->Writing Top 10 clients by connections to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $ConnectionsInfoTbl) {
+					<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+					foreach ($col in $DataSetCols) {			
+						#Fill Excel cell with value from the data set
+						if ("OldestConnectionTime" -contains $col) {
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+						}
+						else {
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col]
+						}
+						$ExcelColNum += 1
+					}
+
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 1
+					$ExcelColNum = 1
+				}
+
+				#Session level options
+				$ExcelStartRow = 14
+				$ExcelColNum = 10
+				$RowNum = 0
+
+				$DataSetCols = @("Option", "SessionSetting", "InstanceSetting", "Description", "URL")
+				if ($DebugInfo) {
+					Write-Host " ->Writing Session level options to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $SessOptTbl) {
+					<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+					foreach ($col in $DataSetCols) {			
+						#Fill Excel cell with value from the data set
+						if ($col -eq "URL") {
+							if ($SessOptTbl.Rows[$RowNum][$col] -like "http*") {
+								$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 10),
+									$SessOptTbl.Rows[$RowNum][$col], "", "Click for more info",
+									$SessOptTbl.Rows[$RowNum]["Option"]) | Out-Null
+							}
+						}
+						else { 
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $SessOptTbl.Rows[$RowNum][$col]
+						}
+						$ExcelColNum += 1
+					}
+
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 1
+					$ExcelColNum = 10
+				}
+
+				##Saving file 
+				$ExcelFile.Save()
+			}
+			##Cleaning up variables 
+			Remove-Variable -Name ResourceInfoTbl
+			Remove-Variable -Name InstanceInfoTbl
+			Remove-Variable -Name ConnectionsInfoTbl
+			Remove-Variable -Name SessOptTbl
+			Remove-Variable -Name InstanceInfoSet
 		}
-		##Cleaning up variables 
-		Remove-Variable -Name ResourceInfoTbl
-		Remove-Variable -Name InstanceInfoTbl
-		Remove-Variable -Name ConnectionsInfoTbl
-		Remove-Variable -Name SessOptTbl
-		Remove-Variable -Name InstanceInfoSet
 	}
 
 	if ($JobStatus -ne "Running") {
@@ -2006,62 +2115,69 @@ $htmlTable3
 	#####################################################################################
 	#						Database info												#
 	#####################################################################################
-	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetDbInfo.sql")	
-	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		Write-Host " Getting database info for $CheckDB... " -NoNewLine
-		[string]$Query = $Query -replace "SET @DatabaseName = N'';", "SET @DatabaseName = N'$CheckDB';"
-	}
-	else {
-		Write-Host " Getting database info... " -NoNewLine
-	}
-	$CmdTimeout = 600
-	$DBInfoQuery = new-object System.Data.SqlClient.SqlCommand
-	$DBInfoQuery.CommandText = $Query
-	$DBInfoQuery.Connection = $SqlConnection
-	$DBInfoQuery.CommandTimeout = $CmdTimeout
-	$DBInfoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-	$DBInfoAdapter.SelectCommand = $DBInfoQuery
-	$DBInfoSet = new-object System.Data.DataSet
-	Try {
+	if ($IsAzureSQLDB) {
 		$StepStart = get-date
-		$DBInfoAdapter.Fill($DBInfoSet) | Out-Null -ErrorAction Stop
-		$SqlConnection.Close()
 		$StepEnd = get-date
-		Write-Host @GreenCheck
-		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-		$RunTime = [Math]::Round($StepRunTime, 2)
-		if ($DebugInfo) {
-			Write-Host " - $RunTime seconds" -Fore Yellow
+		Write-Host " Azure SQL DB - skipping database info."
+		Add-LogRow "Database Info" "Skipped" "Azure SQL DB"
+	}
+ else {
+		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetDbInfo.sql")	
+		if (!([string]::IsNullOrEmpty($CheckDB))) {
+			Write-Host " Getting database info for $CheckDB... " -NoNewLine
+			[string]$Query = $Query -replace "SET @DatabaseName = N'';", "SET @DatabaseName = N'$CheckDB';"
 		}
-		$StepOutcome = "Success"
-		Add-LogRow "Database Info" $StepOutcome
-	}
- Catch {
-		$StepEnd = get-date
-		Invoke-ErrMsg
-		$StepOutcome = "Failure"
-		Add-LogRow "Database Info" $StepOutcome
-	}
-	if ($StepOutcome -eq "Success") {
-		$DBInfoTbl = New-Object System.Data.DataTable
-		$DBInfoTbl = $DBInfoSet.Tables[0]
-		$DBFileInfoTbl = New-Object System.Data.DataTable
-		$DBFileInfoTbl = $DBInfoSet.Tables[1]
-
-		if ($ToHTML -eq "Y") {
-			$tableName = "Database Info"
+		else {
+			Write-Host " Getting database info... " -NoNewLine
+		}
+		$CmdTimeout = 600
+		$DBInfoQuery = new-object System.Data.SqlClient.SqlCommand
+		$DBInfoQuery.CommandText = $Query
+		$DBInfoQuery.Connection = $SqlConnection
+		$DBInfoQuery.CommandTimeout = $CmdTimeout
+		$DBInfoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+		$DBInfoAdapter.SelectCommand = $DBInfoQuery
+		$DBInfoSet = new-object System.Data.DataSet
+		Try {
+			$StepStart = get-date
+			$DBInfoAdapter.Fill($DBInfoSet) | Out-Null -ErrorAction Stop
+			$SqlConnection.Close()
+			$StepEnd = get-date
+			Write-Host @GreenCheck
+			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
+			$RunTime = [Math]::Round($StepRunTime, 2)
 			if ($DebugInfo) {
-				Write-Host " ->Converting Database Info results to HTML" -fore yellow
+				Write-Host " - $RunTime seconds" -Fore Yellow
 			}
-			$htmlTable = $DBInfoTbl | Select-Object "Database", "DatabaseState", "DataFiles", "DataFilesSizeGB", "LogFiles",
-			"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
-			"DatabaseSizeGB", "CompatibilityLevel", "Collation", "SnapshotIsolationState", "ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
-			"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn" | ConvertTo-Html -As Table -Fragment
+			$StepOutcome = "Success"
+			Add-LogRow "Database Info" $StepOutcome
+		}
+		Catch {
+			$StepEnd = get-date
+			Invoke-ErrMsg
+			$StepOutcome = "Failure"
+			Add-LogRow "Database Info" $StepOutcome
+		}
+		if ($StepOutcome -eq "Success") {
+			$DBInfoTbl = New-Object System.Data.DataTable
+			$DBInfoTbl = $DBInfoSet.Tables[0]
+			$DBFileInfoTbl = New-Object System.Data.DataTable
+			$DBFileInfoTbl = $DBInfoSet.Tables[1]
 
-			$htmlTable1 = $DBFileInfoTbl | Select-Object  "Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
-			"MaxFileSizeGB", "GrowthIncrement" | ConvertTo-Html -As Table -Fragment
+			if ($ToHTML -eq "Y") {
+				$tableName = "Database Info"
+				if ($DebugInfo) {
+					Write-Host " ->Converting Database Info results to HTML" -fore yellow
+				}
+				$htmlTable = $DBInfoTbl | Select-Object "Database", "DatabaseState", "DataFiles", "DataFilesSizeGB", "LogFiles",
+				"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
+				"DatabaseSizeGB", "CompatibilityLevel", "Collation", "SnapshotIsolationState", "ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
+				"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn" | ConvertTo-Html -As Table -Fragment
 
-			$html = $HTMLPre + @"
+				$htmlTable1 = $DBFileInfoTbl | Select-Object  "Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
+				"MaxFileSizeGB", "GrowthIncrement" | ConvertTo-Html -As Table -Fragment
+
+				$html = $HTMLPre + @"
 <title>$tableName</title>
 </head>
 <body>
@@ -2075,93 +2191,94 @@ $htmlTable1
 </body>
 </html>
 "@
-			if ($DebugInfo) {
-				Write-Host " ->Writing HTML file." -fore yellow
-			} 
-			$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\DatabaseInfo.html"
-		}
-		else {
-			##Populating the "Database Info" sheet with the database files data first because 
-			#it's narrower and leaves room to fit some of the database info
-			$ExcelSheet = $ExcelFile.Worksheets.Item("Database Info")
-			#Specify at which row in the sheet to start adding the data
-			$ExcelStartRow = 3
-			#Specify with which column in the sheet to start
-			$ExcelColNum = 1
-			#Set counter used for row retrieval
-			$RowNum = 0
-
-			#List of columns that should be returned from the data set
-			$DataSetCols = @("Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
-				"MaxFileSizeGB", "GrowthIncrement")
-			if ($DebugInfo) {
-				Write-Host " ->Writing Database Files Info results to Excel" -fore yellow
+				if ($DebugInfo) {
+					Write-Host " ->Writing HTML file." -fore yellow
+				} 
+				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\DatabaseInfo.html"
 			}
-			#Loop through each Excel row
-			foreach ($row in $DBFileInfoTbl) {
-				<#
-				Loop through each data set column of current row and fill the corresponding 
-				Excel cell
-				#>
-				foreach ($col in $DataSetCols) {
-					#Fill Excel cell with value from the data set
-					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBFileInfoTbl.Rows[$RowNum][$col]
-					
-					#move to the next column
-					$ExcelColNum += 1
-				}
-				#move to the next row in the spreadsheet
-				$ExcelStartRow += 1
-				#move to the next row in the data set
-				$RowNum += 1
-				# reset Excel column number so that next row population begins with column 1
+			else {
+				##Populating the "Database Info" sheet with the database files data first because 
+				#it's narrower and leaves room to fit some of the database info
+				$ExcelSheet = $ExcelFile.Worksheets.Item("Database Info")
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = 3
+				#Specify with which column in the sheet to start
 				$ExcelColNum = 1
-			}
+				#Set counter used for row retrieval
+				$RowNum = 0
 
-			##Populating the "Database Info" sheet with the database data
-			#Specify at which row in the sheet to start adding the data
-			$ExcelStartRow = 3
-			#Specify with which column in the sheet to start
-			$ExcelColNum = 11
-			#Set counter used for row retrieval
-			$RowNum = 0
-
-			#List of columns that should be returned from the data set
-			$DataSetCols = @("Database", "DatabaseState", "DataFiles", "DataFilesSizeGB", "LogFiles",
-				"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
-				"DatabaseSizeGB", "CompatibilityLevel", "Collation", "SnapshotIsolationState", 
-				"ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
-				"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn")
-			if ($DebugInfo) {
-				Write-Host " ->Writing Database Info results to Excel" -fore yellow
-			}
-			#Loop through each Excel row
-			foreach ($row in $DBInfoTbl) {
-				<#
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
+					"MaxFileSizeGB", "GrowthIncrement")
+				if ($DebugInfo) {
+					Write-Host " ->Writing Database Files Info results to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $DBFileInfoTbl) {
+					<#
 				Loop through each data set column of current row and fill the corresponding 
 				Excel cell
 				#>
-				foreach ($col in $DataSetCols) {
-					#Fill Excel cell with value from the data set
-					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
+					foreach ($col in $DataSetCols) {
+						#Fill Excel cell with value from the data set
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBFileInfoTbl.Rows[$RowNum][$col]
 					
-					#move to the next column
-					$ExcelColNum += 1
+						#move to the next column
+						$ExcelColNum += 1
+					}
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 1
+					$ExcelColNum = 1
 				}
-				#move to the next row in the spreadsheet
-				$ExcelStartRow += 1
-				#move to the next row in the data set
-				$RowNum += 1
-				# reset Excel column number so that next row population begins with column 11
-				$ExcelColNum = 11
-			}
 
-			##Saving file 
-			$ExcelFile.Save()
+				##Populating the "Database Info" sheet with the database data
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = 3
+				#Specify with which column in the sheet to start
+				$ExcelColNum = 11
+				#Set counter used for row retrieval
+				$RowNum = 0
+
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("Database", "DatabaseState", "DataFiles", "DataFilesSizeGB", "LogFiles",
+					"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
+					"DatabaseSizeGB", "CompatibilityLevel", "Collation", "SnapshotIsolationState", 
+					"ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
+					"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn")
+				if ($DebugInfo) {
+					Write-Host " ->Writing Database Info results to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $DBInfoTbl) {
+					<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+					foreach ($col in $DataSetCols) {
+						#Fill Excel cell with value from the data set
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
+					
+						#move to the next column
+						$ExcelColNum += 1
+					}
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 11
+					$ExcelColNum = 11
+				}
+
+				##Saving file 
+				$ExcelFile.Save()
+			}
+			Remove-Variable -Name DBInfoTbl
+			Remove-Variable -Name DBFileInfoTbl
+			Remove-Variable -Name DBInfoSet
 		}
-		Remove-Variable -Name DBInfoTbl
-		Remove-Variable -Name DBFileInfoTbl
-		Remove-Variable -Name DBInfoSet
 	}
 
 	if ($JobStatus -ne "Running") {
@@ -2171,52 +2288,59 @@ $htmlTable1
 	#####################################################################################
 	#						sp_Blitz 													#
 	#####################################################################################
-	Write-Host " Running sp_Blitz... " -NoNewLine
-	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitz_NonSPLatest.sql")
-	if (($IsIndepth -eq "Y") -and ([string]::IsNullOrEmpty($CheckDB))) {
-		[string]$Query = $Query -replace ";SET @CheckUserDatabaseObjects = 0;", ";SET @CheckUserDatabaseObjects = 1;"
-	}
-	$CmdTimeout = 600
-	$BlitzQuery = new-object System.Data.SqlClient.SqlCommand
-	$BlitzQuery.CommandText = $Query
-	$BlitzQuery.Connection = $SqlConnection
-	$BlitzQuery.CommandTimeout = $CmdTimeout
-	$BlitzAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-	$BlitzAdapter.SelectCommand = $BlitzQuery
-	$BlitzSet = new-object System.Data.DataSet
-	Try {
+	if ($IsAzureSQLDB) {
 		$StepStart = get-date
-		$BlitzAdapter.Fill($BlitzSet) | Out-Null -ErrorAction Stop
-		$SqlConnection.Close()
 		$StepEnd = get-date
-		Write-Host @GreenCheck
-		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-		$RunTime = [Math]::Round($StepRunTime, 2)
-		if ($DebugInfo) {
-			Write-Host " - $RunTime seconds" -Fore Yellow
+		Write-Host " Azure SQL DB - skipping sp_Blitz."
+		Add-LogRow "sp_Blitz" "Skipped" "Azure SQL DB"
+	}
+ else {
+		Write-Host " Running sp_Blitz... " -NoNewLine
+		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitz_NonSPLatest.sql")
+		if (($IsIndepth -eq "Y") -and ([string]::IsNullOrEmpty($CheckDB))) {
+			[string]$Query = $Query -replace ";SET @CheckUserDatabaseObjects = 0;", ";SET @CheckUserDatabaseObjects = 1;"
 		}
-		$StepOutcome = "Success"
-		Add-LogRow "sp_Blitz" $StepOutcome
-	}
- Catch {
-		$StepEnd = get-date
-		Invoke-ErrMsg
-		$StepOutcome = "Failure"
-		Add-LogRow "sp_Blitz" $StepOutcome
-	}
-		
-	if ($StepOutcome -eq "Success") {
-		$BlitzTbl = New-Object System.Data.DataTable
-		$BlitzTbl = $BlitzSet.Tables[0]
-
-		if ($ToHTML -eq "Y") {
-			$tableName = "Instance Health"
+		$CmdTimeout = 600
+		$BlitzQuery = new-object System.Data.SqlClient.SqlCommand
+		$BlitzQuery.CommandText = $Query
+		$BlitzQuery.Connection = $SqlConnection
+		$BlitzQuery.CommandTimeout = $CmdTimeout
+		$BlitzAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+		$BlitzAdapter.SelectCommand = $BlitzQuery
+		$BlitzSet = new-object System.Data.DataSet
+		Try {
+			$StepStart = get-date
+			$BlitzAdapter.Fill($BlitzSet) | Out-Null -ErrorAction Stop
+			$SqlConnection.Close()
+			$StepEnd = get-date
+			Write-Host @GreenCheck
+			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
+			$RunTime = [Math]::Round($StepRunTime, 2)
 			if ($DebugInfo) {
-				Write-Host " ->Converting sp_Blitz output to HTML" -fore yellow
+				Write-Host " - $RunTime seconds" -Fore Yellow
 			}
-			$htmlTable = $BlitzTbl | Select-Object "Priority", "FindingsGroup", "Finding", "DatabaseName", "Details", "URL" | Where-Object -FilterScript { ($_."Finding" -ne "SQL Server First Responder Kit" ) -and ("Rundate", "Thanks!" -notcontains $_."FindingsGroup") } | ConvertTo-Html -As Table -Fragment
-			$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
-			$html = $HTMLPre + @"
+			$StepOutcome = "Success"
+			Add-LogRow "sp_Blitz" $StepOutcome
+		}
+		Catch {
+			$StepEnd = get-date
+			Invoke-ErrMsg
+			$StepOutcome = "Failure"
+			Add-LogRow "sp_Blitz" $StepOutcome
+		}
+		
+		if ($StepOutcome -eq "Success") {
+			$BlitzTbl = New-Object System.Data.DataTable
+			$BlitzTbl = $BlitzSet.Tables[0]
+
+			if ($ToHTML -eq "Y") {
+				$tableName = "Instance Health"
+				if ($DebugInfo) {
+					Write-Host " ->Converting sp_Blitz output to HTML" -fore yellow
+				}
+				$htmlTable = $BlitzTbl | Select-Object "Priority", "FindingsGroup", "Finding", "DatabaseName", "Details", "URL" | Where-Object -FilterScript { ($_."Finding" -ne "SQL Server First Responder Kit" ) -and ("Rundate", "Thanks!" -notcontains $_."FindingsGroup") } | ConvertTo-Html -As Table -Fragment
+				$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+				$html = $HTMLPre + @"
 <title>$tableName</title>
 </head>
 <body>
@@ -2227,65 +2351,66 @@ $htmlTable
 </html>
 "@
 
-			if ($DebugInfo) {
-				Write-Host " ->Writing HTML file." -fore yellow
-			} 
-			$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\spBlitz.html"
+				if ($DebugInfo) {
+					Write-Host " ->Writing HTML file." -fore yellow
+				} 
+				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\spBlitz.html"
 
-		}
-		else {
-			##Populating the "sp_Blitz" sheet
-			$ExcelSheet = $ExcelFile.Worksheets.Item("sp_Blitz")
-			#Specify at which row in the sheet to start adding the data
-			$ExcelStartRow = $DefaultStartRow
-			#Specify with which column in the sheet to start
-			$ExcelColNum = 1
-			#Set counter used for row retrieval
-			$RowNum = 0
-
-			#List of columns that should be returned from the data set
-			$DataSetCols = @("Priority", "FindingsGroup", "Finding" , "DatabaseName",
-				"Details", "URL")
-			if ($DebugInfo) {
-				Write-Host " ->Writing sp_Blitz results to Excel" -fore yellow
 			}
-			#Loop through each Excel row
-			foreach ($row in $BlitzTbl) {
-				<#
+			else {
+				##Populating the "sp_Blitz" sheet
+				$ExcelSheet = $ExcelFile.Worksheets.Item("sp_Blitz")
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = $DefaultStartRow
+				#Specify with which column in the sheet to start
+				$ExcelColNum = 1
+				#Set counter used for row retrieval
+				$RowNum = 0
+
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("Priority", "FindingsGroup", "Finding" , "DatabaseName",
+					"Details", "URL")
+				if ($DebugInfo) {
+					Write-Host " ->Writing sp_Blitz results to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $BlitzTbl) {
+					<#
 				Loop through each data set column of current row and fill the corresponding 
 				Excel cell
 				#>
-				foreach ($col in $DataSetCols) {
-					#Fill Excel cell with value from the data set
-					if ($col -eq "URL") {
-						#Make URLs clickable
-						if ($BlitzTbl.Rows[$RowNum][$col] -like "http*") {
-							$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 3),
-								$BlitzTbl.Rows[$RowNum][$col], "", "Click for more info",
-								$BlitzTbl.Rows[$RowNum]["Finding"]) | Out-Null
+					foreach ($col in $DataSetCols) {
+						#Fill Excel cell with value from the data set
+						if ($col -eq "URL") {
+							#Make URLs clickable
+							if ($BlitzTbl.Rows[$RowNum][$col] -like "http*") {
+								$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 3),
+									$BlitzTbl.Rows[$RowNum][$col], "", "Click for more info",
+									$BlitzTbl.Rows[$RowNum]["Finding"]) | Out-Null
+							}
 						}
+						else {
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzTbl.Rows[$RowNum][$col]
+						}
+						#move to the next column
+						$ExcelColNum += 1
 					}
-					else {
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzTbl.Rows[$RowNum][$col]
-					}
-					#move to the next column
-					$ExcelColNum += 1
+
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 1
+					$ExcelColNum = 1
 				}
 
-				#move to the next row in the spreadsheet
-				$ExcelStartRow += 1
-				#move to the next row in the data set
-				$RowNum += 1
-				# reset Excel column number so that next row population begins with column 1
-				$ExcelColNum = 1
+				##Saving file 
+				$ExcelFile.Save()
 			}
-
-			##Saving file 
-			$ExcelFile.Save()
+			##Cleaning up variables 
+			Remove-Variable -Name BlitzTbl
+			Remove-Variable -Name BlitzSet		
 		}
-		##Cleaning up variables 
-		Remove-Variable -Name BlitzTbl
-		Remove-Variable -Name BlitzSet		
 	}
 
 	if ($JobStatus -ne "Running") {
@@ -3223,7 +3348,7 @@ $htmlTable
 		if no specific database name has been provided, check BlitzCache results for any database that
 		might account for 2/3 of all the records returned by BlitzCache
 	#>
-	if ([string]::IsNullOrEmpty($CheckDB)) {
+	if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
 		[int]$TwoThirdsBlitzCache = [Math]::Floor([decimal]($BlitzCacheRecs / 1.5))
 		[string]$DBName = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Name | Select-Object -Last 1
 		[int]$DBCount = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Count | Select-Object -Last 1
@@ -3240,10 +3365,11 @@ $htmlTable
 	}
 
 	##Check if DB is eligible for sp_BlitzQueryStore first
-	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		Write-Host " Checking if $CheckDB is eligible for sp_BlizQueryStore..."
+	if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
 		$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
-		$DBQuery = @" 
+		if (!([string]::IsNullOrEmpty($CheckDB))) {
+			Write-Host " Checking if $CheckDB is eligible for sp_BlizQueryStore..."
+			$DBQuery = @" 
 		IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSION')), 4)) < 13 )
   BEGIN
       SELECT 'No' AS [EligibleForBlitzQueryStore]
@@ -3266,9 +3392,34 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
         END
   END;
 "@
-		$CheckDBQuery.CommandText = $DBQuery
-		$CheckDBQuery.Parameters.Add("@DBName", [Data.SQLDBType]::NVarChar, 256) | Out-Null
-		$CheckDBQuery.Parameters["@DBName"].Value = $CheckDB
+			$CheckDBQuery.CommandText = $DBQuery
+			$CheckDBQuery.Parameters.Add("@DBName", [Data.SQLDBType]::NVarChar, 256) | Out-Null
+			$CheckDBQuery.Parameters["@DBName"].Value = $CheckDB
+		}
+		elseif ($IsAzureSQLDB) {
+			Write-Host " Checking if $ASDBName is eligible for sp_BlizQueryStore..."
+			$DBQuery = @"
+			IF ( (SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128))) = N'SQL Azure' )
+			BEGIN
+				IF ( (SELECT SERVERPROPERTY ('EngineEdition')) NOT IN (5,8)
+					  OR (SELECT [compatibility_level]
+						  FROM   sys.[databases]
+						  WHERE  [name] = DB_NAME()) < 130 )
+				  BEGIN
+					  SELECT 'No' AS [EligibleForBlitzQueryStore];
+				  END;
+				ELSE
+				  BEGIN
+					  SELECT 'Yes' AS [EligibleForBlitzQueryStore];
+				  END;
+			END;
+		  ELSE
+			BEGIN
+				SELECT 'Dunno what this is' AS [EligibleForBlitzQueryStore];
+			END;
+"@
+
+		}
 		$CheckDBQuery.Connection = $SqlConnection
 		$CheckDBQuery.CommandTimeout = 100
 		$CheckDBAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
@@ -3279,14 +3430,31 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$CheckDBAdapter.Fill($CheckDBSet) | Out-Null -ErrorAction Stop
 			$SqlConnection.Close()
 			if ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "Yes") {
-				Write-Host " ->$CheckDB - " -NoNewLine -ErrorAction Stop
+				if ($IsAzureSQLDB) {
+					Write-Host " ->$ASDBName - " -NoNewLine -ErrorAction Stop
+				}
+				else {
+					Write-Host " ->$CheckDB - " -NoNewLine -ErrorAction Stop
+				}
 				Write-Host "is eligible for sp_BlizQueryStore" -ErrorAction Stop
 				$CheckQueryStore = 'Y'
 			}
+			elseif ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "No") {
+				$StepEnd = Get-Date
+				if ($IsAzureSQLDB) {
+					Write-Host " ->$ASDBName - is not eligible for sp_BlizQueryStore" -NoNewLine -ErrorAction Stop
+				}
+				else {
+					Write-Host " ->$CheckDB - is not eligible for sp_BlizQueryStore"
+				}
+				Add-LogRow "sp_BlitzQueryStore" "Skipped" "$CheckDB is not eligible"
+			}
 			else {
 				$StepEnd = Get-Date
-				Write-Host " ->$CheckDB - is not eligible for sp_BlizQueryStore"
-				Add-LogRow "sp_BlitzQueryStore" "Skipped" "$CheckDB is not eligible"
+				$QSCheckResult = $CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] 
+				Write-Host " ->$ASDBName - is not eligible for sp_BlizQueryStore" -NoNewLine -ErrorAction Stop
+				Add-LogRow "sp_BlitzQueryStore" "Skipped" $QSCheckResult
+
 			}
 		}
 		Catch {
@@ -3297,10 +3465,17 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 
 		}
 		if ($CheckQueryStore -eq 'Y') {
-			Write-Host " Running sp_BlitzQueryStore for $CheckDB..." -NoNewline
 			[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzQueryStore_NonSPLatest.sql")
+
+			if ($IsAzureSQLDB) {
+				Write-Host " Running sp_BlitzQueryStore for $ASDBName..." -NoNewline
+			}
+			else {
+				Write-Host " Running sp_BlitzQueryStore for $CheckDB..." -NoNewline
+				[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
+			}
+			
 			$CmdTimeout = $MaxTimeout
-			[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 			$BlitzQSQuery = new-object System.Data.SqlClient.SqlCommand
 			$BlitzQSQuery.CommandText = $Query
 			$BlitzQSQuery.CommandTimeout = $CmdTimeout
@@ -3320,14 +3495,23 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					Write-Host " - $RunTime seconds" -Fore Yellow
 				}
 				$StepOutcome = "Success"
-				Add-LogRow "sp_BlitzQueryStore for $CheckDB" $StepOutcome
+				if ($IsAzureSQLDB) {
+					Add-LogRow "sp_BlitzQueryStore for $ASDBName" $StepOutcome
+				}
+				else {
+					Add-LogRow "sp_BlitzQueryStore for $CheckDB" $StepOutcome
+				}
 			}
 			Catch {
 				$StepEnd = get-date
 				Invoke-ErrMsg
 				$StepOutcome = "Failure"
-				Add-LogRow "sp_BlitzQueryStore for $CheckDB" $StepOutcome
-
+				if ($IsAzureSQLDB) {
+					Add-LogRow "sp_BlitzQueryStore for $ASDBName" $StepOutcome
+				}
+				else {
+					Add-LogRow "sp_BlitzQueryStore for $CheckDB" $StepOutcome
+				}
 			}
 
 			if ($StepOutcome -eq "Success") {
@@ -4278,7 +4462,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		if no specific database name has been provided, check BlitzCache results for any database that
 		might account for 2/3 of all the records returned by BlitzCache
 	#>
-	if ([string]::IsNullOrEmpty($CheckDB)) {
+	if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
 		[int]$TwoThirdsBlitzCache = [Math]::Floor([decimal]($BlitzCacheRecs / 1.5))
 		[string]$DBName = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Name | Select-Object -Last 1
 		[int]$DBCount = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Count | Select-Object -Last 1
@@ -4295,11 +4479,17 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	}
 	
 	#Only run the check if a specific database name has been provided
-	if (!([string]::IsNullOrEmpty($CheckDB))) {
-
-		Write-Host " Getting stats info for $CheckDB... " -NoNewLine
+	if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetStatsInfoForWholeDB.sql")
-		[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
+		if ($IsAzureSQLDB) { 
+			Write-Host " Getting stats info for $ASDBName... " -NoNewLine
+			#if it's Azure SQL DB, we can't switch databases
+			[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
+		}
+		else {
+			Write-Host " Getting stats info for $CheckDB... " -NoNewLine		
+			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
+		}
 		$CmdTimeout = $MaxTimeout
 
 		$StatsQuery = new-object System.Data.SqlClient.SqlCommand
@@ -4423,10 +4613,19 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
 			$BlitzWhoPass += 1
 		}
-		
-		Write-Host " Getting index fragmentation info for $CheckDB... " -NoNewLine
+		### get index frag info
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetIndexInfoForWholeDB.sql")
+		if ($IsAzureSQLDB) { 
+			Write-Host " Getting index fragmentation info for $ASDBName... " -NoNewLine
+			#if it's Azure SQL DB, we can't switch databases
+			[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
+			[string]$Query = $Query -replace "AzureSQLDBReplace", "$DirDate"
+		}
+		else {
+		Write-Host " Getting index fragmentation info for $CheckDB... " -NoNewLine
+		
 		[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
+		}
 		$CmdTimeout = $MaxTimeout
 
 		$IndexQuery = new-object System.Data.SqlClient.SqlCommand
@@ -4661,6 +4860,10 @@ finally {
 	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetBlitzWhoData.sql")
 	[string]$Query = $Query -replace "BlitzWho_..BlitzWhoOut.." , "BlitzWho_$DirDate"
 	[string]$Query = $Query -replace "BlitzWhoOutFlag_..BlitzWhoOut.." , "BlitzWhoOutFlag_$DirDate"
+	if ($IsAzureSQLDB) {
+		[string]$Query = $Query.replace('[tempdb].[dbo].', '')
+		[string]$Query = $Query.replace('tempdb.dbo.', '')
+	}
 	$CmdTimeout = 800
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace "SET @DatabaseName = N''; " , "SET @DatabaseName = N'$CheckDB'; "
@@ -5417,4 +5620,8 @@ finally {
 	$SqlConnection.Close()
 	$SqlConnection.Dispose()
 	Remove-Variable -Name SqlConnection
+	if (($InteractiveMode -eq 1) -and (!([string]::IsNullOrEmpty($SQLLogin))) ) {
+		#remove plain text password from memory
+		[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
+	}
 }

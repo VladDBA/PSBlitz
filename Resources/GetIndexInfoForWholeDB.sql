@@ -45,6 +45,7 @@ ELSE
                         AND [ips].[index_id] = [ix].[index_id]
       WHERE  [ips].[database_id] = DB_ID()
              AND [ix].[name] IS NOT NULL
+			 AND [obj].[name] <> N'BlitzWho_AzureSQLDBReplace'
              AND [ips].[avg_fragmentation_in_percent] > 0
              /*only tables bigger than ~400MB */
              AND [ips].[page_count] >= 52000
