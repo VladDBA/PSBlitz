@@ -917,7 +917,7 @@ $SqlConnection.ConnectionString = $ConnString
 [int]$CmdTimeout = 100
 Write-Host "Testing connection to instance $ServerName... " -NoNewLine
 $ConnCheckQuery = new-object System.Data.SqlClient.SqlCommand
-$Query = "SELECT TRY_CAST(SERVERPROPERTY('Edition') AS NVARCHAR(50));"
+$Query = "SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(50));"
 $ConnCheckQuery.CommandText = $Query
 $ConnCheckQuery.Connection = $SqlConnection
 $ConnCheckQuery.CommandTimeout = $CmdTimeout
@@ -4622,9 +4622,9 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			[string]$Query = $Query -replace "AzureSQLDBReplace", "$DirDate"
 		}
 		else {
-		Write-Host " Getting index fragmentation info for $CheckDB... " -NoNewLine
+			Write-Host " Getting index fragmentation info for $CheckDB... " -NoNewLine
 		
-		[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
+			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
 		}
 		$CmdTimeout = $MaxTimeout
 
@@ -4790,7 +4790,11 @@ finally {
 			else {
 				Write-Host " Stopping $JobName background process... " -NoNewline
 			}
-			[string]$CreatFlagTbl = "CREATE TABLE [tempdb].[dbo].[BlitzWhoOutFlag_$DirDate](ID INT); "
+			$CreatFlagTbl = "DECLARE @SQL NVARCHAR(400);`nSELECT @SQL = N'CREATE TABLE '+ CASE "
+			$CreatFlagTbl += "`nWHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure' "
+			$CreatFlagTbl += "`nAND SERVERPROPERTY('EngineEdition') IN (5, 6) "
+			$CreatFlagTbl += "`nTHEN N'[BlitzWhoOutFlag_$DirDate](ID INT);' "
+			$CreatFlagTbl += "`nELSE N'[tempdb].[dbo].[BlitzWhoOutFlag_$DirDate](ID INT);' `nEND; `nEXEC(@SQL);"
 			$CreatFlagTblCommand = new-object System.Data.SqlClient.SqlCommand
 			$CreatFlagTblCommand.CommandText = $CreatFlagTbl
 			$CreatFlagTblCommand.CommandTimeout = 30
@@ -4816,7 +4820,12 @@ finally {
 				$JobOutcome | Out-File utf8 -FilePath "$OutDir\sp_BlitzWhoBackgroundJobLog.txt" -Append
 				if ($DebugInfo) {
 					Write-Host ""
-					Write-Host " ->Failed to create [tempdb].[dbo].[BlitzWhoOutFlag_$DirDate]" -Fore Yellow
+					Write-Host " ->Failed to create " -NoNewline -Fore Yellow
+					if($IsAzureSQLDB){
+						Write-Host "[BlitzWhoOutFlag_$DirDate]" -Fore Yellow
+					} else {
+						Write-Host "[tempdb].[dbo].[BlitzWhoOutFlag_$DirDate]" -Fore Yellow
+					}
 					Write-Host " ->Forcing background process stop." -Fore Yellow
 					
 				}
