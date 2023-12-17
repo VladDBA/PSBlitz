@@ -3788,6 +3788,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
 		Write-Host " Running sp_BlitzIndex for $CheckDB"
 	}
+	elseif($IsAzureSQLDB){
+		[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
+		Write-Host " Running sp_BlitzIndex for $ASDBName"
+	}
  else {
 		Write-Host " Running sp_BlitzIndex for all user databases"
 	}
