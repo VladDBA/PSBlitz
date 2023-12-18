@@ -3418,8 +3418,9 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				SELECT 'Dunno what this is' AS [EligibleForBlitzQueryStore];
 			END;
 "@
-
+			$CheckDBQuery.CommandText = $DBQuery
 		}
+		
 		$CheckDBQuery.Connection = $SqlConnection
 		$CheckDBQuery.CommandTimeout = 100
 		$CheckDBAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
@@ -3788,7 +3789,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
 		Write-Host " Running sp_BlitzIndex for $CheckDB"
 	}
-	elseif($IsAzureSQLDB){
+	elseif ($IsAzureSQLDB) {
 		[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
 		Write-Host " Running sp_BlitzIndex for $ASDBName"
 	}
@@ -4825,9 +4826,10 @@ finally {
 				if ($DebugInfo) {
 					Write-Host ""
 					Write-Host " ->Failed to create " -NoNewline -Fore Yellow
-					if($IsAzureSQLDB){
+					if ($IsAzureSQLDB) {
 						Write-Host "[BlitzWhoOutFlag_$DirDate]" -Fore Yellow
-					} else {
+					}
+					else {
 						Write-Host "[tempdb].[dbo].[BlitzWhoOutFlag_$DirDate]" -Fore Yellow
 					}
 					Write-Host " ->Forcing background process stop." -Fore Yellow
