@@ -55,40 +55,72 @@ DECLARE @LineFeed NVARCHAR(5);
 
 SET @LineFeed = CHAR(13) + CHAR(10);
 
-SELECT @SQL = N'SELECT [cpu_count] AS [logical_cpu_cores],' 
-+ @LineFeed + CASE 
-				WHEN /*If running on SQL Server 2016 SP1 or lower, don't retrieve physical_cpu_cores*/ 
-					(CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) = 13
-					AND CAST(SERVERPROPERTY('ProductLevel') AS NVARCHAR(128)) IN ( N'RTM', N'SP1' )) 
-					OR CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) < 13  
-				THEN N'''-- N/A --'''
-				ELSE N'( [socket_count] * [cores_per_socket] )'
-			END +N' AS [physical_cpu_cores],'
-+ @LineFeed + N'CAST(ROUND(( [physical_memory_kb] / 1024.00 / 1024.00 ), 1) AS DECIMAL(15, 2)) AS [physical_memory_GB],'
-+ @LineFeed + N'(SELECT CAST(CAST([value_in_use] AS INT) / 1024.00 AS DECIMAL(15, 2))' 
-+ @LineFeed + N'FROM [sys].[configurations]'
-+ @LineFeed + N'WHERE [name] = N''max server memory (MB)'')                     AS [max_server_memory_GB],'
-+ @LineFeed + N'(SELECT TOP(1) CAST([cntr_value] / 1024.00 / 1024.00 AS DECIMAL(15, 2))'
-+ @LineFeed + N'FROM [sys].[dm_os_performance_counters]'
-+ @LineFeed + N'WHERE  [object_name] LIKE N''%Memory Manager%'''
-+ @LineFeed + N'AND [counter_name] LIKE N''Target Server Memory (KB)%'''
-+ @LineFeed + N'ORDER  BY [cntr_value] DESC) AS [target_server_memory_GB],'
-+ @LineFeed + N'(SELECT TOP(1) CAST([cntr_value] / 1024.00 / 1024.00 AS DECIMAL(15, 2))'
-+ @LineFeed + N'FROM [sys].[dm_os_performance_counters]'
-+ @LineFeed + N'WHERE  [object_name] LIKE N''%Memory Manager%'''
-+ @LineFeed + N'AND [counter_name] LIKE N''Total Server Memory (KB)%'') AS [total_memory_used_GB],'
-+ @LineFeed + N'(SELECT CASE WHEN [process_physical_memory_low] = 1 THEN ''Yes'''
-+ @LineFeed + N'ELSE ''No'' END FROM sys.dm_os_process_memory) AS [proc_physical_memory_low],'
-+ @LineFeed + N'(SELECT CASE WHEN [process_virtual_memory_low] = 1 THEN ''Yes'''
-+ @LineFeed + N'ELSE ''No'' END FROM sys.dm_os_process_memory) AS [proc_virtual_memory_low],'
-+ @LineFeed + N'(SELECT CAST(([available_physical_memory_kb]/1024.00/1024.00) AS DECIMAL(15, 2))'
-+ @LineFeed + N' FROM [sys].[dm_os_sys_memory]) AS [available_physical_memory_GB],'
-+ @LineFeed + N'(SELECT [system_memory_state_desc] FROM [sys].[dm_os_sys_memory]) AS [os_memory_state],'
-+ @LineFeed + N'(SELECT [value] FROM [sys].[configurations]'
-+ @LineFeed + N' WHERE [name] = N''cost threshold for parallelism'') AS [CTP],'
-+ @LineFeed + N'(SELECT [value] FROM [sys].[configurations]'
-+ @LineFeed + N' WHERE [name] = N''max degree of parallelism'') AS [MAXDOP]'
-+ @LineFeed + N'FROM [sys].[dm_os_sys_info] OPTION(RECOMPILE);'
+SELECT @SQL = CASE
+              /*Skipping this query on Azure SQL DB*/
+                WHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure'
+                     AND SERVERPROPERTY('EngineEdition') IN ( 5, 6 ) THEN N'SELECT ''Not available'' AS [logical_cpu_cores], '' in Azure '' AS [physical_cpu_cores], ''SQL DB'' '
+                                                                          + N'[AS physical_memory_GB], NULL AS [max_server_memory_GB], NULL AS [target_server_memory_GB], '
+                                                                          + N'NULL AS [total_memory_used_GB], NULL AS [proc_physical_memory_low], NULL AS [proc_virtual_memory_low], '
+                                                                          + N'NULL AS [available_physical_memory_GB], NULL AS [os_memory_state], NULL AS [CTP], NULL AS [MAXDOP]'
+                ELSE N'SELECT [cpu_count] AS [logical_cpu_cores],'
+                     + @LineFeed
+                     + CASE
+                         WHEN /*If running on SQL Server 2016 SP1 or lower, don't retrieve physical_cpu_cores*/
+                       ( CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) = 13
+                         AND CAST(SERVERPROPERTY('ProductLevel') AS NVARCHAR(128)) IN ( N'RTM', N'SP1' ) )
+                        OR CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) < 13 THEN N'''-- N/A --'''
+                         ELSE N'( [socket_count] * [cores_per_socket] )'
+                       END
+                     + N' AS [physical_cpu_cores],' + @LineFeed
+                     + N'CAST(ROUND(( [physical_memory_kb] / 1024.00 / 1024.00 ), 1) AS DECIMAL(15, 2)) AS [physical_memory_GB],'
+                     + @LineFeed
+                     + N'(SELECT CAST(CAST([value_in_use] AS INT) / 1024.00 AS DECIMAL(15, 2))'
+                     + @LineFeed + N'FROM [sys].[configurations]'
+                     + @LineFeed
+                     + N'WHERE [name] = N''max server memory (MB)'')                     AS [max_server_memory_GB],'
+                     + @LineFeed
+                     + N'(SELECT TOP(1) CAST([cntr_value] / 1024.00 / 1024.00 AS DECIMAL(15, 2))'
+                     + @LineFeed
+                     + N'FROM [sys].[dm_os_performance_counters]'
+                     + @LineFeed
+                     + N'WHERE  [object_name] LIKE N''%Memory Manager%'''
+                     + @LineFeed
+                     + N'AND [counter_name] LIKE N''Target Server Memory (KB)%'''
+                     + @LineFeed
+                     + N'ORDER  BY [cntr_value] DESC) AS [target_server_memory_GB],'
+                     + @LineFeed
+                     + N'(SELECT TOP(1) CAST([cntr_value] / 1024.00 / 1024.00 AS DECIMAL(15, 2))'
+                     + @LineFeed
+                     + N'FROM [sys].[dm_os_performance_counters]'
+                     + @LineFeed
+                     + N'WHERE  [object_name] LIKE N''%Memory Manager%'''
+                     + @LineFeed
+                     + N'AND [counter_name] LIKE N''Total Server Memory (KB)%'') AS [total_memory_used_GB],'
+                     + @LineFeed
+                     + N'(SELECT CASE WHEN [process_physical_memory_low] = 1 THEN ''Yes'''
+                     + @LineFeed
+                     + N'ELSE ''No'' END FROM sys.dm_os_process_memory) AS [proc_physical_memory_low],'
+                     + @LineFeed
+                     + N'(SELECT CASE WHEN [process_virtual_memory_low] = 1 THEN ''Yes'''
+                     + @LineFeed
+                     + N'ELSE ''No'' END FROM sys.dm_os_process_memory) AS [proc_virtual_memory_low],'
+                     + @LineFeed
+                     + N'(SELECT CAST(([available_physical_memory_kb]/1024.00/1024.00) AS DECIMAL(15, 2))'
+                     + @LineFeed
+                     + N' FROM [sys].[dm_os_sys_memory]) AS [available_physical_memory_GB],'
+                     + @LineFeed
+                     + N'(SELECT [system_memory_state_desc] FROM [sys].[dm_os_sys_memory]) AS [os_memory_state],'
+                     + @LineFeed
+                     + N'(SELECT [value] FROM [sys].[configurations]'
+                     + @LineFeed
+                     + N' WHERE [name] = N''cost threshold for parallelism'') AS [CTP],'
+                     + @LineFeed
+                     + N'(SELECT [value] FROM [sys].[configurations]'
+                     + @LineFeed
+                     + N' WHERE [name] = N''max degree of parallelism'') AS [MAXDOP]'
+                     + @LineFeed
+                     + N'FROM [sys].[dm_os_sys_info] OPTION(RECOMPILE);'
+              END; 
 
 BEGIN
     EXEC(@SQL);

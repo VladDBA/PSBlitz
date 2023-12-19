@@ -240,8 +240,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "3.6.1"
-$VersDate = "20231203"
+$Vers = "4.0.0"
+$VersDate = "20231219"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -2849,6 +2849,8 @@ $htmlTable
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 		Write-Host " Running sp_BlitzCache for $CheckDB"
+	} elseif($IsAzureSQLDB){
+		Write-Host " Running sp_BlitzCache for $ASDBName"
 	}
  else {
 		Write-Host " Running sp_BlitzCache for all user databases"
@@ -4062,6 +4064,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	$CurrRunTime = (New-TimeSpan -Start $StartDate -End $CurrTime).TotalMinutes
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		Write-Host " Running sp_BlitzLock for $CheckDB... " -NoNewLine
+	} elseif($IsAzureSQLDB){
+		Write-Host " Running sp_BlitzCache for $ASDBName"
 	}
  else {
 		Write-Host " Running sp_BlitzLock for all user databases... " -NoNewLine
