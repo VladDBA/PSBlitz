@@ -1308,82 +1308,82 @@ try {
 	#####################################################################################
 	#						Instance Info												#
 	#####################################################################################
-	if ($IsAzureSQLDB) {
+	Write-Host " Retrieving instance information... " -NoNewLine
+	$CmdTimeout = 600
+	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetInstanceInfo.sql")
+	$InstanceInfoQuery = new-object System.Data.SqlClient.SqlCommand
+	$InstanceInfoQuery.CommandText = $Query
+	$InstanceInfoQuery.Connection = $SqlConnection
+	$InstanceInfoQuery.CommandTimeout = $CmdTimeout
+	$InstanceInfoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+	$InstanceInfoAdapter.SelectCommand = $InstanceInfoQuery
+	$InstanceInfoSet = new-object System.Data.DataSet
+	try {
 		$StepStart = get-date
+		$InstanceInfoAdapter.Fill($InstanceInfoSet) | Out-Null -ErrorAction Stop
+		$SqlConnection.Close()
 		$StepEnd = get-date
-		Write-Host " Azure SQL DB - skipping instance info."
-		Add-LogRow "Instance Info" "Skipped" "Azure SQL DB"
+		Write-Host @GreenCheck
+		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
+		$RunTime = [Math]::Round($StepRunTime, 2)
+		if ($DebugInfo) {
+			Write-Host " - $RunTime seconds" -Fore Yellow
+		}
+		$StepOutcome = "Success"
+		Add-LogRow "Instance Info" $StepOutcome
 	}
- else {
-		Write-Host " Retrieving instance information... " -NoNewLine
-		$CmdTimeout = 600
-		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetInstanceInfo.sql")
-		$InstanceInfoQuery = new-object System.Data.SqlClient.SqlCommand
-		$InstanceInfoQuery.CommandText = $Query
-		$InstanceInfoQuery.Connection = $SqlConnection
-		$InstanceInfoQuery.CommandTimeout = $CmdTimeout
-		$InstanceInfoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-		$InstanceInfoAdapter.SelectCommand = $InstanceInfoQuery
-		$InstanceInfoSet = new-object System.Data.DataSet
-		try {
-			$StepStart = get-date
-			$InstanceInfoAdapter.Fill($InstanceInfoSet) | Out-Null -ErrorAction Stop
-			$SqlConnection.Close()
-			$StepEnd = get-date
-			Write-Host @GreenCheck
-			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-			$RunTime = [Math]::Round($StepRunTime, 2)
+	Catch {
+		$StepEnd = get-date
+		Invoke-ErrMsg
+		$StepOutcome = "Failure"
+		Add-LogRow "Instance Info" $StepOutcome
+	}
+		
+	if ($StepOutcome -eq "Success") {
+		$InstanceInfoTbl = New-Object System.Data.DataTable
+		$InstanceInfoTbl = $InstanceInfoSet.Tables[0]
+		$ResourceInfoTbl = New-Object System.Data.DataTable
+		$ResourceInfoTbl = $InstanceInfoSet.Tables[1]
+		$ConnectionsInfoTbl = New-Object System.Data.DataTable
+		$ConnectionsInfoTbl = $InstanceInfoSet.Tables[2]
+		$SessOptTbl = New-Object System.Data.DataTable
+		$SessOptTbl = $InstanceInfoSet.Tables[3]
+		
+		if ($ToHTML -eq "Y") {
 			if ($DebugInfo) {
-				Write-Host " - $RunTime seconds" -Fore Yellow
+				Write-Host " ->Converting instance info to HTML" -fore yellow
 			}
-			$StepOutcome = "Success"
-			Add-LogRow "Instance Info" $StepOutcome
-		}
-		Catch {
-			$StepEnd = get-date
-			Invoke-ErrMsg
-			$StepOutcome = "Failure"
-			Add-LogRow "Instance Info" $StepOutcome
-		}
-		
-		if ($StepOutcome -eq "Success") {
-			$InstanceInfoTbl = New-Object System.Data.DataTable
-			$InstanceInfoTbl = $InstanceInfoSet.Tables[0]
-			$ResourceInfoTbl = New-Object System.Data.DataTable
-			$ResourceInfoTbl = $InstanceInfoSet.Tables[1]
-			$ConnectionsInfoTbl = New-Object System.Data.DataTable
-			$ConnectionsInfoTbl = $InstanceInfoSet.Tables[2]
-			$SessOptTbl = New-Object System.Data.DataTable
-			$SessOptTbl = $InstanceInfoSet.Tables[3]
-		
-			if ($ToHTML -eq "Y") {
-				if ($DebugInfo) {
-					Write-Host " ->Converting instance info to HTML" -fore yellow
-				}
-				$InstanceInfoTbl.Columns.Add("Estimated Response Latency (Sec)", [decimal]) | Out-Null
-				$InstanceInfoTbl.Rows[0]["Estimated Response Latency (Sec)"] = $ConnTest
+			$InstanceInfoTbl.Columns.Add("Estimated Response Latency (Sec)", [decimal]) | Out-Null
+			$InstanceInfoTbl.Rows[0]["Estimated Response Latency (Sec)"] = $ConnTest
 
-				$htmlTable1 = $InstanceInfoTbl | Select-Object  @{Name = "Machine Name"; Expression = { $_."machine_name" } },
-				@{Name = "Instance Name"; Expression = { $_."instance_name" } }, 
-				@{Name = "Version"; Expression = { $_."product_version" } }, 
-				@{Name = "Product Level"; Expression = { $_."product_level" } },
-				@{Name = "Patch Level"; Expression = { $_."patch_level" } },
-				@{Name = "Edition"; Expression = { $_."edition" } }, 
-				@{Name = "Is Clustered?"; Expression = { $_."is_clustered" } }, 
-				@{Name = "Is AlwaysOnAG?"; Expression = { $_."always_on_enabled" } },
-				@{Name = "FILESTREAM Access Level"; Expression = { $_."filestream_access_level" } },
-				@{Name = "Tempdb Metadata Memory Optimized"; Expression = { $_."mem_optimized_tempdb_metadata" } },
-				@{Name = "Fulltext Instaled"; Expression = { $_."fulltext_installed" } },
-				@{Name = "Instance Collation"; Expression = { $_."instance_collation" } },
-				@{Name = "Process ID"; Expression = { $_."process_id" } },
-				@{Name = "Last Startup"; Expression = { $_."instance_last_startup" } },
-				@{Name = "Uptime (days)"; Expression = { $_."uptime_days" } },
-				@{Name = "Client Connections"; Expression = { $_."client_connections" } },
-				"Estimated Response Latency (Sec)" | ConvertTo-Html -As Table -Fragment
+			$htmlTable1 = $InstanceInfoTbl | Select-Object  @{Name = "Machine Name"; Expression = { $_."machine_name" } },
+			@{Name = "Instance Name"; Expression = { $_."instance_name" } }, 
+			@{Name = "Version"; Expression = { $_."product_version" } }, 
+			@{Name = "Product Level"; Expression = { $_."product_level" } },
+			@{Name = "Patch Level"; Expression = { $_."patch_level" } },
+			@{Name = "Edition"; Expression = { $_."edition" } }, 
+			@{Name = "Is Clustered?"; Expression = { $_."is_clustered" } }, 
+			@{Name = "Is AlwaysOnAG?"; Expression = { $_."always_on_enabled" } },
+			@{Name = "FILESTREAM Access Level"; Expression = { $_."filestream_access_level" } },
+			@{Name = "Tempdb Metadata Memory Optimized"; Expression = { $_."mem_optimized_tempdb_metadata" } },
+			@{Name = "Fulltext Instaled"; Expression = { $_."fulltext_installed" } },
+			@{Name = "Instance Collation"; Expression = { $_."instance_collation" } },
+			@{Name = "Process ID"; Expression = { $_."process_id" } },
+			@{Name = "Last Startup"; Expression = { $_."instance_last_startup" } },
+			@{Name = "Uptime (days)"; Expression = { $_."uptime_days" } },
+			@{Name = "Client Connections"; Expression = { $_."client_connections" } },
+			"Estimated Response Latency (Sec)" | ConvertTo-Html -As Table -Fragment
 
-				if ($DebugInfo) {
-					Write-Host " ->Converting resource info to HTML" -fore yellow
-				}    
+			if (($DebugInfo) -and ($IsAzureSQLDB -eq $false)) {
+				Write-Host " ->Converting resource info to HTML" -fore yellow
+			}
+			elseif (($DebugInfo) -and ($IsAzureSQLDB)) {
+				Write-Host " ->Skipping resource instance resource info for Azure SQL DB" -fore yellow
+			} 
+			if ($IsAzureSQLDB) {
+				$htmlTable2 = ""
+			}
+			else {
 				$htmlTable2 = $ResourceInfoTbl | Select-Object  @{Name = "Logical Cores"; Expression = { $_."logical_cpu_cores" } }, 
 				@{Name = "Physical Cores"; Expression = { $_."physical_cpu_cores" } }, 
 				@{Name = "Physical memory GB"; Expression = { $_."physical_memory_GB" } }, 
@@ -1395,29 +1395,30 @@ try {
 				@{Name = "Available Physical Memory GB"; Expression = { $_."available_physical_memory_GB" } },
 				@{Name = "OS Memory State"; Expression = { $_."os_memory_state" } },
 				"CTP",	"MAXDOP" | ConvertTo-Html -As Table -Fragment
+			}
 
-				if ($DebugInfo) {
-					Write-Host " ->Converting connections info to HTML" -fore yellow
-				}    
-				$htmlTable3 = $ConnectionsInfoTbl | Select-Object  "Database", 
-				@{Name = "Connections Count"; Expression = { $_."ConnectionsCount" } }, 
-				@{Name = "Login Name"; Expression = { $_."LoginName" } }, 
-				@{Name = "Client Hostname"; Expression = { $_."ClientHostName" } }, 
-				@{Name = "Client IP"; Expression = { $_."ClientIP" } },
-				@{Name = "Protocol"; Expression = { $_."ProtocolUsed" } },
-				@{Name = "Oldest Connection Time"; Expression = { $_."OldestConnectionTime" } },
-				@{Name = "Program"; Expression = { $_."Program" } }  | ConvertTo-Html -As Table -Fragment
+			if ($DebugInfo) {
+				Write-Host " ->Converting connections info to HTML" -fore yellow
+			}    
+			$htmlTable3 = $ConnectionsInfoTbl | Select-Object  "Database", 
+			@{Name = "Connections Count"; Expression = { $_."ConnectionsCount" } }, 
+			@{Name = "Login Name"; Expression = { $_."LoginName" } }, 
+			@{Name = "Client Hostname"; Expression = { $_."ClientHostName" } }, 
+			@{Name = "Client IP"; Expression = { $_."ClientIP" } },
+			@{Name = "Protocol"; Expression = { $_."ProtocolUsed" } },
+			@{Name = "Oldest Connection Time"; Expression = { $_."OldestConnectionTime" } },
+			@{Name = "Program"; Expression = { $_."Program" } }  | ConvertTo-Html -As Table -Fragment
 
-				if ($DebugInfo) {
-					Write-Host " ->Converting session level options info to HTML" -fore yellow
-				}
+			if ($DebugInfo) {
+				Write-Host " ->Converting session level options info to HTML" -fore yellow
+			}
 
-				$htmlTable4 = $SessOptTbl | Select-Object "Option", "SessionSetting", "InstanceSetting", "Description", "URL" | ConvertTo-Html -As Table -Fragment
-				$htmlTable4 = $htmlTable4 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+			$htmlTable4 = $SessOptTbl | Select-Object "Option", "SessionSetting", "InstanceSetting", "Description", "URL" | ConvertTo-Html -As Table -Fragment
+			$htmlTable4 = $htmlTable4 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
 
 
-				$HtmlTabName = "Instance Overview"
-				$html = $HTMLPre + @"
+			$HtmlTabName = "Instance Overview"
+			$html = $HTMLPre + @"
     <title>$HtmlTabName</title>
     </head>
     <body>
@@ -1436,179 +1437,178 @@ $htmlTable4
 </body>
 </html>
 "@
-				if ($DebugInfo) {
-					Write-Host " ->Writing HTML file." -fore yellow
-				} 			
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\InstanceInfo.html"
-			}
-			else {
-				###Populating the "Instance Info" sheet
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Instance Info")
-				##Instance Info section
-				#Specify at which row in the sheet to start adding the data
-				$ExcelStartRow = 3
-				#Specify with which column in the sheet to start
-				$ExcelColNum = 1
-				#Set counter used for row retrieval
-				$RowNum = 0
-
-				#List of columns that should be returned from the data set
-				$DataSetCols = @("machine_name", "instance_name", "product_version", "product_level",
-					"patch_level", "edition", "is_clustered", "always_on_enabled", "filestream_access_level",
-					"mem_optimized_tempdb_metadata", "fulltext_installed", "instance_collation", "process_id",
-					"instance_last_startup", "uptime_days", "client_connections", "net_latency")
-
-				if ($DebugInfo) {
-					Write-Host " ->Writing instance info to Excel" -fore yellow
-				}
-				#Loop through each Excel row
-				foreach ($row in $InstanceInfoTbl) {
-					<#
-				Loop through each data set column of current row and fill the corresponding 
-				Excel cell
-				#>
-					foreach ($col in $DataSetCols) {			
-						#Fill Excel cell with value from the data set
-						if ($col -eq "net_latency") {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnTest
-						}
-						else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $InstanceInfoTbl.Rows[$RowNum][$col]
-						}
-						$ExcelColNum += 1
-					}
-
-					#move to the next row in the spreadsheet
-					$ExcelStartRow += 1
-					#move to the next row in the data set
-					$RowNum += 1
-					# reset Excel column number so that next row population begins with column 1
-					$ExcelColNum = 1
-				}
-
-				##Resource Info section
-				#Specify at which row in the sheet to start adding the data
-				$ExcelStartRow = 8
-				#Specify with which column in the sheet to start
-				$ExcelColNum = 1
-				#Set counter used for row retrieval
-				$RowNum = 0
-
-				#List of columns that should be returned from the data set
-				$DataSetCols = @("logical_cpu_cores", "physical_cpu_cores", "physical_memory_GB", "max_server_memory_GB", "target_server_memory_GB",
-					"total_memory_used_GB", "proc_physical_memory_low", "proc_virtual_memory_low", "available_physical_memory_GB", "os_memory_state" , "CTP", "MAXDOP")
-
-				if ($DebugInfo) {
-					Write-Host " ->Writing resource info to Excel" -fore yellow
-				}
-				#Loop through each Excel row
-				foreach ($row in $ResourceInfoTbl) {
-					<#
-				Loop through each data set column of current row and fill the corresponding 
-				Excel cell
-				#>
-					foreach ($col in $DataSetCols) {			
-						#Fill Excel cell with value from the data set
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ResourceInfoTbl.Rows[$RowNum][$col]
-						$ExcelColNum += 1
-					}
-
-					#move to the next row in the spreadsheet
-					$ExcelStartRow += 1
-					#move to the next row in the data set
-					$RowNum += 1
-					# reset Excel column number so that next row population begins with column 1
-					$ExcelColNum = 1
-				}
-
-				##Top 10 clients by connections section
-				#Specify at which row in the sheet to start adding the data
-				$ExcelStartRow = 14
-				#Specify with which column in the sheet to start
-				$ExcelColNum = 1
-				#Set counter used for row retrieval
-				$RowNum = 0
-
-				#List of columns that should be returned from the data set
-				$DataSetCols = @("Database", "ConnectionsCount", "LoginName", "ClientHostName", "ClientIP", "ProtocolUsed", 
-					"OldestConnectionTime", "Program")
-
-				if ($DebugInfo) {
-					Write-Host " ->Writing Top 10 clients by connections to Excel" -fore yellow
-				}
-				#Loop through each Excel row
-				foreach ($row in $ConnectionsInfoTbl) {
-					<#
-				Loop through each data set column of current row and fill the corresponding 
-				Excel cell
-				#>
-					foreach ($col in $DataSetCols) {			
-						#Fill Excel cell with value from the data set
-						if ("OldestConnectionTime" -contains $col) {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col]
-						}
-						$ExcelColNum += 1
-					}
-
-					#move to the next row in the spreadsheet
-					$ExcelStartRow += 1
-					#move to the next row in the data set
-					$RowNum += 1
-					# reset Excel column number so that next row population begins with column 1
-					$ExcelColNum = 1
-				}
-
-				#Session level options
-				$ExcelStartRow = 14
-				$ExcelColNum = 10
-				$RowNum = 0
-
-				$DataSetCols = @("Option", "SessionSetting", "InstanceSetting", "Description", "URL")
-				if ($DebugInfo) {
-					Write-Host " ->Writing Session level options to Excel" -fore yellow
-				}
-				#Loop through each Excel row
-				foreach ($row in $SessOptTbl) {
-					<#
-				Loop through each data set column of current row and fill the corresponding 
-				Excel cell
-				#>
-					foreach ($col in $DataSetCols) {			
-						#Fill Excel cell with value from the data set
-						if ($col -eq "URL") {
-							if ($SessOptTbl.Rows[$RowNum][$col] -like "http*") {
-								$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 10),
-									$SessOptTbl.Rows[$RowNum][$col], "", "Click for more info",
-									$SessOptTbl.Rows[$RowNum]["Option"]) | Out-Null
-							}
-						}
-						else { 
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $SessOptTbl.Rows[$RowNum][$col]
-						}
-						$ExcelColNum += 1
-					}
-
-					#move to the next row in the spreadsheet
-					$ExcelStartRow += 1
-					#move to the next row in the data set
-					$RowNum += 1
-					# reset Excel column number so that next row population begins with column 1
-					$ExcelColNum = 10
-				}
-
-				##Saving file 
-				$ExcelFile.Save()
-			}
-			##Cleaning up variables 
-			Remove-Variable -Name ResourceInfoTbl
-			Remove-Variable -Name InstanceInfoTbl
-			Remove-Variable -Name ConnectionsInfoTbl
-			Remove-Variable -Name SessOptTbl
-			Remove-Variable -Name InstanceInfoSet
+			if ($DebugInfo) {
+				Write-Host " ->Writing HTML file." -fore yellow
+			} 			
+			$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\InstanceInfo.html"
 		}
+		else {
+			###Populating the "Instance Info" sheet
+			$ExcelSheet = $ExcelFile.Worksheets.Item("Instance Info")
+			##Instance Info section
+			#Specify at which row in the sheet to start adding the data
+			$ExcelStartRow = 3
+			#Specify with which column in the sheet to start
+			$ExcelColNum = 1
+			#Set counter used for row retrieval
+			$RowNum = 0
+
+			#List of columns that should be returned from the data set
+			$DataSetCols = @("machine_name", "instance_name", "product_version", "product_level",
+				"patch_level", "edition", "is_clustered", "always_on_enabled", "filestream_access_level",
+				"mem_optimized_tempdb_metadata", "fulltext_installed", "instance_collation", "process_id",
+				"instance_last_startup", "uptime_days", "client_connections", "net_latency")
+
+			if ($DebugInfo) {
+				Write-Host " ->Writing instance info to Excel" -fore yellow
+			}
+			#Loop through each Excel row
+			foreach ($row in $InstanceInfoTbl) {
+				<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+				foreach ($col in $DataSetCols) {			
+					#Fill Excel cell with value from the data set
+					if ($col -eq "net_latency") {
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnTest
+					}
+					else {
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $InstanceInfoTbl.Rows[$RowNum][$col]
+					}
+					$ExcelColNum += 1
+				}
+
+				#move to the next row in the spreadsheet
+				$ExcelStartRow += 1
+				#move to the next row in the data set
+				$RowNum += 1
+				# reset Excel column number so that next row population begins with column 1
+				$ExcelColNum = 1
+			}
+
+			##Resource Info section
+			#Specify at which row in the sheet to start adding the data
+			$ExcelStartRow = 8
+			#Specify with which column in the sheet to start
+			$ExcelColNum = 1
+			#Set counter used for row retrieval
+			$RowNum = 0
+
+			#List of columns that should be returned from the data set
+			$DataSetCols = @("logical_cpu_cores", "physical_cpu_cores", "physical_memory_GB", "max_server_memory_GB", "target_server_memory_GB",
+				"total_memory_used_GB", "proc_physical_memory_low", "proc_virtual_memory_low", "available_physical_memory_GB", "os_memory_state" , "CTP", "MAXDOP")
+
+			if ($DebugInfo) {
+				Write-Host " ->Writing resource info to Excel" -fore yellow
+			}
+			#Loop through each Excel row
+			foreach ($row in $ResourceInfoTbl) {
+				<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+				foreach ($col in $DataSetCols) {			
+					#Fill Excel cell with value from the data set
+					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ResourceInfoTbl.Rows[$RowNum][$col]
+					$ExcelColNum += 1
+				}
+
+				#move to the next row in the spreadsheet
+				$ExcelStartRow += 1
+				#move to the next row in the data set
+				$RowNum += 1
+				# reset Excel column number so that next row population begins with column 1
+				$ExcelColNum = 1
+			}
+
+			##Top 10 clients by connections section
+			#Specify at which row in the sheet to start adding the data
+			$ExcelStartRow = 14
+			#Specify with which column in the sheet to start
+			$ExcelColNum = 1
+			#Set counter used for row retrieval
+			$RowNum = 0
+
+			#List of columns that should be returned from the data set
+			$DataSetCols = @("Database", "ConnectionsCount", "LoginName", "ClientHostName", "ClientIP", "ProtocolUsed", 
+				"OldestConnectionTime", "Program")
+
+			if ($DebugInfo) {
+				Write-Host " ->Writing Top 10 clients by connections to Excel" -fore yellow
+			}
+			#Loop through each Excel row
+			foreach ($row in $ConnectionsInfoTbl) {
+				<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+				foreach ($col in $DataSetCols) {			
+					#Fill Excel cell with value from the data set
+					if ("OldestConnectionTime" -contains $col) {
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+					}
+					else {
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col]
+					}
+					$ExcelColNum += 1
+				}
+
+				#move to the next row in the spreadsheet
+				$ExcelStartRow += 1
+				#move to the next row in the data set
+				$RowNum += 1
+				# reset Excel column number so that next row population begins with column 1
+				$ExcelColNum = 1
+			}
+
+			#Session level options
+			$ExcelStartRow = 14
+			$ExcelColNum = 10
+			$RowNum = 0
+
+			$DataSetCols = @("Option", "SessionSetting", "InstanceSetting", "Description", "URL")
+			if ($DebugInfo) {
+				Write-Host " ->Writing Session level options to Excel" -fore yellow
+			}
+			#Loop through each Excel row
+			foreach ($row in $SessOptTbl) {
+				<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+				foreach ($col in $DataSetCols) {			
+					#Fill Excel cell with value from the data set
+					if ($col -eq "URL") {
+						if ($SessOptTbl.Rows[$RowNum][$col] -like "http*") {
+							$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 10),
+								$SessOptTbl.Rows[$RowNum][$col], "", "Click for more info",
+								$SessOptTbl.Rows[$RowNum]["Option"]) | Out-Null
+						}
+					}
+					else { 
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $SessOptTbl.Rows[$RowNum][$col]
+					}
+					$ExcelColNum += 1
+				}
+
+				#move to the next row in the spreadsheet
+				$ExcelStartRow += 1
+				#move to the next row in the data set
+				$RowNum += 1
+				# reset Excel column number so that next row population begins with column 1
+				$ExcelColNum = 10
+			}
+
+			##Saving file 
+			$ExcelFile.Save()
+		}
+		##Cleaning up variables 
+		Remove-Variable -Name ResourceInfoTbl
+		Remove-Variable -Name InstanceInfoTbl
+		Remove-Variable -Name ConnectionsInfoTbl
+		Remove-Variable -Name SessOptTbl
+		Remove-Variable -Name InstanceInfoSet
 	}
 
 	if ($JobStatus -ne "Running") {
@@ -2116,10 +2116,95 @@ $htmlTable3
 	#						Database info												#
 	#####################################################################################
 	if ($IsAzureSQLDB) {
-		$StepStart = get-date
-		$StepEnd = get-date
-		Write-Host " Azure SQL DB - skipping database info."
-		Add-LogRow "Database Info" "Skipped" "Azure SQL DB"
+		#$StepStart = get-date
+		#$StepEnd = get-date
+		#Write-Host " Azure SQL DB - skipping database info."
+		#Add-LogRow "Database Info" "Skipped" "Azure SQL DB"
+		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetAzureSQLDBInfo.sql")
+		Write-Host " Getting database info for $ASDBName... " -NoNewLine 
+		$CmdTimeout = 600
+		$DBInfoQuery = new-object System.Data.SqlClient.SqlCommand
+		$DBInfoQuery.CommandText = $Query
+		$DBInfoQuery.Connection = $SqlConnection
+		$DBInfoQuery.CommandTimeout = $CmdTimeout
+		$DBInfoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+		$DBInfoAdapter.SelectCommand = $DBInfoQuery
+		$DBInfoSet = new-object System.Data.DataSet
+		Try {
+			$StepStart = get-date
+			$DBInfoAdapter.Fill($DBInfoSet) | Out-Null -ErrorAction Stop
+			$SqlConnection.Close()
+			$StepEnd = get-date
+			Write-Host @GreenCheck
+			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
+			$RunTime = [Math]::Round($StepRunTime, 2)
+			if ($DebugInfo) {
+				Write-Host " - $RunTime seconds" -Fore Yellow
+			}
+			$StepOutcome = "Success"
+			Add-LogRow "Azure SQL DB Info" $StepOutcome
+		}
+		Catch {
+			$StepEnd = get-date
+			Invoke-ErrMsg
+			$StepOutcome = "Failure"
+			Add-LogRow "Azure SQL DB Info" $StepOutcome
+		}
+		if ($StepOutcome -eq "Success") {
+			$RsrcGovTbl = New-Object System.Data.DataTable
+			$RsrcGovTbl = $DBInfoSet.Tables[0]
+			$DBInfoTbl = New-Object System.Data.DataTable
+			$DBInfoTbl = $DBInfoSet.Tables[1]
+			$RsrcUsageTbl = New-Object System.Data.DataTable
+			$RsrcUsageTbl = $DBInfoSet.Tables[2]
+			$Top10WaitsTbl = New-Object System.Data.DataTable
+			$Top10WaitsTbl = $DBInfoSet.Tables[3]
+			$DBFileInfoTbl = New-Object System.Data.DataTable
+			$DBFileInfoTbl = $DBInfoSet.Tables[4]
+			$ObjImpUpgrTbl = New-Object System.Data.DataTable
+			$ObjImpUpgrTbl = $DBInfoSet.Tables[5]
+			$DBConfig = New-Object System.Data.DataTable
+			$DBConfig = $DBInfoSet.Tables[6]
+
+			if ($ToHTML -eq "Y") {
+				$tableName = "Azure SQL Database Info"
+				if ($DebugInfo) {
+					Write-Host " ->Converting Database Info results to HTML" -fore yellow
+				}
+
+				$htmlTable = $RsrcGovTbl | Select-Object "Database", "Service level objective", 
+				"DTU limit(empty for vCore)", "vCore limit(empty for DTU databases)", "Min CPU%", "Max CPU%", 
+				"Cap CPU%", "Max DOP", "Min Memory%", "Max Memory%", "Max allowed sessions", "Req Max Memory Grant%", 
+				"Min Max DataFile Size(MB)", "Max Max DataFile Size(MB)", "Default Max DataFile Size(MB)", 
+				"Default DataFile Growth Increment(MB)", "Default Size New DataFile(MB)", "Default Size New LogFile(MB)", 
+				"Instnace Max Log Rate MB/s", "Instance Max Worker Threads", "Replica Type", "Max TLog Space/Transaction(KB)", 
+				"Settings Last Changed", "User Workload Max Worker Threads", "User Workload Min Log Rate MB/s", 
+				"User Workload Max Log Rate MB/s", "User Workload Min IOPS", "User Workload Max IOPS", "User Workload Min CPU%", 
+				"User Workload Max CPU%", "User Workload Max Worker Threads2", "User Workload Pool Max IOPS ", 
+				"Max Local Storage(MB)", "Used Local Storage(MB)", "Max Pool Log Rate MB/s", 
+				"primary_group_max_outbound_connection_workers", "primary_pool_max_outbound_connection_workers", 
+				"Replica Role"	| ConvertTo-Html -As Table -Fragment
+
+				$htmlTable1 = $DBInfoTbl | Select-Object "Database", "Service Objective", "Created", "Database State", 
+				"Data Files", "Data Files Size GB", "Log Files", "LogFilesSizeGB", "VirtualLogFiles", "FILESTREAM Containers", 
+				"FS Containers Size GB", "Database Size GB", "Database MaxSize GB", "Current Log Reuse Wait", 
+				"Compatibility Level", "Page Verify", "Containment", "Collation", "Snapshot Isolation State", 
+				"Read Committed Snapshot On", "Recovery Model", "AutoClose On", "AutoShrink On", "QueryStore On", 
+				"Trustworthy On" | ConvertTo-Html -As Table -Fragment
+
+				$htmlTable2 = $RsrcUsageTbl | Select-Object "Sample Start", "Sample End", "Sample(Minutes)",
+				"Avg CPU Usage %", "Max CPU Usage %", "Avg Data IO %", "Max Data IO %", "Avg Log Write Usage %",
+				"Max Log Write Usage %", "Avg Memory Usage %", "Max Memory Usage %" | ConvertTo-Html -As Table -Fragment
+
+				$htmlTable3 = $Top10WaitsTbl | Select-Object "Sample Start", "Sample End", "Sample(Hours)", "Wait Type", "Wait Count", "Wait %",
+				"Total Wait Time(Sec)", "Avg Wait Time(Sec)", "Total Resource Time(Sec)", "Avg Resource Time(Sec)",
+				"Total Signal Time(Sec)", "Avg Signal Time(Sec)", "URL" | ConvertTo-Html -As Table -Fragment
+
+
+
+			}
+		}
+
 	}
  else {
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetDbInfo.sql")	
@@ -2849,7 +2934,8 @@ $htmlTable
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 		Write-Host " Running sp_BlitzCache for $CheckDB"
-	} elseif($IsAzureSQLDB){
+	}
+ elseif ($IsAzureSQLDB) {
 		Write-Host " Running sp_BlitzCache for $ASDBName"
 	}
  else {
@@ -4064,7 +4150,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	$CurrRunTime = (New-TimeSpan -Start $StartDate -End $CurrTime).TotalMinutes
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		Write-Host " Running sp_BlitzLock for $CheckDB... " -NoNewLine
-	} elseif($IsAzureSQLDB){
+	}
+ elseif ($IsAzureSQLDB) {
 		Write-Host " Running sp_BlitzCache for $ASDBName"
 	}
  else {
