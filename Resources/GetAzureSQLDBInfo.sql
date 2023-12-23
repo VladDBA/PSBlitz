@@ -93,7 +93,7 @@ SELECT DB_NAME()                                                                
        CAST(CAST(DATABASEPROPERTYEX(DB_NAME(), 'MaxSizeInBytes') AS BIGINT) / 1024. / 1024. / 1024. AS NUMERIC(18, 2)) AS [Database MaxSize GB],
        [d].[log_reuse_wait_desc]                                                                                       AS [Current Log Reuse Wait],
        [d].[compatibility_level]                                                                                       AS [Compatibility Level],
-       [d].[page_verify_option_desc]                                                                                   AS [Page Verify],
+       [d].[page_verify_option_desc]                                                                                   AS [Page Verify Option],
        [d].[containment_desc]                                                                                          AS [Containment],
        [d].[collation_name]                                                                                            AS [Collation],
        [d].[snapshot_isolation_state_desc]                                                                             AS [Snapshot Isolation State],

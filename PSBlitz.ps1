@@ -1381,7 +1381,7 @@ try {
 				Write-Host " ->Skipping resource instance resource info for Azure SQL DB" -fore yellow
 			} 
 			if ($IsAzureSQLDB) {
-				$htmlTable2 = ""
+				$htmlTable2 = '<p style="text-align: center;">Instance resource information is not available for Azure SQL DB.</p>'
 			}
 			else {
 				$htmlTable2 = $ResourceInfoTbl | Select-Object  @{Name = "Logical Cores"; Expression = { $_."logical_cpu_cores" } }, 
@@ -2169,7 +2169,7 @@ $htmlTable3
 			if ($ToHTML -eq "Y") {
 				$tableName = "Azure SQL Database Info"
 				if ($DebugInfo) {
-					Write-Host " ->Converting Database Info results to HTML" -fore yellow
+					Write-Host " ->Converting Azure SQL Database Info results to HTML" -fore yellow
 				}
 
 				$htmlTable = $RsrcGovTbl | Select-Object "Database", "Service level objective", 
@@ -2190,13 +2190,13 @@ $htmlTable3
 				@{Name = "Created"; Expression = { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") } }, "Database State", 
 				"Data Files", "Data Files Size GB", "Log Files", "LogFilesSizeGB", "VirtualLogFiles", "FILESTREAM Containers", 
 				"FS Containers Size GB", "Database Size GB", "Database MaxSize GB", "Current Log Reuse Wait", 
-				"Compatibility Level", "Page Verify", "Containment", "Collation", "Snapshot Isolation State", 
+				"Compatibility Level", "Page Verify Option", "Containment", "Collation", "Snapshot Isolation State", 
 				"Read Committed Snapshot On", "Recovery Model", "AutoClose On", "AutoShrink On", "QueryStore On", 
 				"Trustworthy On" | ConvertTo-Html -As Table -Fragment
 
 				$htmlTable2 = $RsrcUsageTbl | Select-Object @{Name = "Sample Start"; Expression = { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") } }, 
 				@{Name = "Sample End"; Expression = { ($_."Sample End").ToString("yyyy-MM-dd HH:mm:ss") } }, 
-				"Sample(Minutes)", 	"Avg CPU Usage %", "Max CPU Usage %", "Avg Data IO %", "Max Data IO %", "Avg Log Write Usage %",
+				"Sample(Minutes)", "Avg CPU Usage %", "Max CPU Usage %", "Avg Data IO %", "Max Data IO %", "Avg Log Write Usage %",
 				"Max Log Write Usage %", "Avg Memory Usage %", "Max Memory Usage %" | ConvertTo-Html -As Table -Fragment
 
 				$htmlTable3 = $Top10WaitsTbl | Select-Object @{Name = "Sample Start"; Expression = { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") } }, 
@@ -2209,10 +2209,11 @@ $htmlTable3
 				$htmlTable4 = $DBFileInfoTbl | Select-Object "Database", "FileID", "File Logical Name", "File Physical Name",
 				"File Type", "State", "SizeGB", "Available SpaceGB", "Max File SizeGB", "Growth Increment" | ConvertTo-Html -As Table -Fragment
 
-				if($ObjImpUpgrTbl.Rows.Count -gt 0){
+				if ($ObjImpUpgrTbl.Rows.Count -gt 0) {
 					$htmlTable5 = $ObjImpUpgrTbl | Select-Objects "Object Type", "Object Name", "Index Name", "Dependency" | ConvertTo-Html -As Table -Fragment
-				} else {
-					$htmlTable5 = '<p style="text-align: center;">No matching objects found</p>'
+				}
+				else {
+					$htmlTable5 = '<p style="text-align: center;">No matching objects found.</p>'
 				}			
 
 				$htmlTable6 = $DBConfig | Select-Object "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
@@ -2261,8 +2262,358 @@ $htmlTable6
 
 			}
 			else {
-				Write-Host "Excel goes here"
+				#Populate the Azure SQL DB Resource Governance section
+				$ExcelSheet = $ExcelFile.Worksheets.Item("Azure SQL DB Info")
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = 3
+				#Specify with which column in the sheet to start
+				$ExcelColNum = 1
+				#Set counter used for row retrieval
+				$RowNum = 0
+
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("Database", "Service level objective", 
+					"DTU limit(empty for vCore)", "vCore limit(empty for DTU databases)", "Min CPU%", "Max CPU%", 
+					"Cap CPU%", "Max DOP", "Min Memory%", "Max Memory%", "Max allowed sessions", "Req Max Memory Grant%", 
+					"Min Max DataFile Size(MB)", "Max Max DataFile Size(MB)", "Default Max DataFile Size(MB)", 
+					"Default DataFile Growth Increment(MB)", "Default Size New DataFile(MB)", "Default Size New LogFile(MB)", 
+					"Instnace Max Log Rate MB/s", "Instance Max Worker Threads", "Replica Type", "Max TLog Space/Transaction(KB)", 
+					"Settings Last Changed", 
+					"User Workload Max Worker Threads", "User Workload Min Log Rate MB/s", 
+					"User Workload Max Log Rate MB/s", "User Workload Min IOPS", "User Workload Max IOPS", "User Workload Min CPU%", 
+					"User Workload Max CPU%", "User Workload Max Worker Threads2", "User Workload Pool Max IOPS ", 
+					"Max Local Storage(MB)", "Used Local Storage(MB)", "Max Pool Log Rate MB/s", 
+					"primary_group_max_outbound_connection_workers", "primary_pool_max_outbound_connection_workers", 
+					"Replica Role")
+				if ($DebugInfo) {
+					Write-Host " ->Writing Azure SQL DB Resource Governance results to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $RsrcGovTbl) {
+					<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+					foreach ($col in $DataSetCols) {
+						#Fill Excel cell with value from the data set
+						if($col -eq "Settings Last Changed"){
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcGovTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+						} else{
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcGovTbl.Rows[$RowNum][$col]
+						}
+					
+						#move to the next column
+						$ExcelColNum += 1
+					}
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 1
+					$ExcelColNum = 1
+				}
+
+				##Saving file 
+				$ExcelFile.Save()
+
+				##Populating the "Database Overview" section
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = 8
+				#Specify with which column in the sheet to start
+				$ExcelColNum = 1
+				#Set counter used for row retrieval
+				$RowNum = 0
+
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("Database", "Service Objective", "Created", "Database State", 
+					"Data Files", "Data Files Size GB", "Log Files", "LogFilesSizeGB", "VirtualLogFiles", "FILESTREAM Containers", 
+					"FS Containers Size GB", "Database Size GB", "Database MaxSize GB", "Current Log Reuse Wait", 
+					"Compatibility Level", "Page Verify Option", "Containment", "Collation", "Snapshot Isolation State", 
+					"Read Committed Snapshot On", "Recovery Model", "AutoClose On", "AutoShrink On", "QueryStore On", 
+					"Trustworthy On")
+				if ($DebugInfo) {
+					Write-Host " ->Writing Database Overview results to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $DBInfoTbl) {
+					<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+					foreach ($col in $DataSetCols) {
+						#Fill Excel cell with value from the data set
+						if($col -eq "Created"){
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+						} else{
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
+						}
+					
+						#move to the next column
+						$ExcelColNum += 1
+					}
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 1
+					$ExcelColNum = 1
+				}
+
+				##Saving file 
+				$ExcelFile.Save()
+
+				##Populating the "Resource Usage" section
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = 13
+				#Specify with which column in the sheet to start
+				$ExcelColNum = 1
+				#Set counter used for row retrieval
+				$RowNum = 0
+
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("Sample Start", "Sample End", "Sample(Minutes)", "Avg CPU Usage %", 
+					"Max CPU Usage %", "Avg Data IO %", "Max Data IO %", "Avg Log Write Usage %",
+					"Max Log Write Usage %", "Avg Memory Usage %", "Max Memory Usage %")
+				if ($DebugInfo) {
+					Write-Host " ->Writing Resource Usage results to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $RsrcUsageTbl) {
+					<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+					foreach ($col in $DataSetCols) {
+						#Fill Excel cell with value from the data set
+						if("Sample Start", "Sample End" -contains $col){
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcUsageTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+						} else{
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcUsageTbl.Rows[$RowNum][$col]
+						}
+					
+						#move to the next column
+						$ExcelColNum += 1
+					}
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 1
+					$ExcelColNum = 1
+				}
+
+				##Saving file 
+				$ExcelFile.Save()
+
+				##Populating the "Top 10 Waits" section
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = 22
+				#Specify with which column in the sheet to start
+				$ExcelColNum = 1
+				#Set counter used for row retrieval
+				$RowNum = 0
+
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("Sample Start", "Sample End", "Sample(Hours)", "Wait Type", "Wait Count", "Wait %",
+					"Total Wait Time(Sec)", "Avg Wait Time(Sec)", "Total Resource Time(Sec)", "Avg Resource Time(Sec)",
+					"Total Signal Time(Sec)", "Avg Signal Time(Sec)", "URL")
+				if ($DebugInfo) {
+					Write-Host " ->Writing Top 10 Waits results to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $Top10WaitsTbl) {
+					<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+					foreach ($col in $DataSetCols) {
+						#Fill Excel cell with value from the data set
+						if("Sample Start", "Sample End" -contains $col){
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $Top10WaitsTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+						}
+						elseif ($col -eq "URL") {
+							#Make URLs clickable
+							if ( $Top10WaitsTbl.Rows[$RowNum][$col] -like "http*") {
+								$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 4),
+									$Top10WaitsTbl.Rows[$RowNum][$col], "", "Click for more info",
+									$Top10WaitsTbl.Rows[$RowNum]["Wait Type"]) | Out-Null
+							}
+						}
+						else {
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $Top10WaitsTbl.Rows[$RowNum][$col]
+						}
+					
+						#move to the next column
+						$ExcelColNum += 1
+					}
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 1
+					$ExcelColNum = 1
+				}
+
+				##Saving file 
+				$ExcelFile.Save()
+
+				##Populating the "Database Files Info" section
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = 36
+				#Specify with which column in the sheet to start
+				$ExcelColNum = 1
+				#Set counter used for row retrieval
+				$RowNum = 0
+
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("Database", "FileID", "File Logical Name", "File Physical Name",
+				"File Type", "State", "SizeGB", "Available SpaceGB", "Max File SizeGB", "Growth Increment")
+				if ($DebugInfo) {
+					Write-Host " ->Writing Database Files Info results to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $DBFileInfoTbl) {
+					<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+					foreach ($col in $DataSetCols) {
+						#Fill Excel cell with value from the data set
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBFileInfoTbl.Rows[$RowNum][$col]
+											
+						#move to the next column
+						$ExcelColNum += 1
+					}
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 1
+					$ExcelColNum = 1
+				}
+
+				##Saving file 
+				$ExcelFile.Save()
+
+				##Populating the "Objects Impacted by a Major Release Upgrade of Azure SQL DB" section
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = 36
+				#Specify with which column in the sheet to start
+				$ExcelColNum = 12
+				#Set counter used for row retrieval
+				$RowNum = 0
+
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("Object Type", "Object Name", "Index Name", "Dependency")
+				if ($DebugInfo) {
+					Write-Host " ->Writing Objects Impacted by a Major Release Upgrade of Azure SQL DB results to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $ObjImpUpgrTbl) {
+					<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+					foreach ($col in $DataSetCols) {
+						#Fill Excel cell with value from the data set
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ObjImpUpgrTbl.Rows[$RowNum][$col]
+											
+						#move to the next column
+						$ExcelColNum += 1
+					}
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 12
+					$ExcelColNum = 12
+				}
+
+				##Saving file 
+				$ExcelFile.Save()
+
+				##Populating the "Objects Impacted by a Major Release Upgrade of Azure SQL DB" section
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = 36
+				#Specify with which column in the sheet to start
+				$ExcelColNum = 12
+				#Set counter used for row retrieval
+				$RowNum = 0
+
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("Object Type", "Object Name", "Index Name", "Dependency")
+				if ($DebugInfo) {
+					Write-Host " ->Writing Objects Impacted by a Major Release Upgrade of Azure SQL DB results to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $ObjImpUpgrTbl) {
+					<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+					foreach ($col in $DataSetCols) {
+						#Fill Excel cell with value from the data set
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ObjImpUpgrTbl.Rows[$RowNum][$col]
+											
+						#move to the next column
+						$ExcelColNum += 1
+					}
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 12
+					$ExcelColNum = 12
+				}
+
+				##Saving file 
+				$ExcelFile.Save()
+
+
+				##Populating the "Database Scoped Configuration" section
+				#Specify at which row in the sheet to start adding the data
+				$ExcelStartRow = 36
+				#Specify with which column in the sheet to start
+				$ExcelColNum = 17
+				#Set counter used for row retrieval
+				$RowNum = 0
+
+				#List of columns that should be returned from the data set
+				$DataSetCols = @("Config Name", "Value", "IsDefault")
+				if ($DebugInfo) {
+					Write-Host " ->Writing Database Scoped Configuration results to Excel" -fore yellow
+				}
+				#Loop through each Excel row
+				foreach ($row in $DBConfig) {
+					<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+					foreach ($col in $DataSetCols) {
+						#Fill Excel cell with value from the data set
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBConfig.Rows[$RowNum][$col]
+											
+						#move to the next column
+						$ExcelColNum += 1
+					}
+					#move to the next row in the spreadsheet
+					$ExcelStartRow += 1
+					#move to the next row in the data set
+					$RowNum += 1
+					# reset Excel column number so that next row population begins with column 17
+					$ExcelColNum = 17
+				}
+
+				##Saving file 
+				$ExcelFile.Save()
 			}
+			Remove-Variable -Name DBInfoTbl
+			Remove-Variable -Name DBFileInfoTbl
+			Remove-Variable -Name RsrcGovTbl
+			Remove-Variable -Name RsrcUsageTbl
+			Remove-Variable -Name ObjImpUpgrTbl
+			Remove-Variable -Name DBConfig
+			Remove-Variable -Name DBInfoSet
 		}
 
 	}
@@ -2314,13 +2665,15 @@ $htmlTable6
 				if ($DebugInfo) {
 					Write-Host " ->Converting Database Info results to HTML" -fore yellow
 				}
-				$htmlTable = $DBInfoTbl | Select-Object "Database", "DatabaseState", "DataFiles", "DataFilesSizeGB", "LogFiles",
+				$htmlTable = $DBInfoTbl | Select-Object "Database", @{Name = "Created"; Expression = { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") } }, 
+				"DatabaseState", "DataFiles", "DataFilesSizeGB", "LogFiles",
 				"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
-				"DatabaseSizeGB", "CompatibilityLevel", "Collation", "SnapshotIsolationState", "ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
+				"DatabaseSizeGB", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", 
+				"SnapshotIsolationState", "ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
 				"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn" | ConvertTo-Html -As Table -Fragment
 
 				$htmlTable1 = $DBFileInfoTbl | Select-Object  "Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
-				"MaxFileSizeGB", "GrowthIncrement" | ConvertTo-Html -As Table -Fragment
+				"AvailableSpaceGB","MaxFileSizeGB", "GrowthIncrement" | ConvertTo-Html -As Table -Fragment
 
 				$html = $HTMLPre + @"
 <title>$tableName</title>
@@ -2353,7 +2706,7 @@ $htmlTable1
 				$RowNum = 0
 
 				#List of columns that should be returned from the data set
-				$DataSetCols = @("Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
+				$DataSetCols = @("Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB", "AvailableSpaceGB",
 					"MaxFileSizeGB", "GrowthIncrement")
 				if ($DebugInfo) {
 					Write-Host " ->Writing Database Files Info results to Excel" -fore yellow
@@ -2388,9 +2741,9 @@ $htmlTable1
 				$RowNum = 0
 
 				#List of columns that should be returned from the data set
-				$DataSetCols = @("Database", "DatabaseState", "DataFiles", "DataFilesSizeGB", "LogFiles",
+				$DataSetCols = @("Database", "Created", "DatabaseState", "DataFiles", "DataFilesSizeGB", "LogFiles",
 					"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
-					"DatabaseSizeGB", "CompatibilityLevel", "Collation", "SnapshotIsolationState", 
+					"DatabaseSizeGB", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", "SnapshotIsolationState", 
 					"ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
 					"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn")
 				if ($DebugInfo) {
@@ -2404,7 +2757,11 @@ $htmlTable1
 				#>
 					foreach ($col in $DataSetCols) {
 						#Fill Excel cell with value from the data set
+						if($col -eq "Created"){
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+						} else{
 						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
+						}
 					
 						#move to the next column
 						$ExcelColNum += 1
