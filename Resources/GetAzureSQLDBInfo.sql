@@ -275,24 +275,24 @@ OPTION (RECOMPILE);
 /*database files details*/
 SELECT DB_NAME()                                                                                                                                  AS [Database],
        [f].[file_id]                                                                                                                              AS [FileID],
-       [f].[name]                                                                                                                                 AS [FileLogicalName],
-       [f].[physical_name]                                                                                                                        AS [FilePhysicalName],
-       [f].[type_desc]                                                                                                                            AS [FileType],
+       [f].[name]                                                                                                                                 AS [File Logical Name],
+       [f].[physical_name]                                                                                                                        AS [File Physical Name],
+       [f].[type_desc]                                                                                                                            AS [File Type],
        [state_desc]                                                                                                                               AS [State],
        CAST(( CAST([f].[size] AS BIGINT) * 8 / 1024.00 / 1024.00 ) AS NUMERIC(23, 3))                                                             AS [SizeGB],
-       CAST(( ( CAST([f].[size] AS BIGINT) - CAST(FILEPROPERTY([f].[name], 'SpaceUsed') AS BIGINT) ) * 8 / 1024.00 / 1024.00 ) AS NUMERIC(23, 3)) AS [AvailableSpaceGB],
+       CAST(( ( CAST([f].[size] AS BIGINT) - CAST(FILEPROPERTY([f].[name], 'SpaceUsed') AS BIGINT) ) * 8 / 1024.00 / 1024.00 ) AS NUMERIC(23, 3)) AS [Available SpaceGB],
        CASE
          WHEN [max_size] = 0
                OR [growth] = 0 THEN 'File autogrowth is disabled'
          WHEN [max_size] = -1
               AND [growth] > 0 THEN 'Unlimited'
          WHEN [max_size] > 0 THEN CAST(CAST (CAST([max_size] AS BIGINT) * 8 / 1024.00 / 1024.00 AS NUMERIC(23, 3)) AS VARCHAR(20))
-       END                                                                                                                                        AS [MaxFileSizeGB],
+       END                                                                                                                                        AS [Max File SizeGB],
        CASE
          WHEN [is_percent_growth] = 1 THEN CAST([growth] AS NVARCHAR(2)) + N' %'
          WHEN [is_percent_growth] = 0 THEN CAST(CAST(CAST([growth] AS BIGINT)*8/1024.00/1024.00 AS NUMERIC(23, 3)) AS VARCHAR(20))
                                            + ' GB'
-       END                                                                                                                                        AS [GrowthIncrement]
+       END                                                                                                                                        AS [Growth Increment]
 FROM   sys.[database_files] AS [f]
 OPTION(RECOMPILE);
 
@@ -322,5 +322,5 @@ SELECT [name] AS [Config Name],
        CASE
          WHEN [is_value_default] = 1 THEN 'Yes'
          ELSE 'No'
-       END AS [Default]
+       END AS [IsDefault]
 FROM   sys.[database_scoped_configurations]; 

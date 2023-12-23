@@ -2178,30 +2178,93 @@ $htmlTable3
 				"Min Max DataFile Size(MB)", "Max Max DataFile Size(MB)", "Default Max DataFile Size(MB)", 
 				"Default DataFile Growth Increment(MB)", "Default Size New DataFile(MB)", "Default Size New LogFile(MB)", 
 				"Instnace Max Log Rate MB/s", "Instance Max Worker Threads", "Replica Type", "Max TLog Space/Transaction(KB)", 
-				"Settings Last Changed", "User Workload Max Worker Threads", "User Workload Min Log Rate MB/s", 
+				@{Name = "Settings Last Changed"; Expression = { ($_."Settings Last Changed").ToString("yyyy-MM-dd HH:mm:ss") } }, 
+				"User Workload Max Worker Threads", "User Workload Min Log Rate MB/s", 
 				"User Workload Max Log Rate MB/s", "User Workload Min IOPS", "User Workload Max IOPS", "User Workload Min CPU%", 
 				"User Workload Max CPU%", "User Workload Max Worker Threads2", "User Workload Pool Max IOPS ", 
 				"Max Local Storage(MB)", "Used Local Storage(MB)", "Max Pool Log Rate MB/s", 
 				"primary_group_max_outbound_connection_workers", "primary_pool_max_outbound_connection_workers", 
 				"Replica Role"	| ConvertTo-Html -As Table -Fragment
 
-				$htmlTable1 = $DBInfoTbl | Select-Object "Database", "Service Objective", "Created", "Database State", 
+				$htmlTable1 = $DBInfoTbl | Select-Object "Database", "Service Objective", 
+				@{Name = "Created"; Expression = { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") } },
+				"Database State", 
 				"Data Files", "Data Files Size GB", "Log Files", "LogFilesSizeGB", "VirtualLogFiles", "FILESTREAM Containers", 
 				"FS Containers Size GB", "Database Size GB", "Database MaxSize GB", "Current Log Reuse Wait", 
 				"Compatibility Level", "Page Verify", "Containment", "Collation", "Snapshot Isolation State", 
 				"Read Committed Snapshot On", "Recovery Model", "AutoClose On", "AutoShrink On", "QueryStore On", 
 				"Trustworthy On" | ConvertTo-Html -As Table -Fragment
 
-				$htmlTable2 = $RsrcUsageTbl | Select-Object "Sample Start", "Sample End", "Sample(Minutes)",
+				$htmlTable2 = $RsrcUsageTbl | Select-Object 
+				@{Name = "Sample Start"; Expression = { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") } }, 
+				@{Name = "Sample End"; Expression = { ($_."Sample End").ToString("yyyy-MM-dd HH:mm:ss") } }, 
+				"Sample(Minutes)",
 				"Avg CPU Usage %", "Max CPU Usage %", "Avg Data IO %", "Max Data IO %", "Avg Log Write Usage %",
 				"Max Log Write Usage %", "Avg Memory Usage %", "Max Memory Usage %" | ConvertTo-Html -As Table -Fragment
 
-				$htmlTable3 = $Top10WaitsTbl | Select-Object "Sample Start", "Sample End", "Sample(Hours)", "Wait Type", "Wait Count", "Wait %",
+				$htmlTable3 = $Top10WaitsTbl | Select-Object 
+				@{Name = "Sample Start"; Expression = { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") } }, 
+				@{Name = "Sample End"; Expression = { ($_."Sample End").ToString("yyyy-MM-dd HH:mm:ss") } },
+				"Sample(Hours)", "Wait Type", "Wait Count", "Wait %",
 				"Total Wait Time(Sec)", "Avg Wait Time(Sec)", "Total Resource Time(Sec)", "Avg Resource Time(Sec)",
 				"Total Signal Time(Sec)", "Avg Signal Time(Sec)", "URL" | ConvertTo-Html -As Table -Fragment
 
+				$htmlTable4 = $DBFileInfoTbl | Select-Object "Database", "FileID", "File Logical Name", "File Physical Name",
+				"File Type", "State", "SizeGB", "Available SpaceGB", "Max File SizeGB", "Growth Increment" | ConvertTo-Html -As Table -Fragment
+
+				if($ObjImpUpgrTbl.Rows.Count -gt 0){
+					$htmlTable5 = $ObjImpUpgrTbl | Select-Objects "Object Type", "Object Name", "Index Name", "Dependency" | ConvertTo-Html -As Table -Fragment
+				} else {
+					$htmlTable5 = '<p style="text-align: center;">No matching objects found</p>'
+				}			
+
+				$htmlTable6 = $DBConfig | Select-Object "Config Name", "Value", "IsDefault"
+
+				$html = $HTMLPre + @"
+<title>$tableName</title>
+</head>
+<body>
+<h1 id="top" style="text-align: center;">$tableName</h1>
+<h2 style="text-align: center;">Azure SQL DB Resource Governance</h1>
+$htmlTable
+<p style="text-align: center;"><a href="#top">Jump to top</a></p>
+<br>
+<h2 style="text-align: center;">Database Overview</h2>
+$htmlTable1
+<p style="text-align: center;"><a href="#top">Jump to top</a></p>
+<br>
+<h2 style="text-align: center;">Resource Usage</h2>
+$htmlTable2
+<p style="text-align: center;"><a href="#top">Jump to top</a></p>
+<br>
+<h2 style="text-align: center;">Top 10 Waits Since Last Startup</h2>
+$htmlTable3
+<p style="text-align: center;"><a href="#top">Jump to top</a></p>
+<br>
+<h2 style="text-align: center;">Database Files Info</h2>
+$htmlTable4
+<p style="text-align: center;"><a href="#top">Jump to top</a></p>
+<br>
+<h2 style="text-align: center;">Objects Impacted by a Major Release Upgrade of Azure SQL DB</h2>
+$htmlTable5
+<p style="text-align: center;"><a href="#top">Jump to top</a></p>
+<br>
+<h2 style="text-align: center;">Database Scoped Configuration</h2>
+$htmlTable6
+<p style="text-align: center;"><a href="#top">Jump to top</a></p>
+</body>
+</html>
+"@
+				if ($DebugInfo) {
+					Write-Host " ->Writing HTML file." -fore yellow
+				} 
+				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\AzureSQLDBInfo.html"
 
 
+
+			}
+			else {
+				Write-Host "Excel goes here"
 			}
 		}
 
