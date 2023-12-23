@@ -56,6 +56,7 @@
     GetDbInfo.sql
     GetBlitzWhoData.sql
     GetInstanceInfo.sql
+	GetAzureSQLDBInfo.sql
     GetTempDBUsageInfo.sql
 	GetStatsInfoForWholeDB.sql
 	GetIndexInfoForWholeDB.sql
@@ -187,6 +188,10 @@
  Run it against the whole instance, with default checks via SQL login and password
 
 .EXAMPLE
+ PS>.\PSBlitz.ps1 yourserver.database.windows.net,1433:YourDatabase -SQLLogin DBA1 -SQLPass SuperSecurePassword
+ Run it against the YourDatabase database hosted in Azure SQL DB at myserver.database.windows.net port 1433 via SQL login and password
+
+.EXAMPLE
   PS>.\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
   Run it against a default instance residing on Server02, with in-depth checks via SQL login and password, 
  while limmiting sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only
@@ -255,7 +260,7 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"GetBlitzWhoData.sql", "GetInstanceInfo.sql",
 	"GetTempDBUsageInfo.sql", "GetOpenTransactions.sql",
 	"GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql",
-	"GetDbInfo.sql",
+	"GetDbInfo.sql", "GetAzureSQLDBInfo.sql",
 	"spBlitzQueryStore_NonSPLatest.sql")
 #Set path+name of the input Excel file
 $OrigExcelF = $ResourcesPath + "\" + $OrigExcelFName
@@ -386,6 +391,8 @@ YourDatabase only, via integrated security"
 	Write-Host ".\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y -CheckDB YourDatabase" -fore green
 	Write-Host "`n Run it against the whole instance, with default checks via SQL login and password"
 	Write-Host ".\PSBlitz.ps1 Server01\SQL01 -SQLLogin DBA1 -SQLPass SuperSecurePassword" -fore green
+	Write-Host "`n Run it against the YourDatabase database hosted in Azure SQL DB at myserver.database.windows.net port 1433 via SQL login and password"
+	Write-Host "\PSBlitz.ps1 yourserver.database.windows.net,1433:YourDatabase -SQLLogin DBA1 -SQLPass SuperSecurePassword"
 	Write-Host "`n Or you can run it in interactive mode by just right-clicking on the PSBlitz.ps1 file 
 -> 'Run with PowerShell', and the script will prompt you for input.
 `n######	What it runs	######
@@ -6067,6 +6074,12 @@ finally {
 				else {
 					$Description += "all databases on the instance."
 				}
+			
+				$AdditionalInfo = ""
+			}
+			elseif ($File.Name -like "AzureSQLDBInfo*") {
+				$QuerySource = "sys.dm_user_db_resource_governance, sys.database_files, sys.dm_db_resource_stats, sys.dm_db_wait_stats, sys.databases, database_scoped_configurations, sys.dm_db_objects_impacted_on_version_change"
+				$Description = "Azure SQL DB resources, resource usage, database, and database configuration for $ASDBName"
 			
 				$AdditionalInfo = ""
 			}
