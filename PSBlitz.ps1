@@ -2195,15 +2195,13 @@ $htmlTable3
 				"Read Committed Snapshot On", "Recovery Model", "AutoClose On", "AutoShrink On", "QueryStore On", 
 				"Trustworthy On" | ConvertTo-Html -As Table -Fragment
 
-				$htmlTable2 = $RsrcUsageTbl | Select-Object 
-				@{Name = "Sample Start"; Expression = { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") } }, 
+				$htmlTable2 = $RsrcUsageTbl | Select-Object @{Name = "Sample Start"; Expression = { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") } }, 
 				@{Name = "Sample End"; Expression = { ($_."Sample End").ToString("yyyy-MM-dd HH:mm:ss") } }, 
 				"Sample(Minutes)",
 				"Avg CPU Usage %", "Max CPU Usage %", "Avg Data IO %", "Max Data IO %", "Avg Log Write Usage %",
 				"Max Log Write Usage %", "Avg Memory Usage %", "Max Memory Usage %" | ConvertTo-Html -As Table -Fragment
 
-				$htmlTable3 = $Top10WaitsTbl | Select-Object 
-				@{Name = "Sample Start"; Expression = { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") } }, 
+				$htmlTable3 = $Top10WaitsTbl | Select-Object @{Name = "Sample Start"; Expression = { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") } }, 
 				@{Name = "Sample End"; Expression = { ($_."Sample End").ToString("yyyy-MM-dd HH:mm:ss") } },
 				"Sample(Hours)", "Wait Type", "Wait Count", "Wait %",
 				"Total Wait Time(Sec)", "Avg Wait Time(Sec)", "Total Resource Time(Sec)", "Avg Resource Time(Sec)",
@@ -2218,7 +2216,7 @@ $htmlTable3
 					$htmlTable5 = '<p style="text-align: center;">No matching objects found</p>'
 				}			
 
-				$htmlTable6 = $DBConfig | Select-Object "Config Name", "Value", "IsDefault"
+				$htmlTable6 = $DBConfig | Select-Object "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
 
 				$html = $HTMLPre + @"
 <title>$tableName</title>
@@ -3091,7 +3089,7 @@ $htmlTable
 			}
 
 			##Add database names to array
-			if ([string]::IsNullOrEmpty($CheckDB)) {
+			if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
 				foreach ($row in $BlitzCacheTbl."Database") {
 					if ($row -ne [System.DBNull]::Value) {
 						$DBArray.Add($row) | Out-Null
