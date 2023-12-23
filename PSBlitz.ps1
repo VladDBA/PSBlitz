@@ -2187,8 +2187,7 @@ $htmlTable3
 				"Replica Role"	| ConvertTo-Html -As Table -Fragment
 
 				$htmlTable1 = $DBInfoTbl | Select-Object "Database", "Service Objective", 
-				@{Name = "Created"; Expression = { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") } },
-				"Database State", 
+				@{Name = "Created"; Expression = { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") } }, "Database State", 
 				"Data Files", "Data Files Size GB", "Log Files", "LogFilesSizeGB", "VirtualLogFiles", "FILESTREAM Containers", 
 				"FS Containers Size GB", "Database Size GB", "Database MaxSize GB", "Current Log Reuse Wait", 
 				"Compatibility Level", "Page Verify", "Containment", "Collation", "Snapshot Isolation State", 
@@ -2197,8 +2196,7 @@ $htmlTable3
 
 				$htmlTable2 = $RsrcUsageTbl | Select-Object @{Name = "Sample Start"; Expression = { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") } }, 
 				@{Name = "Sample End"; Expression = { ($_."Sample End").ToString("yyyy-MM-dd HH:mm:ss") } }, 
-				"Sample(Minutes)",
-				"Avg CPU Usage %", "Max CPU Usage %", "Avg Data IO %", "Max Data IO %", "Avg Log Write Usage %",
+				"Sample(Minutes)", 	"Avg CPU Usage %", "Max CPU Usage %", "Avg Data IO %", "Max Data IO %", "Avg Log Write Usage %",
 				"Max Log Write Usage %", "Avg Memory Usage %", "Max Memory Usage %" | ConvertTo-Html -As Table -Fragment
 
 				$htmlTable3 = $Top10WaitsTbl | Select-Object @{Name = "Sample Start"; Expression = { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") } }, 
@@ -2206,6 +2204,7 @@ $htmlTable3
 				"Sample(Hours)", "Wait Type", "Wait Count", "Wait %",
 				"Total Wait Time(Sec)", "Avg Wait Time(Sec)", "Total Resource Time(Sec)", "Avg Resource Time(Sec)",
 				"Total Signal Time(Sec)", "Avg Signal Time(Sec)", "URL" | ConvertTo-Html -As Table -Fragment
+				$htmlTable3 = $htmlTable3 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
 
 				$htmlTable4 = $DBFileInfoTbl | Select-Object "Database", "FileID", "File Logical Name", "File Physical Name",
 				"File Type", "State", "SizeGB", "Available SpaceGB", "Max File SizeGB", "Growth Increment" | ConvertTo-Html -As Table -Fragment
