@@ -2303,10 +2303,11 @@ $htmlTable6
 				#>
 					foreach ($col in $DataSetCols) {
 						#Fill Excel cell with value from the data set
-						if($col -eq "Settings Last Changed"){
+						if ($col -eq "Settings Last Changed") {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcGovTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-						} else{
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcGovTbl.Rows[$RowNum][$col]
+						}
+						else {
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcGovTbl.Rows[$RowNum][$col]
 						}
 					
 						#move to the next column
@@ -2349,10 +2350,11 @@ $htmlTable6
 				#>
 					foreach ($col in $DataSetCols) {
 						#Fill Excel cell with value from the data set
-						if($col -eq "Created"){
+						if ($col -eq "Created") {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-						} else{
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
+						}
+						else {
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
 						}
 					
 						#move to the next column
@@ -2392,10 +2394,11 @@ $htmlTable6
 				#>
 					foreach ($col in $DataSetCols) {
 						#Fill Excel cell with value from the data set
-						if("Sample Start", "Sample End" -contains $col){
+						if ("Sample Start", "Sample End" -contains $col) {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcUsageTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-						} else{
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcUsageTbl.Rows[$RowNum][$col]
+						}
+						else {
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcUsageTbl.Rows[$RowNum][$col]
 						}
 					
 						#move to the next column
@@ -2435,7 +2438,7 @@ $htmlTable6
 				#>
 					foreach ($col in $DataSetCols) {
 						#Fill Excel cell with value from the data set
-						if("Sample Start", "Sample End" -contains $col){
+						if ("Sample Start", "Sample End" -contains $col) {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $Top10WaitsTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
 						}
 						elseif ($col -eq "URL") {
@@ -2474,7 +2477,7 @@ $htmlTable6
 
 				#List of columns that should be returned from the data set
 				$DataSetCols = @("Database", "FileID", "File Logical Name", "File Physical Name",
-				"File Type", "State", "SizeGB", "Available SpaceGB", "Max File SizeGB", "Growth Increment")
+					"File Type", "State", "SizeGB", "Available SpaceGB", "Max File SizeGB", "Growth Increment")
 				if ($DebugInfo) {
 					Write-Host " ->Writing Database Files Info results to Excel" -fore yellow
 				}
@@ -2680,7 +2683,7 @@ $htmlTable6
 				"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn" | ConvertTo-Html -As Table -Fragment
 
 				$htmlTable1 = $DBFileInfoTbl | Select-Object  "Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
-				"AvailableSpaceGB","MaxFileSizeGB", "GrowthIncrement" | ConvertTo-Html -As Table -Fragment
+				"AvailableSpaceGB", "MaxFileSizeGB", "GrowthIncrement" | ConvertTo-Html -As Table -Fragment
 
 				$html = $HTMLPre + @"
 <title>$tableName</title>
@@ -2743,7 +2746,7 @@ $htmlTable1
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = 3
 				#Specify with which column in the sheet to start
-				$ExcelColNum = 11
+				$ExcelColNum = 12
 				#Set counter used for row retrieval
 				$RowNum = 0
 
@@ -2764,10 +2767,11 @@ $htmlTable1
 				#>
 					foreach ($col in $DataSetCols) {
 						#Fill Excel cell with value from the data set
-						if($col -eq "Created"){
+						if ($col -eq "Created") {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-						} else{
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
+						}
+						else {
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
 						}
 					
 						#move to the next column
@@ -2777,8 +2781,8 @@ $htmlTable1
 					$ExcelStartRow += 1
 					#move to the next row in the data set
 					$RowNum += 1
-					# reset Excel column number so that next row population begins with column 11
-					$ExcelColNum = 11
+					# reset Excel column number so that next row population begins with column 12
+					$ExcelColNum = 12
 				}
 
 				##Saving file 
@@ -5749,12 +5753,49 @@ finally {
 				#$ExcelSheet.Visible = $false
 				$ExcelSheet.Delete()
 			}
+			if ($IsAzureSQLDB) {
+				#Delete the "Database Info" and sp_Blitz rows in the Intro sheet
+				$ExcelSheet = $ExcelFile.Worksheets.Item("Intro")
+				$ExcelSheet.Cells.Item(11, 1).EntireRow.Delete()
+				$ExcelSheet.Cells.Item(12, 1).EntireRow.Delete()
+				$DeleteSheets = @("Database Info ", "sp_Blitz")
+				foreach ($SheetName in $DeleteSheets) {
+					$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
+					$ExcelSheet.Delete()
+				}
+			}
+			else {
+				#delete the Azure SQL DB Info row
+				$ExcelSheet = $ExcelFile.Worksheets.Item("Intro")
+				$ExcelSheet.Cells.Item(10, 1).EntireRow.Delete()
+				$ExcelSheet = $ExcelFile.Worksheets.Item("Azure SQL DB Info")
+				$ExcelSheet.Delete()
+			}
 		}
 		else {
 			#Delete unused sheet (yes, this sheet has a space in its name)
 			$DeleteSheets = @("Intro ", "sp_BlitzIndex 0")
 			foreach ($SheetName in $DeleteSheets) {
 				$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
+				$ExcelSheet.Delete()
+			}
+
+			if ($IsAzureSQLDB) {
+				#Delete the "Database Info" and sp_Blitz rows in the Intro sheet
+				$ExcelSheet = $ExcelFile.Worksheets.Item("Intro")
+				$ExcelSheet.Cells.Item(11, 1).EntireRow.Delete()
+				$ExcelSheet.Cells.Item(12, 1).EntireRow.Delete()
+				$DeleteSheets = @("Database Info ", "sp_Blitz")
+				foreach ($SheetName in $DeleteSheets) {
+					$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
+					$ExcelSheet.Delete()
+				}
+			}
+			else {
+				#delete the Azure SQL DB Info row
+				$ExcelSheet = $ExcelFile.Worksheets.Item("Intro")
+				$ExcelSheet.Cells.Item(10, 1).EntireRow.Delete()
+				$ExcelSheet = $ExcelFile.Worksheets.Item("Azure SQL DB Info")
 				$ExcelSheet.Delete()
 			}
 

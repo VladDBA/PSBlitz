@@ -60,12 +60,12 @@ DECLARE
 
 
 /* Everything from here down is straight out of sp_BlitzWho without 
-the GO at the end  and without the block that creates the view at line 346*/
+the GO at the end  and without the block that creates the view at line 351*/
 	SET NOCOUNT ON;
 	SET STATISTICS XML OFF;
 	SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 	
-	SELECT @Version = '8.17', @VersionDate = '20231010';
+	SELECT @Version = '8.18', @VersionDate = '20231222';
     
 	IF(@VersionCheckMode = 1)
 	BEGIN
