@@ -1256,7 +1256,7 @@ $LogTbl.Columns.Add("ErrorMsg", [string]) | Out-Null
 $StepStart = get-date
 $StepEnd = Get-Date
 $ParametersUsed = "IsIndepth:$IsIndepth; CheckDB:$CheckDB; BlitzWhoDelay:$BlitzWhoDelay; MaxTimeout:$MaxTimeout"
-$ParametersUsed += "; ConnTimeout:$ConnTimeout; CacheTop:$CacheTop"
+$ParametersUsed += "; ConnTimeout:$ConnTimeout; CacheTop:$CacheTop; ASDBName:$ASDBName"
 Add-LogRow "Check start" "Started" $ParametersUsed
 try {
 	###Set completion flag
@@ -1270,7 +1270,13 @@ try {
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		Write-Host " database-specific" -NoNewLine
 	}
-	Write-Host " check for $ServerName" 
+	Write-Host " check for " -NoNewLine 
+	if ($IsAzureSQLDB) {
+		Write-Host "Azure SQL DB - $ASDBName"
+	}
+	else {
+		Write-Host "$ServerName"
+	}
 	Write-Host $("-" * 80)
 
 	if (($DebugInfo) -and ($MaxTimeout -ne 1000)) {
@@ -1926,6 +1932,9 @@ $htmlTable2
 		[string]$Query = $Query -replace "SET @DatabaseName = N'';", "SET @DatabaseName = N'$CheckDB';"
 		Write-Host " for $CheckDB" -NoNewline
 	}
+	elseif ($IsAzureSQLDB) {
+		Write-Host " for $ASDBName" -NoNewline
+	}
 	Write-Host "... " -NoNewline
 	$CmdTimeout = 600
 	$AcTranQuery = new-object System.Data.SqlClient.SqlCommand
@@ -1990,6 +1999,9 @@ $htmlTable2
 				$tableName = "Open transaction info"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$tableName += " for $CheckDB" 
+				}
+				elseif ($IsAzureSQLDB) {
+					$tableName += " for $ASDBName"
 				}
 				if ($DebugInfo) {
 					Write-Host " ->Converting active transaction info to HTML" -fore yellow
@@ -3581,6 +3593,9 @@ $htmlTable
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$HtmlTabName += " for $CheckDB" 
 					}
+					elseif ($IsAzureSQLDB) {
+						$HtmlTabName += " for $ASDBName"
+					}
 					$HtmlFileName = $SheetName -replace " & ", "_"
 					$HtmlFileName = $HtmlFileName -replace " ", "_"
 					$HtmlFileName = "BlitzCache_$HtmlFileName.html"
@@ -4148,7 +4163,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
 					$htmlTable3 = $htmlTable3 -replace $AnchorRegex, $AnchorURL
 
-					$HtmlTabName = "sp_BlitzQueryStore results for $CheckDB"
+					if ($IsAzureSQLDB) {
+						$HtmlTabName = "sp_BlitzQueryStore results for $ASDBName"
+					}
+					else {
+						$HtmlTabName = "sp_BlitzQueryStore results for $CheckDB"
+					}
 					$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
 					</head>
@@ -4389,6 +4409,9 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				}
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$HtmlTabName += " for $CheckDB" 
+				}
+				elseif ($IsAzureSQLDB) {
+					$HtmlTabName += " for $ASDBName"
 				}
 		
 		
@@ -4707,6 +4730,9 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$HtmlTabName = "Deadlocks"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$HtmlTabName += " for $CheckDB" 
+				}
+				elseif ($IsAzureSQLDB) {
+					$HtmlTabName += " for $ASDBName"
 				}
 				$htmlTable1 = $TblLockOver | Select-Object @{Name = "Database"; Expression = { $_."database_name" } }, 
 				@{Name = "Object"; Expression = { $_."object_name" } }, 
@@ -5442,6 +5468,22 @@ finally {
 			Add-LogRow "->Return sp_BlitzWho" $StepOutcome
 		}
 		else {
+
+			##Add plan file column 
+			$BlitzWhoAggTbl.Columns.Add("sqlplan_file", [string]) | Out-Null
+			$RowNum = 0
+			$i = 0
+			
+			foreach ($row in $BlitzWhoAggTbl) {
+				if ($BlitzWhoAggTbl.Rows[$RowNum]["query_plan"] -ne [System.DBNull]::Value) {
+					$i += 1
+					$SQLPlanFile = "RunningNow_" + $i + ".sqlplan"
+					
+				}
+				else { $SQLPlanFile = "-- N/A --" }
+				$BlitzWhoAggTbl.Rows[$RowNum]["sqlplan_file"] = $SQLPlanFile
+				$RowNum += 1
+			}
 			##Exporting execution plans to file
 			#Set counter used for row retrieval
 			[int]$RowNum = 0
@@ -5472,7 +5514,11 @@ finally {
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$HtmlTabName += " for $CheckDB" 
 				}
+				elseif ($IsAzureSQLDB) {
+					$HtmlTabName += " for $ASDBName"
+				}
 				$htmlTable = $BlitzWhoTbl | Select-Object @{Name = "CheckDate"; Expression = { ($_."CheckDate").ToString("yyyy-MM-dd HH:mm:ss") } }, 
+				@{Name = "start_time"; Expression = { ($_."start_time").ToString("yyyy-MM-dd HH:mm:ss") } },
 				"elapsed_time", 
 				"session_id", "database_name", 
 				#"query_text", 
@@ -5497,7 +5543,7 @@ finally {
 				"total_memory_kb", "available_memory_kb", "granted_memory_kb",
 				"query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
 				"timeout_error_count", "forced_grant_count", "workload_group_name",
-				"resource_pool_name", "context_info" | ConvertTo-Html -As Table -Fragment
+				"resource_pool_name", @{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } } | ConvertTo-Html -As Table -Fragment
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
 				</head>
@@ -5537,6 +5583,9 @@ finally {
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$HtmlTabName += " for $CheckDB" 
 				}
+				elseif ($IsAzureSQLDB) {
+					$HtmlTabName += " for $ASDBName"
+				}
 				$htmlTable = $BlitzWhoAggTbl | Select-Object @{Name = "start_time"; Expression = { ($_."start_time").ToString("yyyy-MM-dd HH:mm:ss") } }, 
 				"elapsed_time", "session_id", "database_name", 
 				#"query_text", 
@@ -5563,7 +5612,7 @@ finally {
 				"total_memory_kb", "available_memory_kb", "granted_memory_kb",
 				"query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
 				"timeout_error_count", "forced_grant_count", "workload_group_name",
-				"resource_pool_name", "context_info", 
+				"resource_pool_name", 
 				@{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } },
 				@{Name = "query_plan_hash"; Expression = { Get-HexString -HexInput $_."query_plan_hash" } } | ConvertTo-Html -As Table -Fragment
 				$QExt = '.query'
@@ -5572,7 +5621,7 @@ finally {
 				$AnchorURL = '<a href="#$&">$&</a>'
 				$htmlTable = $htmlTable -replace $AnchorRegex, $AnchorURL
 
-				$htmlTable1 = $BlitzWhoAggTbl | Select-Object "Query", 
+				$htmlTable1 = $BlitzWhoAggTbl | Select-Object "Query", @{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } },
 				"query_text" | Where-Object { $_."query_text" -ne [System.DBNull]::Value } | ConvertTo-Html -As Table -Fragment
 				$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
 				$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
@@ -5615,8 +5664,8 @@ finally {
 				$RowNum = 0
 
 				#List of columns that should be returned from the data set
-				$DataSetCols = @("CheckDate", "elapsed_time", "session_id", "database_name", 
-					"query_text", "query_cost", "sqlplan_file", "status", 
+				$DataSetCols = @("CheckDate", "start_time", "elapsed_time", "session_id", "database_name", 
+					"query_text", "query_cost", "query_hash", "status", 
 					"cached_parameter_info", "wait_info", "top_session_waits",
 					"blocking_session_id", "open_transaction_count", "is_implicit_transaction",
 					"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
@@ -5633,7 +5682,7 @@ finally {
 					"total_memory_kb", "available_memory_kb", "granted_memory_kb",
 					"query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
 					"timeout_error_count", "forced_grant_count", "workload_group_name",
-					"resource_pool_name", "context_info")
+					"resource_pool_name")
 
 				if ($DebugInfo) {
 					Write-Host " ->Writing sp_BlitzWho results to Excel" -fore yellow
@@ -5646,8 +5695,11 @@ finally {
 			#>
 					foreach ($col in $DataSetCols) {
 						#Fill Excel cell with value from the data set
-						if ($col -eq "CheckDate") {
+						if ("CheckDate", "start_time" -contains $col) {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+						}
+						elseif ("query_hash", "query_plan_hash" -Contains $col) {
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $BlitzWhoTbl.Rows[$RowNum][$col]
 						}
 						else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoTbl.Rows[$RowNum][$col]
@@ -5692,7 +5744,7 @@ finally {
 					"total_memory_kb", "available_memory_kb", "granted_memory_kb",
 					"query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
 					"timeout_error_count", "forced_grant_count", "workload_group_name",
-					"resource_pool_name", "context_info", "query_hash", "query_plan_hash")
+					"resource_pool_name", "query_hash", "query_plan_hash")
 
 				if ($DebugInfo) {
 					Write-Host " ->Writing sp_BlitzWho aggregate results to Excel" -fore yellow
@@ -6033,6 +6085,9 @@ finally {
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$Description += " for $CheckDB."
 					}
+					elseif ($IsAzureSQLDB) {
+						$Description += " for $ASDBName"
+					}
 					else {
 						$Description += "."
 					}
@@ -6046,7 +6101,10 @@ finally {
 						$QuerySource += "; "
 					}
 					$Description = "Contains the top $CacheTop queries sorted by $SortOrder and Average $SortOrder"
-					if (!([string]::IsNullOrEmpty($CheckDB))) {
+					if ($IsAzureSQLDB) {
+						$Description += " for $ASDBName."
+					}
+					elseif (!([string]::IsNullOrEmpty($CheckDB))) {
 						$Description += " for $CheckDB."
 					}
 					else {
@@ -6088,12 +6146,24 @@ finally {
 			}
 			elseif ($File.Name -like "StatsInfo*") {
 				$QuerySource = "sys.stats, sys.dm_db_stats_properties, dm_db_incremental_stats_properties"
-				$Description = "Statistics information for $CheckDB."
+				$Description = "Statistics information for "
+				if ($IsAzureSQLDB) {
+					$Description += "$ASDBName."
+				}
+				else {
+					$Description += "$CheckDB."
+				}
 				$AdditionalInfo = "Retrieves info for tables with at least 10k records"
 			}
 			elseif ($File.Name -like "IndexFragInfo*") {
 				$QuerySource = "dm_db_index_physical_stats"
-				$Description = "Index fragmentation information for $CheckDB."
+				$Description = "Index fragmentation information for "
+				if ($IsAzureSQLDB) {
+					$Description += "$ASDBName."
+				}
+				else {
+					$Description += "$CheckDB."
+				}
 				$AdditionalInfo = "Retrieves info for tables containing at least 52k pages (~400MB)"
 			}
 			elseif ($File.Name -like "BlitzLock*") {
@@ -6125,7 +6195,12 @@ finally {
 				$AdditionalInfo = ""
 			}
 			elseif ($File.Name -like "BlitzQueryStore*") {
-				$QuerySource = "sp_BlitzQueryStore @DatabaseName = '$CheckDB'"
+				if ($IsAzureSQLDB) {
+					$QuerySource = "sp_BlitzQueryStore;"
+				}
+				else {
+					$QuerySource = "sp_BlitzQueryStore @DatabaseName = '$CheckDB'"
+				}
 				$Description = "Data collected by the query store for the past 7 days"
 				$AdditionalInfo = ""
 			}
