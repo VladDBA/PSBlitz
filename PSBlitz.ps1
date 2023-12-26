@@ -1037,42 +1037,38 @@ if ((!([string]::IsNullOrEmpty($OutputDir))) -and (Test-Path $OutputDir)) {
 	if ($OutputDir -notlike "*\") {
 		$OutputDir = $OutputDir + "\"
 	}
-	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		if ($HostName -ne $InstName) {
-			$OutDir = $OutputDir + $HostName + "_" + $InstName + "_" + $CheckDB + "_" + $DirDate
-		}
-		else {
-			$OutDir = $OutputDir + $InstName + "_" + $CheckDB + "_" + $DirDate
-		}
+	$OutDir = $OutputDir
+	if ($IsAzureSQLDB) {
+		$OutDir += "AzureSQLDB_$ASDBName" + "_"
+	}
+	elseif ($HostName -ne $InstName) {
+		$OutDir += $HostName + "_" + $InstName + "_"
 	}
 	else {
-		if ($HostName -ne $InstName) {
-			$OutDir = $OutputDir + $HostName + "_" + $InstName + "_" + $DirDate
-		}
-		else {
-			$OutDir = $OutputDir + $InstName + "_" + $DirDate
-		}
+		$OutDir += $InstName + "_"
 	}
+	if (!([string]::IsNullOrEmpty($CheckDB))) {
+		$OutDir += $CheckDB + "_"
+	}
+	$OutDir += $DirDate
 }
 else {
-	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		if ($HostName -ne $InstName) {
-			$OutDir = $scriptPath + "\" + $HostName + "_" + $InstName + "_" + $CheckDB + "_" + $DirDate
-		}
-		else {
-			$OutDir = $scriptPath + "\" + $InstName + "_" + $CheckDB + "_" + $DirDate
-		}
+	$OutDir = $scriptPath + "\"
+	if ($IsAzureSQLDB) {
+		$OutDir += "AzureSQLDB_$ASDBName" + "_"
+	}
+ elseif ($HostName -ne $InstName) {
+		$OutDir += $HostName + "_" + $InstName + "_"
 	}
 	else {
-		if ($HostName -ne $InstName) {
-			$OutDir = $scriptPath + "\" + $HostName + "_" + $InstName + "_" + $DirDate
-		}
-		else {
-			$OutDir = $scriptPath + "\" + $InstName + "_" + $DirDate
-		}
+		$OutDir += $InstName + "_"
 	}
+	if (!([string]::IsNullOrEmpty($CheckDB))) {
+		$OutDir += $CheckDB + "_"
+	}
+	$OutDir += $DirDate
 }
-if ($ZipOutput -eq "Y") {
+<#if ($ZipOutput -eq "Y") {
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		if ($HostName -ne $InstName) {
 			$ZipFile = $HostName + "_" + $InstName + "_" + $CheckDB + "_" + $DirDate + ".zip"
@@ -1089,7 +1085,20 @@ if ($ZipOutput -eq "Y") {
 			$ZipFile = $InstName + "_" + $DirDate + ".zip"
 		}
 	}
+}#>
+if ($IsAzureSQLDB) {
+	$ZipFile = "AzureSQLDB_$ASDBName" + "_"
 }
+elseif ($HostName -ne $InstName) {
+	$ZipFile = $HostName + "_" + $InstName + "_" 
+}
+else {
+	$ZipFile = $InstName + "_"
+}
+if (!([string]::IsNullOrEmpty($CheckDB))) {
+	$ZipFile += $CheckDB + "_" 
+}
+$ZipFile += $DirDate + ".zip"
 if ($DebugInfo) {
 	Write-Host " Output directory: $OutDir" -Fore Yellow
 }
@@ -5522,13 +5531,12 @@ finally {
 				"elapsed_time", 
 				"session_id", "database_name", 
 				#"query_text", 
-				"query_cost", "sqlplan_file", "status", 
+				"query_cost", @{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } }, "status", 
 				"cached_parameter_info", "wait_info", "top_session_waits",
 				"blocking_session_id", "open_transaction_count", "is_implicit_transaction",
 				"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
 				"fix_parameter_sniffing", "client_interface_name", 
 				@{Name = "login_time"; Expression = { ($_."login_time").ToString("yyyy-MM-dd HH:mm:ss") } }, 
-				@{Name = "start_time"; Expression = { ($_."start_time").ToString("yyyy-MM-dd HH:mm:ss") } },
 				@{Name = "request_time"; Expression = { ($_."request_time").ToString("yyyy-MM-dd HH:mm:ss") } }, 
 				"request_cpu_time", "request_logical_reads", "request_writes",
 				"request_physical_reads", "session_cpu", "session_logical_reads",
@@ -5543,7 +5551,7 @@ finally {
 				"total_memory_kb", "available_memory_kb", "granted_memory_kb",
 				"query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
 				"timeout_error_count", "forced_grant_count", "workload_group_name",
-				"resource_pool_name", @{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } } | ConvertTo-Html -As Table -Fragment
+				"resource_pool_name" | ConvertTo-Html -As Table -Fragment
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
 				</head>
@@ -5669,7 +5677,7 @@ finally {
 					"cached_parameter_info", "wait_info", "top_session_waits",
 					"blocking_session_id", "open_transaction_count", "is_implicit_transaction",
 					"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
-					"fix_parameter_sniffing", "client_interface_name", "login_time", "start_time",
+					"fix_parameter_sniffing", "client_interface_name", "login_time",
 					"request_time", "request_cpu_time", "request_logical_reads", "request_writes",
 					"request_physical_reads", "session_cpu", "session_logical_reads",
 					"session_physical_reads", "session_writes", "tempdb_allocations_mb", 
@@ -5695,7 +5703,7 @@ finally {
 			#>
 					foreach ($col in $DataSetCols) {
 						#Fill Excel cell with value from the data set
-						if ("CheckDate", "start_time" -contains $col) {
+						if ("CheckDate", "start_time", "login_time", "request_time" -contains $col) {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
 						}
 						elseif ("query_hash", "query_plan_hash" -Contains $col) {
@@ -6059,7 +6067,7 @@ finally {
 				$AdditionalInfo = ""
 				if (($File.Name -like "BlitzIndex_0*") -or ($File.Name -like "BlitzIndex_4*")) {
 					$Description = "Index-related diagnosis outlining high-value missing indexes, duplicate or almost duplicate indexes, indexes with more writes than reads, etc."
-					$AdditionalInfo += "; for SQL Server 2019 - will output execution plans as .sqlplan files"
+					$AdditionalInfo += "For SQL Server 2019 - will output execution plans as .sqlplan files."
 				}
 				elseif ($File.Name -like "BlitzIndex_1*") {
 					$Description = "Summary of database, tables and index sizes and counts."
@@ -6067,14 +6075,13 @@ finally {
 				elseif ($File.Name -like "BlitzIndex_2*") {
 					$Description = "Index usage details."
 				}
-				$AdditionalInfo += "."
 			}
 			elseif ($File.Name -like "BlitzCache*") {
 				$SortOrder = $File.Name.Replace('BlitzCache_', '')
 				$SortOrder = $SortOrder.Replace('.html', '')
 				$AdditionalInfo = "Outputs execution plans as .sqlplan files."
 				if ($SortOrder -eq "Mem_Recent_Comp") {
-					$QuerySource = "sp_BlitzCache @SortOrder = 'memory grant', @Top = $CacheTop/'recent compilations' , @Top = 50;"
+					$QuerySource = "sp_BlitzCache @SortOrder = 'memory grant', @Top = $CacheTop/'recent compilations' , @Top = 50"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
 					}
