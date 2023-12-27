@@ -237,9 +237,9 @@ Otherwise you can navigate in PowerShell to the directory where the script is an
     .\PSBlitz.ps1 Server01\SQL01 -ToHTML Y -ZipOutput Y 
     ```
 12. Run it against the YourDatabase database hosted in Azure SQL DB at myserver.database.windows.net port 1433 via SQL login and password
-   ```PowerSHell
-   .\PSBlitz.ps1 yourserver.database.windows.net,1433:YourDatabase -SQLLogin DBA1 -SQLPass SuperSecurePassword
-   ```
+    ```PowerSHell
+    .\PSBlitz.ps1 yourserver.database.windows.net,1433:YourDatabase -SQLLogin DBA1 -SQLPass SuperSecurePassword
+    ```
 Note that `-ServerName` is a positional parameter, so you don't necessarily have to specify the parameter's name as long as the first thing after the script's name is the instance 
 
 [*Back to top*](#header1)
