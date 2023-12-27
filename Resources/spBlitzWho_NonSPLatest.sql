@@ -33,8 +33,14 @@ DECLARE
 	@ShowSleepingSPIDs  = 0,
 	@ExpertMode = 1,
 	@Debug = 0,
-	@OutputDatabaseName = 'tempdb',
-	@OutputSchemaName = 'dbo',
+	@OutputDatabaseName = CASE WHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure' 
+								AND SERVERPROPERTY('EngineEdition') IN (5, 6)
+								THEN CAST(DB_NAME() AS NVARCHAR(256))
+								ELSE N'tempdb'END,
+	@OutputSchemaName = CASE WHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure'
+								AND SERVERPROPERTY('EngineEdition') IN (5, 6)
+								THEN CAST(SCHEMA_NAME() AS NVARCHAR(256))
+								ELSE N'dbo'END,
 	@OutputTableName = 'BlitzWho_..PSBlitzReplace..',
 	@OutputTableRetentionDays  = 3,
 	@MinElapsedSeconds = 0,
@@ -54,12 +60,12 @@ DECLARE
 
 
 /* Everything from here down is straight out of sp_BlitzWho without 
-the GO at the end  and without the block that creates the view at line 346*/
+the GO at the end  and without the block that creates the view at line 351*/
 	SET NOCOUNT ON;
 	SET STATISTICS XML OFF;
 	SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 	
-	SELECT @Version = '8.17', @VersionDate = '20231010';
+	SELECT @Version = '8.18', @VersionDate = '20231222';
     
 	IF(@VersionCheckMode = 1)
 	BEGIN

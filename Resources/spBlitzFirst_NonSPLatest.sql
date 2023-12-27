@@ -96,7 +96,7 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-SELECT @Version = '8.17', @VersionDate = '20231010';
+SELECT @Version = '8.18', @VersionDate = '20231222';
 
 IF(@VersionCheckMode = 1)
 BEGIN
@@ -314,7 +314,7 @@ BEGIN
     /* What's running right now? This is the first and last result set. */
     IF @SinceStartup = 0 AND @Seconds > 0 AND @ExpertMode = 1 AND @OutputType <> 'NONE' AND @OutputResultSets LIKE N'%BlitzWho_Start%'
     BEGIN
-		/*IF OBJECT_ID('master.dbo.sp_BlitzWho') IS NULL AND OBJECT_ID('dbo.sp_BlitzWho') IS NULL */
+		/*IF OBJECT_ID('master.dbo.sp_BlitzWho') IS NULL AND OBJECT_ID('dbo.sp_BlitzWho') IS NULL*/
 		IF OBJECT_ID('master.dbo.sp_BlitzWhoxyZ0') IS NULL AND OBJECT_ID('dbo.sp_BlitzWhoxyZ') IS NULL /*Vlad - https://github.com/VladDBA/PSBlitz/issues/17*/
 		BEGIN
 			PRINT N'sp_BlitzWho is not installed in the current database_files.  You can get a copy from http://FirstResponderKit.org';
@@ -4972,7 +4972,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
     /* What's running right now? This is the first and last result set. */
     IF @SinceStartup = 0 AND @Seconds > 0 AND @ExpertMode = 1 AND @OutputType <> 'NONE' AND @OutputResultSets LIKE N'%BlitzWho_End%'
     BEGIN
-		/*IF OBJECT_ID('master.dbo.sp_BlitzWho') IS NULL AND OBJECT_ID('dbo.sp_BlitzWho') IS NULL */
+		/*IF OBJECT_ID('master.dbo.sp_BlitzWho') IS NULL AND OBJECT_ID('dbo.sp_BlitzWho') IS NULL*/
 		IF OBJECT_ID('master.dbo.sp_BlitzWhoxyZ0') IS NULL AND OBJECT_ID('dbo.sp_BlitzWhoxyZ') IS NULL /*Vlad - https://github.com/VladDBA/PSBlitz/issues/17*/
 		BEGIN
 			PRINT N'sp_BlitzWho is not installed in the current database_files.  You can get a copy from http://FirstResponderKit.org';
