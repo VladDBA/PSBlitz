@@ -246,7 +246,7 @@ param(
 ###Internal params
 #Version
 $Vers = "4.0.0"
-$VersDate = "20231219"
+$VersDate = "20231227"
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -924,7 +924,8 @@ $SqlConnection.ConnectionString = $ConnString
 [int]$CmdTimeout = 100
 Write-Host "Testing connection to instance $ServerName... " -NoNewLine
 $ConnCheckQuery = new-object System.Data.SqlClient.SqlCommand
-$Query = "SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(50));"
+$Query = "SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(50)) AS [Edition],"
+$Query += "`nCAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'),0) AS TINYINT) AS [MajorVersion];"
 $ConnCheckQuery.CommandText = $Query
 $ConnCheckQuery.Connection = $SqlConnection
 $ConnCheckQuery.CommandTimeout = $CmdTimeout
@@ -954,11 +955,15 @@ Catch {
 	}
 }
 if ($ConnCheckSet.Tables[0].Rows.Count -eq 1) {
+	$ConnChec = New-Object System.Data.DataTable
+	$ConnChec = $ConnCheckSet.Tables[0]
+	[int]$MajorVers = $ConnChec.Rows[0]["MajorVersion"]
 	Write-Host @GreenCheck
 	$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
 	$ConnTest = [Math]::Round($StepRunTime, 3)
 	if ($DebugInfo) {
 		Write-Host " - $ConnTest seconds"
+		Write-Host " Product Major Version - $MajorVers"  -Fore Yellow
 	}
  else {
 		if ($ConnTest -ge 2) {
@@ -1027,12 +1032,6 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 $sdate = get-date
 $DirDate = $sdate.ToString("yyyyMMddHHmm")
 #Set output directory
-#if (!([string]::IsNullOrEmpty($CheckDB))) {
-#	$OutDir = $scriptPath + "\" + $HostName + "_" + $InstName + "_" + $CheckDB + "_" + $DirDate
-#}
-#else {
-#	$OutDir = $scriptPath + "\" + $HostName + "_" + $InstName + "_" + $DirDate
-#}
 if ((!([string]::IsNullOrEmpty($OutputDir))) -and (Test-Path $OutputDir)) {
 	if ($OutputDir -notlike "*\") {
 		$OutputDir = $OutputDir + "\"
@@ -1068,40 +1067,25 @@ else {
 	}
 	$OutDir += $DirDate
 }
-<#if ($ZipOutput -eq "Y") {
+if ($ZipOutput -eq "Y") {
+	if ($IsAzureSQLDB) {
+		$ZipFile = "AzureSQLDB_$ASDBName" + "_"
+	}
+	elseif ($HostName -ne $InstName) {
+		$ZipFile = $HostName + "_" + $InstName + "_" 
+	}
+	else {
+		$ZipFile = $InstName + "_"
+	}
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		if ($HostName -ne $InstName) {
-			$ZipFile = $HostName + "_" + $InstName + "_" + $CheckDB + "_" + $DirDate + ".zip"
-		}
-		else {
-			$ZipFile = $InstName + "_" + $CheckDB + "_" + $DirDate + ".zip"
-		}
+		$ZipFile += $CheckDB + "_" 
 	}
- else {
-		if ($HostName -ne $InstName) {
-			$ZipFile = $HostName + "_" + $InstName + "_" + $DirDate + ".zip"
-		}
-		else {
-			$ZipFile = $InstName + "_" + $DirDate + ".zip"
-		}
+	$ZipFile += $DirDate + ".zip"
+	if ($DebugInfo) {
+		Write-Host " Output directory: $OutDir" -Fore Yellow
 	}
-}#>
-if ($IsAzureSQLDB) {
-	$ZipFile = "AzureSQLDB_$ASDBName" + "_"
 }
-elseif ($HostName -ne $InstName) {
-	$ZipFile = $HostName + "_" + $InstName + "_" 
-}
-else {
-	$ZipFile = $InstName + "_"
-}
-if (!([string]::IsNullOrEmpty($CheckDB))) {
-	$ZipFile += $CheckDB + "_" 
-}
-$ZipFile += $DirDate + ".zip"
-if ($DebugInfo) {
-	Write-Host " Output directory: $OutDir" -Fore Yellow
-}
+
 
 #Check if output directory exists
 if (!(Test-Path $OutDir)) {
@@ -2191,8 +2175,8 @@ $htmlTable3
 			$DBFileInfoTbl = $DBInfoSet.Tables[4]
 			$ObjImpUpgrTbl = New-Object System.Data.DataTable
 			$ObjImpUpgrTbl = $DBInfoSet.Tables[5]
-			$DBConfig = New-Object System.Data.DataTable
-			$DBConfig = $DBInfoSet.Tables[6]
+			$DBConfigTbl = New-Object System.Data.DataTable
+			$DBConfigTbl = $DBInfoSet.Tables[6]
 
 			if ($ToHTML -eq "Y") {
 				$tableName = "Azure SQL Database Info"
@@ -2244,7 +2228,7 @@ $htmlTable3
 					$htmlTable5 = '<p style="text-align: center;">No matching objects found.</p>'
 				}			
 
-				$htmlTable6 = $DBConfig | Select-Object "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
+				$htmlTable6 = $DBConfigTbl | Select-Object "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
 
 				$html = $HTMLPre + @"
 <title>$tableName</title>
@@ -2615,14 +2599,14 @@ $htmlTable6
 					Write-Host " ->Writing Database Scoped Configuration results to Excel" -fore yellow
 				}
 				#Loop through each Excel row
-				foreach ($row in $DBConfig) {
+				foreach ($row in $DBConfigTbl) {
 					<#
 				Loop through each data set column of current row and fill the corresponding 
 				Excel cell
 				#>
 					foreach ($col in $DataSetCols) {
 						#Fill Excel cell with value from the data set
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBConfig.Rows[$RowNum][$col]
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBConfigTbl.Rows[$RowNum][$col]
 											
 						#move to the next column
 						$ExcelColNum += 1
@@ -2643,7 +2627,7 @@ $htmlTable6
 			Remove-Variable -Name RsrcGovTbl
 			Remove-Variable -Name RsrcUsageTbl
 			Remove-Variable -Name ObjImpUpgrTbl
-			Remove-Variable -Name DBConfig
+			Remove-Variable -Name DBConfigTbl
 			Remove-Variable -Name DBInfoSet
 		}
 
@@ -2690,6 +2674,14 @@ $htmlTable6
 			$DBInfoTbl = $DBInfoSet.Tables[0]
 			$DBFileInfoTbl = New-Object System.Data.DataTable
 			$DBFileInfoTbl = $DBInfoSet.Tables[1]
+			if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
+				#the 3rd result set exists only for SQL Server 2016 and above
+				$DBConfigTbl = New-Object System.Data.DataTable
+				$DBConfigTbl = $DBInfoSet.Tables[2]
+			}
+			elseif (($MajorVers -lt 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
+				Add-LogRow "->Database Scoped Config" "Skipped" "Major Version is $MajorVers"
+			}
 
 			if ($ToHTML -eq "Y") {
 				$tableName = "Database Info"
@@ -2706,6 +2698,16 @@ $htmlTable6
 				$htmlTable1 = $DBFileInfoTbl | Select-Object  "Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
 				"AvailableSpaceGB", "MaxFileSizeGB", "GrowthIncrement" | ConvertTo-Html -As Table -Fragment
 
+				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
+					$htmlTable2 = $DBConfigTbl | Select-Object "Database", "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
+					$htmlBlock = "`n<br>`n" + '<h2 style="text-align: center;">Database Scoped Configuration</h2>'
+					$htmlBlock += "`n $htmlTable2 `n"
+					$htmlBlock += '<p style="text-align: center;"><a href="#top">Jump to top</a></p>'
+				}
+				else {
+					$htmlBlock = ""
+				}
+
 				$html = $HTMLPre + @"
 <title>$tableName</title>
 </head>
@@ -2717,6 +2719,7 @@ $htmlTable
 <h2 style="text-align: center;">Database Files Info</h2>
 $htmlTable1
 <p style="text-align: center;"><a href="#top">Jump to top</a></p>
+$htmlBlock
 </body>
 </html>
 "@
@@ -2804,6 +2807,43 @@ $htmlTable1
 					$RowNum += 1
 					# reset Excel column number so that next row population begins with column 12
 					$ExcelColNum = 12
+				}
+
+				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
+					##Populating the DB Scoped Config sheet
+					$ExcelSheet = $ExcelFile.Worksheets.Item("DB Scoped Config")
+					#Specify at which row in the sheet to start adding the data
+					$ExcelStartRow = 2
+					#Specify with which column in the sheet to start
+					$ExcelColNum = 2
+					#Set counter used for row retrieval
+					$RowNum = 0
+
+					#List of columns that should be returned from the data set
+					$DataSetCols = @("Database", "Config Name", "Value", "IsDefault")
+					if ($DebugInfo) {
+						Write-Host " ->Writing Database Scoped Configuration results to Excel" -fore yellow
+					}
+					#Loop through each Excel row
+					foreach ($row in $DBConfigTbl) {
+						<#
+				Loop through each data set column of current row and fill the corresponding 
+				Excel cell
+				#>
+						foreach ($col in $DataSetCols) {
+							#Fill Excel cell with value from the data set
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBConfigTbl.Rows[$RowNum][$col]
+					
+							#move to the next column
+							$ExcelColNum += 1
+						}
+						#move to the next row in the spreadsheet
+						$ExcelStartRow += 1
+						#move to the next row in the data set
+						$RowNum += 1
+						# reset Excel column number so that next row population begins with column 1
+						$ExcelColNum = 2
+					}
 				}
 
 				##Saving file 
@@ -4012,6 +4052,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Write-Host " Running sp_BlitzQueryStore for $ASDBName..." -NoNewline
 			}
 			else {
+				if ($DBSwitched = "Y") {
+					$OldCheckDBStr = ";SET @DatabaseName = NULL;"
+					$NewCheckDBStr = ";SET @DatabaseName = '" + $CheckDB + "';"
+				}
 				Write-Host " Running sp_BlitzQueryStore for $CheckDB..." -NoNewline
 				[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 			}
@@ -4190,11 +4234,11 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					<br>
 					<h2 style="text-align: center;">Summary</h2>
 					$htmlTable2
-					<p><a href="#top">Jump to top</a></p>
+					<p style="text-align: center;"><a href="#top">Jump to top</a></p>
 					<br>
 					<h2 id="Queries" style="text-align: center;">Query text</h2>
 					$htmlTable3
-					<p><a href="#top">Jump to top</a></p>
+					<p style="text-align: center;"><a href="#top">Jump to top</a></p>
 					<<br>
 					</body>
 					</html>
@@ -4612,7 +4656,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		Write-Host " Running sp_BlitzLock for $CheckDB... " -NoNewLine
 	}
  elseif ($IsAzureSQLDB) {
-		Write-Host " Running sp_BlitzCache for $ASDBName"
+		Write-Host " Running sp_BlitzLock for $ASDBName... " -NoNewLine
 	}
  else {
 		Write-Host " Running sp_BlitzLock for all user databases... " -NoNewLine
@@ -5082,36 +5126,47 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		if ($StepOutcome -eq "Success") {
 			$StatsTbl = New-Object System.Data.DataTable
 			$StatsTbl = $StatsSet.Tables[0]
+			[int]$RowsReturned = $StatsTbl.Rows.Count
+			if ($RowsReturned -le 0) {
+				Write-Host " ->No rows returned."
+				Add-LogRow "->Stats Info" "No rows returned"
+			}
+			else {
 
 
-			if ($ToHTML -eq "Y") {
-				if ($DebugInfo) {
-					Write-Host " ->Converting stats info to HTML" -fore yellow
-				}
-				$htmlTable = $StatsTbl | Select-Object @{Name = "Database"; Expression = { $_."database" } },
-				@{Name = "Object Name"; Expression = { $_."object_name" } },
-				@{Name = "Object Type"; Expression = { $_."object_type" } },
-				@{Name = "Stats Name"; Expression = { $_."stats_name" } },
-				@{Name = "Origin"; Expression = { $_."origin" } },
-				@{Name = "Filter Definition"; Expression = { $_."filter_definition" } },
-				@{Name = "Last Updated"; Expression = { ($_."last_updated").ToString("yyyy-MM-dd HH:mm:ss") } },
-				@{Name = "Rows"; Expression = { $_."rows" } },
-				@{Name = "Unfiltered Rows"; Expression = { $_."unfiltered_rows" } },
-				@{Name = "Rows Sampled"; Expression = { $_."rows_sampled" } },
-				@{Name = "Sample %"; Expression = { $_."sample_percent" } },
-				@{Name = "Modifications Count"; Expression = { $_."modification_counter" } },
-				@{Name = "Modified %"; Expression = { $_."modified_percent" } },
-				@{Name = "Steps"; Expression = { $_."steps" } },
-				@{Name = "Incremental"; Expression = { $_."incremental" } },
-				@{Name = "Temporary"; Expression = { $_."temporary" } },
-				@{Name = "With NORECOMPUTE"; Expression = { $_."no_recompute" } },
-				@{Name = "Persisted Sample"; Expression = { $_."persisted_sample" } },
-				@{Name = "Persisted Sample %"; Expression = { $_."persisted_sample_percent" } },
-				@{Name = "Partitioned"; Expression = { $_."partitioned" } },
-				@{Name = "Partition No."; Expression = { $_."partition_number" } },
-				@{Name = "Get Stats Details"; Expression = { $_."get_details" } } | ConvertTo-Html -As Table -Fragment
-				$HtmlTabName = "Statistics info for $CheckDB"
-				$html = $HTMLPre + @"
+				if ($ToHTML -eq "Y") {
+					if ($DebugInfo) {
+						Write-Host " ->Converting stats info to HTML" -fore yellow
+					}
+					$htmlTable = $StatsTbl | Select-Object @{Name = "Database"; Expression = { $_."database" } },
+					@{Name = "Object Name"; Expression = { $_."object_name" } },
+					@{Name = "Object Type"; Expression = { $_."object_type" } },
+					@{Name = "Stats Name"; Expression = { $_."stats_name" } },
+					@{Name = "Origin"; Expression = { $_."origin" } },
+					@{Name = "Filter Definition"; Expression = { $_."filter_definition" } },
+					@{Name = "Last Updated"; Expression = { ($_."last_updated").ToString("yyyy-MM-dd HH:mm:ss") } },
+					@{Name = "Rows"; Expression = { $_."rows" } },
+					@{Name = "Unfiltered Rows"; Expression = { $_."unfiltered_rows" } },
+					@{Name = "Rows Sampled"; Expression = { $_."rows_sampled" } },
+					@{Name = "Sample %"; Expression = { $_."sample_percent" } },
+					@{Name = "Modifications Count"; Expression = { $_."modification_counter" } },
+					@{Name = "Modified %"; Expression = { $_."modified_percent" } },
+					@{Name = "Steps"; Expression = { $_."steps" } },
+					@{Name = "Incremental"; Expression = { $_."incremental" } },
+					@{Name = "Temporary"; Expression = { $_."temporary" } },
+					@{Name = "With NORECOMPUTE"; Expression = { $_."no_recompute" } },
+					@{Name = "Persisted Sample"; Expression = { $_."persisted_sample" } },
+					@{Name = "Persisted Sample %"; Expression = { $_."persisted_sample_percent" } },
+					@{Name = "Partitioned"; Expression = { $_."partitioned" } },
+					@{Name = "Partition No."; Expression = { $_."partition_number" } },
+					@{Name = "Get Stats Details"; Expression = { $_."get_details" } } | ConvertTo-Html -As Table -Fragment
+					if ($IsAzureSQLDB) {
+						$HtmlTabName = "Statistics info for $ASDBName"
+					}
+					else {
+						$HtmlTabName = "Statistics info for $CheckDB"
+					}
+					$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
 				</head>
 				<body>
@@ -5120,52 +5175,59 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				</body>
 				</html>
 "@
-				if ($DebugInfo) {
-					Write-Host " - >Writing HTML file." -fore yellow
-				} 
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\StatsInfo_$CheckDB.html"
-				
-			}
-			else {
-
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Statistics Info")
-				$ExcelStartRow = $DefaultStartRow
-				$ExcelColNum = 1
-				$RowNum = 0
-				$DataSetCols = @("database", "object_name", "object_type", "stats_name", "origin", 
-					"filter_definition", "last_updated", "rows", "unfiltered_rows", 
-					"rows_sampled", "sample_percent", "modification_counter", 
-					"modified_percent", "incremental", "temporary", "no_recompute", "persisted_sample",
-					"persisted_sample_percent", "steps", "partitioned", "partition_number",
-					"get_details")
-
-				if ($DebugInfo) {
-					Write-Host " ->Writing Stats results to sheet Statistics Info" -fore yellow
-				}
-
-				foreach ($row in $StatsTbl) {
-					foreach ($col in $DataSetCols) {
-						if ($col -eq "last_updated") {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StatsTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StatsTbl.Rows[$RowNum][$col]
-						}
-						$ExcelColNum += 1
+					if ($DebugInfo) {
+						Write-Host " - >Writing HTML file." -fore yellow
 					}
-					$ExcelStartRow += 1
-					$RowNum += 1
-					$ExcelColNum = 1
+					if ($IsAzureSQLDB) {
+						$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\StatsInfo_$ASDBName.html"
+					}
+					else {
+						$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\StatsInfo_$CheckDB.html"
+					}
+				
+				
 				}
+				else {
+
+					$ExcelSheet = $ExcelFile.Worksheets.Item("Statistics Info")
+					$ExcelStartRow = $DefaultStartRow
+					$ExcelColNum = 1
+					$RowNum = 0
+					$DataSetCols = @("database", "object_name", "object_type", "stats_name", "origin", 
+						"filter_definition", "last_updated", "rows", "unfiltered_rows", 
+						"rows_sampled", "sample_percent", "modification_counter", 
+						"modified_percent", "incremental", "temporary", "no_recompute", "persisted_sample",
+						"persisted_sample_percent", "steps", "partitioned", "partition_number",
+						"get_details")
+
+					if ($DebugInfo) {
+						Write-Host " ->Writing Stats results to sheet Statistics Info" -fore yellow
+					}
+
+					foreach ($row in $StatsTbl) {
+						foreach ($col in $DataSetCols) {
+							if ($col -eq "last_updated") {
+								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StatsTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+							}
+							else {
+								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StatsTbl.Rows[$RowNum][$col]
+							}
+							$ExcelColNum += 1
+						}
+						$ExcelStartRow += 1
+						$RowNum += 1
+						$ExcelColNum = 1
+					}
 
 
-				##Saving file
-				$ExcelFile.Save()
+					##Saving file
+					$ExcelFile.Save()
+				}
 			}
 			##Cleaning up variables
 			Remove-Variable -Name StatsTbl
 			Remove-Variable -Name StatsSet
-
+		
 		}
 
 		if ($JobStatus -ne "Running") {
@@ -5242,7 +5304,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				[int]$RowsReturned = $IndexTbl.Rows.Count
 				if ($RowsReturned -le 0) {
 					Write-Host " ->No rows returned."
-					Add-LogRow "->Index Frag Info" "Skipped" "No rows returned."
+					Add-LogRow "->Index Frag Info" "No rows returned."
 				}
 				else {
 
@@ -5260,7 +5322,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						@{Name = "Page Count"; Expression = { $_."page_count" } },
 						@{Name = "Size in GB"; Expression = { $_."size_in_GB" } },
 						@{Name = "Record Count"; Expression = { $_."record_count" } } | ConvertTo-Html -As Table -Fragment
-						$HtmlTabName = "Index fragmentation info for $CheckDB"
+						if ($IsAzureSQLDB) {
+							$HtmlTabName = "Index fragmentation info for $ASDBName"
+						}
+						else {
+							$HtmlTabName = "Index fragmentation info for $CheckDB"
+						}
 			
 						$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
@@ -5274,7 +5341,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						if ($DebugInfo) {
 							Write-Host " - >Writing HTML file." -fore yellow
 						} 
-						$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\IndexFragInfo_$CheckDB.html"
+						if ($IsAzureSQLDB) {
+							$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\IndexFragInfo_$ASDBName.html"
+						}
+						else {
+							$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\IndexFragInfo_$CheckDB.html"
+						}
+						
 					}
 					else {
 
@@ -5640,16 +5713,16 @@ finally {
 				</head>
 				<body>
 				<h1 id="top">$HtmlTabName</h1>
-				<p><a href="#Queries">Jump to query text</a></p>
+				<p style="text-align: center;"><a href="#Queries">Jump to query text</a></p>
 				<br>
 				$htmlTable 
-				<p><a href="#top">Jump to top</a></p>
+				<p style="text-align: center;"><a href="#top">Jump to top</a></p>
 				<br>
 				<h1 id="Queries">Query text</h1>
 				<br>
 				$htmlTable1
 				<br>
-				<p><a href="#top">Jump to top</a></p>
+				<p style="text-align: center;"><a href="#top">Jump to top</a></p>
 				<br>
 				</body>
 				</html>
@@ -5815,19 +5888,27 @@ finally {
 			}
 			if ($IsAzureSQLDB) {
 				#Delete the "Database Info" and sp_Blitz rows in the Intro sheet
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Intro")
-				$ExcelSheet.Cells.Item(11, 1).EntireRow.Delete()
-				$ExcelSheet.Cells.Item(12, 1).EntireRow.Delete()
-				$DeleteSheets = @("Database Info ", "sp_Blitz")
+				$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro ")
+				$ExcelSheetUpd.Cells.Item(13, 1).EntireRow.Delete() | Out-Null
+				$ExcelSheetUpd.Cells.Item(12, 1).EntireRow.Delete() | Out-Null
+				$ExcelSheetUpd.Cells.Item(11, 1).EntireRow.Delete() | Out-Null		
+				
+				$DeleteSheets = @("Database Info", "sp_Blitz", "DB Scoped Config")
 				foreach ($SheetName in $DeleteSheets) {
 					$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
 					$ExcelSheet.Delete()
 				}
 			}
-			else {
+			elseif($IsAzureSQLDB -eq $false) {
+				if (($MajorVers -lt 13) -or ([string]::IsNullOrEmpty($CheckDB))) {
+					$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro ")
+					$ExcelSheetUpd.Cells.Item(12, 1).EntireRow.Delete() | Out-Null
+					$ExcelSheet = $ExcelFile.Worksheets.Item("DB Scoped Config")
+					$ExcelSheet.Delete()
+				}
 				#delete the Azure SQL DB Info row
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Intro")
-				$ExcelSheet.Cells.Item(10, 1).EntireRow.Delete()
+				$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro ")
+				$ExcelSheetUpd.Cells.Item(10, 1).EntireRow.Delete() | Out-Null
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Azure SQL DB Info")
 				$ExcelSheet.Delete()
 			}
@@ -5842,26 +5923,33 @@ finally {
 
 			if ($IsAzureSQLDB) {
 				#Delete the "Database Info" and sp_Blitz rows in the Intro sheet
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Intro")
-				$ExcelSheet.Cells.Item(11, 1).EntireRow.Delete()
-				$ExcelSheet.Cells.Item(12, 1).EntireRow.Delete()
-				$DeleteSheets = @("Database Info ", "sp_Blitz")
+				$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro")
+				$ExcelSheetUpd.Cells.Item(13, 1).EntireRow.Delete() | Out-Null
+				$ExcelSheetUpd.Cells.Item(12, 1).EntireRow.Delete() | Out-Null
+				$ExcelSheetUpd.Cells.Item(11, 1).EntireRow.Delete() | Out-Null
+				$DeleteSheets = @("Database Info", "sp_Blitz", "DB Scoped Config")
 				foreach ($SheetName in $DeleteSheets) {
 					$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
 					$ExcelSheet.Delete()
 				}
 			}
-			else {
+			elseif($IsAzureSQLDB -eq $false) {
+				if (($MajorVers -lt 13) -or ([string]::IsNullOrEmpty($CheckDB))) {
+					$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro")
+					$ExcelSheetUpd.Cells.Item(12, 1).EntireRow.Delete() | Out-Null
+					$ExcelSheet = $ExcelFile.Worksheets.Item("DB Scoped Config")
+					$ExcelSheet.Delete()
+				}
 				#delete the Azure SQL DB Info row
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Intro")
-				$ExcelSheet.Cells.Item(10, 1).EntireRow.Delete()
+				$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro")
+				$ExcelSheetUpd.Cells.Item(10, 1).EntireRow.Delete() | Out-Null
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Azure SQL DB Info")
 				$ExcelSheet.Delete()
 			}
 
 		}
 
-		if (([string]::IsNullOrEmpty($CheckDB)) -and ([string]::IsNullOrEmpty($DBName))) {
+		if (([string]::IsNullOrEmpty($CheckDB)) -and ([string]::IsNullOrEmpty($DBName)) -and ($IsAzureSQLDB -eq $false)) {
 			$DeleteSheets = @("Statistics Info", "Index Fragmentation")
 			foreach ($SheetName in $DeleteSheets) {
 				$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
@@ -6185,6 +6273,9 @@ finally {
 			}
 			elseif ($File.Name -like "DatabaseInfo*") {
 				$QuerySource = "sys.databases, sys.master_files, sys.database_files, sys.dm_db_log_info"
+				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
+					$QuerySource += ", sys.database_scoped_configurations"
+				}
 				$Description = "Database info and database files info for "
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$Description += "$CheckDB."
