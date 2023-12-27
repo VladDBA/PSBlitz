@@ -88,6 +88,7 @@ opened transactions, statistics and index fragmentation info:
 - GetDbInfo.sql
 - GetBlitzWhoData.sql
 - GetInstanceInfo.sql
+- GetAzureSQLDBInfo.sql
 - GetTempDBUsageInfo.sql
 - GetOpenTransactions.sql
 - GetIndexInfoForWholeDB.sql
