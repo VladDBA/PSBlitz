@@ -1,6 +1,10 @@
+/*
+	Part of PSBlitz - https://github.com/VladDBA/PSBlitz
+	License - https://github.com/VladDBA/PSBlitz/blob/main/LICENSE
+*/
+
 SET NOCOUNT ON;
 SET STATISTICS XML OFF;
-SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
 /*Create supporting index*/
 CREATE NONCLUSTERED INDEX [IX_AGG]
@@ -14,21 +18,12 @@ SET @DatabaseName = N'';
 
 /*Standard output*/
 SELECT [CheckDate],
+       [start_time],
        [elapsed_time],
        [session_id],
        [database_name],
        [query_text],
        [query_cost],
-       CASE
-         WHEN [query_plan] IS NOT NULL THEN 'RunningNow_'
-                                            + CAST([session_id] AS VARCHAR(5))
-                                            + '_'
-                                            + REPLACE(REPLACE(REPLACE(CONVERT(VARCHAR(19), [start_time], 120), ':', ''), ' ', '_'), '-', '')
-                                            + '_'
-                                            + ISNULL(CONVERT(VARCHAR(20), [query_plan_hash], 1), '0x00')
-                                            + '.sqlplan'
-         ELSE '-- N/A --'
-       END AS [sqlplan_file],
        [status],
        [cached_parameter_info],
        [wait_info],
@@ -44,7 +39,6 @@ SELECT [CheckDate],
        [fix_parameter_sniffing],
        [client_interface_name],
        [login_time],
-       [start_time],
        [request_time],
        [request_cpu_time],
        [request_logical_reads],
@@ -86,7 +80,7 @@ SELECT [CheckDate],
        [forced_grant_count],
        [workload_group_name],
        [resource_pool_name],
-       [context_info]
+	   [query_hash]
 FROM   [tempdb].[dbo].[BlitzWho_..BlitzWhoOut..]
 WHERE  [database_name] = CASE
                            WHEN @DatabaseName = N'' THEN [database_name]
@@ -118,16 +112,6 @@ SELECT [agg].[start_time],
        [who].[outer_command],
        [who].[query_plan],
        [who].[query_cost],
-       CASE
-         WHEN [query_plan] IS NOT NULL THEN 'RunningNow_'
-                                            + CAST([agg].[session_id] AS VARCHAR(5))
-                                            + '_'
-                                            + REPLACE(REPLACE(REPLACE(CONVERT(VARCHAR(19), [agg].[start_time], 120), ':', ''), ' ', '_'), '-', '')
-                                            + '_'
-                                            + ISNULL(CONVERT(VARCHAR(20), [who].[query_plan_hash], 1), '0x00')
-                                            + '.sqlplan'
-         ELSE '-- N/A --'
-       END AS [sqlplan_file],
        [who].[status],
        [who].[cached_parameter_info],
        [who].[wait_info],
@@ -184,7 +168,6 @@ SELECT [agg].[start_time],
        [who].[forced_grant_count],
        [who].[workload_group_name],
        [who].[resource_pool_name],
-       [who].[context_info],
        [agg].[query_hash],
        [who].[query_plan_hash]
 FROM   [tempdb].[dbo].[BlitzWho_..BlitzWhoOut..] [who]

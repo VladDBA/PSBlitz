@@ -29,6 +29,7 @@ Outputs the following to an Excel spreadsheet or to an HTML report:
 - Index-related issues and recommendations - from sp_BlitzIndex
 - Top 10 most resource intensive queries - from sp_BlitzCache
 - Deadlock related information from the past 15 days - from sp_BlitzLock
+- Information about Azure SQL DB resources, resource usage, database and database configuration
 - Information about all databases and their files or for a single database in case of a database-specific check
 - Query Store information in the case of a database-specific check on an eligible database - from sp_BlitzQueryStore
 - Statistics details for a given database - in the case of database-specific check or if a database accounts for at least 2/3 of the sp_BlitzCache data
@@ -87,6 +88,7 @@ opened transactions, statistics and index fragmentation info:
 - GetDbInfo.sql
 - GetBlitzWhoData.sql
 - GetInstanceInfo.sql
+- GetAzureSQLDBInfo.sql
 - GetTempDBUsageInfo.sql
 - GetOpenTransactions.sql
 - GetIndexInfoForWholeDB.sql
@@ -234,6 +236,10 @@ Otherwise you can navigate in PowerShell to the directory where the script is an
 11. Run PSBlitz but return the report as HTML instead of XLSX while also creating a zip archive of the output files.
     ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01 -ToHTML Y -ZipOutput Y 
+    ```
+12. Run it against the YourDatabase database hosted in Azure SQL DB at myserver.database.windows.net port 1433 via SQL login and password
+    ```PowerSHell
+    .\PSBlitz.ps1 yourserver.database.windows.net,1433:YourDatabase -SQLLogin DBA1 -SQLPass SuperSecurePassword
     ```
 Note that `-ServerName` is a positional parameter, so you don't necessarily have to specify the parameter's name as long as the first thing after the script's name is the instance 
 

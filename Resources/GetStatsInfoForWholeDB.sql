@@ -2,7 +2,7 @@
 	Part of PSBlitz - https://github.com/VladDBA/PSBlitz
 	License - https://github.com/VladDBA/PSBlitz/blob/main/LICENSE
 */
-USE [..PSBlitzReplace..];
+
 SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
@@ -44,13 +44,15 @@ N'SELECT DB_NAME() AS [database],'
 + @LineFeed + N'ELSE ''No'' END AS [temporary],'
 + @LineFeed + N'CASE WHEN [stat].[no_recompute] = 1 THEN ''Yes'''
 + @LineFeed + N'ELSE ''No'' END AS [no_recompute],'
-+ CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) >= 15
++ CASE WHEN CAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'),0) AS TINYINT) >= 15
+OR CAST(SERVERPROPERTY('Edition') AS NVARCHAR(50)) = 'SQL Azure'
   THEN @LineFeed + N'CASE WHEN [stat].[has_persisted_sample]  = 1 THEN ''Yes'''
   + @LineFeed + N'ELSE ''No'' END AS [persisted_sample],'
   ELSE @LineFeed + N'''only available for 2019 and above'' AS [persisted_sample],'
 END
-+ CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) >= 13 THEN 
-  @LineFeed + N'[sp].[persisted_sample_percent],'
++ CASE WHEN CAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'),0) AS TINYINT) >= 13 
+OR CAST(SERVERPROPERTY('Edition') AS NVARCHAR(50)) = 'SQL Azure'
+THEN  @LineFeed + N'[sp].[persisted_sample_percent],'
   ELSE @LineFeed + N'0 AS [persisted_sample_percent],'
 END
 + @LineFeed + N'ISNULL([sp].[steps],0) AS [steps],'
@@ -64,11 +66,11 @@ END
 + @LineFeed + N'ON [stat].[object_id] = [obj].[object_id]'
 + @LineFeed + N'WHERE'
 + @LineFeed + N'[obj].[type] IN ( ''U'', ''V'' )'	/*limit objects to tables and potentially indexed views*/
-+ @LineFeed + CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) > 11
++ @LineFeed + CASE WHEN CAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'),0) AS TINYINT) > 11
 				THEN N'AND [stat].[is_incremental] = 0'
 				ELSE N'' END						/*limit to non-incremental stats only */
 + @LineFeed + N'AND [sp].[rows] >= ' + CAST(@MinRecords AS NVARCHAR(10))
-+ CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) > 11
++ CASE WHEN CAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'),0) AS TINYINT) > 11
 				THEN + @LineFeed + N'UNION'
 + @LineFeed + N'SELECT DB_NAME() AS [database],'
 + @LineFeed + N'SCHEMA_NAME([obj].[schema_id]) + ''.'''
@@ -102,7 +104,8 @@ END
 + @LineFeed + N'ELSE ''No'' END AS [temporary],'
 + @LineFeed + N'CASE WHEN [stat].[no_recompute] = 1 THEN ''Yes'''
 + @LineFeed + N'ELSE ''No'' END AS [no_recompute],'
-+ CASE WHEN CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) >= 15
++ CASE WHEN CAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'),0) AS TINYINT) >= 15
+OR CAST(SERVERPROPERTY('Edition') AS NVARCHAR(50)) = 'SQL Azure'
   THEN @LineFeed + N'CASE WHEN [stat].[has_persisted_sample]  = 1 THEN ''Yes'''
   + @LineFeed + N'ELSE ''No'' END AS [persisted_sample],'
   ELSE @LineFeed + N'''only available for 2019 and above'' AS [persisted_sample],'
