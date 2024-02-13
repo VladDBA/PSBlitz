@@ -743,7 +743,7 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 	}
 	#Azure SQL DB 
 	elseif ($ServerName -like "*database.windows.net*") {
-		$IsAzureSQLDB = $true
+		$IsAzure = $true
 		#let's strip "tcp: first just in case"
 		if ($ServerName -like "tcp:*") {
 			$TCPStripped = $true
@@ -754,6 +754,9 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 			$pos = $ServerName.IndexOf(":")
 			[string]$ASDBName = $ServerName.Substring($pos + 1)
 			$ServerName = $ServerName.Substring(0, $pos)
+			if(!([string]::IsNullOrEmpty($ASDBName))){
+				$IsAzureSQLDB = $true
+			}
 		}
 		#Get the hostname
 		if ($ServerName -like "*,*") {
@@ -802,16 +805,18 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 		Exit
 	}
 
-	if ($IsAzureSQLDB) {
+	#if ($IsAzureSQLDB) {
 		#get the database name if not provided
-		while ([string]::IsNullOrEmpty($ASDBName)) {
-			$ASDBName = Read-Host "Name of the Azure SQL DB database (cannot be empty)"
-		}
-	}
- else {
+	#	while ([string]::IsNullOrEmpty($ASDBName)) {
+	#		$ASDBName = Read-Host -Prompt "Name of the Azure SQL DB database (cannot be empty)"
+		#}
+	#}
+ #else {
 		##Have sp_BlitzIndex, sp_BlitzCache, sp_BlitzLock executed against a specific database
+		if($IsAzure -eq $false){
 		$CheckDB = Read-Host -Prompt "Name of the database you want to check (leave empty for all)"
-	}
+		}
+	#}
 	##SQL Login
 	$SQLLogin = Read-Host -Prompt "SQL login name (leave empty to use integrated security)"
 	if (!([string]::IsNullOrEmpty($SQLLogin))) {
@@ -842,7 +847,7 @@ else {
 	}
  #Azure SQL DB 
  elseif ($ServerName -like "*database.windows.net*") {
-		$IsAzureSQLDB = $true
+		$IsAzure = $true
 		#let's strip "tcp: first just in case"
 		if ($ServerName -like "tcp:*") {
 			$TCPStripped = $true
@@ -853,6 +858,9 @@ else {
 			$pos = $ServerName.IndexOf(":")
 			[string]$ASDBName = $ServerName.Substring($pos + 1)
 			$ServerName = $ServerName.Substring(0, $pos)
+			if(!([string]::IsNullOrEmpty($ASDBName))){
+				$IsAzureSQLDB = $true
+			}
 		}
 		#Get the hostname
 		if ($ServerName -like "*,*") {
@@ -881,11 +889,7 @@ else {
 	}
 }
 
-#If Azure SQL DB make sure database name is provided even in script mode
-while (($IsAzureSQLDB) -and ($InteractiveMode -eq 0) -and ([string]::IsNullOrEmpty($ASDBName))) {
-	Write-Host "Azure SQL DB instance was passed for ServerName, but database name was not provided." -Fore red
-	$ASDBName = Read-Host "Name of the Azure SQL DB database (cannot be empty)"
-}
+
 
 #Convert the secure password to plain text for SqlConnection
 if (($InteractiveMode -eq 1) -and (!([string]::IsNullOrEmpty($SQLLogin))) ) {
@@ -898,6 +902,89 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 	$OldCheckDBStr = ";SET @DatabaseName = NULL;"
 	$NewCheckDBStr = ";SET @DatabaseName = '" + $CheckDB + "';" 
 }
+
+
+### If Azure and database name was not provided, do a preliminary test for the type of env
+if (($IsAzure) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzureSQLDB -eq $false)) {
+	$SqlConnection = New-Object System.Data.SqlClient.SqlConnection
+	if (!([string]::IsNullOrEmpty($SQLLogin))) {
+		$ConnString = "Server=$ServerName;Database=master;User Id=$SQLLogin;Password=$SQLPass;Connection Timeout=$ConnTimeout;Application Name=$AppName"
+	}
+	else {
+
+		$ConnString = "Server=$ServerName;Database=master;trusted_connection=true;Connection Timeout=$ConnTimeout;Application Name=$AppName"
+	}
+	$SqlConnection.ConnectionString = $ConnString
+
+	###Test connection to instance
+	[int]$CmdTimeout = 100
+	Write-Host "Detecting type of Azure environment... " -NoNewLine
+	$AzCheckQuery = new-object System.Data.SqlClient.SqlCommand
+	$Query = "SELECT CAST(SERVERPROPERTY('EngineEdition') AS INT) AS [EngineEdition],"
+	$Query += "`nCAST(SERVERPROPERTY('Edition') AS NVARCHAR(128)) AS [Edition];"
+	$AzCheckQuery.CommandText = $Query
+	$AzCheckQuery.Connection = $SqlConnection
+	$AzCheckQuery.CommandTimeout = $CmdTimeout
+	$AzCheckAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+	$AzCheckAdapter.SelectCommand = $AzCheckQuery
+	$AzCheckSet = new-object System.Data.DataSet
+	Try {
+		$StepStart = get-date
+		$AzCheckAdapter.Fill($AzCheckSet) | Out-Null -ErrorAction Stop
+		$SqlConnection.Close()
+		$StepEnd = get-date
+	}
+	Catch {
+		$StepEnd = get-date
+		Invoke-ErrMsg
+		$Help = Read-Host -Prompt "Need help?[Y/N]"
+		if ($Help -eq "Y") {
+			Get-PSBlitzHelp
+			#Don't close the window automatically if in interactive mode
+			if ($InteractiveMode -eq 1) {
+				Read-Host -Prompt "Press Enter to close this window."
+				Exit
+			}
+		}
+		else {
+			Exit
+		}
+	}
+	if ($AzCheckSet.Tables[0].Rows.Count -eq 1) {
+		$AzCheckTbl = New-Object System.Data.DataTable
+		$AzCheckTbl = $AzCheckSet.Tables[0]
+		[int]$EngineEdition = $AzCheckTbl.Rows[0]["EngineEdition"]
+		[string]$Edition = $AzCheckTbl.Rows[0]["Edition"]
+		Write-Host @GreenCheck
+		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
+		if ($DebugInfo) {
+			Write-Host " Engine Edition - $EngineEdition"  -Fore Yellow
+		}
+		if ($Edition -eq "SQL Azure") {
+			if ($EngineEdition -eq 8) {
+				$IsAzureMI = $true
+				Write-Host " ->Azure SQL MI"
+			}
+			elseif ($EngineEdition -eq 5) {
+				$IsAzureSQLDB = $true
+				Write-Host " ->Azure SQL DB"
+			}
+		} else {
+			Write-Host " ->Well this is awquard, use the following info to debug:"
+			Write-Host " Edition - $Edition; EngineEdition - $EngineEdition"
+		}
+	}
+
+}
+
+#If Azure SQL DB make sure database name is provided even in script mode
+while (($IsAzureSQLDB) -and ($InteractiveMode -eq 0) -and ([string]::IsNullOrEmpty($ASDBName))) {
+	Write-Host " The environment has been identified as being Azure SQL DB, but a database name was not provide." -Fore red
+	while ([string]::IsNullOrEmpty($ASDBName)) {
+		$ASDBName = Read-Host -Prompt "Name of the Azure SQL DB database (cannot be empty):"
+	}
+}
+
 
 ###Define connection
 $AppName = "PSBlitz " + $Vers
@@ -924,7 +1011,7 @@ $SqlConnection.ConnectionString = $ConnString
 [int]$CmdTimeout = 100
 Write-Host "Testing connection to instance $ServerName... " -NoNewLine
 $ConnCheckQuery = new-object System.Data.SqlClient.SqlCommand
-$Query = "SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(50)) AS [Edition],"
+$Query = "SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128)) AS [Edition],"
 $Query += "`nCAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'),0) AS TINYINT) AS [MajorVersion];"
 $ConnCheckQuery.CommandText = $Query
 $ConnCheckQuery.Connection = $SqlConnection
@@ -5899,7 +5986,7 @@ finally {
 					$ExcelSheet.Delete()
 				}
 			}
-			elseif($IsAzureSQLDB -eq $false) {
+			elseif ($IsAzureSQLDB -eq $false) {
 				if (($MajorVers -lt 13) -or ([string]::IsNullOrEmpty($CheckDB))) {
 					$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro ")
 					$ExcelSheetUpd.Cells.Item(12, 1).EntireRow.Delete() | Out-Null
@@ -5933,7 +6020,7 @@ finally {
 					$ExcelSheet.Delete()
 				}
 			}
-			elseif($IsAzureSQLDB -eq $false) {
+			elseif ($IsAzureSQLDB -eq $false) {
 				if (($MajorVers -lt 13) -or ([string]::IsNullOrEmpty($CheckDB))) {
 					$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro")
 					$ExcelSheetUpd.Cells.Item(12, 1).EntireRow.Delete() | Out-Null
