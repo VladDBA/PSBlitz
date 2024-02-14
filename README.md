@@ -14,8 +14,8 @@
 
 ## Intro
 
-Since I'm a big fan of [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) and I've found myself in many situations where I would have liked a quick way to easily export the output of sp_Blitz, sp_BlitzCache, sp_BlitzFirst, sp_BlitzIndex, sp_BlitzLock, and sp_BlitzWho to Excel, as well as saving to disk the execution plans identified by sp_BlitzCache and deadlock graphs from sp_BlitzLock, I've decided to put together a PowerShell script that does just that.
-As of version 3.0.0, PSBlitz is also capable of exporting the report to HTML making Excel/Office no longer a hard requirement for running PSBlitz.
+Since I'm a big fan of [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) and I've found myself in many situations where I would have liked a quick way to easily export the output of sp_Blitz, sp_BlitzCache, sp_BlitzFirst, sp_BlitzIndex, sp_BlitzLock, and sp_BlitzWho to Excel, as well as saving to disk the execution plans identified by sp_BlitzCache and deadlock graphs from sp_BlitzLock, I've decided to put together a PowerShell script that does just that.<br>
+As of version 3.0.0, PSBlitz is also capable of exporting the report to HTML making Excel/Office no longer a hard requirement for running PSBlitz.<br>
 As of version 4.0.1, PSBlitz is also compatible with Azure SQL DB and Azure SQL Managed Instance.
 
 ## What it does
@@ -45,7 +45,7 @@ Exports the following files:
 - Execution plans (as .sqlplan files) - from sp_BlitzQueryStore in the case of a database-specific check on an eligible database
 
 ### Note
-If the execution of PSBlitz took longer than 15 minutes up until the call to sp_BlitzLock, the timeframe for sp_BlitzLock will be narrowed down to the last 7 days in order to keep execution time within a reasonable amount.
+If the execution of PSBlitz took longer than 15 minutes up until the call to sp_BlitzLock, the timeframe for sp_BlitzLock will be narrowed down to the last 7 days in order to keep execution time within a reasonable amount.<br>
 If PSBlitz detects an exclusive lock being held on a table it will automatically skip index fragmentation information retrieval.
 
 ## Prerequisites
@@ -164,7 +164,7 @@ sp_BlitzLock @StartDate = DATEADD(DAY,-15, GETDATE()), @EndDate = GETDATE(), @Da
 [*Back to top*](#header1)
 
 ## Output files
-The output directory will be created by default in the PSBlitz directory where the PSBlitz.ps1 script lives.
+The output directory will be created by default in the PSBlitz directory where the PSBlitz.ps1 script lives.<br>
 If you want to script to write the output directory to another path, use the `-OutputDir` parameter followed by the desired path (the path has to be valid otherwise PSBlitz will use the default output path).
 
 Output directory name `[HostName]_[Instance]_[TimeStamp]` for an instance-wide check, or `[HostName]_[Instance]_[TimeStamp]_[Database]` for a database-specific check.
@@ -185,7 +185,7 @@ Execution plans file naming convention:
 [*Back to top*](#header1)
 
 ## Usage examples
-You can run PSBlitz.ps1 by simply right-clicking on the script and then clicking on "Run With PowerShell" which will execute the script in interactive mode, prompting you for the required input.
+You can run PSBlitz.ps1 by simply right-clicking on the script and then clicking on "Run With PowerShell" which will execute the script in interactive mode, prompting you for the required input.<br>
 Note that parameters like `-DebugMode`, `-OutputDir`, `-CacheTop`, and `-MaxTimeout` are only available in command line mode.
 
 Otherwise you can navigate in PowerShell to the directory where the script is and execute it by providing parameters and appropriate values.
