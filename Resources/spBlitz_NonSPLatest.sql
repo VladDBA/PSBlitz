@@ -68,7 +68,8 @@ IF OBJECT_ID('tempdb.dbo.#dbcc_events_from_trace', 'U') IS NOT NULL
     DROP TABLE #dbcc_events_from_trace
 
 /*
-Everything beyond this point is straight from sp_Blitz 
+Except for the addition of skipped checks 224 and 92 for Azure SQL MI,
+everything beyond this point is straight from sp_Blitz 
 without the GO at the end
 */
 
@@ -879,6 +880,8 @@ without the GO at the end
 						INSERT INTO #SkipChecks (CheckID, DatabaseName) VALUES (80, 'model');  /* Max file size set */
 						INSERT INTO #SkipChecks (CheckID, DatabaseName) VALUES (80, 'msdb');  /* Max file size set */
 						INSERT INTO #SkipChecks (CheckID, DatabaseName) VALUES (80, 'tempdb');  /* Max file size set */
+						INSERT INTO #SkipChecks (CheckID) VALUES (224);  /* CheckID 224 - Performance - SSRS/SSAS/SSIS Installed -- Vlad -- https://github.com/VladDBA/PSBlitz/issues/164*/
+						INSERT INTO #SkipChecks (CheckID) VALUES (92);  /* CheckID 92 - drive space -- Vlad -- https://github.com/VladDBA/PSBlitz/issues/164*/
 			            INSERT  INTO #BlitzResults
 			            ( CheckID ,
 				            Priority ,

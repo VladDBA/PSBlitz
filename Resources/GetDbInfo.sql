@@ -43,6 +43,7 @@ FROM   sys.master_files AS mf
 INNER JOIN sys.databases AS d ON mf.database_id = d.database_id
 WHERE  mf.[type] = 2
 AND d.[state] = 0
+AND d.[user_access] = 0
 AND  mf.database_id = CASE WHEN @DatabaseName <> N'' 
                         THEN DB_ID(@DatabaseName)
 						ELSE mf.database_id
@@ -74,6 +75,8 @@ DEALLOCATE DBsWithFS;
 SELECT @ExecSQL = N'SELECT d.[name] AS [Database],d.[create_date] AS [Created],'
                   + @LineFeed
                   + N'd.[state_desc] AS [DatabaseState],'
+                  + @LineFeed
+                  + N'd.[user_access_desc] AS [UserAccess],'
                   + @LineFeed
                   + N'SUM(CASE WHEN f.[type] = 0 THEN 1 ELSE 0'
                   + @LineFeed
@@ -145,7 +148,7 @@ SELECT @ExecSQL = N'SELECT d.[name] AS [Database],d.[create_date] AS [Created],'
                   + @LineFeed
                   + N'GROUP  BY d.[name], [fs].FSFilesCount, [fs].FSFilesSizeGB,  [d].[compatibility_level],'
                   + @LineFeed
-                  + N'[d].[state_desc], [d].[create_date], [d].[collation_name],'
+                  + N'[d].[state_desc], d.[user_access_desc], [d].[create_date], [d].[collation_name],'
                   + @LineFeed
                   + N'[d].[log_reuse_wait_desc], [d].[snapshot_isolation_state_desc], [d].[is_read_committed_snapshot_on],'
                   + @LineFeed
@@ -180,7 +183,8 @@ CREATE TABLE #AvailableSpace
 DECLARE AvailableSpace CURSOR LOCAL STATIC READ_ONLY FORWARD_ONLY FOR
 SELECT [name]
 FROM   sys.[databases]
-WHERE  [state] = 0; 
+WHERE  [state] = 0
+AND [user_access] = 0; 
 
 OPEN AvailableSpace; 
 
@@ -196,7 +200,8 @@ WHILE @@FETCH_STATUS = 0
                      + N'CAST(( ( CAST([f].[size] AS BIGINT) - CAST(FILEPROPERTY([f].[name], ''SpaceUsed'') '
                      + N'AS BIGINT) ) * 8 / 1024.00 / 1024.00 ) AS NUMERIC(23, 3)) AS [Available SpaceGB]'
                      + @LineFeed
-                     + N'FROM   sys.[database_files] AS [f] WHERE [f].[type] <> 2;';
+                     + N'FROM   sys.[database_files] AS [f] WHERE [f].[type] <> 2'
+					 + @LineFeed + N'OPTION (RECOMPILE);';
       EXEC (@ExecSQL);
       FETCH NEXT FROM AvailableSpace INTO @DBName;
   END; 
@@ -257,6 +262,7 @@ IF ( @DatabaseName <> N'' AND CAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'),
 						ELSE 'n/a' END 
 						+N' AS [IsDefault] FROM '
 						+QUOTENAME(@DatabaseName)
-						+N'.sys.[database_scoped_configurations];';
+						+N'.sys.[database_scoped_configurations]'
+						+ @LineFeed + N'OPTION (RECOMPILE);';
       EXEC(@ExecSQL);
   END;
