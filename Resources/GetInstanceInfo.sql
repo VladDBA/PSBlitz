@@ -6,12 +6,15 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 /*Get instance info*/
-SELECT SERVERPROPERTY('MachineName')                                                       AS [machine_name],
+SELECT ISNULL(SERVERPROPERTY('MachineName'),'N/A')                                         AS [machine_name],
        ISNULL(CAST(SERVERPROPERTY('InstanceName') AS NVARCHAR(100)), '(default instance)') AS [instance_name],
        SERVERPROPERTY('ProductVersion')                                                    AS [product_version],
        SERVERPROPERTY('ProductLevel')                                                      AS [product_level],
        SERVERPROPERTY('ProductUpdateLevel')                                                AS [patch_level],
-       SERVERPROPERTY('Edition')                                                           AS [edition],
+	   CASE 
+         WHEN CAST(SERVERPROPERTY('EngineEdition') AS INT) = 8 THEN 'Azure SQL Managed Instance'
+         ELSE SERVERPROPERTY('Edition')   
+       END                                                                                 AS [edition],
        CASE
          WHEN SERVERPROPERTY('IsClustered') = 1 THEN 'Yes'
          WHEN SERVERPROPERTY('IsClustered') = 0 THEN 'No'

@@ -86,7 +86,7 @@
  SQL Server First Responder Kit - https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit
  Copyright for PSBlitz.ps1, GetStatsInfoForWholeDB.sql, GetOpenTransactions.sql, 
  GetIndexInfoForWholeDB.sql, GetInstanceInfo.sql, and GetTempDBUsageInfo.sql 
- is held by Vlad Drumea, 2023 as described below.
+ is held by Vlad Drumea, 2024 as described below.
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -156,7 +156,7 @@
  Author: Vlad Drumea (VladDBA)
  Website: https://vladdba.com/
 
- Copyright: (c) 2023 by Vlad Drumea, licensed under MIT
+ Copyright: (c) 2024 by Vlad Drumea, licensed under MIT
  License: MIT https://opensource.org/licenses/MIT
 
 .LINK
@@ -206,6 +206,18 @@
  PS>.\PSBlitz.ps1 Server01\SQL01 -ToHTML Y -ZipOutput Y
  Run PSBlitz but output the report as HTML instead of XLSX while also creating a zip archive of the output files.
 
+.EXAMPLE
+ PS>.\PSBlitz.ps1 yourserver.database.windows.net,1433:YourDatabase -SQLLogin DBA1 -SQLPass SuperSecurePassword
+ Run it against the YourDatabase database hosted in Azure SQL DB at yourserver.database.windows.net port 1433 via SQL login and password
+
+.EXAMPLE
+ PS>.\PSBlitz.ps1 yourserver.database.windows.net -SQLLogin DBA1 -SQLPass SuperSecurePassword
+ Run it against the Azure SQL Managed Instance yourserver.database.windows.net
+
+.EXAMPLE
+ PS>.\PSBlitz.ps1 yourserver.database.windows.net -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
+ Run it against the Azure SQL Managed Instance yourserver.database.windows.net with an in-depth check while limiting index, stats, plan cache, and database info to YourDatabase
+
 #>
 
 
@@ -245,8 +257,10 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.0.0"
-$VersDate = "20231227"
+$Vers = "4.0.1"
+$VersDate = "2024-02-14"
+$TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
+$NowDate = Get-Date
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #Set resources path
@@ -557,15 +571,15 @@ $InitScriptBlock = {
 	function Format-ExceptionMsg {
 		[string]$ErrorMessage = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty Message
 		#Get SQL related error info
-		[string]$SQLErrNo = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Number
-		[string]$SQLErrLev = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Class
-		[string]$SQLErrState = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty State
-		[string]$SQLErrLineNo = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty LineNumber
-		[string]$SQLErrMsg = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Message
-		if (!([string]::IsNullOrEmpty($SQLErrNo))) {
-			Write-Output "MSg $SQLErrNo, Level $SQLErrLev, State $SQLErrState, Line $SQLErrLineNo `n $SQLErrMsg"
+		try {
+			[string]$SQLErrNo = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Number -ErrorAction Stop
+			[string]$SQLErrLev = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Class -ErrorAction Stop
+			[string]$SQLErrState = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty State -ErrorAction Stop
+			[string]$SQLErrLineNo = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty LineNumber -ErrorAction Stop
+			[string]$SQLErrMsg = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Message -ErrorAction Stop
+			Write-Output "MSg $SQLErrNo, Level $SQLErrLev, State $SQLErrState, Line $SQLErrLineNo `n $SQLErrMsg" -ErrorAction Stop
 		}
-	 else {
+		catch {
 			Write-Output $ErrorMessage
 		}
 	}
@@ -724,6 +738,8 @@ if ($MissingFiles.Count -gt 0) {
 	Exit
 }
 $IsAzureSQLDB = $false
+$IsAzureSQLMI = $false
+$IsAzure = $false
 ###Switch to interactive mode if $ServerName is empty
 if ([string]::IsNullOrEmpty($ServerName)) {
 	Write-Host "Running in interactive mode"
@@ -754,7 +770,7 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 			$pos = $ServerName.IndexOf(":")
 			[string]$ASDBName = $ServerName.Substring($pos + 1)
 			$ServerName = $ServerName.Substring(0, $pos)
-			if(!([string]::IsNullOrEmpty($ASDBName))){
+			if (!([string]::IsNullOrEmpty($ASDBName))) {
 				$IsAzureSQLDB = $true
 			}
 		}
@@ -804,24 +820,17 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 		Read-Host -Prompt "Press Enter to close this window."
 		Exit
 	}
-
-	#if ($IsAzureSQLDB) {
-		#get the database name if not provided
-	#	while ([string]::IsNullOrEmpty($ASDBName)) {
-	#		$ASDBName = Read-Host -Prompt "Name of the Azure SQL DB database (cannot be empty)"
-		#}
-	#}
- #else {
-		##Have sp_BlitzIndex, sp_BlitzCache, sp_BlitzLock executed against a specific database
-		if($IsAzure -eq $false){
+	
+	##Have sp_BlitzIndex, sp_BlitzCache, sp_BlitzLock executed against a specific database
+	if ($IsAzure -eq $false) {
 		$CheckDB = Read-Host -Prompt "Name of the database you want to check (leave empty for all)"
-		}
-	#}
+	}
+	
 	##SQL Login
 	$SQLLogin = Read-Host -Prompt "SQL login name (leave empty to use integrated security)"
 	if (!([string]::IsNullOrEmpty($SQLLogin))) {
 		##SQL Login pass
-		$SecSQLPass = Read-Host -Prompt "Password " -AsSecureString
+		$SecSQLPass = Read-Host -Prompt "Password" -AsSecureString
 	}
 	##Indepth check 
 	$IsIndepth = Read-Host -Prompt "Perform an in-depth check?[Y/N]"
@@ -858,7 +867,7 @@ else {
 			$pos = $ServerName.IndexOf(":")
 			[string]$ASDBName = $ServerName.Substring($pos + 1)
 			$ServerName = $ServerName.Substring(0, $pos)
-			if(!([string]::IsNullOrEmpty($ASDBName))){
+			if (!([string]::IsNullOrEmpty($ASDBName))) {
 				$IsAzureSQLDB = $true
 			}
 		}
@@ -889,24 +898,22 @@ else {
 	}
 }
 
-
-
 #Convert the secure password to plain text for SqlConnection
 if (($InteractiveMode -eq 1) -and (!([string]::IsNullOrEmpty($SQLLogin))) ) {
 	$BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecSQLPass)
 	$SQLPass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
 }
-	
-#Set the string to replace for $CheckDB
-if (!([string]::IsNullOrEmpty($CheckDB))) {
-	$OldCheckDBStr = ";SET @DatabaseName = NULL;"
-	$NewCheckDBStr = ";SET @DatabaseName = '" + $CheckDB + "';" 
-}
 
+###If release is older than 2 months print an info message
+if($NowDate -ge $TwoMonthsFromRelease){
+	Write-Host "Informational: This release of PSBlitz is two months old" -Fore Yellow
+	Write-Host "->You can check for a newer release at https://github.com/VladDBA/PSBlitz/releases"
+}
 
 ### If Azure and database name was not provided, do a preliminary test for the type of env
 if (($IsAzure) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzureSQLDB -eq $false)) {
 	$SqlConnection = New-Object System.Data.SqlClient.SqlConnection
+	$AppName = "PSBlitz " + $Vers
 	if (!([string]::IsNullOrEmpty($SQLLogin))) {
 		$ConnString = "Server=$ServerName;Database=master;User Id=$SQLLogin;Password=$SQLPass;Connection Timeout=$ConnTimeout;Application Name=$AppName"
 	}
@@ -916,7 +923,6 @@ if (($IsAzure) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzureSQLDB -eq
 	}
 	$SqlConnection.ConnectionString = $ConnString
 
-	###Test connection to instance
 	[int]$CmdTimeout = 100
 	Write-Host "Detecting type of Azure environment... " -NoNewLine
 	$AzCheckQuery = new-object System.Data.SqlClient.SqlCommand
@@ -962,14 +968,15 @@ if (($IsAzure) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzureSQLDB -eq
 		}
 		if ($Edition -eq "SQL Azure") {
 			if ($EngineEdition -eq 8) {
-				$IsAzureMI = $true
+				$IsAzureSQLMI = $true
 				Write-Host " ->Azure SQL MI"
 			}
 			elseif ($EngineEdition -eq 5) {
 				$IsAzureSQLDB = $true
 				Write-Host " ->Azure SQL DB"
 			}
-		} else {
+		}
+		else {
 			Write-Host " ->Well this is awquard, use the following info to debug:"
 			Write-Host " Edition - $Edition; EngineEdition - $EngineEdition"
 		}
@@ -977,14 +984,22 @@ if (($IsAzure) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzureSQLDB -eq
 
 }
 
-#If Azure SQL DB make sure database name is provided even in script mode
-while (($IsAzureSQLDB) -and ($InteractiveMode -eq 0) -and ([string]::IsNullOrEmpty($ASDBName))) {
-	Write-Host " The environment has been identified as being Azure SQL DB, but a database name was not provide." -Fore red
+#If Azure SQL DB make sure database name is provided regardless of mode
+if (($IsAzureSQLDB) -and ([string]::IsNullOrEmpty($ASDBName))) {
+	Write-Host " The environment has been identified as Azure SQL DB, but a database name was not provide." -Fore yellow
 	while ([string]::IsNullOrEmpty($ASDBName)) {
-		$ASDBName = Read-Host -Prompt "Name of the Azure SQL DB database (cannot be empty):"
+		$ASDBName = Read-Host -Prompt "Name of the Azure SQL DB database (cannot be empty)"
 	}
 }
+elseif (($IsAzureSQLMI) -and ($InteractiveMode -eq 1) -and ([string]::IsNullOrEmpty($CheckDB))) {
+	$CheckDB = Read-Host -Prompt "Name of the database you want to check (leave empty for all)"
+}
 
+#Set the string to replace for $CheckDB
+if (!([string]::IsNullOrEmpty($CheckDB))) {
+	$OldCheckDBStr = ";SET @DatabaseName = NULL;"
+	$NewCheckDBStr = ";SET @DatabaseName = '" + $CheckDB + "';" 
+}
 
 ###Define connection
 $AppName = "PSBlitz " + $Vers
@@ -1009,7 +1024,7 @@ $SqlConnection.ConnectionString = $ConnString
 
 ###Test connection to instance
 [int]$CmdTimeout = 100
-Write-Host "Testing connection to instance $ServerName... " -NoNewLine
+Write-Host "Testing connection to $ServerName... " -NoNewLine
 $ConnCheckQuery = new-object System.Data.SqlClient.SqlCommand
 $Query = "SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128)) AS [Edition],"
 $Query += "`nCAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'),0) AS TINYINT) AS [MajorVersion];"
@@ -1127,6 +1142,9 @@ if ((!([string]::IsNullOrEmpty($OutputDir))) -and (Test-Path $OutputDir)) {
 	if ($IsAzureSQLDB) {
 		$OutDir += "AzureSQLDB_$ASDBName" + "_"
 	}
+	elseif ($IsAzureSQLMI) {
+		$OutDir += $InstName.Replace('.database.windows.net', '') + "_"
+	}
 	elseif ($HostName -ne $InstName) {
 		$OutDir += $HostName + "_" + $InstName + "_"
 	}
@@ -1143,6 +1161,9 @@ else {
 	if ($IsAzureSQLDB) {
 		$OutDir += "AzureSQLDB_$ASDBName" + "_"
 	}
+	elseif ($IsAzureSQLMI) {
+		$OutDir += $InstName.Replace('.database.windows.net', '') + "_"
+	}
  elseif ($HostName -ne $InstName) {
 		$OutDir += $HostName + "_" + $InstName + "_"
 	}
@@ -1157,6 +1178,9 @@ else {
 if ($ZipOutput -eq "Y") {
 	if ($IsAzureSQLDB) {
 		$ZipFile = "AzureSQLDB_$ASDBName" + "_"
+	}
+	elseif ($IsAzureSQLMI) {
+		$OutDir += $InstName.Replace('.database.windows.net', '') + "_"
 	}
 	elseif ($HostName -ne $InstName) {
 		$ZipFile = $HostName + "_" + $InstName + "_" 
@@ -1353,6 +1377,8 @@ try {
 	Write-Host " check for " -NoNewLine 
 	if ($IsAzureSQLDB) {
 		Write-Host "Azure SQL DB - $ASDBName"
+	}elseif($IsAzureSQLMI){
+		Write-Host "Azure SQL MI - $($ServerName.Replace('.database.windows.net',''))" 
 	}
 	else {
 		Write-Host "$ServerName"
@@ -2776,7 +2802,7 @@ $htmlTable6
 					Write-Host " ->Converting Database Info results to HTML" -fore yellow
 				}
 				$htmlTable = $DBInfoTbl | Select-Object "Database", @{Name = "Created"; Expression = { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") } }, 
-				"DatabaseState", "DataFiles", "DataFilesSizeGB", "LogFiles",
+				"DatabaseState","UserAccess", "DataFiles", "DataFilesSizeGB", "LogFiles",
 				"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
 				"DatabaseSizeGB", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", 
 				"SnapshotIsolationState", "ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
@@ -2862,7 +2888,7 @@ $htmlBlock
 				$RowNum = 0
 
 				#List of columns that should be returned from the data set
-				$DataSetCols = @("Database", "Created", "DatabaseState", "DataFiles", "DataFilesSizeGB", "LogFiles",
+				$DataSetCols = @("Database", "Created", "DatabaseState", "UserAccess","DataFiles", "DataFilesSizeGB", "LogFiles",
 					"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
 					"DatabaseSizeGB", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", "SnapshotIsolationState", 
 					"ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
@@ -4033,9 +4059,12 @@ $htmlTable
 
 	##Check if DB is eligible for sp_BlitzQueryStore first
 	if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
+		if($DBSwitched -ne "Y"){
+			Write-Host " " -NoNewLine
+		}
 		$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
-			Write-Host " Checking if $CheckDB is eligible for sp_BlizQueryStore..."
+			Write-Host "Checking if $CheckDB is eligible for sp_BlizQueryStore..."
 			$DBQuery = @" 
 		IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSION')), 4)) < 13 )
   BEGIN
@@ -4064,7 +4093,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$CheckDBQuery.Parameters["@DBName"].Value = $CheckDB
 		}
 		elseif ($IsAzureSQLDB) {
-			Write-Host " Checking if $ASDBName is eligible for sp_BlizQueryStore..."
+			Write-Host "Checking if $ASDBName is eligible for sp_BlizQueryStore..."
 			$DBQuery = @"
 			IF ( (SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128))) = N'SQL Azure' )
 			BEGIN
@@ -5158,8 +5187,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		[int]$DBCount = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Count | Select-Object -Last 1
 		if (($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --")) {
 			Write-Host " $DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
-			Write-Host " ->" -NoNewLine
 			$StepStart = get-date
+			Write-Host " ->" -NoNewline
 			[string]$CheckDB = $DBName
 			$DBSwitched = "Y"
 			$StepEnd = get-date
@@ -5170,14 +5199,17 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	
 	#Only run the check if a specific database name has been provided
 	if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
+		if($DBSwitched -ne "Y"){
+			Write-Host " " -NoNewLine
+		}
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetStatsInfoForWholeDB.sql")
-		if ($IsAzureSQLDB) { 
-			Write-Host " Getting stats info for $ASDBName... " -NoNewLine
+		if ($IsAzureSQLDB) {
+			Write-Host "Getting stats info for $ASDBName... " -NoNewLine
 			#if it's Azure SQL DB, we can't switch databases
 			[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
 		}
 		else {
-			Write-Host " Getting stats info for $CheckDB... " -NoNewLine		
+			Write-Host "Getting stats info for $CheckDB... " -NoNewLine		
 			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
 		}
 		$CmdTimeout = $MaxTimeout
@@ -5323,14 +5355,19 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		}
 		### get index frag info
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetIndexInfoForWholeDB.sql")
+		if($DBSwitched -ne "Y"){
+			Write-Host " " -NoNewLine
+		} elseif ($DBSwitched -eq "Y") {
+			Write-Host " ->" -NoNewLine
+		}
 		if ($IsAzureSQLDB) { 
-			Write-Host " Getting index fragmentation info for $ASDBName... " -NoNewLine
+			Write-Host "Getting index fragmentation info for $ASDBName... " -NoNewLine
 			#if it's Azure SQL DB, we can't switch databases
 			[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
 			[string]$Query = $Query -replace "AzureSQLDBReplace", "$DirDate"
 		}
 		else {
-			Write-Host " Getting index fragmentation info for $CheckDB... " -NoNewLine
+			Write-Host "Getting index fragmentation info for $CheckDB... " -NoNewLine
 		
 			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
 		}
@@ -6117,6 +6154,13 @@ finally {
 						</html>
 "@ 
 		$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\ExecutionLog.html"
+		$AzureEnv = ""
+		if($IsAzureSQLMI){
+			$AzureEnv = "- Azure SQL MI"
+		}elseif($IsAzureSQLDB){
+			$AzureEnv = "- Azure SQL DB"
+			$DbPortion = "- $ASDBName"
+		}
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
 			$DbPortion = "- database-specific check: $CheckDB"
 		}
@@ -6157,13 +6201,18 @@ finally {
 					text-align: center;
     }
     h2 {
-					test-align: center;
+					text-align: center;
     }
+	footer{
+		text-align: center;
+		margin-left: auto;
+		margin-right: auto;
+	}
 				</style>
 				<title>PSBlitz Output For $InstName</title>
 				</head>
 				<body>
-    <h1>PSBlitz Output For $InstName $DbPortion</h1>
+    <h1>PSBlitz Output For $($InstName.Replace(".database.windows.net", "")) $AzureEnv $DbPortion</h1>
     <table>
 				<tr>
 				<th>Generated With</th>
@@ -6396,6 +6445,11 @@ finally {
 		$IndexContent += @"
     </table>
 				<br>
+				<br>
+				<br>
+				<footer>  
+				<p>Report generated with <a href="https://github.com/VladDBA/PSBlitz">PSBlitz</a> - created by <a href="https://vladdba.com/">Vlad Drumea</a></p>
+				</footer>  
 				</body>
 				</html>
 "@
