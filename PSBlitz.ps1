@@ -257,8 +257,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.0.1"
-$VersDate = "2024-02-14"
+$Vers = "4.0.2"
+$VersDate = "2024-02-21"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -905,7 +905,7 @@ if (($InteractiveMode -eq 1) -and (!([string]::IsNullOrEmpty($SQLLogin))) ) {
 }
 
 ###If release is older than 2 months print an info message
-if($NowDate -ge $TwoMonthsFromRelease){
+if ($NowDate -ge $TwoMonthsFromRelease) {
 	Write-Host "Informational: This release of PSBlitz is two months old" -Fore Yellow
 	Write-Host "->You can check for a newer release at https://github.com/VladDBA/PSBlitz/releases"
 }
@@ -1377,7 +1377,8 @@ try {
 	Write-Host " check for " -NoNewLine 
 	if ($IsAzureSQLDB) {
 		Write-Host "Azure SQL DB - $ASDBName"
-	}elseif($IsAzureSQLMI){
+	}
+	elseif ($IsAzureSQLMI) {
 		Write-Host "Azure SQL MI - $($ServerName.Replace('.database.windows.net',''))" 
 	}
 	else {
@@ -2802,7 +2803,7 @@ $htmlTable6
 					Write-Host " ->Converting Database Info results to HTML" -fore yellow
 				}
 				$htmlTable = $DBInfoTbl | Select-Object "Database", @{Name = "Created"; Expression = { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") } }, 
-				"DatabaseState","UserAccess", "DataFiles", "DataFilesSizeGB", "LogFiles",
+				"DatabaseState", "UserAccess", "DataFiles", "DataFilesSizeGB", "LogFiles",
 				"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
 				"DatabaseSizeGB", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", 
 				"SnapshotIsolationState", "ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
@@ -2888,7 +2889,7 @@ $htmlBlock
 				$RowNum = 0
 
 				#List of columns that should be returned from the data set
-				$DataSetCols = @("Database", "Created", "DatabaseState", "UserAccess","DataFiles", "DataFilesSizeGB", "LogFiles",
+				$DataSetCols = @("Database", "Created", "DatabaseState", "UserAccess", "DataFiles", "DataFilesSizeGB", "LogFiles",
 					"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
 					"DatabaseSizeGB", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", "SnapshotIsolationState", 
 					"ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
@@ -3618,13 +3619,18 @@ $htmlTable
 			#Setting $i to 0
 			$i = 0
 
+			$BlitzCacheTbl.Columns.Add("SQLPlan File", [string]) | Out-Null
+
 			foreach ($row in $BlitzCacheTbl) {
 				#Increment file name counter	
 				$i += 1
+				$SQLPlanFile = "-- N/A --" 
 				#Get only the column storing the execution plan data that's not NULL and write it to a file
 				if ($BlitzCacheTbl.Rows[$RowNum]["Query Plan"] -ne [System.DBNull]::Value) {
-					$BlitzCacheTbl.Rows[$RowNum]["Query Plan"] | Format-XML | Set-Content -Path $PlanOutDir\$($FileSOrder)_$($i).sqlplan -Force
-				}		
+					$SQLPlanFile = $FileSOrder + "_" + $i + ".sqlplan"
+					$BlitzCacheTbl.Rows[$RowNum]["Query Plan"] | Format-XML | Set-Content -Path "$PlanOutDir\$SQLPlanFile" -Force
+				}
+				$BlitzCacheTbl.Rows[$RowNum]["SQLPlan File"] = $SQLPlanFile		
 				#Increment row retrieval counter
 				$RowNum += 1
 			}
@@ -3668,20 +3674,10 @@ $htmlTable
 
 			if ($ToHTML -eq "Y") {
 				$SheetName = $SheetName -replace "sp_BlitzCache ", ""
-				$BlitzCacheTbl.Columns.Add("SQLPlan File", [string]) | Out-Null
+				
 				$RowNum = 0
 				$i = 0
 			
-				foreach ($row in $BlitzCacheTbl) {
-					if ($BlitzCacheTbl.Rows[$RowNum]["Query Plan"] -ne [System.DBNull]::Value) {
-						$i += 1
-						$SQLPlanFile = $FileSOrder + "_" + $i + ".sqlplan"
-					
-					}
-					else { $SQLPlanFile = "-- N/A --" }
-					$BlitzCacheTbl.Rows[$RowNum]["SQLPlan File"] = $SQLPlanFile
-					$RowNum += 1
-				}
 				#adding query name
 				$BlitzCacheTbl.Columns.Add("Query", [string]) | Out-Null
 				$RowNum = 0
@@ -3866,7 +3862,7 @@ $htmlTable
 				$ExcelColNum = 1
 
 				#define column list to only get the sp_BlitzCache columns that are relevant in this case
-				$DataSetCols = @("Database", "Cost", "Query Text", "Query Type", "Warnings", "Missing Indexes",	"Implicit Conversion Info", "Cached Execution Parameters",
+				$DataSetCols = @("Database", "Cost", "Query Text", "SQLPlan File", "Query Type", "Warnings", "Missing Indexes",	"Implicit Conversion Info", "Cached Execution Parameters",
 					"# Executions", "Executions / Minute", "Execution Weight",
 					"% Executions (Type)", "Serial Desired Memory",
 					"Serial Required Memory", "Total CPU (ms)", "Avg CPU (ms)", "CPU Weight", "% CPU (Type)",
@@ -3883,11 +3879,6 @@ $htmlTable
 					Write-Host " ->Writing sp_BlitzCache results to sheet $SheetName" -fore yellow
 				}
 				foreach ($row in $BlitzCacheTbl) {
-					$SQLPlanFile = "-- N/A --"
-					#Changing the value of $SQLPlanFile only for records where execution plan exists
-					if ($BlitzCacheTbl.Rows[$RowNum]["Query Plan"] -ne [System.DBNull]::Value) {
-						$SQLPlanFile = $FileSOrder + "_" + $SQLPlanNum + ".sqlplan"
-					}
 					#Loop through each column from $DataSetCols for curent row and retrieve data from 
 					foreach ($col in $DataSetCols) {
 
@@ -3909,23 +3900,13 @@ $htmlTable
 						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzCacheTbl.Rows[$RowNum][$col]
 						#move to the next column
 						$ExcelColNum += 1			
-						<# 
-					If the next column is the SQLPlan Name column 
-					fill it separately and then move to next column
-					#>
-						if ($ExcelColNum -eq 4) {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $SQLPlanFIle
-							#move to the next column
-							$ExcelColNum += 1
-						}
+						
 					}
 
 					#move to the next row in the spreadsheet
 					$ExcelStartRow += 1
 					#move to the next row in the data set
 					$RowNum += 1
-					#Move to the next sqlplan file
-					$SQLPlanNum += 1
 					# reset Excel column number so that next row population begins with column 1
 					$ExcelColNum = 1
 				}
@@ -4045,7 +4026,7 @@ $htmlTable
 		[int]$TwoThirdsBlitzCache = [Math]::Floor([decimal]($BlitzCacheRecs / 1.5))
 		[string]$DBName = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Name | Select-Object -Last 1
 		[int]$DBCount = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Count | Select-Object -Last 1
-		if (($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --")) {
+		if (($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --") -and (!([string]::IsNullOrEmpty($DBName)))) {
 			Write-Host " $DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
 			Write-Host " ->" -NoNewLine
 			$StepStart = get-date
@@ -4059,7 +4040,7 @@ $htmlTable
 
 	##Check if DB is eligible for sp_BlitzQueryStore first
 	if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
-		if($DBSwitched -ne "Y"){
+		if ($DBSwitched -ne "Y") {
 			Write-Host " " -NoNewLine
 		}
 		$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
@@ -4225,36 +4206,27 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				if ($DebugInfo) {
 					Write-Host " ->Exporting execution plans" -fore yellow
 				}
+				#Add column to table 
+				$BlitzQSTbl.Columns.Add("SQLPlan File", [string]) | Out-Null
 				#Set counter used for row retrieval
 				$RowNum = 0
 				#Setting $i to 0
 				$i = 0
-				$FileSOrder = "QueryStore"
-
+				
 				foreach ($row in $BlitzQSTbl) {
 					#Increment file name counter	
 					$i += 1
+					$SQLPlanFile = "-- N/A --"
 					#Get only the column storing the execution plan data that's not NULL and write it to a file
 					if ($BlitzQSTbl.Rows[$RowNum]["query_plan_xml"] -ne [System.DBNull]::Value) {
-						$BlitzQSTbl.Rows[$RowNum]["query_plan_xml"] | Format-XML | Set-Content -Path $PlanOutDir\$($FileSOrder)_$($i).sqlplan -Force
-					}		
+						$SQLPlanFile = "QueryStore_" + $i + ".sqlplan"
+						$BlitzQSTbl.Rows[$RowNum]["query_plan_xml"] | Format-XML | Set-Content -Path "$PlanOutDir\$SQLPlanFile" -Force
+					}
+					$BlitzQSTbl.Rows[$RowNum]["SQLPlan File"] = $SQLPlanFile		
 					#Increment row retrieval counter
 					$RowNum += 1
 				}
-				$BlitzQSTbl.Columns.Add("SQLPlan File", [string]) | Out-Null
-				$RowNum = 0
-				$i = 0
-			
-				foreach ($row in $BlitzQSTbl) {
-					if ($BlitzQSTbl.Rows[$RowNum]["query_plan_xml"] -ne [System.DBNull]::Value) {
-						$i += 1
-						$SQLPlanFile = "QueryStore_" + $i + ".sqlplan"
-					
-					}
-					else { $SQLPlanFile = "-- N/A --" }
-					$BlitzQSTbl.Rows[$RowNum]["SQLPlan File"] = $SQLPlanFile
-					$RowNum += 1
-				}
+				
 				if ($ToHTML -eq "Y") {
 					
 					#adding query name
@@ -4266,7 +4238,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						if ($BlitzQSTbl.Rows[$RowNum]["query_sql_text"] -ne [System.DBNull]::Value) {
 							$i += 1
 							$QueryName = "QueryStore_" + $i + ".query"
-					
 						}
 						else { $QueryName = "" }
 						$BlitzQSTbl.Rows[$RowNum]["Query"] = $QueryName
@@ -4862,6 +4833,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			if ($DebugInfo) {
 				Write-Host " ->Exporting execution plans related to deadlocks." -fore yellow
 			}
+			$TblLockPlans.Columns.Add("PlanID", [string]) | Out-Null
 			#Set counter used for row retrieval
 			$RowNum = 0
 			#Setting $i to 0
@@ -4870,10 +4842,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			foreach ($row in $TblLockPlans) {
 				#Increment file name counter	
 				$i += 1
+				$SQLPlanFile = "-- N/A --"
 				#Get only the column storing the execution plan data that's not NULL and write it to a file
 				if ($TblLockPlans.Rows[$RowNum]["query_plan"] -ne [System.DBNull]::Value) {
-					$TblLockPlans.Rows[$RowNum]["query_plan"] | Format-XML | Set-Content -Path $PlanOutDir\"Deadlock_"$($i).sqlplan -Force
-				}		
+					$SQLPlanFile = "Deadlock_" + $i + ".sqlplan"
+					$TblLockPlans.Rows[$RowNum]["query_plan"] | Format-XML | Set-Content -Path "$PlanOutDir\$SQLPlanFile" -Force
+				}
+				$TblLockPlans.Rows[$RowNum]["PlanID"] = $SQLPlanFile		
 				#Increment row retrieval counter
 				$RowNum += 1
 			}
@@ -4882,19 +4857,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				if ($DebugInfo) {
 					Write-Host " ->Converting sp_BlitzLock output to HTML" -fore yellow
 				}
-				$TblLockPlans.Columns.Add("PlanID", [string]) | Out-Null
-				$RowNum = 0
-				$i = 0
-				foreach ($row in $TblLockPlans) {
-					if ($TblLockPlans.Rows[$RowNum]["query_plan"] -ne [System.DBNull]::Value) {
-						$i += 1
-						$SQLPlanFile = "Deadlock_" + $i + ".sqlplan"
-					} 
-					else { $SQLPlanFile = "-- N/A --" }
-					$TblLockPlans.Rows[$RowNum]["PlanID"] = $SQLPlanFile
-					$RowNum += 1
-				}
-
 
 				$HtmlTabName = "Deadlocks"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
@@ -5111,7 +5073,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$SQLPlanNum = 1
 
 				#List of columns that should be returned from the data set
-				$DataSetCols = @("database_name", "creation_time",
+				$DataSetCols = @("database_name", "PlanID", "creation_time",
 				 "last_execution_time", "execution_count",
 					"executions_per_second", "total_worker_time_ms",
 				 "avg_worker_time_ms", "total_elapsed_time_ms",
@@ -5125,25 +5087,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				}
 				#Loop through each Excel row
 				foreach ($row in $TblLockPlans) {
-					$SQLPlanFile = "-- N/A --"
-					#Changing the value of $SQLPlanFile only for records where execution plan exists
-					if ($TblLockPlans.Rows[$RowNum]["query_plan"] -ne [System.DBNull]::Value) {
-						$SQLPlanFile = "Deadlock_" + $SQLPlanNum + ".sqlplan"
-					}
 					foreach ($col in $DataSetCols) {
 						#Fill Excel cell with value from the data set
 						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TblLockPlans.Rows[$RowNum][$col]
 						#move to the next column
 						$ExcelColNum += 1
-						<# 
-					If the next column is the SQLPlan Name column 
-					fill it separately and then move to next column
-					#>
-						if ($ExcelColNum -eq 2) {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $SQLPlanFIle
-							#move to the next column
-							$ExcelColNum += 1
-						}
+
 					}
 
 					#move to the next row in the spreadsheet
@@ -5152,8 +5101,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$RowNum += 1
 					# reset Excel column number so that next row population begins with column 1
 					$ExcelColNum = 1
-					#Move to the next sqlplan file
-					$SQLPlanNum += 1
 				}
 
 				##Saving file 
@@ -5185,7 +5132,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		[int]$TwoThirdsBlitzCache = [Math]::Floor([decimal]($BlitzCacheRecs / 1.5))
 		[string]$DBName = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Name | Select-Object -Last 1
 		[int]$DBCount = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Count | Select-Object -Last 1
-		if (($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --")) {
+		if (($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --") -and (!([string]::IsNullOrEmpty($DBName)) )) {
 			Write-Host " $DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
 			$StepStart = get-date
 			Write-Host " ->" -NoNewline
@@ -5199,7 +5146,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	
 	#Only run the check if a specific database name has been provided
 	if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
-		if($DBSwitched -ne "Y"){
+		if ($DBSwitched -ne "Y") {
 			Write-Host " " -NoNewLine
 		}
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetStatsInfoForWholeDB.sql")
@@ -5355,9 +5302,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		}
 		### get index frag info
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetIndexInfoForWholeDB.sql")
-		if($DBSwitched -ne "Y"){
+		if ($DBSwitched -ne "Y") {
 			Write-Host " " -NoNewLine
-		} elseif ($DBSwitched -eq "Y") {
+		}
+		elseif ($DBSwitched -eq "Y") {
 			Write-Host " ->" -NoNewLine
 		}
 		if ($IsAzureSQLDB) { 
@@ -5677,38 +5625,21 @@ finally {
 
 			##Add plan file column 
 			$BlitzWhoAggTbl.Columns.Add("sqlplan_file", [string]) | Out-Null
-			$RowNum = 0
-			$i = 0
-			
-			foreach ($row in $BlitzWhoAggTbl) {
-				if ($BlitzWhoAggTbl.Rows[$RowNum]["query_plan"] -ne [System.DBNull]::Value) {
-					$i += 1
-					$SQLPlanFile = "RunningNow_" + $i + ".sqlplan"
-					
-				}
-				else { $SQLPlanFile = "-- N/A --" }
-				$BlitzWhoAggTbl.Rows[$RowNum]["sqlplan_file"] = $SQLPlanFile
-				$RowNum += 1
-			}
-			##Exporting execution plans to file
-			#Set counter used for row retrieval
-			[int]$RowNum = 0
-			#loop through each row
+			##Exporting execution plans to file and setting plan file names
 			if ($DebugInfo) {
 				Write-Host " ->Exporting execution plans" -fore yellow
 			}
+			$RowNum = 0
+			$i = 0			
 			foreach ($row in $BlitzWhoAggTbl) {
-				<#
-			Get only the column storing the execution plan data that's 
-			not NULL and write it to a file
-			#>
+				$i += 1
+				$SQLPlanFile = "-- N/A --"
 				if ($BlitzWhoAggTbl.Rows[$RowNum]["query_plan"] -ne [System.DBNull]::Value) {
-					#Get session_id to append to filename
-					[string]$SQLPlanFile = $BlitzWhoAggTbl.Rows[$RowNum]["sqlplan_file"]
-					#Write execution plan to file
-					$BlitzWhoAggTbl.Rows[$RowNum]["query_plan"] | Format-XML | Set-Content -Path $PlanOutDir\$($SQLPlanFile) -Force
-				}		
-				#Increment row retrieval counter
+					
+					$SQLPlanFile = "RunningNow_" + $i + ".sqlplan"
+					$BlitzWhoAggTbl.Rows[$RowNum]["query_plan"] | Format-XML | Set-Content -Path "$PlanOutDir\$SQLPlanFile" -Force			
+				}
+				$BlitzWhoAggTbl.Rows[$RowNum]["sqlplan_file"] = $SQLPlanFile
 				$RowNum += 1
 			}
 
@@ -5775,8 +5706,9 @@ finally {
 				$i = 0
 			
 				foreach ($row in $BlitzWhoAggTbl) {
+					$i += 1
 					if ($BlitzWhoAggTbl.Rows[$RowNum]["query_text"] -ne [System.DBNull]::Value) {
-						$i += 1
+						
 						$QueryName = "RunningNow_" + $i + ".query"
 					
 					}
@@ -6155,9 +6087,10 @@ finally {
 "@ 
 		$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\ExecutionLog.html"
 		$AzureEnv = ""
-		if($IsAzureSQLMI){
+		if ($IsAzureSQLMI) {
 			$AzureEnv = "- Azure SQL MI"
-		}elseif($IsAzureSQLDB){
+		}
+		elseif ($IsAzureSQLDB) {
 			$AzureEnv = "- Azure SQL DB"
 			$DbPortion = "- $ASDBName"
 		}
