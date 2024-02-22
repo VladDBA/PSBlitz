@@ -4149,7 +4149,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Write-Host " Running sp_BlitzQueryStore for $ASDBName..." -NoNewline
 			}
 			else {
-				if ($DBSwitched = "Y") {
+				if ($DBSwitched -eq "Y") {
 					$OldCheckDBStr = ";SET @DatabaseName = NULL;"
 					$NewCheckDBStr = ";SET @DatabaseName = '" + $CheckDB + "';"
 				}
@@ -5125,23 +5125,16 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	#####################################################################################
 
 	<#
-		if no specific database name has been provided, check BlitzCache results for any database that
-		might account for 2/3 of all the records returned by BlitzCache
+		if db was switched for querystore we can switch it again no without doing all the math again
 	#>
-	if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
-		[int]$TwoThirdsBlitzCache = [Math]::Floor([decimal]($BlitzCacheRecs / 1.5))
-		[string]$DBName = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Name | Select-Object -Last 1
-		[int]$DBCount = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Count | Select-Object -Last 1
-		if (($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --") -and (!([string]::IsNullOrEmpty($DBName)) )) {
-			Write-Host " $DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
-			$StepStart = get-date
-			Write-Host " ->" -NoNewline
-			[string]$CheckDB = $DBName
-			$DBSwitched = "Y"
-			$StepEnd = get-date
-			Add-LogRow "CheckDB value" "Switched" "$DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
-		}
-		
+	if ($DBSwitched -eq "Y") {
+		Write-Host " $DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
+		$StepStart = get-date
+		Write-Host " ->" -NoNewline
+		[string]$CheckDB = $DBName
+		$DBSwitched = "Y"
+		$StepEnd = get-date
+		Add-LogRow "CheckDB value" "Switched" "$DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
 	}
 	
 	#Only run the check if a specific database name has been provided
