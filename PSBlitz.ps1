@@ -5125,7 +5125,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	#####################################################################################
 
 	<#
-		if db was switched for querystore we can switch it again no without doing all the math again
+		if db was switched for querystore we can switch it again without doing all the math again
 	#>
 	if ($DBSwitched -eq "Y") {
 		Write-Host " $DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
