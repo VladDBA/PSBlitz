@@ -68,8 +68,7 @@ IF OBJECT_ID('tempdb.dbo.#dbcc_events_from_trace', 'U') IS NOT NULL
     DROP TABLE #dbcc_events_from_trace
 
 /*
-Except for the addition of skipped checks 224 and 92 for Azure SQL MI,
-everything beyond this point is straight from sp_Blitz 
+Everything beyond this point is straight from sp_Blitz 
 without the GO at the end
 */
 
@@ -78,7 +77,7 @@ without the GO at the end
 	SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 	
 
-	SELECT @Version = '8.18', @VersionDate = '20231222';
+	SELECT @Version = '8.19', @VersionDate = '20240222';
 	SET @OutputType = UPPER(@OutputType);
 
     IF(@VersionCheckMode = 1)
@@ -241,6 +240,7 @@ without the GO at the end
 			,@SkipModel bit = 0
 			,@SkipTempDB bit = 0
 			,@SkipValidateLogins bit = 0
+      ,@SkipGetAlertInfo bit = 0
 
 			DECLARE
 			    @db_perms table
@@ -265,6 +265,23 @@ without the GO at the end
             
             /* End of declarations for First Responder Kit consistency check:*/
         ;
+
+        /* Create temp table for check 73 */
+        IF OBJECT_ID('tempdb..#AlertInfo') IS NOT NULL
+			EXEC sp_executesql N'DROP TABLE #AlertInfo;';
+
+        CREATE TABLE #AlertInfo
+		(
+		    FailSafeOperator NVARCHAR(255) ,
+		    NotificationMethod INT ,
+		    ForwardingServer NVARCHAR(255) ,
+		    ForwardingSeverity INT ,
+		    PagerToTemplate NVARCHAR(255) ,
+		    PagerCCTemplate NVARCHAR(255) ,
+		    PagerSubjectTemplate NVARCHAR(255) ,
+		    PagerSendSubjectOnly NVARCHAR(255) ,
+		    ForwardAlways INT
+		);
 
 		/* Create temp table for check 2301 */
 		IF OBJECT_ID('tempdb..#InvalidLogins') IS NOT NULL
@@ -355,6 +372,20 @@ without the GO at the end
 			    END CATCH;
 			END; /*Need execute on sp_validatelogins*/
             
+            IF ISNULL(@SkipGetAlertInfo, 0) != 1 /*If @SkipGetAlertInfo hasn't been set to 1 by the caller*/
+			BEGIN
+			    BEGIN TRY
+			        /* Try to fill the table for check 73 */
+					INSERT INTO #AlertInfo
+                    EXEC [master].[dbo].[sp_MSgetalertinfo] @includeaddresses = 0;
+			
+			    	SET @SkipGetAlertInfo = 0; /*We can execute sp_MSgetalertinfo*/
+			    END TRY
+			    BEGIN CATCH
+			    	SET @SkipGetAlertInfo = 1; /*We have don't have execute rights or sp_MSgetalertinfo throws an error so skip it*/
+			    END CATCH;
+			END; /*Need execute on sp_MSgetalertinfo*/
+
 			IF ISNULL(@SkipModel, 0) != 1 /*If @SkipModel hasn't been set to 1 by the caller*/
 			BEGIN
 				IF EXISTS
@@ -667,7 +698,7 @@ without the GO at the end
 		SELECT
 		    v.*
 		FROM (VALUES(NULL, 211, NULL)) AS v (DatabaseName, CheckID, ServerName) /*xp_regread*/
-		WHERE @SkipXPRegRead = 1;
+		WHERE @sa = 0;
 
 		INSERT #SkipChecks (DatabaseName, CheckID, ServerName)
 		SELECT
@@ -679,7 +710,13 @@ without the GO at the end
 		SELECT
 		    v.*
 		FROM (VALUES(NULL, 2301, NULL))	AS v (DatabaseName, CheckID, ServerName) /*sp_validatelogins*/
-		WHERE @SkipValidateLogins = 1
+		WHERE @SkipValidateLogins = 1;
+
+        INSERT #SkipChecks (DatabaseName, CheckID, ServerName)
+		SELECT
+		    v.*
+		FROM (VALUES(NULL, 73, NULL)) AS v (DatabaseName, CheckID, ServerName) /*sp_validatelogins*/
+		WHERE @SkipGetAlertInfo = 1;
 
 		IF @sa = 0
 		BEGIN
@@ -880,8 +917,8 @@ without the GO at the end
 						INSERT INTO #SkipChecks (CheckID, DatabaseName) VALUES (80, 'model');  /* Max file size set */
 						INSERT INTO #SkipChecks (CheckID, DatabaseName) VALUES (80, 'msdb');  /* Max file size set */
 						INSERT INTO #SkipChecks (CheckID, DatabaseName) VALUES (80, 'tempdb');  /* Max file size set */
-						INSERT INTO #SkipChecks (CheckID) VALUES (224);  /* CheckID 224 - Performance - SSRS/SSAS/SSIS Installed -- Vlad -- https://github.com/VladDBA/PSBlitz/issues/164*/
-						INSERT INTO #SkipChecks (CheckID) VALUES (92);  /* CheckID 92 - drive space -- Vlad -- https://github.com/VladDBA/PSBlitz/issues/164*/
+						INSERT INTO #SkipChecks (CheckID) VALUES (224); /* CheckID 224 - Performance - SSRS/SSAS/SSIS Installed */
+						INSERT INTO #SkipChecks (CheckID) VALUES (92); /* CheckID 92 - drive space */
 			            INSERT  INTO #BlitzResults
 			            ( CheckID ,
 				            Priority ,
@@ -1202,7 +1239,7 @@ without the GO at the end
 		IF @BringThePain = 0 AND 50 <= (SELECT COUNT(*) FROM sys.databases) AND @CheckUserDatabaseObjects = 1
 			BEGIN
 			SET @CheckUserDatabaseObjects = 0;
-			PRINT 'Running sp_Blitz @CheckUserDatabaseObjects = 1 on a server with 50+ databases may cause temporary insanity for the server and/or user.';
+			PRINT 'Running sp_Blitz @CheckUserDatabaseObjects = 1 on a server with 50+ databases may cause temporary problems for the server and/or user.';
 			PRINT 'If you''re sure you want to do this, run again with the parameter @BringThePain = 1.';
 			INSERT  INTO #BlitzResults
 			( CheckID ,
@@ -3436,23 +3473,6 @@ without the GO at the end
 
 						IF @Debug IN (1, 2) RAISERROR('Running CheckId [%d].', 0, 1, 53) WITH NOWAIT;
 
-						--INSERT  INTO #BlitzResults
-                                         --            ( CheckID ,
-                                         --              Priority ,
-                                         --              FindingsGroup ,
-                                         --              Finding ,
-                                         --              URL ,
-                                         --              Details
-                                         --            )
-                                         --            SELECT TOP 1
-                                         --                         53 AS CheckID ,
-                                         --                         200 AS Priority ,
-                                         --                         'Informational' AS FindingsGroup ,
-                                         --                         'Cluster Node' AS Finding ,
-                                         --                         'https://BrentOzar.com/go/node' AS URL ,
-                                         --                         'This is a node in a cluster.' AS Details
-                                         --            FROM    sys.dm_os_cluster_nodes;
-
                                          DECLARE @AOFCI AS INT, @AOAG AS INT, @HAType AS VARCHAR(10), @errmsg AS VARCHAR(200)
 
                                          SELECT @AOAG = CAST(SERVERPROPERTY('IsHadrEnabled') AS INT)
@@ -3483,7 +3503,7 @@ without the GO at the end
                                                                       Details
                                                                )
 
-                                                   SELECT 53 AS CheckID ,
+                                                   SELECT DISTINCT 53 AS CheckID ,
                                                    200 AS Priority ,
                                                    'Informational' AS FindingsGroup ,
                                                    'Cluster Node' AS Finding ,
@@ -3500,7 +3520,7 @@ without the GO at the end
                                                                                    URL ,
                                                                                    Details
                                                                             )
-                                                                SELECT 53 AS CheckID ,
+                                                                SELECT DISTINCT 53 AS CheckID ,
                                                                 200 AS Priority ,
                                                                 'Informational' AS FindingsGroup ,
                                                                 'Cluster Node Info' AS Finding ,
@@ -3526,7 +3546,7 @@ without the GO at the end
                                                                                    URL ,
                                                                                    Details
                                                                             )
-                                                                SELECT 53 AS CheckID ,
+                                                                SELECT DISTINCT 53 AS CheckID ,
                                                                 200 AS Priority ,
                                                                 'Informational' AS FindingsGroup ,
                                                                 'Cluster Node Info' AS Finding ,
@@ -3551,7 +3571,7 @@ without the GO at the end
                                                                                    URL ,
                                                                                    Details
                                                                             )
-                                                                SELECT 53 AS CheckID ,
+                                                                SELECT DISTINCT 53 AS CheckID ,
                                                                 200 AS Priority ,
                                                                 'Informational' AS FindingsGroup ,
                                                                 'Cluster Node Info' AS Finding ,
@@ -4862,6 +4882,10 @@ without the GO at the end
 						  FROM sys.all_columns
 						  WHERE name = 'is_memory_optimized_elevate_to_snapshot_on' AND object_id = OBJECT_ID('sys.databases')
                             AND SERVERPROPERTY('EngineEdition') <> 8; /* Hekaton is always enabled in Managed Instances per https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit/issues/1919 */
+						INSERT INTO #DatabaseDefaults
+						  SELECT 'is_accelerated_database_recovery_on', 0, 145, 210, 'Acclerated Database Recovery Enabled', 'https://www.brentozar.com/go/dbdefaults', NULL
+						  FROM sys.all_columns
+						  WHERE name = 'is_accelerated_database_recovery_on' AND object_id = OBJECT_ID('sys.databases') AND SERVERPROPERTY('EngineEdition') NOT IN (5, 8) ;
 
 						DECLARE DatabaseDefaultsLoop CURSOR FOR
 						  SELECT name, DefaultValue, CheckID, Priority, Finding, URL, Details
@@ -8253,20 +8277,6 @@ IF @ProductVersionMajor >= 10
 
 						IF @Debug IN (1, 2) RAISERROR('Running CheckId [%d].', 0, 1, 73) WITH NOWAIT;
 						
-						DECLARE @AlertInfo TABLE
-							(
-							  FailSafeOperator NVARCHAR(255) ,
-							  NotificationMethod INT ,
-							  ForwardingServer NVARCHAR(255) ,
-							  ForwardingSeverity INT ,
-							  PagerToTemplate NVARCHAR(255) ,
-							  PagerCCTemplate NVARCHAR(255) ,
-							  PagerSubjectTemplate NVARCHAR(255) ,
-							  PagerSendSubjectOnly NVARCHAR(255) ,
-							  ForwardAlways INT
-							);
-						INSERT  INTO @AlertInfo
-								EXEC [master].[dbo].[sp_MSgetalertinfo] @includeaddresses = 0;
 						INSERT  INTO #BlitzResults
 								( CheckID ,
 								  Priority ,
@@ -8281,7 +8291,7 @@ IF @ProductVersionMajor >= 10
 										'No Failsafe Operator Configured' AS Finding ,
 										'https://www.brentozar.com/go/failsafe' AS URL ,
 										( 'No failsafe operator is configured on this server.  This is a good idea just in-case there are issues with the [msdb] database that prevents alerting.' ) AS Details
-								FROM    @AlertInfo
+								FROM    #AlertInfo
 								WHERE   FailSafeOperator IS NULL;
 					END;
 
@@ -10086,6 +10096,11 @@ IF @ProductVersionMajor >= 10 AND  NOT EXISTS ( SELECT  1
 	IF(OBJECT_ID('tempdb..#InvalidLogins') IS NOT NULL)
 	BEGIN
 		EXEC sp_executesql N'DROP TABLE #InvalidLogins;';
+	END;
+
+	IF OBJECT_ID('tempdb..#AlertInfo') IS NOT NULL
+	BEGIN
+		EXEC sp_executesql N'DROP TABLE #AlertInfo;';
 	END;
 
 	/*

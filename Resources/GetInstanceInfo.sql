@@ -154,9 +154,8 @@ GROUP  BY [d].[database_id],
 ORDER  BY [ConnectionsCount] DESC
 OPTION(RECOMPILE);
 
-DECLARE @InstanceLevelOption INT;
-
 /*Get SET options from both session and instance*/
+DECLARE @InstanceLevelOption INT;
 SELECT @InstanceLevelOption = CAST([value_in_use] AS INT)
 FROM   sys.configurations
 WHERE  [name] = N'user options';

@@ -2,6 +2,8 @@
 	Part of PSBlitz - https://github.com/VladDBA/PSBlitz
 	License - https://github.com/VladDBA/PSBlitz/blob/main/LICENSE
 */
+/*Stats Info*/
+USE [..PSBlitzReplace..];
 
 SET NOCOUNT ON;
 SET STATISTICS XML OFF;
