@@ -257,8 +257,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.0.4"
-$VersDate = "2024-02-24"
+$Vers = "4.0.5"
+$VersDate = "2024-03-01"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -543,7 +543,7 @@ function Add-LogRow {
 		$LogRow.ErrorMsg = $ErrMsg
 	}
  elseif ($StepStatus -eq "Success") {
-		$LogRow.ErrorMsg = ""
+		$LogRow.ErrorMsg = $MoreInfo
 	}
 	else {
 		$LogRow.ErrorMsg = $MoreInfo
@@ -1313,7 +1313,13 @@ if ($ToHTML -eq "Y") {
 		}
 	}
 	.QueryStoreTab{
-		td:nth-child(3) {
+		td:nth-child(6) {
+			position: sticky; left: 0;
+			background-color: rgba(255, 255, 255, 0.7);
+		}
+	}
+	.ActiveSessionsTab{
+		td:nth-child(5) {
 			position: sticky; left: 0;
 			background-color: rgba(255, 255, 255, 0.7);
 		}
@@ -1525,7 +1531,8 @@ try {
 			@{Name = "Last Startup"; Expression = { $_."instance_last_startup" } },
 			@{Name = "Uptime (days)"; Expression = { $_."uptime_days" } },
 			@{Name = "Client Connections"; Expression = { $_."client_connections" } },
-			"Estimated Response Latency (Sec)" | ConvertTo-Html -As Table -Fragment
+			"Estimated Response Latency (Sec)", 
+			@{Name = "Server Time"; Expression = {($_."server_time").ToString("yyyy-MM-dd HH:mm:ss")}} | ConvertTo-Html -As Table -Fragment
 
 			if (($DebugInfo) -and ($IsAzureSQLDB -eq $false)) {
 				Write-Host " ->Converting resource info to HTML" -fore yellow
@@ -1610,7 +1617,7 @@ $htmlTable4
 			$DataSetCols = @("machine_name", "instance_name", "product_version", "product_level",
 				"patch_level", "edition", "is_clustered", "always_on_enabled", "filestream_access_level",
 				"mem_optimized_tempdb_metadata", "fulltext_installed", "instance_collation", "process_id",
-				"instance_last_startup", "uptime_days", "client_connections", "net_latency")
+				"instance_last_startup", "uptime_days", "client_connections", "net_latency","server_time")
 
 			if ($DebugInfo) {
 				Write-Host " ->Writing instance info to Excel" -fore yellow
@@ -1625,6 +1632,8 @@ $htmlTable4
 					#Fill Excel cell with value from the data set
 					if ($col -eq "net_latency") {
 						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnTest
+					}elseif($col -eq "server_time"){
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $InstanceInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
 					}
 					else {
 						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $InstanceInfoTbl.Rows[$RowNum][$col]
@@ -3628,7 +3637,8 @@ $htmlTable
 			}
 			$PreviousOutcome = $StepOutcome
 			$StepOutcome = "Success"
-			Add-LogRow "sp_BlitzCache $SortOrder" $StepOutcome
+			$RecordsReturned = $BlitzCacheSet.Tables[0].Rows.Count
+			Add-LogRow "sp_BlitzCache $SortOrder" $StepOutcome "$RecordsReturned records returned"
 		}
 	 Catch {
 			$StepEnd = get-date
@@ -3809,7 +3819,7 @@ $htmlTable
 					$HtmlFileName = $HtmlFileName -replace " ", "_"
 					$HtmlFileName = "BlitzCache_$HtmlFileName.html"
 					$HtmlTabName2 = $SortOrder -replace "'", ""
-					#$html = $HTMLPre + @"
+					
 					$html = @"
 					<title>$HtmlTabName</title>
 					</head>
@@ -3898,10 +3908,6 @@ $htmlTable
 "@
 					$html3 | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\$HtmlFileName"
 				}
-
-				#Remove-Variable -Name html3
-				#Remove-Variable -Name html2
-				#Remove-Variable -Name html1
 
 			}
 			else {
@@ -4237,11 +4243,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					Write-Host " - $RunTime seconds" -Fore Yellow
 				}
 				$StepOutcome = "Success"
+				$RecordsReturned = $BlitzQSSet.Tables[0].Rows.Count
 				if ($IsAzureSQLDB) {
-					Add-LogRow "sp_BlitzQueryStore for $ASDBName" $StepOutcome
+					Add-LogRow "sp_BlitzQueryStore for $ASDBName" $StepOutcome "$RecordsReturned records returned"
 				}
 				else {
-					Add-LogRow "sp_BlitzQueryStore for $CheckDB" $StepOutcome
+					Add-LogRow "sp_BlitzQueryStore for $CheckDB" $StepOutcome "$RecordsReturned records returned"
 				}
 			}
 			Catch {
@@ -4558,7 +4565,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Write-Host " - $RunTime seconds" -Fore Yellow
 			}
 			$StepOutcome = "Success"
-			Add-LogRow "sp_BlitzIndex mode $Mode" $StepOutcome
+			$RecordsReturned = $BlitzIndexSet.Tables[0].Rows.Count
+			Add-LogRow "sp_BlitzIndex mode $Mode" $StepOutcome "$RecordsReturned records returned"
 		}
 	 Catch {
 			$StepEnd = get-date
@@ -5235,7 +5243,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Write-Host " - $RunTime seconds" -Fore Yellow
 			}
 			$StepOutcome = "Success"
-			Add-LogRow "Stats Info" $StepOutcome
+			$RecordsReturned = $StatsSet.Tables[0].Rows.Count
+			Add-LogRow "Stats Info" $StepOutcome "$RecordsReturned records returned"
 		}
 	 Catch {
 			$StepEnd = get-date
@@ -5395,7 +5404,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Write-Host " - $RunTime seconds" -Fore Yellow
 			}
 			$StepOutcome = "Success"
-			Add-LogRow "Index Frag Info" $StepOutcome
+			$RecordsReturned = $IndexSet.Tables[0].Rows.Count
+			Add-LogRow "Index Frag Info" $StepOutcome "$RecordsReturned records returned"
 		}
 	 Catch {
 			$StepEnd = get-date
@@ -5698,6 +5708,10 @@ finally {
 				$RowNum += 1
 			}
 
+			#Get capture time-frame
+			$BtilzWhoStartTime = $BlitzWhoTbl | Sort-Object -Property "CheckDate" | Select-Object -ExpandProperty "CheckDate" -First 1
+			$BtilzWhoEndTime = $BlitzWhoTbl | Sort-Object -Property "CheckDate" -Descending | Select-Object -ExpandProperty "CheckDate" -First 1
+
 			if ($ToHTML -eq "Y") {
 				if ($DebugInfo) {
 					Write-Host " ->Converting sp_BlitzWho output to HTML" -fore yellow
@@ -5778,6 +5792,7 @@ finally {
 				elseif ($IsAzureSQLDB) {
 					$HtmlTabName += " for $ASDBName"
 				}
+				#Aggregate session table
 				$htmlTable = $BlitzWhoAggTbl | Select-Object @{Name = "start_time"; Expression = { ($_."start_time").ToString("yyyy-MM-dd HH:mm:ss") } }, 
 				"elapsed_time", "session_id", "database_name", 
 				#"query_text", 
@@ -5807,12 +5822,14 @@ finally {
 				"resource_pool_name", 
 				@{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } },
 				@{Name = "query_plan_hash"; Expression = { Get-HexString -HexInput $_."query_plan_hash" } } | ConvertTo-Html -As Table -Fragment
+				$htmlTable = $htmlTable -replace '<table>', '<table class="ActiveSessionsTab">'
 				$QExt = '.query'
 				$FileSOrder = "RunningNow"
 				$AnchorRegex = "$FileSOrder(_\d+)$QExt"
 				$AnchorURL = '<a href="#$&">$&</a>'
 				$htmlTable = $htmlTable -replace $AnchorRegex, $AnchorURL
 
+				#Query table
 				$htmlTable1 = $BlitzWhoAggTbl | Select-Object "Query", @{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } },
 				"query_text" | Where-Object { $_."query_text" -ne [System.DBNull]::Value } | ConvertTo-Html -As Table -Fragment
 				$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
@@ -5824,6 +5841,7 @@ finally {
 				</head>
 				<body>
 				<h1 id="top">$HtmlTabName</h1>
+				<h3 style="text-align: center;">Based on session activity captured between $($BtilzWhoStartTime.ToString("yyyy-MM-dd HH:mm:ss")) and $($BtilzWhoEndTime.ToString("yyyy-MM-dd HH:mm:ss")) server time.</h3>
 				<p style="text-align: center;"><a href="#Queries">Jump to query text</a></p>
 				<br>
 				$htmlTable 
@@ -5910,8 +5928,12 @@ finally {
 
 				##Populating the "sp_BlitzWho Aggregate" sheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item("sp_BlitzWho Aggregate")
+				#Add session capture interval
+				$ExcelSheet.Cells.Item(1, 6) =$BtilzWhoStartTime.ToString("yyyy-MM-dd HH:mm:ss")
+				$ExcelSheet.Cells.Item(1, 8) =$BtilzWhoEndTime.ToString("yyyy-MM-dd HH:mm:ss")
+
 				#Specify at which row in the sheet to start adding the data
-				$ExcelStartRow = $DefaultStartRow
+				$ExcelStartRow = 3
 				#Specify with which column in the sheet to start
 				$ExcelColNum = 1
 				#Set counter used for row retrieval
@@ -6439,7 +6461,7 @@ finally {
 				<br>
 				<br>
 				<footer>  
-				<p>Report generated with <a href="https://github.com/VladDBA/PSBlitz">PSBlitz</a> - created by <a href="https://vladdba.com/">Vlad Drumea</a></p>
+				<p>Report generated with <a href='https://github.com/VladDBA/PSBlitz' target='_blank'>PSBlitz</a> - created by <a href='https://vladdba.com/' target='_blank'>Vlad Drumea</a></p>
 				</footer>  
 				</body>
 				</html>
