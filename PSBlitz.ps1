@@ -257,8 +257,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.0.4"
-$VersDate = "2024-02-24"
+$Vers = "4.0.5"
+$VersDate = "2024-03-01"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -543,7 +543,7 @@ function Add-LogRow {
 		$LogRow.ErrorMsg = $ErrMsg
 	}
  elseif ($StepStatus -eq "Success") {
-		$LogRow.ErrorMsg = ""
+		$LogRow.ErrorMsg = $MoreInfo
 	}
 	else {
 		$LogRow.ErrorMsg = $MoreInfo
@@ -1252,6 +1252,7 @@ if ($ToHTML -eq "Y") {
 	if (!(Test-Path $HTMLOutDir)) {
 		New-Item -ItemType Directory -Force -Path $HTMLOutDir | Out-Null
 	}
+	#HTML elements and styles used in most report pages
 	$HTMLPre = @"
 	<!DOCTYPE html>
 	<html>
@@ -1275,15 +1276,53 @@ if ($ToHTML -eq "Y") {
 		padding: 5px;
 		text-align: center;
 		border: 1px solid black;
+		position: sticky; 
+		top: 0; 
+		z-index: 1;
 	}
 	td {
 		padding: 5px;
 		border: 1px solid black;
 		vertical-align: top;
 	}
+	tr:hover{
+		background-color: rgba(255, 255, 0, 0.4);
+	}
 	td:first-child {
 		font-weight: bold;
 		text-align: left;
+	}
+	.CacheTable1{
+		td:nth-child(3) {
+			position: sticky; left: 0;
+			background-color: rgba(255, 255, 255, 0.7);
+		}
+		td:nth-child(CacheTab1High) {
+			font-weight: bold;
+			background-color: rgba(255, 255, 0, 0.4);
+		}
+	}
+	.CacheTable2{
+		td:nth-child(3) {
+			position: sticky; left: 0;
+			background-color: rgba(255, 255, 255, 0.7);
+		}
+		td:nth-child(CacheTab2High) {
+			font-weight: bold;
+			background-color: rgba(255, 255, 0, 0.4);
+		}
+	}
+	.QueryStoreTab{
+		td:nth-child(6) {
+			position: sticky; left: 0;
+			background-color: rgba(255, 255, 255, 0.7);
+		}
+	}
+	.ActiveSessionsTab{
+		td:nth-child(5) {
+			position: sticky; left: 0;
+			background-color: rgba(255, 255, 255, 0.7);
+		}
 	}
 	h1 {
 		text-align: center;
@@ -1492,7 +1531,8 @@ try {
 			@{Name = "Last Startup"; Expression = { $_."instance_last_startup" } },
 			@{Name = "Uptime (days)"; Expression = { $_."uptime_days" } },
 			@{Name = "Client Connections"; Expression = { $_."client_connections" } },
-			"Estimated Response Latency (Sec)" | ConvertTo-Html -As Table -Fragment
+			"Estimated Response Latency (Sec)", 
+			@{Name = "Server Time"; Expression = {($_."server_time").ToString("yyyy-MM-dd HH:mm:ss")}} | ConvertTo-Html -As Table -Fragment
 
 			if (($DebugInfo) -and ($IsAzureSQLDB -eq $false)) {
 				Write-Host " ->Converting resource info to HTML" -fore yellow
@@ -1577,7 +1617,7 @@ $htmlTable4
 			$DataSetCols = @("machine_name", "instance_name", "product_version", "product_level",
 				"patch_level", "edition", "is_clustered", "always_on_enabled", "filestream_access_level",
 				"mem_optimized_tempdb_metadata", "fulltext_installed", "instance_collation", "process_id",
-				"instance_last_startup", "uptime_days", "client_connections", "net_latency")
+				"instance_last_startup", "uptime_days", "client_connections", "net_latency","server_time")
 
 			if ($DebugInfo) {
 				Write-Host " ->Writing instance info to Excel" -fore yellow
@@ -1592,6 +1632,8 @@ $htmlTable4
 					#Fill Excel cell with value from the data set
 					if ($col -eq "net_latency") {
 						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnTest
+					}elseif($col -eq "server_time"){
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $InstanceInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
 					}
 					else {
 						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $InstanceInfoTbl.Rows[$RowNum][$col]
@@ -3595,7 +3637,8 @@ $htmlTable
 			}
 			$PreviousOutcome = $StepOutcome
 			$StepOutcome = "Success"
-			Add-LogRow "sp_BlitzCache $SortOrder" $StepOutcome
+			$RecordsReturned = $BlitzCacheSet.Tables[0].Rows.Count
+			Add-LogRow "sp_BlitzCache $SortOrder" $StepOutcome "$RecordsReturned records returned"
 		}
 	 Catch {
 			$StepEnd = get-date
@@ -3645,31 +3688,42 @@ $htmlTable
 				}
 			}
 
-			#Set Excel sheet names based on $SortOrder
+			<#
+			 Set Excel sheet names based on $SortOrder
+			Since we're already checking for sort order, I'll also add the column number for CSS
+			#>
 			$SheetName = "sp_BlitzCache "
 			if ($SortOrder -like '*CPU*') {
 				$SheetName = $SheetName + "CPU"
+				$HighlightCol = 16
 			}
 			elseif ($SortOrder -like '*Reads*') {
 				$SheetName = $SheetName + "Reads"
+				$HighlightCol = 24
 			}
 			elseif ($SortOrder -like '*Duration*') {
 				$SheetName = $SheetName + "Duration"
+				$HighlightCol = 20
 			}
 			elseif ($SortOrder -like '*Executions*') {
 				$SheetName = $SheetName + "Executions"
+				$HighlightCol = 10
 			}
 			elseif ($SortOrder -like '*Writes*') {
 				$SheetName = $SheetName + "Writes"
+				$HighlightCol = 28
 			}
 			elseif ($SortOrder -like '*Spills*') {
 				$SheetName = $SheetName + "Spills"
+				$HighlightCol = 58
 			}
 			elseif ($SortOrder -like '*Memory*') {
 				$SheetName = $SheetName + "Mem & Recent Comp"
+				$HighlightCol = 52
 			}
 			elseif ($SortOrder -eq "'Recent compilations'") {
 				$SheetName = $SheetName + "Mem & Recent Comp"
+				$HighlightCol = 38
 			}
 
 			if ($ToHTML -eq "Y") {
@@ -3696,6 +3750,7 @@ $htmlTable
 				if ($DebugInfo) {
 					Write-Host " ->Converting sp_BlitzCache output to HTML" -fore yellow
 				}
+				
 				$htmlTable1 = $BlitzCacheTbl | Select-Object "Database", "Cost", 
 				"Query",
 				"SQLPlan File", 
@@ -3723,7 +3778,7 @@ $htmlTable
 				"Maximum Memory Grant KB", "Minimum Used Grant KB", "Maximum Used Grant KB",
 				"Average Max Memory Grant", "Min Spills", "Max Spills", "Total Spills", "Avg Spills" | ConvertTo-Html -As Table -Fragment
 				
-				#$htmlTable1 = $htmlTable1 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+				#Handling URLs
 				$QExt = '.query'
 				$AnchorRegex = "$FileSOrder(_\d+)$QExt"
 				$AnchorURL = '<a href="#$&">$&</a>'
@@ -3742,6 +3797,11 @@ $htmlTable
 				#pairing up related tables in the same HTML file
 				if ("'CPU'", "'Reads'", "'Duration'", "'Executions'", "'Writes'",
 					"'Spills'", "'Memory Grant'" -contains $SortOrder) {
+					#Handling CSS
+					$CacheHTMLPre = $HTMLPre
+					$CacheHTMLPre = $CacheHTMLPre -replace 'CacheTab1High', $HighlightCol
+					$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="CacheTable1">'
+					
 					if ($SheetName -eq "Mem & Recent Comp") {
 						$HtmlTabName = "Queries by Memory Grants & Recent Compilations"
 					}
@@ -3754,11 +3814,13 @@ $htmlTable
 					elseif ($IsAzureSQLDB) {
 						$HtmlTabName += " for $ASDBName"
 					}
+					
 					$HtmlFileName = $SheetName -replace " & ", "_"
 					$HtmlFileName = $HtmlFileName -replace " ", "_"
 					$HtmlFileName = "BlitzCache_$HtmlFileName.html"
 					$HtmlTabName2 = $SortOrder -replace "'", ""
-					$html = $HTMLPre + @"
+					
+					$html = @"
 					<title>$HtmlTabName</title>
 					</head>
 					<body>
@@ -3790,19 +3852,25 @@ $htmlTable
 				#adding the second half of each html page and writing to file
 				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'")) {
 					$HtmlTabName2 = $SortOrder -replace "'", ""
+					#Handling CSS
+					$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="CacheTable2">'
+					
 					#Add heading if first half of the table failed
 					if ($PreviousOutcome -eq "Failure") {
-						$html = $HTMLPre
+						$CacheHTMLPre = $HTMLPre
+						#$html = $CacheHTMLPre
 						$html2 = @"
 						<br>
 "@
-					}
+					} 					
 					if ($SortOrder -eq "'Recent Compilations'") {
-						$TopCount = "50"
+						$TopCount = "50"						
 					}
 					else {
 						$TopCount = "$CacheTop"
+						$HighlightCol += 1
 					}
+					$CacheHTMLPre = $CacheHTMLPre -replace 'CacheTab2High', $HighlightCol
 					$html += @"
 				<h2 style="text-align: center;">Top $TopCount Queries by $HtmlTabName2</h2>
 				<p style="text-align: center;"><a href="#Queries2">Jump to query text</a></p>
@@ -3820,28 +3888,26 @@ $htmlTable
 					<p style="text-align: center;"><a href="#top">Jump to top</a></p>
 "@
 					#putting it all together
-					$html += $html2 + @"
+					$html3 = $CacheHTMLPre + $html + $html2 + @"
 					<br>
 					</body>
 					</html>
 "@
 					$SecondHalf = "Done"
-					$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\$HtmlFileName"
+					$html3 | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\$HtmlFileName"
 				}
 				if ($DebugInfo) {
 					Write-Host " ->Writing HTML file." -fore yellow
 				}
 				#Only writing the file here if this is the first half
 				if (($FirstHalf -eq "Done") -and ($SecondHalf -eq "NotDone")) {
-					$html3 = $html + $html2 + @"
+					$html3 = $CacheHTMLPre + $html + $html2 + @"
 					<br>
 					</body>
 					</html>
 "@
 					$html3 | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\$HtmlFileName"
 				}
-
-
 
 			}
 			else {
@@ -4045,7 +4111,7 @@ $htmlTable
 		}
 		$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
-			Write-Host "Checking if $CheckDB is eligible for sp_BlizQueryStore..."
+			Write-Host "Checking if $CheckDB is eligible for sp_BlitzQueryStore..."
 			$DBQuery = @" 
 		IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSION')), 4)) < 13 )
   BEGIN
@@ -4074,7 +4140,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$CheckDBQuery.Parameters["@DBName"].Value = $CheckDB
 		}
 		elseif ($IsAzureSQLDB) {
-			Write-Host "Checking if $ASDBName is eligible for sp_BlizQueryStore..."
+			Write-Host "Checking if $ASDBName is eligible for sp_BlitzQueryStore..."
 			$DBQuery = @"
 			IF ( (SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128))) = N'SQL Azure' )
 			BEGIN
@@ -4114,23 +4180,23 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				else {
 					Write-Host " ->$CheckDB - " -NoNewLine -ErrorAction Stop
 				}
-				Write-Host "is eligible for sp_BlizQueryStore" -ErrorAction Stop
+				Write-Host "is eligible for sp_BlitzQueryStore" -ErrorAction Stop
 				$CheckQueryStore = 'Y'
 			}
 			elseif ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "No") {
 				$StepEnd = Get-Date
 				if ($IsAzureSQLDB) {
-					Write-Host " ->$ASDBName - is not eligible for sp_BlizQueryStore" -NoNewLine -ErrorAction Stop
+					Write-Host " ->$ASDBName - is not eligible for sp_BlitzQueryStore" -NoNewLine -ErrorAction Stop
 				}
 				else {
-					Write-Host " ->$CheckDB - is not eligible for sp_BlizQueryStore"
+					Write-Host " ->$CheckDB - is not eligible for sp_BlitzQueryStore"
 				}
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" "$CheckDB is not eligible"
 			}
 			else {
 				$StepEnd = Get-Date
 				$QSCheckResult = $CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] 
-				Write-Host " ->$ASDBName - is not eligible for sp_BlizQueryStore" -NoNewLine -ErrorAction Stop
+				Write-Host " ->$ASDBName - is not eligible for sp_BlitzQueryStore" -NoNewLine -ErrorAction Stop
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" $QSCheckResult
 
 			}
@@ -4177,11 +4243,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					Write-Host " - $RunTime seconds" -Fore Yellow
 				}
 				$StepOutcome = "Success"
+				$RecordsReturned = $BlitzQSSet.Tables[0].Rows.Count
 				if ($IsAzureSQLDB) {
-					Add-LogRow "sp_BlitzQueryStore for $ASDBName" $StepOutcome
+					Add-LogRow "sp_BlitzQueryStore for $ASDBName" $StepOutcome "$RecordsReturned records returned"
 				}
 				else {
-					Add-LogRow "sp_BlitzQueryStore for $CheckDB" $StepOutcome
+					Add-LogRow "sp_BlitzQueryStore for $CheckDB" $StepOutcome "$RecordsReturned records returned"
 				}
 			}
 			Catch {
@@ -4258,9 +4325,9 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					@{Name = "Pattern"; Expression = { ($_."pattern") } },
 					@{Name = "Parameter Sniffing Symptoms"; Expression = { ($_."parameter_sniffing_symptoms") } },
 					@{Name = "Top Three Waits"; Expression = { ($_."top_three_waits") } },
-					@{Name = "Missing Indexes"; Expression = { ($_."missing_indexes") } },
-					@{Name = "Implicit Conversion Info"; Expression = { ($_."implicit_conversion_info") } },
-					@{Name = "Cached Exec Parameters"; Expression = { ($_."cached_execution_parameters") } },
+					@{Name = "Missing Indexes"; Expression = { ($_."missing_indexes").Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
+					@{Name = "Implicit Conversion Info"; Expression = { ($_."implicit_conversion_info").Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
+					@{Name = "Cached Exec Parameters"; Expression = { ($_."cached_execution_parameters").Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
 					@{Name = "Executions"; Expression = { ($_."count_executions") } },
 					@{Name = "Compiles"; Expression = { ($_."count_compiles") } },
 					@{Name = "Total CPU Time(ms)"; Expression = { ($_."total_cpu_time") } },
@@ -4288,6 +4355,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					@{Name = "Last Force Failure Reasson"; Expression = { ($_."last_force_failure_reason_desc") } },
 					@{Name = "Context Settings"; Expression = { ($_."context_settings") } } | ConvertTo-Html -As Table -Fragment
 
+
+					$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="QueryStoreTab">'
 					$QExt = '.query'
 					$FileSOrder = "QueryStore"
 					$AnchorRegex = "$FileSOrder(_\d+)$QExt"
@@ -4316,7 +4385,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					<h1 id="top">$HtmlTabName</h1>
 					<br>
 					<h2 style="text-align: center;">Query Store results from past 7 days</h2>
-					<p><a href="#Queries1">Jump to query text</a></p>
+					<p style="text-align: center;"><a href="#Queries">Jump to query text</a></p>
 					$htmlTable1
 					<br>
 					<h2 style="text-align: center;">Summary</h2>
@@ -4496,7 +4565,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Write-Host " - $RunTime seconds" -Fore Yellow
 			}
 			$StepOutcome = "Success"
-			Add-LogRow "sp_BlitzIndex mode $Mode" $StepOutcome
+			$RecordsReturned = $BlitzIndexSet.Tables[0].Rows.Count
+			Add-LogRow "sp_BlitzIndex mode $Mode" $StepOutcome "$RecordsReturned records returned"
 		}
 	 Catch {
 			$StepEnd = get-date
@@ -5173,7 +5243,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Write-Host " - $RunTime seconds" -Fore Yellow
 			}
 			$StepOutcome = "Success"
-			Add-LogRow "Stats Info" $StepOutcome
+			$RecordsReturned = $StatsSet.Tables[0].Rows.Count
+			Add-LogRow "Stats Info" $StepOutcome "$RecordsReturned records returned"
 		}
 	 Catch {
 			$StepEnd = get-date
@@ -5333,7 +5404,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Write-Host " - $RunTime seconds" -Fore Yellow
 			}
 			$StepOutcome = "Success"
-			Add-LogRow "Index Frag Info" $StepOutcome
+			$RecordsReturned = $IndexSet.Tables[0].Rows.Count
+			Add-LogRow "Index Frag Info" $StepOutcome "$RecordsReturned records returned"
 		}
 	 Catch {
 			$StepEnd = get-date
@@ -5636,6 +5708,10 @@ finally {
 				$RowNum += 1
 			}
 
+			#Get capture time-frame
+			$BtilzWhoStartTime = $BlitzWhoTbl | Sort-Object -Property "CheckDate" | Select-Object -ExpandProperty "CheckDate" -First 1
+			$BtilzWhoEndTime = $BlitzWhoTbl | Sort-Object -Property "CheckDate" -Descending | Select-Object -ExpandProperty "CheckDate" -First 1
+
 			if ($ToHTML -eq "Y") {
 				if ($DebugInfo) {
 					Write-Host " ->Converting sp_BlitzWho output to HTML" -fore yellow
@@ -5716,6 +5792,7 @@ finally {
 				elseif ($IsAzureSQLDB) {
 					$HtmlTabName += " for $ASDBName"
 				}
+				#Aggregate session table
 				$htmlTable = $BlitzWhoAggTbl | Select-Object @{Name = "start_time"; Expression = { ($_."start_time").ToString("yyyy-MM-dd HH:mm:ss") } }, 
 				"elapsed_time", "session_id", "database_name", 
 				#"query_text", 
@@ -5745,12 +5822,14 @@ finally {
 				"resource_pool_name", 
 				@{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } },
 				@{Name = "query_plan_hash"; Expression = { Get-HexString -HexInput $_."query_plan_hash" } } | ConvertTo-Html -As Table -Fragment
+				$htmlTable = $htmlTable -replace '<table>', '<table class="ActiveSessionsTab">'
 				$QExt = '.query'
 				$FileSOrder = "RunningNow"
 				$AnchorRegex = "$FileSOrder(_\d+)$QExt"
 				$AnchorURL = '<a href="#$&">$&</a>'
 				$htmlTable = $htmlTable -replace $AnchorRegex, $AnchorURL
 
+				#Query table
 				$htmlTable1 = $BlitzWhoAggTbl | Select-Object "Query", @{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } },
 				"query_text" | Where-Object { $_."query_text" -ne [System.DBNull]::Value } | ConvertTo-Html -As Table -Fragment
 				$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
@@ -5762,6 +5841,7 @@ finally {
 				</head>
 				<body>
 				<h1 id="top">$HtmlTabName</h1>
+				<h3 style="text-align: center;">Based on session activity captured between $($BtilzWhoStartTime.ToString("yyyy-MM-dd HH:mm:ss")) and $($BtilzWhoEndTime.ToString("yyyy-MM-dd HH:mm:ss")) server time.</h3>
 				<p style="text-align: center;"><a href="#Queries">Jump to query text</a></p>
 				<br>
 				$htmlTable 
@@ -5848,8 +5928,12 @@ finally {
 
 				##Populating the "sp_BlitzWho Aggregate" sheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item("sp_BlitzWho Aggregate")
+				#Add session capture interval
+				$ExcelSheet.Cells.Item(1, 6) =$BtilzWhoStartTime.ToString("yyyy-MM-dd HH:mm:ss")
+				$ExcelSheet.Cells.Item(1, 8) =$BtilzWhoEndTime.ToString("yyyy-MM-dd HH:mm:ss")
+
 				#Specify at which row in the sheet to start adding the data
-				$ExcelStartRow = $DefaultStartRow
+				$ExcelStartRow = 3
 				#Specify with which column in the sheet to start
 				$ExcelColNum = 1
 				#Set counter used for row retrieval
@@ -6119,6 +6203,9 @@ finally {
 					border: 1px solid black;
 					padding: 5px;
     }
+	tr:hover{
+		background-color: rgba(255, 255, 0, 0.4);
+	}
     td:first-child {
 					font-weight: bold;
 					text-align: left;
@@ -6374,7 +6461,7 @@ finally {
 				<br>
 				<br>
 				<footer>  
-				<p>Report generated with <a href="https://github.com/VladDBA/PSBlitz">PSBlitz</a> - created by <a href="https://vladdba.com/">Vlad Drumea</a></p>
+				<p>Report generated with <a href='https://github.com/VladDBA/PSBlitz' target='_blank'>PSBlitz</a> - created by <a href='https://vladdba.com/' target='_blank'>Vlad Drumea</a></p>
 				</footer>  
 				</body>
 				</html>

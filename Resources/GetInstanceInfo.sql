@@ -47,7 +47,8 @@ SELECT ISNULL(SERVERPROPERTY('MachineName'),'N/A')                              
        SERVERPROPERTY('ProcessID')                                                         AS [process_id],
        CAST(DATEDIFF(HH, [sqlserver_start_time], GETDATE()) / 24.00 AS NUMERIC(23, 2))     AS [uptime_days],
        (SELECT COUNT(*)
-        FROM   [sys].[dm_exec_connections])                                                AS [client_connections]
+        FROM   [sys].[dm_exec_connections])                                                AS [client_connections],
+		GETDATE()                                                                          AS [server_time]
 FROM   [sys].[dm_os_sys_info]
 OPTION(RECOMPILE); 
 
