@@ -257,8 +257,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.0.5"
-$VersDate = "2024-03-01"
+$Vers = "4.0.6"
+$VersDate = "2024-03-12"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -4652,9 +4652,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					@{Name = "Most Recent Modify Date"; Expression = { ($_."Most Recent Modify Date").ToString("yyyy-MM-dd HH:mm:ss") } } | ConvertTo-Html -As Table -Fragment
 				}
 				elseif ($Mode -eq "2") {
+					$BlitzIxTbl.Columns["Definition: [Property] ColumnName {datatype maxbytes}"].ColumnName = "Definition"
 					$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Schema Name", "Object Name", 
 					"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
-					"Object Type", "Definition: [Property] ColumnName {datatype maxbytes}", 
+					"Object Type", "Definition", 
 					"Key Column Names With Sort", "Count Key Columns", "Include Column Names", 
 					"Count Included Columns", "Secret Column Names", "Count Secret Columns", 
 					"Partition Key Column Name", "Filter Definition", "Is Indexed View", 
