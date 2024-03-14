@@ -2864,7 +2864,7 @@ $htmlTable6
 				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 					$htmlTable2 = $DBConfigTbl | Select-Object "Database", "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
 					$htmlBlock = "`n<br>`n" + '<h2 style="text-align: center;">Database Scoped Configuration</h2>'
-					$htmlBlock += '<p style="text-align: center;"><a href="https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-scoped-configuration-transact-sql?view=sql-server-ver16">More Info</a></p>'
+					$htmlBlock += '<p style="text-align: center;"><a href="https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-scoped-configuration-transact-sql?view=sql-server-ver16" target="_blank">More Info</a></p>'
 					$htmlBlock += "`n $htmlTable2 `n"
 					$htmlBlock += '<p style="text-align: center;"><a href="#top">Jump to top</a></p>'
 				}
