@@ -257,8 +257,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.0.6"
-$VersDate = "2024-03-12"
+$Vers = "4.0.7"
+$VersDate = "2024-03-15"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -473,17 +473,16 @@ function Format-XML {
 #Function to format exception messages
 function Format-ExceptionMsg {
 	[string]$ErrorMessage = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty Message
-	#Get SQL related error info
+	try {#Get SQL related error info
 	[string]$SQLErrNo = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Number
 	[string]$SQLErrLev = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Class
 	[string]$SQLErrState = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty State
 	[string]$SQLErrLineNo = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty LineNumber
 	[string]$SQLErrMsg = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Message
-	if (!([string]::IsNullOrEmpty($SQLErrNo))) {
-		##formatting the error message in SQL Server style if there's an error number
-		Write-Output "MSg $SQLErrNo, Level $SQLErrLev, State $SQLErrState, Line $SQLErrLineNo `n $SQLErrMsg"
+	##formatting the error message in SQL Server style if there's an error number
+	Write-Output "MSg $SQLErrNo, Level $SQLErrLev, State $SQLErrState, Line $SQLErrLineNo `n $SQLErrMsg"
 	}
- else {
+ catch {
 		Write-Output $ErrorMessage
 	}
 }
@@ -896,6 +895,14 @@ else {
 		$InstName = $ServerName
 		$HostName = $ServerName
 	}
+}
+
+if(($InteractiveMode -eq 0) -and (!([string]::IsNullOrEmpty($SQLLogin))) -and ([string]::IsNullOrEmpty($SQLPass))){
+	Write-Host " You've provided a SQL login, but no password." -Fore Yellow
+	$SecSQLPass = Read-Host -Prompt "Password" -AsSecureString
+	#Convert the secure password to plain text for SqlConnection
+	$BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($SecSQLPass)
+	$SQLPass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
 }
 
 #Convert the secure password to plain text for SqlConnection
@@ -1784,7 +1791,7 @@ $htmlTable4
 	Write-Host " Retrieving TempDB usage data... " -NoNewLine
 	$CmdTimeout = 600
 	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetTempDBUsageInfo.sql")
-	[string]$Query = $Query -replace "..PSBlitzReplace..", "$DirDate"
+	[string]$Query = $Query -replace '..PSBlitzReplace..', "$DirDate"
 	$TempDBSelect = new-object System.Data.SqlClient.SqlCommand
 	$TempDBSelect.CommandText = $Query
 	$TempDBSelect.Connection = $SqlConnection
@@ -2857,6 +2864,7 @@ $htmlTable6
 				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 					$htmlTable2 = $DBConfigTbl | Select-Object "Database", "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
 					$htmlBlock = "`n<br>`n" + '<h2 style="text-align: center;">Database Scoped Configuration</h2>'
+					$htmlBlock += '<p style="text-align: center;"><a href="https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-scoped-configuration-transact-sql?view=sql-server-ver16" target="_blank">More Info</a></p>'
 					$htmlBlock += "`n $htmlTable2 `n"
 					$htmlBlock += '<p style="text-align: center;"><a href="#top">Jump to top</a></p>'
 				}
@@ -3352,7 +3360,7 @@ $htmlTable
 				$htmlTable = $StorageTbl | Select-Object "Pattern", 
 				@{Name = "Sample Time"; Expression = { ($_."Sample Time").ToString("yyyy-MM-dd HH:mm:ss") } }, 
 				"Sample (seconds)", 
-				@{Name = "File Name [type]"; Expression = { $_."File Name" } },
+				"File Name",
 				"Drive", "# Reads/Writes", "MB Read/Written", "Avg Stall (ms)", 
 				@{Name = "Physical File Name"; Expression = { $_."file physical name" } },
 				@{Name = "Database Name"; Expression = { $_."DatabaseName" } } | ConvertTo-Html -As Table -Fragment
@@ -4363,7 +4371,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$AnchorURL = '<a href="#$&">$&</a>'
 					$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
 
-					$htmlTable2 = $BlitzQSSumTbl | Select-Object "Priority", "FindingsGroup", "Finding", "URL", "Details" | ConvertTo-Html -As Table -Fragment
+					$htmlTable2 = $BlitzQSSumTbl | Select-Object "Priority", "FindingsGroup", "Finding", "Details", "URL" | ConvertTo-Html -As Table -Fragment
 					$htmlTable2 = $htmlTable2 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
 
 					$htmlTable3 = $BlitzQSTbl | Select-Object "Query", 
@@ -6247,9 +6255,9 @@ finally {
     <h1>Table of contents</h1>
     <table>
 				<tr>
-				<th>File Name</th>
-				<th>Query Source</th>
+				<th>Page Name</th>
 				<th>Description</th>
+				<th>Query Source</th>
 				<th>Additional info</th>
 				</tr>
 "@
@@ -6452,7 +6460,7 @@ finally {
 				$Description = "Data collected by the query store for the past 7 days"
 				$AdditionalInfo = ""
 			}
-			$IndexContent += "<tr><td><a href='$RelativePath' target='_blank'>$($File.Name.Replace('.html',''))</a></td><td>$QuerySource</td><td>$Description</td><td>$AdditionalInfo</td></tr>"
+			$IndexContent += "<tr><td><a href='$RelativePath' target='_blank'>$($File.Name.Replace('.html',''))</a></td><td>$Description</td><td>$QuerySource</td><td>$AdditionalInfo</td></tr>"
 		}
 
 		# Close the HTML tags.
