@@ -248,7 +248,7 @@ IF ( @DatabaseName <> N'' AND CAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'),
       SELECT @ExecSQL = N'SELECT N'''+@DatabaseName +N''' AS [Database], [name] AS [Config Name],'
                         + @LineFeed
                         + N'CASE WHEN [value] = 0 AND [name] <> N''MAXDOP'' THEN ''Off'''
-                        + @LineFeed + N'WHEN [value] = 1 THEN ''On'''
+						+ @LineFeed + N'WHEN [value] = 1 AND [name] <> N''MAXDOP'' THEN ''On'''
                         + @LineFeed
                         + N'WHEN CAST([value] AS VARCHAR(3)) IN (''OFF'', ''ON'')'
                         + @LineFeed
