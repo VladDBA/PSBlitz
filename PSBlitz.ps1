@@ -220,7 +220,6 @@
 
 #>
 
-
 ###Input Params
 ##Params for running from command line
 [cmdletbinding()]
@@ -6273,6 +6272,7 @@ finally {
 			$RelativePath = ".\HTMLFiles\" + $RelativePath
 			if ($File.Name -eq "spBlitz.html") {
 				$Description = "Instance-level health information"
+				$PageName = "Instance Health"
 				if ($IsIndepth -eq "Y") {
 					$QuerySource = "sp_Blitz @CheckServerInfo = 1, @CheckUserDatabaseObjects = 1; "
 					$Description += " including a review of user databases for triggers, heaps, etc"
@@ -6283,14 +6283,17 @@ finally {
 				$Description += "."
 			}
 			elseif ($File.Name -like "InstanceInfo*") {
+				$PageName = "Instance Info"
 				$QuerySource = "sys.dm_os_sys_info, sys.dm_os_performance_counters and SERVERPROPERTY"
 				$Description = "Summary information about the instance and its resources."
 			}
 			elseif ($File.Name -like "TempDBInfo*") {
+				$PageName = "TempDB Info"
 				$QuerySource = "dm_db_file_space_usage, dm_db_partition_stats, dm_exec_requests"
 				$Description = "Information pertaining to TempDB usage, size and configuration."
 			}
 			elseif ($File.Name -like "OpenTransactions*") {
+				$PageName = "Open Transactions"
 				$QuerySource = "sys.dm_tran_session_transactions, sys.dm_tran_active_transactions, sys.dm_exec_sessions, sys.dm_exec_connections, and sys.dm_exec_requests"
 				$Description = "Information about currently open transactions"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
@@ -6312,21 +6315,26 @@ finally {
 				}
 				$AdditionalInfo = ""
 				if (($File.Name -like "BlitzIndex_0*") -or ($File.Name -like "BlitzIndex_4*")) {
+					$PageName = "Index Diagnostics"
 					$Description = "Index-related diagnosis outlining high-value missing indexes, duplicate or almost duplicate indexes, indexes with more writes than reads, etc."
 					$AdditionalInfo += "For SQL Server 2019 - will output execution plans as .sqlplan files."
 				}
 				elseif ($File.Name -like "BlitzIndex_1*") {
+					$PageName = "Index Summary"
 					$Description = "Summary of database, tables and index sizes and counts."
 				}
 				elseif ($File.Name -like "BlitzIndex_2*") {
+					$PageName = "Index Usage"
 					$Description = "Index usage details."
 				}
 			}
 			elseif ($File.Name -like "BlitzCache*") {
 				$SortOrder = $File.Name.Replace('BlitzCache_', '')
 				$SortOrder = $SortOrder.Replace('.html', '')
+				$PageName = "Top $CacheTop Queries - $SortOrder"
 				$AdditionalInfo = "Outputs execution plans as .sqlplan files."
 				if ($SortOrder -eq "Mem_Recent_Comp") {
+					$PageName = "Top $CacheTop Queries - Memory and Recently Compiled"
 					$QuerySource = "sp_BlitzCache @SortOrder = 'memory grant', @Top = $CacheTop/'recent compilations' , @Top = 50"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
@@ -6334,7 +6342,7 @@ finally {
 					else {
 						$QuerySource += "; "
 					}
-					$Description = "Contains the top $CacheTop queries sorted by memory grant size, and the top 50 most recently compiled queries"
+					$Description = "Contains the top $CacheTop queries, found in the plan cache, sorted by memory grant size, and the top 50 most recently compiled queries"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$Description += " for $CheckDB."
 					}
@@ -6353,7 +6361,7 @@ finally {
 					else {
 						$QuerySource += "; "
 					}
-					$Description = "Contains the top $CacheTop queries sorted by $SortOrder and Average $SortOrder"
+					$Description = "Contains the top $CacheTop queries, found in the plan cache, sorted by $SortOrder and Average $SortOrder"
 					if ($IsAzureSQLDB) {
 						$Description += " for $ASDBName."
 					}
@@ -6368,16 +6376,20 @@ finally {
 			elseif ($File.Name -like "BlitzFirst3*") {
 				$QuerySource = "sp_BlitzFirst @ExpertMode = 1, @Seconds = 30; "
 				$Description = "What's happening on the instance during a 30 seconds time-frame."
+				$PageName = "Happening Now"
 			}
 			elseif ($File.Name -like "BlitzFirst_*") {
 				$QuerySource = "sp_BlitzFirst @SinceStartup = 1;"
 				if ($File.Name -like "BlitzFirst_Perfmon*") {
+					$PageName = "Perfmon Stats"
 					$Description = "Performance counters and their curent values since last instance restart from sys.dm_os_performance_counters."
 				}
 				elseif ($File.Name -like "BlitzFirst_Storage*") {
+					$PageName = "Storage Stats"
 					$Description = "Information about each database's files, their usage an throughput since last instance restart."
 				}
 				elseif ($File.Name -like "BlitzFirst_Waits*") {
+					$PageName = "Wait Stats"
 					$Description = "Information about wait stats recorded since last instance restart."
 				}
 			}
@@ -6391,13 +6403,16 @@ finally {
 				}
 				if ($File.Name -like "BlitzWho_Agg*") {
 					$Description = "Aggregate of all the sp_BlitzWho passes sorted by duration descending."
+					$PageName = "Session Activity - Aggregated"
 					$AdditionalInfo = "Outputs execution plans as .sqlplan files."
 				}
 				else {
+					$PageName = "Session Activity - Raw"
 					$Description = "All the data that was collected repeatedly by sp_BlitzWho while PSBlitz was running."
 				}
 			}
 			elseif ($File.Name -like "StatsInfo*") {
+				$PageName = "Statistics Information"
 				$QuerySource = "sys.stats, sys.dm_db_stats_properties, dm_db_incremental_stats_properties"
 				$Description = "Statistics information for "
 				if ($IsAzureSQLDB) {
@@ -6410,6 +6425,7 @@ finally {
 			}
 			elseif ($File.Name -like "IndexFragInfo*") {
 				$QuerySource = "dm_db_index_physical_stats"
+				$PageName = "Index Fragmentation"
 				$Description = "Index fragmentation information for "
 				if ($IsAzureSQLDB) {
 					$Description += "$ASDBName."
@@ -6420,16 +6436,19 @@ finally {
 				$AdditionalInfo = "Retrieves info for tables containing at least 52k pages (~400MB)"
 			}
 			elseif ($File.Name -like "BlitzLock*") {
+				$PageName = "Deadlock Info"
 				$QuerySource = "sp_BlitzLock @StartDate = DATEADD(DAY, -15, GETDATE()), @EndDate = GETDATE(); "
 				$Description = "Information about the deadlocks recorded in the default extended events session."
 				$AdditionalInfo = "Outputs deadlock graphs as .xdl files."
 			}
 			elseif ($File.Name -like "ExecutionLog*") {
 				$QuerySource = ""
+				$PageName = "Execution Log"
 				$Description = "Log for the current run of PSBlitz."
 				$AdditionalInfo = "Contains step status and any error messages that might have been thrown"
 			}
 			elseif ($File.Name -like "DatabaseInfo*") {
+				$PageName = "Database Info"
 				$QuerySource = "sys.databases, sys.master_files, sys.database_files, sys.dm_db_log_info"
 				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 					$QuerySource += ", sys.database_scoped_configurations"
@@ -6445,12 +6464,14 @@ finally {
 				$AdditionalInfo = ""
 			}
 			elseif ($File.Name -like "AzureSQLDBInfo*") {
+				$PageName = "Azure SQL DB Info"
 				$QuerySource = "sys.dm_user_db_resource_governance, sys.database_files, sys.dm_db_resource_stats, sys.dm_db_wait_stats, sys.databases, database_scoped_configurations, sys.dm_db_objects_impacted_on_version_change"
 				$Description = "Azure SQL DB resources, resource usage, database, and database configuration for $ASDBName"
 			
 				$AdditionalInfo = ""
 			}
 			elseif ($File.Name -like "BlitzQueryStore*") {
+				$PageName = "Query Store Info"
 				if ($IsAzureSQLDB) {
 					$QuerySource = "sp_BlitzQueryStore;"
 				}
@@ -6460,7 +6481,7 @@ finally {
 				$Description = "Data collected by the query store for the past 7 days"
 				$AdditionalInfo = ""
 			}
-			$IndexContent += "<tr><td><a href='$RelativePath' target='_blank'>$($File.Name.Replace('.html',''))</a></td><td>$Description</td><td>$QuerySource</td><td>$AdditionalInfo</td></tr>"
+			$IndexContent += "<tr><td><a href='$RelativePath' target='_blank'>$PageName</a></td><td>$Description</td><td>$QuerySource</td><td>$AdditionalInfo</td></tr>"
 		}
 
 		# Close the HTML tags.
@@ -6538,3 +6559,6 @@ finally {
 		[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
 	}
 }
+## Experimental fix for https://github.com/VladDBA/PSBlitz/issues/161
+Remove-Variable * -ErrorAction SilentlyContinue
+$error.Clear();
