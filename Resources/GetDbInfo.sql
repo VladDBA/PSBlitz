@@ -259,7 +259,7 @@ IF ( @DatabaseName <> N'' AND CAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'),
 						WHEN CAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'),0) AS TINYINT)>= 14 
 						THEN N'CASE WHEN [is_value_default] = 1 THEN ''Yes'' ELSE ''No'''
                         + @LineFeed + N'END ' 
-						ELSE 'n/a' END 
+						ELSE '''n/a''' END 
 						+N' AS [IsDefault] FROM '
 						+QUOTENAME(@DatabaseName)
 						+N'.sys.[database_scoped_configurations]'

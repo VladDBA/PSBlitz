@@ -4897,6 +4897,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			if ($DebugInfo) {
 				Write-Host " ->Exporting deadlock graphs (if any)" -fore yellow
 			}
+			$TblLockDtl.Columns.Add("DeadlockGraphFile", [string]) | Out-Null
 			foreach ($row in $TblLockDtl) {
 				#Increment file name counter
 				$i += 1

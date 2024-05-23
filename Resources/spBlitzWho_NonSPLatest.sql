@@ -66,7 +66,7 @@ the GO at the end  and without the block that creates the view at line 351*/
 	SET STATISTICS XML OFF;
 	SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 	
-	SELECT @Version = '8.19', @VersionDate = '20240222';
+	SELECT @Version = '8.20', @VersionDate = '20240522';
     
 	IF(@VersionCheckMode = 1)
 	BEGIN
@@ -349,7 +349,7 @@ IF @OutputDatabaseName IS NOT NULL AND @OutputSchemaName IS NOT NULL AND @Output
 
 	SET @ObjectFullName = @OutputDatabaseName + N'.' + @OutputSchemaName + N'.' +  @OutputTableNameQueryStats_View;
 
-         /* Vlad - removed create view portion - https://github.com/VladDBA/PSBlitz/issues/55 */
+        /* Vlad - removed create view portion - https://github.com/VladDBA/PSBlitz/issues/55 */
 
  END
 
