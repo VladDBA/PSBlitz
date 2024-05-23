@@ -537,7 +537,7 @@ function Add-LogRow {
 	$LogRow.EndDate = $StepEnd.ToString("yyyy-MM-dd HH:mm:ss")
 	$LogRow.Duration = $ExecTime
 	$LogRow.Outcome = $StepStatus
-	if ($StepStatus -eq "Failure") {
+	if ("Failure", "Interrupted" -contains $StepStatus) {
 		$LogRow.ErrorMsg = $ErrMsg
 	}
  elseif ($StepStatus -eq "Success") {
@@ -5581,6 +5581,9 @@ finally {
 	if ($TryCompleted -eq "N") {
 		Write-Host ""
 		Write-Host " Script execution was interrupted." -Fore yellow
+		Write-Host " ->Latest exception (if any):"
+		Invoke-ErrMsg
+		Add-LogRow "PSBlitz Execution" "Interrupted"
 		Write-Host " Finishing up..." -Fore yellow
 	}
 	
@@ -6593,13 +6596,13 @@ finally {
 	Write-Host " "
 	Write-Host $("-" * 80)
 
-	if (($DebugInfo) -or ($InteractiveMode -eq 1)) {
+	if ($InteractiveMode -eq 1) {
 		Read-Host -Prompt "Done. Press Enter to close this window."
 	}
 	$SqlConnection.Close()
 	$SqlConnection.Dispose()
 	Remove-Variable -Name SqlConnection
-	if (($InteractiveMode -eq 1) -and (!([string]::IsNullOrEmpty($SQLLogin))) ) {
+	if (!([string]::IsNullOrEmpty($SQLLogin)) ) {
 		#remove plain text password from memory
 		[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
 	}
