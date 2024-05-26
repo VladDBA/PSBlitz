@@ -72,7 +72,7 @@ CLOSE DBsWithFS;
 DEALLOCATE DBsWithFS;
 
 /*Return database files and size info*/
-SELECT @ExecSQL = N'SELECT d.[name] AS [Database],d.[create_date] AS [Created],'
+SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],d.[create_date] AS [Created],' AS NVARCHAR(MAX))
                   + @LineFeed
                   + N'd.[state_desc] AS [DatabaseState],'
                   + @LineFeed
@@ -93,8 +93,8 @@ SELECT @ExecSQL = N'SELECT d.[name] AS [Database],d.[create_date] AS [Created],'
                   + N'ELSE 0.00 END) AS NUMERIC(23, 3))  AS [LogFilesSizeGB],'
                   + @LineFeed
                   + CASE
-                      WHEN @SkipThis = 1 THEN ' ''n/a'' AS '
-                      ELSE 'l.'
+                      WHEN @SkipThis = 1 THEN N' ''n/a'' AS '
+                      ELSE N'l.'
                     END
                   + '[VirtualLogFiles], ISNULL(fs.FSFilesCount, 0)        AS [FILESTREAMContainers],'
                   + @LineFeed

@@ -256,8 +256,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.0.8"
-$VersDate = "2024-03-25"
+$Vers = "4.1.0"
+$VersDate = "2024-05-27"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -5328,7 +5328,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					@{Name = "Persisted Sample %"; Expression = { $_."persisted_sample_percent" } },
 					@{Name = "Partitioned"; Expression = { $_."partitioned" } },
 					@{Name = "Partition No."; Expression = { $_."partition_number" } },
-					@{Name = "Get Stats Details"; Expression = { $_."get_details" } } | ConvertTo-Html -As Table -Fragment
+					@{Name = "Get Stats Details"; Expression = { $_."get_details" } },
+					@{Name = "Update Table Stats"; Expression = { $_."update_table_stats" } },
+					@{Name = "Update Individual Stats"; Expression = { $_."update_individual_stats" } },
+					@{Name = "Update Partition Stats"; Expression = { $_."update_partition_stats" } } | ConvertTo-Html -As Table -Fragment
 					if ($IsAzureSQLDB) {
 						$HtmlTabName = "Statistics info for $ASDBName"
 					}
@@ -5367,7 +5370,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						"rows_sampled", "sample_percent", "modification_counter", 
 						"modified_percent", "incremental", "temporary", "no_recompute", "persisted_sample",
 						"persisted_sample_percent", "steps", "partitioned", "partition_number",
-						"get_details")
+						"get_details", "update_table_stats", "update_individual_stats", "update_partition_stats")
 
 					if ($DebugInfo) {
 						Write-Host " ->Writing Stats results to sheet Statistics Info" -fore yellow
