@@ -126,7 +126,21 @@ SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],d.[create_date] AS [Creat
                   + @LineFeed
                   + N'CASE WHEN d.[is_query_store_on] = 1 THEN ''Yes'' ELSE ''No'' END AS [QueryStoreOn],'
                   + @LineFeed
-                  + N'CASE WHEN d.[is_trustworthy_on] = 1 THEN ''Yes'' ELSE ''No'' END AS [TrustworthyOn]'
+                  + N'CASE WHEN d.[is_trustworthy_on] = 1 THEN ''Yes'' ELSE ''No'' END AS [TrustworthyOn],'
+				  + @LineFeed
+				  + N'CASE WHEN d.[is_encrypted] = 1 THEN ''Yes'' ELSE ''No'' END AS [IsEncrypted]'
+				  + @LineFeed
+                  + CASE
+                      WHEN @SkipThis = 1 THEN ' ''n/a'' AS [EncryptionState]'
+					  ELSE N', CASE WHEN ek.[encryption_state] = 0 OR ek.[encryption_state] IS NULL THEN ''No Encryption'''
+					  + @LineFeed + N'WHEN ek.[encryption_state] = 1 THEN ''Unencrypted'''
+					  + @LineFeed + N'WHEN ek.[encryption_state] = 2 THEN ''Encryption in progress'''
+					  + @LineFeed + N'WHEN ek.[encryption_state] = 3 THEN ''Encrypted'''
+					  + @LineFeed + N'WHEN ek.[encryption_state] = 4 THEN ''Key change in progress'''
+					  + @LineFeed + N'WHEN ek.[encryption_state] = 5 THEN ''Decryption in progress'''
+					  + @LineFeed + N'WHEN ek.[encryption_state] = 6 THEN ''Protection change in progress'''
+					  + @LineFeed + N'END AS [EncryptionState]'
+					  END
                   + @LineFeed + N'FROM   sys.master_files AS f'
                   + @LineFeed
                   + N'INNER JOIN sys.databases AS d  ON f.database_id = d.database_id'
@@ -139,6 +153,8 @@ SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],d.[create_date] AS [Creat
                            + @LineFeed
                            + N'COUNT(*) AS [VirtualLogFiles] FROM   sys.dm_db_log_info (d.database_id)'
                            + @LineFeed + N'GROUP  BY [file_id]) AS l'
+						   + @LineFeed + N'LEFT JOIN sys.dm_database_encryption_keys AS ek'
+						   + @LineFeed + N'ON d.[database_id] = ek.[database_id]'
                     END
                   + @LineFeed + N'WHERE d.[database_id] = '
                   + CASE
@@ -154,11 +170,11 @@ SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],d.[create_date] AS [Creat
                   + @LineFeed
                   + N'[d].recovery_model_desc, [d].[is_auto_close_on], [d].[is_auto_shrink_on],'
                   + @LineFeed
-                  + N'[d].[containment_desc],[d].[page_verify_option_desc],[d].[is_query_store_on], [d].[is_trustworthy_on]'
+                  + N'[d].[containment_desc],[d].[page_verify_option_desc],[d].[is_query_store_on], [d].[is_trustworthy_on], d.[is_trustworthy_on],d.[is_encrypted]'
                   + @LineFeed
                   + CASE
                       WHEN @SkipThis = 1 THEN ''
-                      ELSE ',[l].[VirtualLogFiles]'
+                      ELSE ',[l].[VirtualLogFiles], ek.[encryption_state]'
                     END
                   + @LineFeed
                   + N'ORDER BY [DatabaseSizeGB] DESC'
