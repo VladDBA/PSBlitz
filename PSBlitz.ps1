@@ -257,11 +257,13 @@ param(
 ###Internal params
 #Version
 $Vers = "4.1.0"
-$VersDate = "2024-05-27"
+$VersDate = "2024-05-28"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
 $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
+#clear previous errors
+$error.Clear();
 #Set resources path
 $ResourcesPath = $ScriptPath + "\Resources"
 #Set name of the input Excel file
@@ -471,19 +473,39 @@ function Format-XML {
 
 #Function to format exception messages
 function Format-ExceptionMsg {
-	[string]$ErrorMessage = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty Message
+	$ErrorMessage = $error[0] 
+	
+	[string]$ErrorMessageString = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty Message
 	try {
-		#Get SQL related error info
-		[string]$SQLErrNo = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Number
-		[string]$SQLErrLev = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Class
-		[string]$SQLErrState = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty State
-		[string]$SQLErrLineNo = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty LineNumber
-		[string]$SQLErrMsg = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Message
-		##formatting the error message in SQL Server style if there's an error number
-		Write-Output "MSg $SQLErrNo, Level $SQLErrLev, State $SQLErrState, Line $SQLErrLineNo `n $SQLErrMsg"
+		
+		[string]$SQLErrNo = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Number 
+		if (!([string]::IsNullOrEmpty($SQLErrNo))) {
+			#Get SQL related error info
+			[string]$SQLErrLev = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Class
+			[string]$SQLErrState = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty State
+			[string]$SQLErrLineNo = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty LineNumber
+			[string]$SQLErrMsg = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Message
+			##formatting the error message in SQL Server style if there's an error number
+			Write-Output "SQL Error: MSg $SQLErrNo, Level $SQLErrLev, State $SQLErrState, Line $SQLErrLineNo `n $SQLErrMsg"
+		}
+		else {
+			#Get PS related error info
+			[string]$PSErrMsg = $ErrorMessageString
+			[string]$PSErrLine = $ErrorMessage | Select-Object -ExpandProperty InvocationInfo | Select-Object -ExpandProperty ScriptLineNumber
+			[string]$PSErrStatement = $ErrorMessage | Select-Object -ExpandProperty InvocationInfo | Select-Object -ExpandProperty Line
+			if (!([string]::IsNullOrEmpty($PSErrStatement))) {
+				$PSErrStatement = $PSErrStatement.Trim()
+			}
+			if (!([string]::IsNullOrEmpty($PSErrMsg))) {
+				Write-Output "PS Error: Script Line $PSErrLine `n Message $PSErrMsg `n Statement $PSErrStatement"
+			}
+			else {
+				Write-Output "No exceptions ecnountered."
+			}			
+		}
 	}
  catch {
-		Write-Output $ErrorMessage
+		Write-Output $ErrorMessageString
 	}
 }
 #Function to return error messages in the catch block
@@ -538,7 +560,7 @@ function Add-LogRow {
 	$LogRow.EndDate = $StepEnd.ToString("yyyy-MM-dd HH:mm:ss")
 	$LogRow.Duration = $ExecTime
 	$LogRow.Outcome = $StepStatus
-	if ("Failure", "Interrupted" -contains $StepStatus) {
+	if ("Interrupted", "Failure" -contains $StepStatus ) {
 		$LogRow.ErrorMsg = $ErrMsg
 	}
  elseif ($StepStatus -eq "Success") {
@@ -568,18 +590,39 @@ $InitScriptBlock = {
 		$SqlConnection.Close()
 	}
 	function Format-ExceptionMsg {
-		[string]$ErrorMessage = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty Message
-		#Get SQL related error info
+		$ErrorMessage = $error[0] 
+		
+		[string]$ErrorMessageString = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty Message
 		try {
-			[string]$SQLErrNo = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Number -ErrorAction Stop
-			[string]$SQLErrLev = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Class -ErrorAction Stop
-			[string]$SQLErrState = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty State -ErrorAction Stop
-			[string]$SQLErrLineNo = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty LineNumber -ErrorAction Stop
-			[string]$SQLErrMsg = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Message -ErrorAction Stop
-			Write-Output "MSg $SQLErrNo, Level $SQLErrLev, State $SQLErrState, Line $SQLErrLineNo `n $SQLErrMsg" -ErrorAction Stop
+			
+			[string]$SQLErrNo = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Number 
+			if (!([string]::IsNullOrEmpty($SQLErrNo))) {
+				#Get SQL related error info
+				[string]$SQLErrLev = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Class
+				[string]$SQLErrState = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty State
+				[string]$SQLErrLineNo = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty LineNumber
+				[string]$SQLErrMsg = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Message
+				##formatting the error message in SQL Server style if there's an error number
+				Write-Output "SQL Error: MSg $SQLErrNo, Level $SQLErrLev, State $SQLErrState, Line $SQLErrLineNo `n $SQLErrMsg"
+			}
+			else {
+				#Get PS related error info
+				[string]$PSErrMsg = $ErrorMessageString
+				[string]$PSErrLine = $ErrorMessage | Select-Object -ExpandProperty InvocationInfo | Select-Object -ExpandProperty ScriptLineNumber
+				[string]$PSErrStatement = $ErrorMessage | Select-Object -ExpandProperty InvocationInfo | Select-Object -ExpandProperty Line
+				if (!([string]::IsNullOrEmpty($PSErrStatement))) {
+					$PSErrStatement = $PSErrStatement.Trim()
+				}
+				if (!([string]::IsNullOrEmpty($PSErrMsg))) {
+					Write-Output "PS Error: Script Line $PSErrLine `n Message $PSErrMsg `n Statement $PSErrStatement"
+				}
+				else {
+					Write-Output "No exceptions ecnountered."
+				}			
+			}
 		}
-		catch {
-			Write-Output $ErrorMessage
+	 catch {
+			Write-Output $ErrorMessageString
 		}
 	}
 	function Invoke-FlagTableCheck {
@@ -1637,11 +1680,16 @@ $htmlTable4
 				#>
 				foreach ($col in $DataSetCols) {			
 					#Fill Excel cell with value from the data set
+					[string]$DebugCol = $col
+					[string]$DebugValue = $InstanceInfoTbl.Rows[$RowNum][$col]
 					if ($col -eq "net_latency") {
 						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnTest
 					}
-					elseif ("server_time", "instance_last_startup" -contains $col) {
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $InstanceInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+					elseif (("instance_last_startup", "server_time" -contains $col) -and ($InstanceInfoTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+						
+						$DateForExcel = $InstanceInfoTbl.Rows[$RowNum][$col] | Get-Date
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						
 					}
 					else {
 						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $InstanceInfoTbl.Rows[$RowNum][$col]
@@ -1678,7 +1726,9 @@ $htmlTable4
 				Loop through each data set column of current row and fill the corresponding 
 				Excel cell
 				#>
-				foreach ($col in $DataSetCols) {			
+				foreach ($col in $DataSetCols) {
+					[string]$DebugCol = $col
+					[string]$DebugValue = $ResourceInfoTbl.Rows[$RowNum][$col]			
 					#Fill Excel cell with value from the data set
 					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ResourceInfoTbl.Rows[$RowNum][$col]
 					$ExcelColNum += 1
@@ -1713,10 +1763,13 @@ $htmlTable4
 				Loop through each data set column of current row and fill the corresponding 
 				Excel cell
 				#>
-				foreach ($col in $DataSetCols) {			
+				foreach ($col in $DataSetCols) {
+					[string]$DebugCol = $col
+					[string]$DebugValue = $ConnectionsInfoTbl.Rows[$RowNum][$col]			
 					#Fill Excel cell with value from the data set
-					if ("OldestConnectionTime" -contains $col) {
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+					if (($col -eq "OldestConnectionTime" -and ($ConnectionsInfoTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value))) {
+						$DateForExcel = $ConnectionsInfoTbl.Rows[$RowNum][$col] | Get-Date
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 					}
 					else {
 						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col]
@@ -1748,6 +1801,8 @@ $htmlTable4
 				Excel cell
 				#>
 				foreach ($col in $DataSetCols) {			
+					[string]$DebugCol = $col
+					[string]$DebugValue = $SessOptTbl.Rows[$RowNum][$col]
 					#Fill Excel cell with value from the data set
 					if ($col -eq "URL") {
 						if ($SessOptTbl.Rows[$RowNum][$col] -like "http*") {
@@ -1974,7 +2029,9 @@ $htmlTable2
 				Loop through each data set column of current row and fill the corresponding 
 				Excel cell
 				#>
-				foreach ($col in $DataSetCols) {			
+				foreach ($col in $DataSetCols) {
+					[string]$DebugCol = $col
+					[string]$DebugValue = $TempDBTbl.Rows[$RowNum][$col]			
 					#Fill Excel cell with value from the data set
 					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TempDBTbl.Rows[$RowNum][$col]
 					$ExcelColNum += 1
@@ -2009,6 +2066,8 @@ $htmlTable2
 				Excel cell
 				#>
 				foreach ($col in $DataSetCols) {
+					[string]$DebugCol = $col
+					[string]$DebugValue = $TempTabTbl.Rows[$RowNum][$col]
 					#Fill Excel cell with value from the data set
 					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TempTabTbl.Rows[$RowNum][$col]
 					$ExcelColNum += 1
@@ -2044,7 +2103,9 @@ $htmlTable2
 				Loop through each data set column of current row and fill the corresponding 
 				Excel cell
 				#>
-				foreach ($col in $DataSetCols) {			
+				foreach ($col in $DataSetCols) {
+					[string]$DebugCol = $col
+					[string]$DebugValue = $TempDBSessTbl.Rows[$RowNum][$col]			
 					#Fill Excel cell with value from the data set
 					#Properly handling Query Hash and Plan Hash hex values 
 					if ("query_hash", "query_plan_hash" -Contains $col) {
@@ -2165,16 +2226,16 @@ $htmlTable2
 				}
 
 				
-				$htmlTable1 = $AcTranTbl | Select-Object @{Name = "time_of_check"; Expression = { ($_."time_of_check").ToString("yyyy-MM-dd HH:mm:ss") } },
+				$htmlTable1 = $AcTranTbl | Select-Object @{Name = "time_of_check"; Expression = { if ($_."time_of_check" -ne [System.DBNull]::Value) { ($_."time_of_check").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."time_of_check" } } },
 				"database_name", "session_id", "blocking_session_id",
 				"current_query", "current_plan_file", "most_recent_query", "most_recent_plan_file", "wait_type",
 				"wait_time_seconds", "wait_resource", "command",
 				"session_status", "current_reuqest_status", "transaction_name",
 			 "open_transaction_count",
-				@{Name = "transaction_begin_time"; Expression = { ($_."transaction_begin_time").ToString("yyyy-MM-dd HH:mm:ss") } },
+				@{Name = "transaction_begin_time"; Expression = { if ($_."transaction_begin_time" -ne [System.DBNull]::Value) { ($_."transaction_begin_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."transaction_begin_time" } } },
 			 "transaction_type", "transaction_state",
-			 @{Name = "request_start_time"; Expression = { ($_."request_start_time").ToString("yyyy-MM-dd HH:mm:ss") } },
-			 @{Name = "request_end_time"; Expression = { ($_."request_end_time").ToString("yyyy-MM-dd HH:mm:ss") } },
+			 @{Name = "request_start_time"; Expression = { if ($_."request_start_time" -ne [System.DBNull]::Value) { ($_."request_start_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_start_time" } } },
+			 @{Name = "request_end_time"; Expression = { if ($_."request_end_time" -ne [System.DBNull]::Value) { ($_."request_end_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_end_time" } } },
 			 "active_request_elapsed_seconds",
 			 "host_name", "login_name", "program_name", "client_interface_name" | ConvertTo-Html -As Table -Fragment
 				$QExt = '.query'
@@ -2252,8 +2313,12 @@ $htmlTable3
 				#>
 					
 					foreach ($col in $DataSetCols) {
-						if ("time_of_check", "transaction_begin_time" -contains $col) {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $AcTranTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+						[string]$DebugCol = $col
+						[string]$DebugValue = $AcTranTbl.Rows[$RowNum][$col]
+						if (("time_of_check", "transaction_begin_time", "request_start_time", "request_end_time" -contains $col) -and ($AcTranTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+							
+							$DateForExcel = $AcTranTbl.Rows[$RowNum][$col] | Get-Date
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 						}
 						else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $AcTranTbl.Rows[$RowNum][$col]
@@ -2354,7 +2419,7 @@ $htmlTable3
 				"Min Max DataFile Size(MB)", "Max Max DataFile Size(MB)", "Default Max DataFile Size(MB)", 
 				"Default DataFile Growth Increment(MB)", "Default Size New DataFile(MB)", "Default Size New LogFile(MB)", 
 				"Instnace Max Log Rate MB/s", "Instance Max Worker Threads", "Replica Type", "Max TLog Space/Transaction(KB)", 
-				@{Name = "Settings Last Changed"; Expression = { ($_."Settings Last Changed").ToString("yyyy-MM-dd HH:mm:ss") } }, 
+				@{Name = "Settings Last Changed"; Expression = { if ($_."Settings Last Changed" -ne [System.DBNull]::Value) { ($_."Settings Last Changed").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Settings Last Changed" } } }, 
 				"User Workload Max Worker Threads", "User Workload Min Log Rate MB/s", 
 				"User Workload Max Log Rate MB/s", "User Workload Min IOPS", "User Workload Max IOPS", "User Workload Min CPU%", 
 				"User Workload Max CPU%", "User Workload Max Worker Threads2", "User Workload Pool Max IOPS ", 
@@ -2363,20 +2428,20 @@ $htmlTable3
 				"Replica Role"	| ConvertTo-Html -As Table -Fragment
 
 				$htmlTable1 = $DBInfoTbl | Select-Object "Database", "Service Objective", 
-				@{Name = "Created"; Expression = { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") } }, "Database State", 
+				@{Name = "Created"; Expression = { if ($_."Created" -ne [System.DBNull]::Value) { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Created" } } }, "Database State", 
 				"Data Files", "Data Files Size GB", "Log Files", "LogFilesSizeGB", "VirtualLogFiles", "FILESTREAM Containers", 
 				"FS Containers Size GB", "Database Size GB", "Database MaxSize GB", "Current Log Reuse Wait", 
 				"Compatibility Level", "Page Verify Option", "Containment", "Collation", "Snapshot Isolation State", 
 				"Read Committed Snapshot On", "Recovery Model", "AutoClose On", "AutoShrink On", "QueryStore On", 
 				"Trustworthy On" | ConvertTo-Html -As Table -Fragment
 
-				$htmlTable2 = $RsrcUsageTbl | Select-Object @{Name = "Sample Start"; Expression = { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") } }, 
-				@{Name = "Sample End"; Expression = { ($_."Sample End").ToString("yyyy-MM-dd HH:mm:ss") } }, 
+				$htmlTable2 = $RsrcUsageTbl | Select-Object @{Name = "Sample Start"; Expression = { if ($_."Sample Start" -ne [System.DBNull]::Value) { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample Start" } } }, 
+				@{Name = "Sample End"; Expression = { if ($_."Sample End" -ne [System.DBNull]::Value) { ($_."Sample End").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample End" } } }, 
 				"Sample(Minutes)", "Avg CPU Usage %", "Max CPU Usage %", "Avg Data IO %", "Max Data IO %", "Avg Log Write Usage %",
 				"Max Log Write Usage %", "Avg Memory Usage %", "Max Memory Usage %" | ConvertTo-Html -As Table -Fragment
 
-				$htmlTable3 = $Top10WaitsTbl | Select-Object @{Name = "Sample Start"; Expression = { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") } }, 
-				@{Name = "Sample End"; Expression = { ($_."Sample End").ToString("yyyy-MM-dd HH:mm:ss") } },
+				$htmlTable3 = $Top10WaitsTbl | Select-Object @{Name = "Sample Start"; Expression = { if ($_."Sample Start" -ne [System.DBNull]::Value) { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample Start" } } }, 
+				@{Name = "Sample End"; Expression = { if ($_."Sample End" -ne [System.DBNull]::Value) { ($_."Sample End").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample End" } } },
 				"Sample(Hours)", "Wait Type", "Wait Count", "Wait %",
 				"Total Wait Time(Sec)", "Avg Wait Time(Sec)", "Total Resource Time(Sec)", "Avg Resource Time(Sec)",
 				"Total Signal Time(Sec)", "Avg Signal Time(Sec)", "URL" | ConvertTo-Html -As Table -Fragment
@@ -2471,12 +2536,13 @@ $htmlTable6
 				Excel cell
 				#>
 					foreach ($col in $DataSetCols) {
-						#Fill Excel cell with value from the data set
-						if ($col -eq "Settings Last Changed") {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcGovTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcGovTbl.Rows[$RowNum][$col]
+						[string]$DebugCol = $col
+						[string]$DebugValue = $RsrcGovTbl.Rows[$RowNum][$col]
+						if(($col -eq "Settings Last Changed") -and ($RsrcGovTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)){
+							$DateForExcel = $AcTranTbl.Rows[$RowNum][$col] | Get-Date
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						}else{
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcGovTbl.Rows[$RowNum][$col]
 						}
 					
 						#move to the next column
@@ -2518,12 +2584,14 @@ $htmlTable6
 				Excel cell
 				#>
 					foreach ($col in $DataSetCols) {
-						#Fill Excel cell with value from the data set
-						if ($col -eq "Created") {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
+						[string]$DebugCol = $col
+						[string]$DebugValue = $DBInfoTbl.Rows[$RowNum][$col]
+						if(($col -eq "Created") -and ( $DBInfoTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) 
+						{ 
+							$DateForExcel = $DBInfoTbl.Rows[$RowNum][$col] | Get-Date
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						}else{
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
 						}
 					
 						#move to the next column
@@ -2562,12 +2630,15 @@ $htmlTable6
 				Excel cell
 				#>
 					foreach ($col in $DataSetCols) {
+						[string]$DebugCol = $col
+						[string]$DebugValue = $RsrcUsageTbl.Rows[$RowNum][$col]
+
+						if(("Sample Start", "Sample End" -contains $col) -and ($RsrcUsageTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)){
+							$DateForExcel = $RsrcUsageTbl.Rows[$RowNum][$col] | Get-Date
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						}else{
 						#Fill Excel cell with value from the data set
-						if ("Sample Start", "Sample End" -contains $col) {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcUsageTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcUsageTbl.Rows[$RowNum][$col]
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcUsageTbl.Rows[$RowNum][$col]
 						}
 					
 						#move to the next column
@@ -2607,16 +2678,18 @@ $htmlTable6
 				#>
 					foreach ($col in $DataSetCols) {
 						#Fill Excel cell with value from the data set
-						if ("Sample Start", "Sample End" -contains $col) {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $Top10WaitsTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						elseif ($col -eq "URL") {
+						[string]$DebugCol = $col
+						[string]$DebugValue = $Top10WaitsTbl.Rows[$RowNum][$col]
+						if ($col -eq "URL") {
 							#Make URLs clickable
 							if ( $Top10WaitsTbl.Rows[$RowNum][$col] -like "http*") {
 								$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 4),
 									$Top10WaitsTbl.Rows[$RowNum][$col], "", "Click for more info",
 									$Top10WaitsTbl.Rows[$RowNum]["Wait Type"]) | Out-Null
 							}
+						}elseif(("Sample Start", "Sample End" -contains $col) -and ($Top10WaitsTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)){
+							$DateForExcel = $Top10WaitsTbl.Rows[$RowNum][$col] | Get-Date
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 						}
 						else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $Top10WaitsTbl.Rows[$RowNum][$col]
@@ -2852,7 +2925,7 @@ $htmlTable6
 				if ($DebugInfo) {
 					Write-Host " ->Converting Database Info results to HTML" -fore yellow
 				}
-				$htmlTable = $DBInfoTbl | Select-Object "Database", @{Name = "Created"; Expression = { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") } }, 
+				$htmlTable = $DBInfoTbl | Select-Object "Database", @{Name = "Created"; Expression = { if ($_."Created" -ne [System.DBNull]::Value) { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Created" } } }, 
 				"DatabaseState", "UserAccess", "DataFiles", "DataFilesSizeGB", "LogFiles",
 				"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
 				"DatabaseSizeGB", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", 
@@ -2944,7 +3017,7 @@ $htmlBlock
 					"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
 					"DatabaseSizeGB", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", "SnapshotIsolationState", 
 					"ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
-					"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn")
+					"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn", "IsEncrypted", "EncryptionState")
 				if ($DebugInfo) {
 					Write-Host " ->Writing Database Info results to Excel" -fore yellow
 				}
@@ -2956,11 +3029,13 @@ $htmlBlock
 				#>
 					foreach ($col in $DataSetCols) {
 						#Fill Excel cell with value from the data set
-						if ($col -eq "Created") {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
+						[string]$DebugCol = $col
+						[string]$DebugValue = $DBInfoTbl.Rows[$RowNum][$col]
+						if(($col -eq "Created") -and ($DBInfoTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)){
+							$DateForExcel = $DBInfoTbl.Rows[$RowNum][$col] | Get-Date
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						} else{
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
 						}
 					
 						#move to the next column
@@ -3434,16 +3509,20 @@ $htmlTable
 					#Loop through each data set column of current row and fill the corresponding 
 					# Excel cell
 					foreach ($col in $DataSetCols) {
-						if ($col -eq "Sample Ended") {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $WaitsTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						elseif ($col -eq "URL") {
+						[string]$DebugCol = $col
+						[string]$DebugValue = $WaitsTbl.Rows[$RowNum][$col]
+						if ($col -eq "URL") {
 							#Make URLs clickable
 							if ($WaitsTbl.Rows[$RowNum][$col] -like "http*") {
 								$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 5),
 									$WaitsTbl.Rows[$RowNum][$col], "", "Click for more info",
 									$WaitsTbl.Rows[$RowNum]["wait_type"]) | Out-Null
 							}
+						} elseif(($col -eq "Sample Ended") -and ($WaitsTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)){
+							#$DateTemp is a dumb workaround for a dumb problem that caused the hour to always be 00:00:00
+							[string]$DateTemp = $WaitsTbl.Rows[$RowNum][$col]
+							$DateForExcel = $DateTemp | Get-Date
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 						}
 						else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $WaitsTbl.Rows[$RowNum][$col]
@@ -3482,13 +3561,17 @@ $htmlTable
 					#Loop through each data set column of current row and fill the corresponding 
 					# Excel cell
 					foreach ($col in $DataSetCols) {
+						[string]$DebugCol = $col
+						[string]$DebugValue = $StorageTbl.Rows[$RowNum][$col]
 						#Fill Excel cell with value from the data set
-						if ($col -eq "Sample Time") {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StorageTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+						if (($col -eq "Sample Time") -and ($StorageTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+							[string]$DateTemp = $StorageTbl.Rows[$RowNum][$col]
+							$DateForExcel = $DateTemp | Get-Date
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						} else {
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StorageTbl.Rows[$RowNum][$col]
 						}
-						else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StorageTbl.Rows[$RowNum][$col]
-						}
+						
 						#move to the next column
 						$ExcelColNum += 1
 					}
@@ -3524,13 +3607,18 @@ $htmlTable
 					#Loop through each data set column of current row and fill the corresponding 
 					# Excel cell
 					foreach ($col in $DataSetCols) {
+						[string]$DebugCol = $col
+						[string]$DebugValue = $PerfmonTbl.Rows[$RowNum][$col]
 						#Fill Excel cell with value from the data set
-						if ("FirstSampleTime", "LastSampleTime" -Contains $col) {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $PerfmonTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+						if (("FirstSampleTime", "LastSampleTime" -Contains $col) -and ($PerfmonTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value))	{
+							[string]$DateTemp = $PerfmonTbl.Rows[$RowNum][$col]
+							$DateForExcel = $DateTemp | Get-Date
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 						}
-						else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $PerfmonTbl.Rows[$RowNum][$col]
+						else{
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $PerfmonTbl.Rows[$RowNum][$col]
 						}
+						
 						#move to the next column
 						$ExcelColNum += 1
 					}
@@ -3954,23 +4042,27 @@ $htmlTable
 				foreach ($row in $BlitzCacheTbl) {
 					#Loop through each column from $DataSetCols for curent row and retrieve data from 
 					foreach ($col in $DataSetCols) {
-
+						[string]$DebugCol = $col
+						[string]$DebugValue = $BlitzCacheTbl.Rows[$RowNum][$col]
 						#Properly handling Query Hash, Plan Hash, Plan, and SQL Handle hex values 
 						if ("Query Hash", "Query Plan Hash", "Plan Handle", "SQL Handle" -Contains $col) {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $BlitzCacheTbl.Rows[$RowNum][$col]
 							#move to the next column
-							$ExcelColNum += 1
+							#$ExcelColNum += 1
 							#move to the top of the loop
 							Continue
-						}
-						if ($BlitzCacheTbl.Rows[$RowNum][$col] -eq "<?NoNeedToClickMe -- N/A --?>") {
+						}elseif ($BlitzCacheTbl.Rows[$RowNum][$col] -eq "<?NoNeedToClickMe -- N/A --?>") {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = "   -- N/A --   "
 							#move to the next column
-							$ExcelColNum += 1
+							#$ExcelColNum += 1
 							#move to the top of the loop
-							Continue
-						}			
+							#Continue
+						}elseif(("Created At", "Last Execution" -contains $col) -and ($BlitzCacheTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)){
+							$DateForExcel = $BlitzCacheTbl.Rows[$RowNum][$col] | Get-Date
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						}else{			
 						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzCacheTbl.Rows[$RowNum][$col]
+						}
 						#move to the next column
 						$ExcelColNum += 1			
 						
@@ -4357,8 +4449,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					@{Name = "Avg log bytes used"; Expression = { ($_."avg_log_bytes_used") } },
 					@{Name = "Total Num Physical IO Reads"; Expression = { ($_."total_num_physical_io_reads") } },
 					@{Name = "Avg Num Physical IO Reads"; Expression = { ($_."avg_num_physical_io_reads") } },
-					@{Name = "First Exec Time"; Expression = { if($_."first_execution_time"-ne [System.DBNull]::Value){($_."first_execution_time").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."first_execution_time"} } },
-					@{Name = "Last Exec Time"; Expression = { if($_."last_execution_time"-ne [System.DBNull]::Value){($_."last_execution_time").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."last_execution_time"} } },
+					@{Name = "First Exec Time"; Expression = { if ($_."first_execution_time" -ne [System.DBNull]::Value) { ($_."first_execution_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."first_execution_time" } } },
+					@{Name = "Last Exec Time"; Expression = { if ($_."last_execution_time" -ne [System.DBNull]::Value) { ($_."last_execution_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_execution_time" } } },
 					@{Name = "Last Force Failure Reasson"; Expression = { ($_."last_force_failure_reason_desc") } },
 					@{Name = "Context Settings"; Expression = { ($_."context_settings") } } | ConvertTo-Html -As Table -Fragment
 
@@ -4477,14 +4569,20 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$RowNum = 0
 					foreach ($row in $BlitzQSTbl) {
 						foreach ($col in $DataSetCols) {
+							[string]$DebugCol = $col
+							[string]$DebugValue = $BlitzQSTbl.Rows[$RowNum][$col]
 							if ($BlitzQSTbl.Rows[$RowNum][$col] -eq "<?NoNeedToClickMe -- N/A --?>") {
 								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = "   -- N/A --   "
 								#move to the next column
-								$ExcelColNum += 1
+								#$ExcelColNum += 1
 								#move to the top of the loop
-								Continue
-							}
+								#Continue
+							}elseif(("first_execution_time", "last_execution_time" -Contains $col ) -and ($BlitzQSTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)){
+								$DateForExcel = $RsrcUsageTbl.Rows[$RowNum][$col] | Get-Date
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzQSTbl.ToString("yyyy-MM-dd HH:mm:ss")
+							}else{
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzQSTbl.Rows[$RowNum][$col]
+							}
 							#move to the next column
 							$ExcelColNum += 1
 						}
@@ -4654,9 +4752,9 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					"Indexed Views", "Max Row Count", "Max Table GB", "Max NC Index GB", 
 					"Count Tables > 1GB", "Count Tables > 10GB", "Count Tables > 100GB", 
 					"Count NCs > 1GB", "Count NCs > 10GB", "Count NCs > 100GB", 
-					@{Name = "Oldest Create Date"; Expression = { if($_."Oldest Create Date"-ne [System.DBNull]::Value){($_."Oldest Create Date").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."Oldest Create Date"} } }, 
-					@{Name = "Most Recent Create Date"; Expression = { if($_."Most Recent Create Date"-ne [System.DBNull]::Value){($_."Most Recent Create Date").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."Most Recent Create Date"} } }, 
-					@{Name = "Most Recent Modify Date"; Expression = { if($_."Most Recent Modify Date"-ne [System.DBNull]::Value){($_."Most Recent Modify Date").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."Most Recent Modify Date"} } } | ConvertTo-Html -As Table -Fragment
+					@{Name = "Oldest Create Date"; Expression = { if ($_."Oldest Create Date" -ne [System.DBNull]::Value) { ($_."Oldest Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Oldest Create Date" } } }, 
+					@{Name = "Most Recent Create Date"; Expression = { if ($_."Most Recent Create Date" -ne [System.DBNull]::Value) { ($_."Most Recent Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Most Recent Create Date" } } }, 
+					@{Name = "Most Recent Modify Date"; Expression = { if ($_."Most Recent Modify Date" -ne [System.DBNull]::Value) { ($_."Most Recent Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Most Recent Modify Date" } } } | ConvertTo-Html -As Table -Fragment
 				}
 				elseif ($Mode -eq "2") {
 					$BlitzIxTbl.Columns["Definition: [Property] ColumnName {datatype maxbytes}"].ColumnName = "Definition"
@@ -4669,10 +4767,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					"Is Primary Key", "Is XML", "Is Spatial", "Is NC Columnstore", 
 					"Is CX Columnstore", "Is Disabled", "Is Hypothetical", "Is Padded", 
 					"Fill Factor", "Is Reference by Foreign Key", 
-					@{Name = "Last User Seek"; Expression = { if($_."Last User Seek"-ne [System.DBNull]::Value){($_."Last User Seek").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."Last User Seek"} } }, 
-					@{Name = "Last User Scan"; Expression = { if($_."Last User Scan"-ne [System.DBNull]::Value){($_."Last User Scan").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."Last User Scan"} } }, 
-					@{Name = "Last User Lookup"; Expression = { if($_."Last User Lookup"-ne [System.DBNull]::Value){($_."Last User Lookup").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."Last User Lookup"} } }, 
-					@{Name = "Last User Update"; Expression = { if($_."Last User Update"-ne [System.DBNull]::Value){($_."Last User Update").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."Last User Update"} } }, 
+					@{Name = "Last User Seek"; Expression = { if ($_."Last User Seek" -ne [System.DBNull]::Value) { ($_."Last User Seek").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Seek" } } }, 
+					@{Name = "Last User Scan"; Expression = { if ($_."Last User Scan" -ne [System.DBNull]::Value) { ($_."Last User Scan").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Scan" } } }, 
+					@{Name = "Last User Lookup"; Expression = { if ($_."Last User Lookup" -ne [System.DBNull]::Value) { ($_."Last User Lookup").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Lookup" } } }, 
+					@{Name = "Last User Update"; Expression = { if ($_."Last User Update" -ne [System.DBNull]::Value) { ($_."Last User Update").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Update" } } }, 
 					"Total Reads", 
 					"User Updates", "Reads Per Write", "Index Usage", "Partition Count", 
 					"Rows", "Reserved MB", "Reserved LOB MB", "Reserved Row Overflow MB", 
@@ -4681,8 +4779,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					"Page Lock Wait ms", "Avg Page Lock Wait ms", "Lock Escalation Attempts", 
 					"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
 					"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
-					@{Name = "Create Date"; Expression = { if($_."Create Date"-ne [System.DBNull]::Value){($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."Create Date"} } }, 
-					@{Name = "Modify Date"; Expression = { if($_."Modify Date"-ne [System.DBNull]::Value){($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."Modify Date"} } }, 
+					@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
+					@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } }, 
 					"More Info" | ConvertTo-Html -As Table -Fragment
 				}
 		
@@ -4781,12 +4879,19 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					#Loop through each data set column of current row and fill the corresponding 
 					# Excel cell
 					foreach ($col in $DataSetCols) {
+						[string]$DebugCol = $col
+						[string]$DebugValue = $BlitzIxTbl.Rows[$RowNum][$col]
 						if ($col -eq "URL") {
 							if ($BlitzIxTbl.Rows[$RowNum][$col] -like "http*") {
 								$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 2),
 									$BlitzIxTbl.Rows[$RowNum][$col], "", "Click for more info",
 									$BlitzIxTbl.Rows[$RowNum]["Finding"]) | Out-Null
 							}
+						}elseif(("Oldest Create Date", "Most Recent Create Date","Most Recent Modify Date","Last User Seek", 
+						"Last User Scan", "Last User Lookup", "Last User Update", "Create Date", "Modify Date" -contains $col) -and ($BlitzIxTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)){
+							$DateForExcel = $BlitzIxTbl.Rows[$RowNum][$col] | Get-Date
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+
 						}
 						else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzIxTbl.Rows[$RowNum][$col]
@@ -4965,7 +5070,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				@{Name = "Finding"; Expression = { $_."finding" } } | Where-Object "database_name" -NotLike "sp_BlitzLock*" | ConvertTo-Html -As Table -Fragment
 			
 				$htmlTable2 = $TblLockDtl | Select-Object @{Name = "Type"; Expression = { $_."deadlock_type" } }, 
-				@{Name = "Event Date"; Expression = { if($_."event_date"-ne [System.DBNull]::Value){($_."event_date").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."event_date"} } },
+				@{Name = "Event Date"; Expression = { if ($_."event_date" -ne [System.DBNull]::Value) { ($_."event_date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."event_date" } } },
 				@{Name = "Database"; Expression = { $_."database_name" } }, 
 				@{Name = "SPID"; Expression = { $_."spid" } },
 				@{Name = "Deadlock Group"; Expression = { $_."deadlock_group" } },
@@ -4982,9 +5087,9 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				@{Name = "Wait Resource"; Expression = { $_."wait_resource" } }, 
 				@{Name = "Priority"; Expression = { $_."priority" } }, 
 				@{Name = "Log Used"; Expression = { $_."log_used" } }, 
-				@{Name = "Last Tran Start"; Expression = { if($_."last_tran_started"-ne [System.DBNull]::Value){($_."last_tran_started").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."last_tran_started"} } }, 
-				@{Name = "Last Batch Start"; Expression = { if($_."last_batch_started"-ne [System.DBNull]::Value){($_."last_batch_started").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."last_batch_started"} } },
-				@{Name = "Last Batch Completed"; Expression = {if($_."last_batch_completed"-ne [System.DBNull]::Value){($_."last_batch_completed").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."last_batch_completed"} } },	
+				@{Name = "Last Tran Start"; Expression = { if ($_."last_tran_started" -ne [System.DBNull]::Value) { ($_."last_tran_started").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_tran_started" } } }, 
+				@{Name = "Last Batch Start"; Expression = { if ($_."last_batch_started" -ne [System.DBNull]::Value) { ($_."last_batch_started").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_batch_started" } } },
+				@{Name = "Last Batch Completed"; Expression = { if ($_."last_batch_completed" -ne [System.DBNull]::Value) { ($_."last_batch_completed").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_batch_completed" } } },	
 				@{Name = "Tran Name"; Expression = { $_."transaction_name" } } | ConvertTo-Html -As Table -Fragment
 
 				$QExt = '.query'
@@ -5001,8 +5106,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 
 				$htmlTable4 = $TblLockPlans | Select-Object @{Name = "Database"; Expression = { $_."database_name" } },
 				"Query", @{Name = "SQLPlan File"; Expression = { $_."PlanID" } },
-				@{Name = "Created At"; Expression = { if($_."creation_time"-ne [System.DBNull]::Value){($_."creation_time").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."creation_time"} } },
-				@{Name = "Last Execution"; Expression = { if($_."last_execution_time"-ne [System.DBNull]::Value){($_."last_execution_time").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."last_execution_time"} } },
+				@{Name = "Created At"; Expression = { if ($_."creation_time" -ne [System.DBNull]::Value) { ($_."creation_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."creation_time" } } },
+				@{Name = "Last Execution"; Expression = { if ($_."last_execution_time" -ne [System.DBNull]::Value) { ($_."last_execution_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_execution_time" } } },
 				@{Name = "Executions"; Expression = { $_."execution_count" } },
 				@{Name = "Executions / Second"; Expression = { $_."executions_per_second" } },
 				@{Name = "Total Worker Time(ms)"; Expression = { $_."total_worker_time_ms" } },
@@ -5114,8 +5219,14 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				 Excel cell
 				 #>
 					foreach ($col in $DataSetCols) {
-						#Fill Excel cell with value from the data set
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TblLockDtl.Rows[$RowNum][$col]
+						[string]$DebugCol = $col
+						[string]$DebugValue = $TblLockDtl.Rows[$RowNum][$col]
+						if(("event_date","last_tran_started", "last_batch_started",	"last_batch_completed" -contains $col ) -and ($TblLockDtl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)){
+							$DateForExcel = $TblLockDtl.Rows[$RowNum][$col] | Get-Date
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						} else {
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TblLockDtl.Rows[$RowNum][$col]
+						}
 						#move to the next column
 						$ExcelColNum += 1
 					}
@@ -5198,11 +5309,15 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				#Loop through each Excel row
 				foreach ($row in $TblLockPlans) {
 					foreach ($col in $DataSetCols) {
+						[string]$DebugCol = $col
+						[string]$DebugValue = $TblLockPlans.Rows[$RowNum][$col]
 						#Fill Excel cell with value from the data set
 						if ($col -eq "query_text") {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TblLockPlans.Rows[$RowNum][$col].Replace('<?query ', '').Replace('   ?>', '')
-						}
-						else {
+						}elseif(("creation_time","last_execution_time" -contains $col ) -and ($TblLockPlans.Rows[$RowNum][$col] -ne [System.DBNull]::Value)){
+							$DateForExcel = $TblLockPlans.Rows[$RowNum][$col] | Get-Date
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						}else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TblLockPlans.Rows[$RowNum][$col]
 						}
 						#move to the next column
@@ -5384,12 +5499,15 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 
 					foreach ($row in $StatsTbl) {
 						foreach ($col in $DataSetCols) {
-							if ($col -eq "last_updated") {
-								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StatsTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
+							[string]$DebugCol = $col
+							[string]$DebugValue = $StatsTbl.Rows[$RowNum][$col]
+							if(($col -eq "last_updated") -and ($StatsTbl.Rows[$RowNum][$col] -ne  [System.DBNull]::Value)){
+								$DateForExcel = $StatsTbl.Rows[$RowNum][$col] | Get-Date
+								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+							}else{		
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StatsTbl.Rows[$RowNum][$col]
 							}
-							else {
-								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StatsTbl.Rows[$RowNum][$col]
-							}
+							
 							$ExcelColNum += 1
 						}
 						$ExcelStartRow += 1
@@ -5591,8 +5709,18 @@ finally {
 		Write-Host ""
 		Write-Host " Script execution was interrupted." -Fore yellow
 		Write-Host " ->Latest exception (if any):"
-		Invoke-ErrMsg
-		Add-LogRow "PSBlitz Execution" "Interrupted"
+		[string]$TerminatingErrorMessage = Format-ExceptionMsg
+		if ($TerminatingErrorMessage -eq "No exceptions ecnountered.") {
+			Write-Host " $TerminatingErrorMessage" -Fore green
+		}
+		else {
+			Write-Host " $TerminatingErrorMessage" -fore red
+			Write-Host "Debug Column: $DebugCol"
+			Write-Host "Debug Value: $DebugValue"
+		}
+		#[string]$TerminatingErrorMessage = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty Message
+		#Write-Host " $TerminatingErrorMessage"
+		Add-LogRow "PSBlitz Execution" "Interrupted" "$TerminatingErrorMessage"
 		Write-Host " Finishing up..." -Fore yellow
 	}
 	
@@ -5783,8 +5911,8 @@ finally {
 				"open_transaction_count", "is_implicit_transaction",
 				"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
 				"fix_parameter_sniffing", "client_interface_name", 
-				@{Name = "login_time"; Expression = { if($_."login_time"-ne [System.DBNull]::Value){($_."login_time").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."login_time"} } }, 
-				@{Name = "request_time"; Expression = { if($_."request_time"-ne [System.DBNull]::Value){($_."request_time").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."request_time"} } }, 
+				@{Name = "login_time"; Expression = { if ($_."login_time" -ne [System.DBNull]::Value) { ($_."login_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."login_time" } } }, 
+				@{Name = "request_time"; Expression = { if ($_."request_time" -ne [System.DBNull]::Value) { ($_."request_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_time" } } }, 
 				"request_cpu_time", "request_logical_reads", "request_writes",
 				"request_physical_reads", "session_cpu", "session_logical_reads",
 				"session_physical_reads", "session_writes", "tempdb_allocations_mb", 
@@ -5843,7 +5971,7 @@ finally {
 					$HtmlTabName += " for $ASDBName"
 				}
 				#Aggregate session table
-				$htmlTable = $BlitzWhoAggTbl | Select-Object @{Name = "start_time"; Expression = { if($_."start_time"-ne [System.DBNull]::Value){($_."start_time").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."start_time"} } }, 
+				$htmlTable = $BlitzWhoAggTbl | Select-Object @{Name = "start_time"; Expression = { if ($_."start_time" -ne [System.DBNull]::Value) { ($_."start_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."start_time" } } }, 
 				"elapsed_time", "database_name", "session_id", "blocking_session_id",  
 				#"query_text", 
 				"Query",
@@ -5852,8 +5980,8 @@ finally {
 				"open_transaction_count", "is_implicit_transaction",
 				"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
 				"fix_parameter_sniffing", "client_interface_name", 
-				@{Name = "login_time"; Expression = { if($_."login_time"-ne [System.DBNull]::Value){($_."login_time").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."login_time"} } }, 
-				@{ Name = "request_time"; Expression = { if($_."request_time" -ne [System.DBNull]::Value){($_."request_time").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."request_time"} } }, 
+				@{Name = "login_time"; Expression = { if ($_."login_time" -ne [System.DBNull]::Value) { ($_."login_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."login_time" } } }, 
+				@{ Name = "request_time"; Expression = { if ($_."request_time" -ne [System.DBNull]::Value) { ($_."request_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_time" } } }, 
 				"request_cpu_time", "request_logical_reads", "request_writes",
 				"request_physical_reads", "session_cpu", "session_logical_reads",
 				"session_physical_reads", "session_writes", "tempdb_allocations_mb", 
@@ -5955,16 +6083,11 @@ finally {
 			#>
 					foreach ($col in $DataSetCols) {
 						#Fill Excel cell with value from the data set
-						if ("CheckDate", "start_time", "login_time", "request_time" -contains $col) {
-							if ($BlitzWhoTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value) {
-								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoTbl.Rows[$RowNum][$col].ToString("yyyy-MM-dd HH:mm:ss")
-							} else {
-								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoTbl.Rows[$RowNum][$col] 
-							}
-						}
-						elseif ("query_hash", "query_plan_hash" -Contains $col) {
+						[string]$DebugCol = $col
+						[string]$DebugValue = $BlitzWhoTbl.Rows[$RowNum][$col]
+						if ("query_hash", "query_plan_hash" -Contains $col) {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $BlitzWhoTbl.Rows[$RowNum][$col]
-						}
+						} 
 						else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoTbl.Rows[$RowNum][$col]
 						}
@@ -6584,7 +6707,10 @@ finally {
 	}
 	
 	if ($ToHTML -ne "Y") {
+		$ExcelFile.Save()
+		Start-Sleep -Seconds 1
 		$ExcelFile.Close()
+		Start-Sleep -Seconds 1
 		$ExcelApp.Quit()
 		[System.Runtime.Interopservices.Marshal]::ReleaseComObject($ExcelApp) | Out-Null
 		Remove-Variable -Name ExcelApp
@@ -6595,7 +6721,7 @@ finally {
 		else {
 			$OutExcelFName = "PSBlitzOutput_$InstName.xlsx"
 		}
-		Rename-Item -Path $OutExcelF -NewName $OutExcelFName
+		Rename-Item -Path $OutExcelF -NewName $OutExcelFName -Force
 	}
 	if ($ZipOutput -eq "Y") {
 		Compress-Archive -Path "$OutDir" -DestinationPath "$OutDir\..\$ZipFile"
@@ -6624,5 +6750,5 @@ finally {
 	}
 }
 ## Experimental fix for https://github.com/VladDBA/PSBlitz/issues/161
-Remove-Variable * -ErrorAction SilentlyContinue
-$error.Clear();
+#Remove-Variable * -ErrorAction SilentlyContinue
+#$error.Clear();

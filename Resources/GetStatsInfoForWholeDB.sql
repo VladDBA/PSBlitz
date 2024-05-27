@@ -240,7 +240,7 @@ UPDATE ##PSBlitzStatsInfo SET [update_partition_stats] = CASE
                               END
 WHERE incremental = N'Yes';
 
-SELECT [id], [database], [object_schema], [object_name], [object_type],
+SELECT [id], [database], [object_schema]+N'.'+[object_name] AS [object_name], [object_type],
        [stats_name], [origin], [filter_definition],
        [last_updated], [rows], [unfiltered_rows],
        [rows_sampled], [sample_percent],
