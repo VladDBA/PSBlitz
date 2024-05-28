@@ -62,11 +62,11 @@ SET @LineFeed = CHAR(13) + CHAR(10);
 SELECT @SQL = CASE
               /*Skipping this query on Azure SQL DB*/
                 WHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure'
-                     AND SERVERPROPERTY('EngineEdition') IN ( 5, 6 ) THEN N'SELECT ''Not available'' AS [logical_cpu_cores], '' in Azure '' AS [physical_cpu_cores], ''SQL DB'' '
+                     AND SERVERPROPERTY('EngineEdition') IN ( 5, 6 ) THEN CAST(N'SELECT ''Not available'' AS [logical_cpu_cores], '' in Azure '' AS [physical_cpu_cores], ''SQL DB'' ' AS NVARCHAR(MAX))
                                                                           + N'[AS physical_memory_GB], NULL AS [max_server_memory_GB], NULL AS [target_server_memory_GB], '
                                                                           + N'NULL AS [total_memory_used_GB], NULL AS [proc_physical_memory_low], NULL AS [proc_virtual_memory_low], '
                                                                           + N'NULL AS [available_physical_memory_GB], NULL AS [os_memory_state], NULL AS [CTP], NULL AS [MAXDOP]'
-                ELSE N'SELECT [cpu_count] AS [logical_cpu_cores],'
+                ELSE CAST(N'SELECT [cpu_count] AS [logical_cpu_cores],' AS NVARCHAR(MAX))
                      + @LineFeed
                      + CASE
                          WHEN /*If running on SQL Server 2016 SP1 or lower, don't retrieve physical_cpu_cores*/
