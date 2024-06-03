@@ -256,8 +256,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.1.0"
-$VersDate = "2024-05-28"
+$Vers = "4.1.1"
+$VersDate = "2024-06-04"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -1379,6 +1379,11 @@ if ($ToHTML -eq "Y") {
 	}
 	h2 {
 		text-align: Left;
+	}
+	footer{
+		text-align: center;
+		margin-left: auto;
+		margin-right: auto;
 	}
 	</style>
 	
@@ -3408,7 +3413,7 @@ $htmlTable
 				$HtmlTabName = "Wait Stats Since Last Startup"
 
 				$htmlTable = $WaitsTbl | Select-Object "Pattern", 
-				@{Name = "Sample Ended"; Expression = { if($_."Sample Ended" -ne [System.DBNull]::Value){($_."Sample Ended").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."Sample Ended"} } },
+				@{Name = "Sample Ended"; Expression = { if ($_."Sample Ended" -ne [System.DBNull]::Value) { ($_."Sample Ended").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample Ended" } } },
 				"Hours Sample", "Thread Time (Hours)",
 				@{Name = "Wait Type"; Expression = { $_."wait_type" } }, 
 				@{Name = "Wait Category"; Expression = { $_."wait_category" } }, 
@@ -3438,7 +3443,7 @@ $htmlTable
 				}
 				$HtmlTabName = "Storage Throughput Since Instance Startup"
 				$htmlTable = $StorageTbl | Select-Object "Pattern", 
-				@{Name = "Sample Time"; Expression = { if($_."Sample Time" -ne [System.DBNull]::Value){($_."Sample Time").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."Sample Time"} } }, 
+				@{Name = "Sample Time"; Expression = { if ($_."Sample Time" -ne [System.DBNull]::Value) { ($_."Sample Time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample Time" } } }, 
 				"Sample (seconds)", 
 				"File Name",
 				"Drive", "# Reads/Writes", "MB Read/Written", "Avg Stall (ms)", 
@@ -3469,9 +3474,9 @@ $htmlTable
 				@{Name = "ObjectName"; Expression = { $_."object_name" } }, 
 				@{Name = "CounterName"; Expression = { $_."counter_name" } }, 
 				@{Name = "InstanceName"; Expression = { $_."instance_name" } }, 
-				@{Name = "FirstSampleTime"; Expression = { if($_."FirstSampleTime" -ne [System.DBNull]::Value){[string]$DateTepm =$_."FirstSampleTime"; $DateForExcel = $DateTepm | Get-Date; $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")}else{$_."FirstSampleTime"} } }, 
+				@{Name = "FirstSampleTime"; Expression = { if ($_."FirstSampleTime" -ne [System.DBNull]::Value) { [string]$DateTepm = $_."FirstSampleTime"; $DateForExcel = $DateTepm | Get-Date; $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss") }else { $_."FirstSampleTime" } } }, 
 				"FirstSampleValue", 
-				@{Name = "LastSampleTime"; Expression = { if($_."LastSampleTime" -ne [System.DBNull]::Value){[string]$DateTepm =$_."LastSampleTime"; $DateForExcel = $DateTepm | Get-Date; $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")}else{$_."LastSampleTime"} } }, 
+				@{Name = "LastSampleTime"; Expression = { if ($_."LastSampleTime" -ne [System.DBNull]::Value) { [string]$DateTepm = $_."LastSampleTime"; $DateForExcel = $DateTepm | Get-Date; $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss") }else { $_."LastSampleTime" } } }, 
 				"LastSampleValue", "ValueDelta", "ValuePerSecond" | ConvertTo-Html -As Table -Fragment
 			 
 				$html = $HTMLPre + @"
@@ -3866,8 +3871,8 @@ $htmlTable
 				"Total Reads", "Average Reads", "Read Weight", "% Reads (Type)", "Total Writes",
 				"Average Writes", "Write Weight", "% Writes (Type)", "Total Rows", "Avg Rows", "Min Rows",
 				"Max Rows", "# Plans", "# Distinct Plans", 
-				@{Name = "Created At"; Expression = { if($_."Created At" -ne [System.DBNull]::Value){($_."Created At").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."Created At"} } }, 
-				@{Name = "Last Execution"; Expression = { if($_."Last Execution" -ne [System.DBNull]::Value){($_."Last Execution").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."Last Execution"} } },
+				@{Name = "Created At"; Expression = { if ($_."Created At" -ne [System.DBNull]::Value) { ($_."Created At").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Created At" } } }, 
+				@{Name = "Last Execution"; Expression = { if ($_."Last Execution" -ne [System.DBNull]::Value) { ($_."Last Execution").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last Execution" } } },
 				"StatementStartOffset", "StatementEndOffset", 
 				@{Name = "Query Hash"; Expression = { Get-HexString -HexInput $_."Query Hash" } }, 
 				@{Name = "Query Plan Hash"; Expression = { Get-HexString -HexInput $_."Query Plan Hash" } },
@@ -5455,7 +5460,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					@{Name = "Stats Name"; Expression = { $_."stats_name" } },
 					@{Name = "Origin"; Expression = { $_."origin" } },
 					@{Name = "Filter Definition"; Expression = { $_."filter_definition" } },
-					@{Name = "Last Updated"; Expression = { if($_."last_updated" -ne [System.DBNull]::Value){($_."last_updated").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."last_updated"} } },
+					@{Name = "Last Updated"; Expression = { if ($_."last_updated" -ne [System.DBNull]::Value) { ($_."last_updated").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_updated" } } },
 					@{Name = "Rows"; Expression = { $_."rows" } },
 					@{Name = "Unfiltered Rows"; Expression = { $_."unfiltered_rows" } },
 					@{Name = "Rows Sampled"; Expression = { $_."rows_sampled" } },
@@ -5592,7 +5597,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Write-Host " - $RunTime seconds" -Fore Yellow
 			}
 			$StepOutcome = "Success"
-			$RecordsReturned = $IndexSet.Tables[0].Rows.Count
+			[int]$RecordsReturned = $IndexSet.Tables[0].Rows.Count
 			Add-LogRow "Index Frag Info" $StepOutcome "$RecordsReturned records returned"
 		}
 	 Catch {
@@ -5606,13 +5611,19 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 
 			$IndexTbl = New-Object System.Data.DataTable
 			$IndexTbl = $IndexSet.Tables[0]
-			if ($IndexTbl.Columns[0].ColumnName -eq "xlocked") {
+			$IndexLckTbl = New-Object System.Data.DataTable
+			$IndexLckTbl = $IndexSet.Tables[1]
+			if ($RecordsReturned -le 0) {
+				Write-Host " ->No rows returned."
+				Add-LogRow "->Index Frag Info" "No rows returned."
+			} else {
+			if ($IndexLckTbl.Rows.Count -gt 0) {
 				$RowNum = 0
 				Write-Host " ->Exclusive lock detected on table(s):"
 				$LockedTabList = ""
 				$LockedTabLogMsg = "Exclusive locks on table(s):"
-				foreach ($row in $IndexTbl) {
-					$LockedTab = $IndexTbl.Rows[$RowNum]["object_name"]
+				foreach ($row in $IndexLckTbl) {
+					$LockedTab = $IndexLckTbl.Rows[$RowNum]["object_name"]
 					Write-Host "  - $LockedTab"
 					if ($RowNum -eq 0) { 
 						$LockedTabList += "$LockedTab" 
@@ -5622,16 +5633,16 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					}
 					$RowNum += 1
 				}
-				Write-Host " ->Index fragmentation check has been skipped."
-				Add-LogRow "->Index Frag Info" "Skipped" "$LockedTabLogMsg $LockedTabList"
+				#Write-Host " ->Index fragmentation check has been skipped."
+				Add-LogRow "->Index Frag Info" "Skipped XLocked Tables" "$LockedTabLogMsg $LockedTabList"
 			}
-			else {
-				[int]$RowsReturned = $IndexTbl.Rows.Count
-				if ($RowsReturned -le 0) {
-					Write-Host " ->No rows returned."
-					Add-LogRow "->Index Frag Info" "No rows returned."
-				}
-				else {
+			#else { #before records returned count
+				
+				#if ($RecordsReturned -le 0) {
+				#	Write-Host " ->No rows returned."
+				#	Add-LogRow "->Index Frag Info" "No rows returned."
+				#}
+				#else { #after records returned count
 
 					if ($ToHTML -eq "Y") {
 				
@@ -5646,7 +5657,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						@{Name = "Avg. Frag. %"; Expression = { $_."avg_frag_percent" } },
 						@{Name = "Page Count"; Expression = { $_."page_count" } },
 						@{Name = "Size in GB"; Expression = { $_."size_in_GB" } },
-						@{Name = "Record Count"; Expression = { $_."record_count" } } | ConvertTo-Html -As Table -Fragment
+						@{Name = "Record Count"; Expression = { $_."record_count" } },
+						@{Name = "Forwarded Records"; Expression = { $_."forwarded_record_count"}} | ConvertTo-Html -As Table -Fragment
 						if ($IsAzureSQLDB) {
 							$HtmlTabName = "Index fragmentation info for $ASDBName"
 						}
@@ -5682,7 +5694,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						$ExcelColNum = 1
 						$RowNum = 0
 						$DataSetCols = @("database", "object_name", "object_type", "index_name", 
-							"index_type", "avg_frag_percent", "page_count", "size_in_GB", "record_count")
+							"index_type", "avg_frag_percent", "page_count", "size_in_GB", "record_count","forwarded_record_count")
 
 						if ($DebugInfo) {
 							Write-Host " ->Writing Stats results to sheet Index Fragmentation" -fore yellow
@@ -5705,8 +5717,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					Remove-Variable -Name IndexTbl
 					Remove-Variable -Name IndexSet
 
-				}
-			}
+				} # after records returned count
+			#}# else before records returned count
 		}
 	
 
@@ -5926,8 +5938,8 @@ finally {
 				elseif ($IsAzureSQLDB) {
 					$HtmlTabName += " for $ASDBName"
 				}
-				$htmlTable = $BlitzWhoTbl | Select-Object @{Name = "CheckDate"; Expression = { if($_."CheckDate"-ne [System.DBNull]::Value){($_."CheckDate").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."CheckDate"} } }, 
-				@{Name = "start_time"; Expression = { if($_."start_time"-ne [System.DBNull]::Value){($_."start_time").ToString("yyyy-MM-dd HH:mm:ss")}else{$_."start_time"} } },
+				$htmlTable = $BlitzWhoTbl | Select-Object @{Name = "CheckDate"; Expression = { if ($_."CheckDate" -ne [System.DBNull]::Value) { ($_."CheckDate").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."CheckDate" } } }, 
+				@{Name = "start_time"; Expression = { if ($_."start_time" -ne [System.DBNull]::Value) { ($_."start_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."start_time" } } },
 				"elapsed_time", "database_name", "session_id", "blocking_session_id",
 				#"query_text", 
 				"query_cost", @{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } }, "status", 
@@ -6187,7 +6199,7 @@ finally {
 						}
 						elseif (("start_time", "login_time", "request_time" -contains $col) -and ($BlitzWhoAggTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
 							#$DateTemp is a dumb workaround for a dumb problem that caused the hour to always be 00:00:00
-							$DateForExcel =  $BlitzWhoAggTbl.Rows[$RowNum][$col] | Get-Date
+							$DateForExcel = $BlitzWhoAggTbl.Rows[$RowNum][$col] | Get-Date
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 						}
 						else {
@@ -6380,6 +6392,10 @@ finally {
 		<br>
 						$htmlTable 
 		<br>
+		<br>
+		<footer> 
+				<p>To report an issue, plese use <a href='https://github.com/VladDBA/PSBlitz/issues' target='_blank'>GitHub</a>, but make sure to read <a href='https://github.com/VladDBA/PSBlitz/issues/216' target='_blank'>this</a> first.</p>
+				</footer> 
 						</body>
 						</html>
 "@ 
@@ -6780,6 +6796,11 @@ finally {
 	}
 	Write-Host " "
 	Write-Host $("-" * 80)
+
+	If ($DebugInfo) {
+		Write-Host "  If you want to report an issue, please use GitHub and read this first:" -Fore Yellow
+		Write-Host "      >>>>>>>  https://github.com/VladDBA/PSBlitz/issues/216 <<<<<<<" -Fore Yellow
+	}
 
 	if ($InteractiveMode -eq 1) {
 		Read-Host -Prompt "Done. Press Enter to close this window."
