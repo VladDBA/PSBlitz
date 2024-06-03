@@ -27,9 +27,9 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
       WHERE   [ix].[type] IN(0, 1,2,3,4,5,6,7)
 			 AND [obj].[name] <> N'BlitzWho_AzureSQLDBReplace'
 			 AND [obj].[type] in ('U', 'V')
-             --AND [ips].[avg_fragmentation_in_percent] > 0
+             AND [ips].[avg_fragmentation_in_percent] > 0
              /*only tables larger than ~400MB */
-             --AND [ips].[page_count] >= 52000
+             AND [ips].[page_count] >= 52000
 			 AND obj.object_id not in 
 			 (SELECT l.resource_associated_entity_id 
       FROM   sys.dm_tran_locks l
