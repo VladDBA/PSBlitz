@@ -9,6 +9,7 @@
 - [Default check VS in-depth check](#Default-check-VS-in-depth-check)
 - [Output files](#Output-files)
 - [Usage examples](#Usage-examples)
+- [Report a bug](#Report-a-Bug)
 - [Screenshots](#Screenshots)
 - [License](/LICENSE)
 
@@ -253,6 +254,9 @@ Otherwise you can navigate in PowerShell to the directory where the script is an
 Note that `-ServerName` is a positional parameter, so you don't necessarily have to specify the parameter's name as long as the first thing after the script's name is the instance 
 
 [*Back to top*](#header1)
+
+## Report a Bug
+If you've ran into an error while running PSBlitz, please read [this](https://github.com/VladDBA/PSBlitz/issues/216) before opening an issue.
 
 ## Screenshots
 ![GIF](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/GIF_000.gif)
