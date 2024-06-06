@@ -256,8 +256,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.1.1"
-$VersDate = "2024-06-04"
+$Vers = "4.1.2"
+$VersDate = "2024-06-05"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -1370,6 +1370,12 @@ if ($ToHTML -eq "Y") {
 	}
 	.ActiveSessionsTab{
 		td:nth-child(5) {
+			position: sticky; left: 0;
+			background-color: rgba(255, 255, 255, 0.7);
+		}
+	}
+	.IndexUsageTable{
+		td:nth-child(6) {
 			position: sticky; left: 0;
 			background-color: rgba(255, 255, 255, 0.7);
 		}
@@ -4798,6 +4804,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
 					@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } }, 
 					"More Info" | ConvertTo-Html -As Table -Fragment
+					#add table specify style
+					$htmlTable = $htmlTable -replace '<table>', '<table class="IndexUsageTable">'
 				}
 		
 				$html = $HTMLPre + @"
@@ -5653,7 +5661,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						@{Name = "Object Name"; Expression = { $_."object_name" } },
 						@{Name = "Object Type"; Expression = { $_."object_type" } },
 						@{Name = "Index Name"; Expression = { $_."index_name" } }, 
-						@{Name = "Index Type"; Expression = { $_."index_type" } }, 
+						@{Name = "Index Type"; Expression = { $_."index_type" } },
+						@{Name = "Partition"; Expression = {$_."partition_number"}}, 
 						@{Name = "Avg. Frag. %"; Expression = { $_."avg_frag_percent" } },
 						@{Name = "Page Count"; Expression = { $_."page_count" } },
 						@{Name = "Size in GB"; Expression = { $_."size_in_GB" } },
@@ -5694,7 +5703,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						$ExcelColNum = 1
 						$RowNum = 0
 						$DataSetCols = @("database", "object_name", "object_type", "index_name", 
-							"index_type", "avg_frag_percent", "page_count", "size_in_GB", "record_count","forwarded_record_count")
+							"index_type", "partition_number", "avg_frag_percent", "page_count", "size_in_GB", "record_count","forwarded_record_count")
 
 						if ($DebugInfo) {
 							Write-Host " ->Writing Stats results to sheet Index Fragmentation" -fore yellow

@@ -204,7 +204,7 @@ SET    [update_table_stats] = CASE
                                 ELSE NULL
                               END
 
-WHERE  [id] IN(SELECT MAX([id])
+WHERE  [id] IN(SELECT MIN([id])
              FROM   ##PSBlitzStatsInfo
              GROUP  BY [object_name]);
 UPDATE ##PSBlitzStatsInfo SET [update_individual_stats] = CASE
