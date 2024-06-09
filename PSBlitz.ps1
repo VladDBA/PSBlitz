@@ -257,7 +257,7 @@ param(
 ###Internal params
 #Version
 $Vers = "4.2.0"
-$VersDate = "2024-06-09"
+$VersDate = "2024-06-10"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -276,7 +276,7 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"GetTempDBUsageInfo.sql", "GetOpenTransactions.sql",
 	"GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql",
 	"GetDbInfo.sql", "GetAzureSQLDBInfo.sql",
-	"spBlitzQueryStore_NonSPLatest.sql")
+	"spBlitzQueryStore_NonSPLatest.sql", "searchtable.js", "sorttable.js")
 #Set path+name of the input Excel file
 $OrigExcelF = $ResourcesPath + "\" + $OrigExcelFName
 #Set default start row for Excel output
@@ -478,9 +478,10 @@ function Format-ExceptionMsg {
 	[string]$ErrorMessageString = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty Message
 	try {
 		
-		[string]$SQLErrNo = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Number 
+		[string]$SQLErrNo = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Number -ErrorAction Ignore
 		if (!([string]::IsNullOrEmpty($SQLErrNo))) {
 			#Get SQL related error info
+			[string]$SQLErrState = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty State -ErrorAction Stop
 			[string]$SQLErrLev = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Class
 			[string]$SQLErrState = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty State
 			[string]$SQLErrLineNo = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty LineNumber
@@ -491,7 +492,7 @@ function Format-ExceptionMsg {
 		else {
 			#Get PS related error info
 			[string]$PSErrMsg = $ErrorMessageString
-			[string]$PSErrLine = $ErrorMessage | Select-Object -ExpandProperty InvocationInfo | Select-Object -ExpandProperty ScriptLineNumber
+			[string]$PSErrLine = $ErrorMessage | Select-Object -ExpandProperty InvocationInfo | Select-Object -ExpandProperty ScriptLineNumber -ErrorAction Stop
 			[string]$PSErrStatement = $ErrorMessage | Select-Object -ExpandProperty InvocationInfo | Select-Object -ExpandProperty Line
 			if (!([string]::IsNullOrEmpty($PSErrStatement))) {
 				$PSErrStatement = $PSErrStatement.Trim()
@@ -505,6 +506,7 @@ function Format-ExceptionMsg {
 		}
 	}
  catch {
+
 		Write-Output $ErrorMessageString
 	}
 }
@@ -595,11 +597,11 @@ $InitScriptBlock = {
 		[string]$ErrorMessageString = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty Message
 		try {
 			
-			[string]$SQLErrNo = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Number 
+			[string]$SQLErrNo = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Number -ErrorAction Ignore
 			if (!([string]::IsNullOrEmpty($SQLErrNo))) {
 				#Get SQL related error info
+				[string]$SQLErrState = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty State -ErrorAction Stop
 				[string]$SQLErrLev = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Class
-				[string]$SQLErrState = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty State
 				[string]$SQLErrLineNo = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty LineNumber
 				[string]$SQLErrMsg = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Message
 				##formatting the error message in SQL Server style if there's an error number
@@ -608,7 +610,7 @@ $InitScriptBlock = {
 			else {
 				#Get PS related error info
 				[string]$PSErrMsg = $ErrorMessageString
-				[string]$PSErrLine = $ErrorMessage | Select-Object -ExpandProperty InvocationInfo | Select-Object -ExpandProperty ScriptLineNumber
+				[string]$PSErrLine = $ErrorMessage | Select-Object -ExpandProperty InvocationInfo | Select-Object -ExpandProperty ScriptLineNumber -ErrorAction Stop
 				[string]$PSErrStatement = $ErrorMessage | Select-Object -ExpandProperty InvocationInfo | Select-Object -ExpandProperty Line
 				if (!([string]::IsNullOrEmpty($PSErrStatement))) {
 					$PSErrStatement = $PSErrStatement.Trim()
@@ -1402,7 +1404,33 @@ if ($ToHTML -eq "Y") {
 			position: sticky; left: 0;
 			background-color: rgba(255, 255, 255, 0.7);
 		}
-	}	
+		td:first-child {
+			font-weight: normal;
+			text-align: left;
+		}
+		td:nth-child(2) {
+			font-weight: bold;
+			text-align: left;
+		}
+	}
+	.Perfmon{
+		td:first-child {
+			font-weight: normal
+		}
+	
+	}
+	.WaitStats{
+		td:first-child {
+			font-weight: normal
+		}
+		td:nth-child(5) {
+			font-weight: bold
+		}
+		td:nth-child(7) {
+			font-weight: bold
+		}
+	
+	}		
 	h1 {
 		text-align: center;
 	}
@@ -1430,7 +1458,7 @@ if ($ToHTML -eq "Y") {
 		margin: 0 auto;
 		margin-left: auto;
 		margin-right: auto;
-		border-radius: 12px;
+		border-radius: 10px;
 	}
 	</style>
 	<script src="sorttable.js"></script>
@@ -2007,7 +2035,7 @@ $htmlTable4
 			$htmlTable3 = $htmlTable3 -replace $AnchorRegex, $AnchorURL
 
 			$htmlTable4 = $TempDBSessTbl | Select-Object "Query", 
-			@{Name = "Query Text"; Expression = { $_."query_text" } } | Where-Object { $_."query_text" -ne [System.DBNull]::Value } | ConvertTo-Html -As Table -Fragment
+			@{Name = "Query Text"; Expression = { $_."query_text" } } | Where-Object -FilterScript {$_."Query Text" -ne [System.DBNull]::Value}  | ConvertTo-Html -As Table -Fragment
 			$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
 			$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
 			$htmlTable4 = $htmlTable4 -replace $AnchorRegex, $AnchorURL
@@ -2305,7 +2333,7 @@ $htmlTable2
 				$AnchorURL = '<a href="#$&">$&</a>'
 				$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
 				$htmlTable2 = $AcTranTbl | Select-Object @{Name = "Query"; Expression = { $_."current_query" } }, 
-				@{Name = "Query text"; Expression = { $_."current_sql" } } | Where-Object { $_."current_sql" -ne [System.DBNull]::Value } | ConvertTo-Html -As Table -Fragment
+				@{Name = "Query text"; Expression = { $_."current_sql" } } | Where-Object -FilterScript {$_."Query text" -ne [System.DBNull]::Value} | ConvertTo-Html -As Table -Fragment
 				$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
 				$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
 				$htmlTable2 = $htmlTable2 -replace $AnchorRegex, $AnchorURL
@@ -2317,7 +2345,7 @@ $htmlTable2
 				#@{Name = "Wait Category"; Expression = { $_."wait_category" } },
 
 				$htmlTable3 = $AcTranTbl | Select-Object @{Name = "Query"; Expression = { $_."most_recent_query" } }, 
-				@{Name = "Query text"; Expression = { $_."most_recent_sql" } } | Where-Object { $_."most_recent_sql" -ne [System.DBNull]::Value } | ConvertTo-Html -As Table -Fragment
+				@{Name = "Query text"; Expression = { $_."most_recent_sql" } } | Where-Object -FilterScript {$_."Query text" -ne [System.DBNull]::Value}  | ConvertTo-Html -As Table -Fragment
 				$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
 				$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
 				$htmlTable3 = $htmlTable3 -replace $AnchorRegex, $AnchorURL			
@@ -2999,13 +3027,8 @@ $JumpToTop
 				
 				$htmlTable1 = $DBFileInfoTbl | Select-Object  "Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
 				"AvailableSpaceGB", "MaxFileSizeGB", "GrowthIncrement" | ConvertTo-Html -As Table -Fragment
-				if($DBInfoTbl.Rows.Count -gt 10){
-					$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable sortable">'
-					$htmlTable1 = $htmlTable1 -replace '<table>', '<table id="DBFileInfoTable" class="sortable">'
-				} else {
-					$htmlTable = $htmlTable -replace '<table>', '<table class="DatabaseInfoTable sortable">'
-					$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="sortable">'
-				}
+				$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable sortable">'
+				$htmlTable1 = $htmlTable1 -replace '<table>', '<table id="DBFileInfoTable" class="sortable">'
 				
 
 				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
@@ -3030,7 +3053,7 @@ $htmlTable
 $JumpToTop
 <br>
 <h2>Database Files Info</h2>
-$(if($DBInfoTbl.Rows.Count -gt 10){$SearchDiv -replace 'ReplaceSearchFunction','SearchDBFileInfo' -replace 'object', 'database'})
+$(if($DBInfoTbl.Rows.Count -gt 10){$SearchDiv -replace 'ReplaceSearchFunction','SearchDBFileInfo' -replace 'object', 'database' -replace 'id="SearchBox"', 'id="SearchBox1"'})
 $SortableTable
 $htmlTable1
 $JumpToTop
@@ -3231,12 +3254,15 @@ $htmlBlock
 					Write-Host " ->Converting sp_Blitz output to HTML" -fore yellow
 				}
 				$htmlTable = $BlitzTbl | Select-Object "Priority", "FindingsGroup", "Finding", "DatabaseName", "Details", "URL" | Where-Object -FilterScript { ($_."Finding" -ne "SQL Server First Responder Kit" ) -and ("Rundate", "Thanks!" -notcontains $_."FindingsGroup") } | ConvertTo-Html -As Table -Fragment
+				$htmlTable = $htmlTable -replace '<table>', '<table id="InstanceHealthTable">'
 				$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
 				$html = $HTMLPre + @"
 <title>$tableName</title>
 </head>
 <body>
 <h1 id="top">$tableName</h1>
+$($SearchDiv -replace 'ReplaceSearchFunction', 'SearchInstanceHealth' -replace 'object' , 'database')
+<br>
 $htmlTable
 $JumpToTop
 </body>
@@ -3266,7 +3292,7 @@ $JumpToTop
 					Write-Host " ->Writing sp_Blitz results to Excel" -fore yellow
 				}
 				#Loop through each Excel row
-				foreach ($row in $BlitzTbl) {
+				foreach ($row in $BlitzTbl ) {
 					<#
 				Loop through each data set column of current row and fill the corresponding 
 				Excel cell
@@ -3353,9 +3379,10 @@ $JumpToTop
 			if ($DebugInfo) {
 				Write-Host " ->Converting sp_BlitzFirst output to HTML" -fore yellow
 			}
-			$ReplaceThis = 'Try running our more in-depth checks with sp_Blitz, or there may not be an unusual SQL Server performance problem'
-			$htmlTable = $BlitzFirstTbl | Select-Object "Priority", "FindingsGroup", "Finding", 
-			@{Name = "Details"; Expression = { $_."Details".Replace('ClickToSeeDetails', '').Replace($ReplaceThis,'') } }, "URL" | Where-Object -FilterScript { ( "0", "255" -NotContains $_."Priority" ) } | ConvertTo-Html -As Table -Fragment
+			
+			$htmlTable = $BlitzFirstTbl | Select-Object "Priority", "FindingsGroup", 
+			@{Name = "Finding"; Expression = {$_."Finding" -replace "From Your Community.*", ""}}, 
+			@{Name = "Details"; Expression = { $_."Details".Replace('ClickToSeeDetails', '') -replace ".*in-depth checks with sp_Blitz.*","Nothing to report" } }, "URL" | Where-Object -FilterScript { ( "0", "255" -NotContains $_."Priority" ) } | ConvertTo-Html -As Table -Fragment
 			$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
 			$HtmlTabName = "What's happening on the instance now?"
 			$html = $HTMLPre + @"
@@ -3490,7 +3517,7 @@ $htmlTable
 				"Wait Time (Hours)", "Per Core Per Hour", 
 				"Signal Wait Time (Hours)", "Percent Signal Waits", "Number of Waits",
 				"Avg ms Per Wait", "URL" | ConvertTo-Html -As Table -Fragment
-				$htmlTable = $htmlTable -replace '<table>', '<table class="sortable">'
+				$htmlTable = $htmlTable -replace '<table>', '<table class="WaitStats">'
 				$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'				
 			 
 				$html = $HTMLPre + @"
@@ -3498,7 +3525,6 @@ $htmlTable
 </head>
 <body>
 <h1>$HtmlTabName</h1>
-$SortableTable
 $htmlTable
 $JumpToTop
 </body>
@@ -3521,13 +3547,14 @@ $JumpToTop
 				"Drive", "# Reads/Writes", "MB Read/Written", "Avg Stall (ms)", 
 				@{Name = "Physical File Name"; Expression = { $_."file physical name" } },
 				@{Name = "Database Name"; Expression = { $_."DatabaseName" } } | ConvertTo-Html -As Table -Fragment
-				$htmlTable = $htmlTable -replace '<table>', '<table class="sortable">'
+				$htmlTable = $htmlTable -replace '<table>', '<table id="StorageStatsTable" class="Perfmon sortable">'
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
 </head>
 <body>
 <h1>$HtmlTabName</h1>
+$($SearchDiv -replace 'ReplaceSearchFunction', 'SearchStorageStats' -replace 'object', 'database')
 $SortableTable
 $htmlTable
 $JumpToTop
@@ -3552,7 +3579,7 @@ $JumpToTop
 				"FirstSampleValue", 
 				@{Name = "LastSampleTime"; Expression = { if ($_."LastSampleTime" -ne [System.DBNull]::Value) { [string]$DateTepm = $_."LastSampleTime"; $DateForExcel = $DateTepm | Get-Date; $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss") }else { $_."LastSampleTime" } } }, 
 				"LastSampleValue", "ValueDelta", "ValuePerSecond" | ConvertTo-Html -As Table -Fragment
-				$htmlTable = $htmlTable -replace '<table>', '<table class="sortable">'
+				$htmlTable = $htmlTable -replace '<table>', '<table class="Perfmon sortable">'
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
@@ -4847,7 +4874,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					"Count NCs > 1GB", "Count NCs > 10GB", "Count NCs > 100GB", 
 					@{Name = "Oldest Create Date"; Expression = { if ($_."Oldest Create Date" -ne [System.DBNull]::Value) { ($_."Oldest Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Oldest Create Date" } } }, 
 					@{Name = "Most Recent Create Date"; Expression = { if ($_."Most Recent Create Date" -ne [System.DBNull]::Value) { ($_."Most Recent Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Most Recent Create Date" } } }, 
-					@{Name = "Most Recent Modify Date"; Expression = { if ($_."Most Recent Modify Date" -ne [System.DBNull]::Value) { ($_."Most Recent Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Most Recent Modify Date" } } } | ConvertTo-Html -As Table -Fragment
+					@{Name = "Most Recent Modify Date"; Expression = { if ($_."Most Recent Modify Date" -ne [System.DBNull]::Value) { ($_."Most Recent Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Most Recent Modify Date" } } } | Where-Object "Number Objects" -NotLike "sp_BlitzIndex*" | ConvertTo-Html -As Table -Fragment
 				}
 				elseif ($Mode -eq "2") {
 					$BlitzIxTbl.Columns["Definition: [Property] ColumnName {datatype maxbytes}"].ColumnName = "Definition"
@@ -5153,6 +5180,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				#Increment row retrieval counter
 				$RowNum += 1
 			}
+			$DeadlockSpan = $TblLockOver.Rows[0]["object_name"]
 		
 			if ($ToHTML -eq "Y") {
 				if ($DebugInfo) {
@@ -5169,7 +5197,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$htmlTable1 = $TblLockOver | Select-Object @{Name = "Database"; Expression = { $_."database_name" } }, 
 				@{Name = "Object"; Expression = { $_."object_name" } }, 
 				@{Name = "Finding Group"; Expression = { $_."finding_group" } }, 
-				@{Name = "Finding"; Expression = { $_."finding" } } | Where-Object "database_name" -NotLike "sp_BlitzLock*" | ConvertTo-Html -As Table -Fragment
+				@{Name = "Finding"; Expression = { $_."finding" } } | Where-Object "Database" -NotLike "sp_BlitzLock version*" | ConvertTo-Html -As Table -Fragment
 			
 				$htmlTable2 = $TblLockDtl | Select-Object @{Name = "Type"; Expression = { $_."deadlock_type" } }, 
 				@{Name = "Event Date"; Expression = { if ($_."event_date" -ne [System.DBNull]::Value) { ($_."event_date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."event_date" } } },
@@ -5194,7 +5222,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				@{Name = "Last Batch Start"; Expression = { if ($_."last_batch_started" -ne [System.DBNull]::Value) { ($_."last_batch_started").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_batch_started" } } },
 				@{Name = "Last Batch Completed"; Expression = { if ($_."last_batch_completed" -ne [System.DBNull]::Value) { ($_."last_batch_completed").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_batch_completed" } } },	
 				@{Name = "Tran Name"; Expression = { $_."transaction_name" } } | ConvertTo-Html -As Table -Fragment
-				$htmlTable2 = $htmlTable2 -replace '<table>', '<table class="DeadlockDetailsTable">'
+				$htmlTable2 = $htmlTable2 -replace '<table>', '<table id="DeadlockDtlTable" class="DeadlockDetailsTable">'
 
 				$QExt = '.query'
 				$AnchorRegex = "DL(\d+)Q(\d+)V{0,}$QExt"
@@ -5247,6 +5275,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		</head>
 		<body>
 		<h1 id="top">$HtmlTabName</h1>
+		<p>$DeadlockSpan</p>
 		<h2>Deadlock Overview</h2>
 		<p><a href="#Deadlocks1">Jump to deadlock details</a></p>
 "@
@@ -5260,6 +5289,11 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		$JumpToTop
 		<br>
 		<h2 id="Deadlocks1">Deadlock Details</h2>
+		$(if($TblLockDtl.Rows.Count -ge 10){
+			$SearchDiv -replace 'ReplaceSearchFunction', 'SearchDeadlockDetails'
+			'<br>'
+		
+		})
 		$htmlTable2
 		$JumpToTop
 		<br>
@@ -6133,7 +6167,7 @@ finally {
 
 				#Query table
 				$htmlTable1 = $BlitzWhoAggTbl | Select-Object "Query", @{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } },
-				"query_text" | Where-Object { $_."query_text" -ne [System.DBNull]::Value } | ConvertTo-Html -As Table -Fragment
+				"query_text" | Where-Object -FilterScript { $_."query_text" -ne [System.DBNull]::Value } | ConvertTo-Html -As Table -Fragment
 				$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
 				$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
 				$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
@@ -6408,7 +6442,7 @@ finally {
 		##Populating the "ExecutionLog" sheet
 		$ExcelSheet = $ExcelFile.Worksheets.Item("ExecutionLog")
 		#Specify at which row in the sheet to start adding the data
-		$ExcelStartRow = $DefaultStartRow
+		$ExcelStartRow = 3
 		#Specify with which column in the sheet to start
 		$ExcelColNum = 1
 		#Set counter used for row retrieval
@@ -6637,7 +6671,7 @@ finally {
 						$PageName = "Extended $PageName"
 					}
 					$Description = "Index-related diagnosis outlining high-value missing indexes, duplicate or almost duplicate indexes, indexes with more writes than reads, etc."
-					$AdditionalInfo += "For SQL Server 2019 - will output execution plans as .sqlplan files."
+					$AdditionalInfo += "For SQL Server 2019 and above - will output execution plans as .sqlplan files."
 				}
 				elseif ($File.Name -like "BlitzIndex_1*") {
 					$PageName = "Index Summary"
@@ -6823,7 +6857,7 @@ finally {
 				<br>
 				<br>
 				<footer>  
-				<p>Report generated with <a href='https://github.com/VladDBA/PSBlitz' target='_blank'>PSBlitz</a> - created by <a href='https://vladdba.com/' target='_blank'>Vlad Drumea</a></p>
+				<p>Report generated with <a href='https://github.com/VladDBA/PSBlitz' target='_blank'>PSBlitz</a> - created by <a href='https://vladdba.com/?ref=PSBlitz' target='_blank'>Vlad Drumea</a></p>
 				</footer>  
 				</body>
 				</html>
