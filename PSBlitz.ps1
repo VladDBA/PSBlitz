@@ -2950,7 +2950,7 @@ $JumpToTop
 <br>
 <h2>Database Files Info</h2>
 $(if($DBInfoTbl.Rows.Count -gt 10){$SearchDiv -replace 'ReplaceSearchFunction','SearchDBFileInfo' -replace 'object', 'database' -replace 'id="SearchBox"', 'id="SearchBox1"'})
-$(if ([string]::IsNullOrEmpty($CheckDB)){$SortableTable})
+$SortableTable
 $htmlTable1
 $JumpToTop
 $htmlBlock
@@ -6412,7 +6412,6 @@ finally {
 						<p>To report an issue, plese use <a href='https://github.com/VladDBA/PSBlitz/issues' target='_blank'>GitHub</a>, but make sure to read <a href='https://github.com/VladDBA/PSBlitz/issues/216' target='_blank'>this</a> first.</p>
 						$htmlTable
 						$JumpToTop
-						<br>
 				 		$Footer 
 						</body>
 						</html>
