@@ -256,8 +256,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.2.0"
-$VersDate = "2024-06-10"
+$Vers = "4.2.1"
+$VersDate = "2024-06-11"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -276,7 +276,8 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"GetTempDBUsageInfo.sql", "GetOpenTransactions.sql",
 	"GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql",
 	"GetDbInfo.sql", "GetAzureSQLDBInfo.sql",
-	"spBlitzQueryStore_NonSPLatest.sql", "searchtable.js", "sorttable.js")
+	"spBlitzQueryStore_NonSPLatest.sql", "searchtable.js", "sorttable.js",
+	"styles.css")
 #Set path+name of the input Excel file
 $OrigExcelF = $ResourcesPath + "\" + $OrigExcelFName
 #Set default start row for Excel output
@@ -1309,52 +1310,8 @@ if ($ToHTML -eq "Y") {
 	<!DOCTYPE html>
 	<html>
 	<head>
+	<link rel="stylesheet" href="styles.css">
 	<style>
-	body 
-	{ 
-	background-color:#FFFFFF;
-	font-family:Tahoma;
-	font-size:11pt; 
-	}
-	table.sortable thead {
-		background-color: dodgerblue;
-		color: white;
-		font-weight: bold;
-	  }
-	.sortable th {
-		cursor: pointer;
-    }
-	th.tooltip {
-        cursor: help;
-    }
-	table {
-        margin-left: auto;
-        margin-right: auto;
-		border-spacing: 1px;
-    }
-	th {
-		background-color: dodgerblue;
-		color: white;
-		font-weight: bold;
-		padding: 5px;
-		text-align: center;
-		border: 1px solid black;
-		position: sticky; 
-		top: 0; 
-		z-index: 1;
-	}
-	td {
-		padding: 5px;
-		border: 1px solid black;
-		vertical-align: top;
-	}
-	tr:hover{
-		background-color: rgba(255, 255, 0, 0.4);
-	}
-	td:first-child {
-		font-weight: bold;
-		text-align: left;
-	}
 	.CacheTable1{
 		td:nth-child(3) {
 			position: sticky; left: 0;
@@ -1375,91 +1332,6 @@ if ($ToHTML -eq "Y") {
 			background-color: rgba(255, 255, 0, 0.4);
 		}
 	}
-	.QueryStoreTab{
-		td:nth-child(6) {
-			position: sticky; left: 0;
-			background-color: rgba(255, 255, 255, 0.7);
-		}
-	}
-	.ActiveSessionsTab{
-		td:nth-child(6) {
-			position: sticky; left: 0;
-			background-color: rgba(255, 255, 255, 0.7);
-		}
-	}
-	.IndexUsageTable{
-		td:nth-child(6) {
-			position: sticky; left: 0;
-			background-color: rgba(255, 255, 255, 0.7);
-		}
-	}
-	.DatabaseInfoTable{
-		td:nth-child(1) {
-			position: sticky; left: 0;
-			background-color: rgba(255, 255, 255, 0.7);
-		}
-	}
-	.DeadlockDetailsTable{
-		td:nth-child(5) {
-			position: sticky; left: 0;
-			background-color: rgba(255, 255, 255, 0.7);
-		}
-		td:first-child {
-			font-weight: normal;
-			text-align: left;
-		}
-		td:nth-child(2) {
-			font-weight: bold;
-			text-align: left;
-		}
-	}
-	.Perfmon{
-		td:first-child {
-			font-weight: normal
-		}
-	
-	}
-	.WaitStats{
-		td:first-child {
-			font-weight: normal
-		}
-		td:nth-child(5) {
-			font-weight: bold
-		}
-		td:nth-child(7) {
-			font-weight: bold
-		}
-	
-	}		
-	h1 {
-		text-align: center;
-	}
-	h2 {
-		text-align: center;
-	}
-	h3 {
-		text-align: center;
-	}
-	p {
-		text-align: center;
-	}
-	footer{
-		text-align: center;
-		margin-left: auto;
-		margin-right: auto;
-	}
-	div{
-		text-align:center;
-	}
-	input.SearchBox{
-		font-size: 16px;
-		text-align:left;
-		border: 3px solid #778899;
-		margin: 0 auto;
-		margin-left: auto;
-		margin-right: auto;
-		border-radius: 10px;
-	}
 	</style>
 	<script src="sorttable.js"></script>
 	<script src="searchtable.js"></script>
@@ -1472,6 +1344,15 @@ if ($ToHTML -eq "Y") {
 	    <div>
 		<input type=`"text`" id=`"SearchBox`" class=`"SearchBox`" onkeyup=`"ReplaceSearchFunction()`" placeholder=`" Search by object name...`">
 		</div>
+"@
+	$Footer = @"
+	<br>
+	<br>
+	<footer>  
+	<p>Report generated with <a href='https://github.com/VladDBA/PSBlitz' target='_blank'>PSBlitz</a> - created by <a href='https://vladdba.com/?ref=PSBlitz' target='_blank'>Vlad Drumea</a></p>
+	</footer>
+	<br>
+
 "@
 }
 else {
@@ -1672,6 +1553,7 @@ try {
 			@{Name = "Client Connections"; Expression = { $_."client_connections" } },
 			"Estimated Response Latency (Sec)", 
 			@{Name = "Server Time"; Expression = { ($_."server_time").ToString("yyyy-MM-dd HH:mm:ss") } } | ConvertTo-Html -As Table -Fragment
+			$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="InstanceInfoTbl">'
 
 			if (($DebugInfo) -and ($IsAzureSQLDB -eq $false)) {
 				Write-Host " ->Converting resource info to HTML" -fore yellow
@@ -1680,7 +1562,7 @@ try {
 				Write-Host " ->Skipping resource instance resource info for Azure SQL DB" -fore yellow
 			} 
 			if ($IsAzureSQLDB) {
-				$htmlTable2 = '<p style="text-align: center;">Instance resource information is not available for Azure SQL DB.</p>'
+				$htmlTable2 = '<p>Instance resource information is not available for Azure SQL DB.</p>'
 			}
 			else {
 				$htmlTable2 = $ResourceInfoTbl | Select-Object  @{Name = "Logical Cores"; Expression = { $_."logical_cpu_cores" } }, 
@@ -1694,6 +1576,7 @@ try {
 				@{Name = "Available Physical Memory GB"; Expression = { $_."available_physical_memory_GB" } },
 				@{Name = "OS Memory State"; Expression = { $_."os_memory_state" } },
 				"CTP",	"MAXDOP" | ConvertTo-Html -As Table -Fragment
+				$htmlTable2 = $htmlTable2 -replace '<table>', '<table class="RsrcInfoTbl">'
 			}
 
 			if ($DebugInfo) {
@@ -1705,14 +1588,16 @@ try {
 			@{Name = "Client Hostname"; Expression = { $_."ClientHostName" } }, 
 			@{Name = "Client IP"; Expression = { $_."ClientIP" } },
 			@{Name = "Protocol"; Expression = { $_."ProtocolUsed" } },
-			@{Name = "Oldest Connection Time"; Expression = { $_."OldestConnectionTime" } },
+			@{Name = "Oldest Connection Time"; Expression = { ($_."OldestConnectionTime").ToString("yyyy-MM-dd HH:mm:ss") } },
 			@{Name = "Program"; Expression = { $_."Program" } }  | ConvertTo-Html -As Table -Fragment
+			$htmlTable3 = $htmlTable3 -replace '<table>', '<table class="Top10ClientConnTbl">'
 
 			if ($DebugInfo) {
 				Write-Host " ->Converting session level options info to HTML" -fore yellow
 			}
 
 			$htmlTable4 = $SessOptTbl | Select-Object "Option", "SessionSetting", "InstanceSetting", "Description", "URL" | ConvertTo-Html -As Table -Fragment
+			$htmlTable4 = $htmlTable4 -replace '<table>', '<table class="SessOptTbl sortable">'
 			$htmlTable4 = $htmlTable4 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
 
 
@@ -1722,16 +1607,16 @@ try {
     </head>
     <body>
 <h1>$HtmlTabName</h1>
-<h2 style="text-align: center;">Instance information</h2>
+<h2>Instance information</h2>
 $htmlTable1
 <br>
-<h2 style="text-align: center;">Resource information</h2>
+<h2>Resource information</h2>
 $htmlTable2
 <br>
-<h2 style="text-align: center;">Top 10 clients by connections</h2>
+<h2>Top 10 clients by connections</h2>
 $htmlTable3
 <br>
-<h2 style="text-align: center;">Session level options</h2>
+<h2>Session level options</h2>
 $htmlTable4
 </body>
 </html>
@@ -1986,6 +1871,7 @@ $htmlTable4
 			@{Name = "Internal Objects MB"; Expression = { $_."internal_objects_MB" } },
 			@{Name = "User Objects MB"; Expression = { $_."user_objects_MB" } },
 			@{Name = "Version Store MB"; Expression = { $_."version_store_MB" } } | ConvertTo-Html -As Table -Fragment
+			$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="TempdbInfoTbl">'
 
 			if ($DebugInfo) {
 				Write-Host " ->Converting TempDB table info to HTML" -fore yellow
@@ -2035,7 +1921,7 @@ $htmlTable4
 			$htmlTable3 = $htmlTable3 -replace $AnchorRegex, $AnchorURL
 
 			$htmlTable4 = $TempDBSessTbl | Select-Object "Query", 
-			@{Name = "Query Text"; Expression = { $_."query_text" } } | Where-Object -FilterScript {$_."Query Text" -ne [System.DBNull]::Value}  | ConvertTo-Html -As Table -Fragment
+			@{Name = "Query Text"; Expression = { $_."query_text" } } | Where-Object -FilterScript { $_."Query Text" -ne [System.DBNull]::Value }  | ConvertTo-Html -As Table -Fragment
 			$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
 			$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
 			$htmlTable4 = $htmlTable4 -replace $AnchorRegex, $AnchorURL
@@ -2333,7 +2219,7 @@ $htmlTable2
 				$AnchorURL = '<a href="#$&">$&</a>'
 				$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
 				$htmlTable2 = $AcTranTbl | Select-Object @{Name = "Query"; Expression = { $_."current_query" } }, 
-				@{Name = "Query text"; Expression = { $_."current_sql" } } | Where-Object -FilterScript {$_."Query text" -ne [System.DBNull]::Value} | ConvertTo-Html -As Table -Fragment
+				@{Name = "Query text"; Expression = { $_."current_sql" } } | Where-Object -FilterScript { $_."Query text" -ne [System.DBNull]::Value } | ConvertTo-Html -As Table -Fragment
 				$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
 				$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
 				$htmlTable2 = $htmlTable2 -replace $AnchorRegex, $AnchorURL
@@ -2345,7 +2231,7 @@ $htmlTable2
 				#@{Name = "Wait Category"; Expression = { $_."wait_category" } },
 
 				$htmlTable3 = $AcTranTbl | Select-Object @{Name = "Query"; Expression = { $_."most_recent_query" } }, 
-				@{Name = "Query text"; Expression = { $_."most_recent_sql" } } | Where-Object -FilterScript {$_."Query text" -ne [System.DBNull]::Value}  | ConvertTo-Html -As Table -Fragment
+				@{Name = "Query text"; Expression = { $_."most_recent_sql" } } | Where-Object -FilterScript { $_."Query text" -ne [System.DBNull]::Value }  | ConvertTo-Html -As Table -Fragment
 				$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
 				$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
 				$htmlTable3 = $htmlTable3 -replace $AnchorRegex, $AnchorURL			
@@ -2578,6 +2464,8 @@ $htmlTable5
 $JumpToTop
 <br>
 <h2>Database Scoped Configuration</h2>
+<br>
+$SortableTable
 $htmlTable6
 $JumpToTop
 </body>
@@ -2961,7 +2849,8 @@ $JumpToTop
 		}
 
 	}
- else { #if it's not Azure SQL DB
+ else {
+		#if it's not Azure SQL DB
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetDbInfo.sql")	
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
 			Write-Host " Getting database info for $CheckDB... " -NoNewLine
@@ -3027,19 +2916,26 @@ $JumpToTop
 				
 				$htmlTable1 = $DBFileInfoTbl | Select-Object  "Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
 				"AvailableSpaceGB", "MaxFileSizeGB", "GrowthIncrement" | ConvertTo-Html -As Table -Fragment
-				$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable sortable">'
+				if (!([string]::IsNullOrEmpty($CheckDB))) {
+					$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable">'
+				}
+				else {
+					$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable sortable">'
+				}
 				$htmlTable1 = $htmlTable1 -replace '<table>', '<table id="DBFileInfoTable" class="sortable">'
 				
 
 				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 					$htmlTable2 = $DBConfigTbl | Select-Object "Database", "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
+					$htmlTable2 = $htmlTable2 -replace '<table>','<table class="sortable">'
 					$htmlBlock = "`n<br>`n" + '<h2>Database Scoped Configuration</h2>'
 					$htmlBlock += '<p><a href="https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-scoped-configuration-transact-sql?view=sql-server-ver16" target="_blank">More Info</a></p>'
-					$htmlBlock += "`n $htmlTable2 `n"
+					$htmlBlock += "`n $SortableTable `n $htmlTable2 `n"
 					$htmlBlock += '<p><a href="#top">Jump to top</a></p>'
+					$htmlBlock += '<br>'
 				}
 				else {
-					$htmlBlock = ""
+					$htmlBlock = '<br>'
 				}
 
 				$html = $HTMLPre + @"
@@ -3048,13 +2944,13 @@ $JumpToTop
 <body>
 <h1 id="top">$tableName</h1>
 $(if($DBInfoTbl.Rows.Count -gt 10){$SearchDiv -replace 'ReplaceSearchFunction','SearchDBInfo' -replace 'object', 'database'})
-$SortableTable
+$(if ([string]::IsNullOrEmpty($CheckDB)){$SortableTable})
 $htmlTable
 $JumpToTop
 <br>
 <h2>Database Files Info</h2>
 $(if($DBInfoTbl.Rows.Count -gt 10){$SearchDiv -replace 'ReplaceSearchFunction','SearchDBFileInfo' -replace 'object', 'database' -replace 'id="SearchBox"', 'id="SearchBox1"'})
-$SortableTable
+$(if ([string]::IsNullOrEmpty($CheckDB)){$SortableTable})
 $htmlTable1
 $JumpToTop
 $htmlBlock
@@ -3381,8 +3277,8 @@ $JumpToTop
 			}
 			
 			$htmlTable = $BlitzFirstTbl | Select-Object "Priority", "FindingsGroup", 
-			@{Name = "Finding"; Expression = {$_."Finding" -replace "From Your Community.*", ""}}, 
-			@{Name = "Details"; Expression = { $_."Details".Replace('ClickToSeeDetails', '') -replace ".*in-depth checks with sp_Blitz.*","Nothing to report" } }, "URL" | Where-Object -FilterScript { ( "0", "255" -NotContains $_."Priority" ) } | ConvertTo-Html -As Table -Fragment
+			@{Name = "Finding"; Expression = { $_."Finding" -replace "From Your Community.*", "" } }, 
+			@{Name = "Details"; Expression = { $_."Details".Replace('ClickToSeeDetails', '') -replace ".*in-depth checks with sp_Blitz.*", "Nothing to report" } }, "URL" | Where-Object -FilterScript { ( "0", "255" -NotContains $_."Priority" ) } | ConvertTo-Html -As Table -Fragment
 			$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
 			$HtmlTabName = "What's happening on the instance now?"
 			$html = $HTMLPre + @"
@@ -3993,7 +3889,7 @@ $JumpToTop
 				$AnchorURL = '<a href="#$&">$&</a>'
 				$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
 		
-				$htmlTable2 = $BlitzCacheWarnTbl | Select-Object "Priority", "FindingsGroup", "Finding", "Details", "URL" | Where-Object {$_."Priority" -ne 255}|ConvertTo-Html -As Table -Fragment
+				$htmlTable2 = $BlitzCacheWarnTbl | Select-Object "Priority", "FindingsGroup", "Finding", "Details", "URL" | Where-Object { $_."Priority" -ne 255 } | ConvertTo-Html -As Table -Fragment
 				$htmlTable2 = $htmlTable2 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
 
 				$htmlTable3 = $BlitzCacheTbl | Select-Object "Query", 
@@ -5737,53 +5633,54 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			if ($RecordsReturned -le 0) {
 				Write-Host " ->No rows returned."
 				Add-LogRow "->Index Frag Info" "No rows returned."
-			} else {
-			if ($IndexLckTbl.Rows.Count -gt 0) {
-				$RowNum = 0
-				Write-Host " ->Exclusive lock detected on table(s):"
-				$LockedTabList = ""
-				$LockedTabLogMsg = "Exclusive locks on table(s):"
-				foreach ($row in $IndexLckTbl) {
-					$LockedTab = $IndexLckTbl.Rows[$RowNum]["object_name"]
-					Write-Host "  - $LockedTab"
-					if ($RowNum -eq 0) { 
-						$LockedTabList += "$LockedTab" 
-					}
-					else {
-						$LockedTabList += ", $LockedTab"
-					}
-					$RowNum += 1
-				}
-				
-				Add-LogRow "->Index Frag Info" "Skipped XLocked Tables" "$LockedTabLogMsg $LockedTabList"
 			}
-
-
-					if ($ToHTML -eq "Y") {
-				
-						if ($DebugInfo) {
-							Write-Host " ->Converting index info to HTML" -fore yellow
-						}
-						$htmlTable = $IndexTbl | Select-Object @{Name = "Database"; Expression = { $_."database" } },
-						@{Name = "Object Name"; Expression = { $_."object_name" } },
-						@{Name = "Object Type"; Expression = { $_."object_type" } },
-						@{Name = "Index Name"; Expression = { $_."index_name" } }, 
-						@{Name = "Index Type"; Expression = { $_."index_type" } },
-						@{Name = "Partition"; Expression = {$_."partition_number"}}, 
-						@{Name = "Avg. Frag. %"; Expression = { $_."avg_frag_percent" } },
-						@{Name = "Page Count"; Expression = { $_."page_count" } },
-						@{Name = "Size in GB"; Expression = { $_."size_in_GB" } },
-						@{Name = "Record Count"; Expression = { $_."record_count" } },
-						@{Name = "Forwarded Records"; Expression = { $_."forwarded_record_count"}} | ConvertTo-Html -As Table -Fragment
-						$htmlTable = $htmlTable -replace '<table>', '<table id="StatsOrIxFragTable" class="sortable">'
-						if ($IsAzureSQLDB) {
-							$HtmlTabName = "Index fragmentation info for $ASDBName"
+			else {
+				if ($IndexLckTbl.Rows.Count -gt 0) {
+					$RowNum = 0
+					Write-Host " ->Exclusive lock detected on table(s):"
+					$LockedTabList = ""
+					$LockedTabLogMsg = "Exclusive locks on table(s):"
+					foreach ($row in $IndexLckTbl) {
+						$LockedTab = $IndexLckTbl.Rows[$RowNum]["object_name"]
+						Write-Host "  - $LockedTab"
+						if ($RowNum -eq 0) { 
+							$LockedTabList += "$LockedTab" 
 						}
 						else {
-							$HtmlTabName = "Index fragmentation info for $CheckDB"
+							$LockedTabList += ", $LockedTab"
 						}
+						$RowNum += 1
+					}
+				
+					Add-LogRow "->Index Frag Info" "Skipped XLocked Tables" "$LockedTabLogMsg $LockedTabList"
+				}
+
+
+				if ($ToHTML -eq "Y") {
+				
+					if ($DebugInfo) {
+						Write-Host " ->Converting index info to HTML" -fore yellow
+					}
+					$htmlTable = $IndexTbl | Select-Object @{Name = "Database"; Expression = { $_."database" } },
+					@{Name = "Object Name"; Expression = { $_."object_name" } },
+					@{Name = "Object Type"; Expression = { $_."object_type" } },
+					@{Name = "Index Name"; Expression = { $_."index_name" } }, 
+					@{Name = "Index Type"; Expression = { $_."index_type" } },
+					@{Name = "Partition"; Expression = { $_."partition_number" } }, 
+					@{Name = "Avg. Frag. %"; Expression = { $_."avg_frag_percent" } },
+					@{Name = "Page Count"; Expression = { $_."page_count" } },
+					@{Name = "Size in GB"; Expression = { $_."size_in_GB" } },
+					@{Name = "Record Count"; Expression = { $_."record_count" } },
+					@{Name = "Forwarded Records"; Expression = { $_."forwarded_record_count" } } | ConvertTo-Html -As Table -Fragment
+					$htmlTable = $htmlTable -replace '<table>', '<table id="StatsOrIxFragTable" class="sortable">'
+					if ($IsAzureSQLDB) {
+						$HtmlTabName = "Index fragmentation info for $ASDBName"
+					}
+					else {
+						$HtmlTabName = "Index fragmentation info for $CheckDB"
+					}
 			
-						$html = $HTMLPre + @"
+					$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
 				</head>
 				<body>
@@ -5795,49 +5692,49 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				</body>
 				</html>
 "@
-						if ($DebugInfo) {
-							Write-Host " - >Writing HTML file." -fore yellow
-						} 
-						if ($IsAzureSQLDB) {
-							$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\IndexFragInfo_$ASDBName.html"
-						}
-						else {
-							$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\IndexFragInfo_$CheckDB.html"
-						}
-						
+					if ($DebugInfo) {
+						Write-Host " - >Writing HTML file." -fore yellow
+					} 
+					if ($IsAzureSQLDB) {
+						$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\IndexFragInfo_$ASDBName.html"
 					}
 					else {
+						$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\IndexFragInfo_$CheckDB.html"
+					}
+						
+				}
+				else {
 
 				
-						$ExcelSheet = $ExcelFile.Worksheets.Item("Index Fragmentation")
-						$ExcelStartRow = $DefaultStartRow
-						$ExcelColNum = 1
-						$RowNum = 0
-						$DataSetCols = @("database", "object_name", "object_type", "index_name", 
-							"index_type", "partition_number", "avg_frag_percent", "page_count", "size_in_GB", "record_count","forwarded_record_count")
+					$ExcelSheet = $ExcelFile.Worksheets.Item("Index Fragmentation")
+					$ExcelStartRow = $DefaultStartRow
+					$ExcelColNum = 1
+					$RowNum = 0
+					$DataSetCols = @("database", "object_name", "object_type", "index_name", 
+						"index_type", "partition_number", "avg_frag_percent", "page_count", "size_in_GB", "record_count", "forwarded_record_count")
 
-						if ($DebugInfo) {
-							Write-Host " ->Writing Stats results to sheet Index Fragmentation" -fore yellow
-						}
-
-						foreach ($row in $IndexTbl) {
-							foreach ($col in $DataSetCols) {
-								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $IndexTbl.Rows[$RowNum][$col]
-								$ExcelColNum += 1
-							}
-							$ExcelStartRow += 1
-							$RowNum += 1
-							$ExcelColNum = 1
-						}
-
-						##Saving file
-						$ExcelFile.Save()
+					if ($DebugInfo) {
+						Write-Host " ->Writing Stats results to sheet Index Fragmentation" -fore yellow
 					}
-					##Cleaning up variables
-					Remove-Variable -Name IndexTbl
-					Remove-Variable -Name IndexSet
 
-				} 
+					foreach ($row in $IndexTbl) {
+						foreach ($col in $DataSetCols) {
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $IndexTbl.Rows[$RowNum][$col]
+							$ExcelColNum += 1
+						}
+						$ExcelStartRow += 1
+						$RowNum += 1
+						$ExcelColNum = 1
+					}
+
+					##Saving file
+					$ExcelFile.Save()
+				}
+				##Cleaning up variables
+				Remove-Variable -Name IndexTbl
+				Remove-Variable -Name IndexSet
+
+			} 
 		}
 	
 
@@ -6515,6 +6412,8 @@ finally {
 						<p>To report an issue, plese use <a href='https://github.com/VladDBA/PSBlitz/issues' target='_blank'>GitHub</a>, but make sure to read <a href='https://github.com/VladDBA/PSBlitz/issues/216' target='_blank'>this</a> first.</p>
 						$htmlTable
 						$JumpToTop
+						<br>
+				 		$Footer 
 						</body>
 						</html>
 "@ 
@@ -6537,47 +6436,7 @@ finally {
 				<!DOCTYPE html>
 				<html>
 				<head>
-				<style>
-				body { 
-					background-color:#FFFFFF;
-					font-family:Tahoma;
-					font-size:11pt; 
-				}
-				table {
-					margin-left: auto;
-					margin-right: auto;
-					border-spacing: 1px;
-    }
-    th {
-					background-color: dodgerblue;
-					color: white;
-					font-weight: bold;
-					padding: 5px;
-					text-align: center;
-    }
-    td, th {
-					border: 1px solid black;
-					padding: 5px;
-    }
-	tr:hover{
-		background-color: rgba(255, 255, 0, 0.4);
-	}
-    td:first-child {
-					font-weight: bold;
-					text-align: left;
-    }
-    h1 {
-					text-align: center;
-    }
-    h2 {
-					text-align: center;
-    }
-	footer{
-		text-align: center;
-		margin-left: auto;
-		margin-right: auto;
-	}
-				</style>
+				<link rel="stylesheet" href="HTMLFiles\styles.css">
 				<title>PSBlitz Output For $InstName</title>
 				</head>
 				<body>
@@ -6781,7 +6640,7 @@ finally {
 					$Description += "$CheckDB."
 				}
 				$AdditionalInfo = "Retrieves info for tables with at least 10k records. "
-				$AdditionalInfo +="`nThe commented options in the stats update commands are just suggestions based on records counts, hence the comments." 
+				$AdditionalInfo += "`nThe commented options in the stats update commands are just suggestions based on records counts, hence the comments." 
 			}
 			elseif ($File.Name -like "IndexFragInfo*") {
 				$QuerySource = "dm_db_index_physical_stats"
@@ -6854,11 +6713,7 @@ finally {
 		$IndexContent += @"
     </table>
 				<br>
-				<br>
-				<br>
-				<footer>  
-				<p>Report generated with <a href='https://github.com/VladDBA/PSBlitz' target='_blank'>PSBlitz</a> - created by <a href='https://vladdba.com/?ref=PSBlitz' target='_blank'>Vlad Drumea</a></p>
-				</footer>  
+				 $Footer 
 				</body>
 				</html>
 "@
@@ -6876,6 +6731,7 @@ finally {
 		#copy js resources
 		Copy-Item -Path "$ResourcesPath\sorttable.js" -Destination "$HTMLOutDir\"
 		Copy-Item -Path "$ResourcesPath\searchtable.js" -Destination "$HTMLOutDir\"
+		Copy-Item -Path "$ResourcesPath\styles.css" -Destination "$HTMLOutDir\"
 	}
 	Write-Host $("-" * 80)
 	Write-Host "Execution completed in: " -NoNewLine
