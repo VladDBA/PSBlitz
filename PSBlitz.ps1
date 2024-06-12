@@ -257,7 +257,7 @@ param(
 ###Internal params
 #Version
 $Vers = "4.2.1"
-$VersDate = "2024-06-11"
+$VersDate = "2024-06-12"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -2927,8 +2927,9 @@ $JumpToTop
 
 				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 					$htmlTable2 = $DBConfigTbl | Select-Object "Database", "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
+					$htmlTable2 = $htmlTable2 -replace '<td>No</td>', '<td bgcolor="yellow">No</td>'
 					$htmlTable2 = $htmlTable2 -replace '<table>','<table class="sortable">'
-					$htmlBlock = "`n<br>`n" + '<h2>Database Scoped Configuration</h2>'
+					$htmlBlock = "`n<br>`n <h2>Database Scoped Configuration for $CheckDB</h2>"
 					$htmlBlock += '<p><a href="https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-scoped-configuration-transact-sql?view=sql-server-ver16" target="_blank">More Info</a></p>'
 					$htmlBlock += "`n $SortableTable `n $htmlTable2 `n"
 					$htmlBlock += '<p><a href="#top">Jump to top</a></p>'
@@ -2949,7 +2950,7 @@ $htmlTable
 $JumpToTop
 <br>
 <h2>Database Files Info</h2>
-$(if($DBInfoTbl.Rows.Count -gt 10){$SearchDiv -replace 'ReplaceSearchFunction','SearchDBFileInfo' -replace 'object', 'database' -replace 'id="SearchBox"', 'id="SearchBox1"'})
+$SearchDiv -replace 'ReplaceSearchFunction','SearchDBFileInfo' -replace 'object', 'database' -replace 'id="SearchBox"', 'id="SearchBox1"'
 $SortableTable
 $htmlTable1
 $JumpToTop
@@ -6676,7 +6677,7 @@ finally {
 				}
 				$Description = "Database and database files information for "
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
-					$Description += "$CheckDB."
+					$Description += "$CheckDB and system databases."
 				}
 				else {
 					$Description += "all databases on the instance."
