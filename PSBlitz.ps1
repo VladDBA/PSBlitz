@@ -2927,7 +2927,7 @@ $JumpToTop
 
 				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 					$htmlTable2 = $DBConfigTbl | Select-Object "Database", "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
-					$htmlTable2 = $htmlTable2 -replace '<td>No</td>', '<td bgcolor="yellow">No</td>'
+					#$htmlTable2 = $htmlTable2 -replace '<td>No</td>', '<td bgcolor="yellow">No</td>'
 					$htmlTable2 = $htmlTable2 -replace '<table>','<table class="sortable">'
 					$htmlBlock = "`n<br>`n <h2>Database Scoped Configuration for $CheckDB</h2>"
 					$htmlBlock += '<p><a href="https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-scoped-configuration-transact-sql?view=sql-server-ver16" target="_blank">More Info</a></p>'
@@ -2950,7 +2950,7 @@ $htmlTable
 $JumpToTop
 <br>
 <h2>Database Files Info</h2>
-$SearchDiv -replace 'ReplaceSearchFunction','SearchDBFileInfo' -replace 'object', 'database' -replace 'id="SearchBox"', 'id="SearchBox1"'
+$($SearchDiv -replace 'ReplaceSearchFunction','SearchDBFileInfo' -replace 'object', 'database' -replace 'id="SearchBox"', 'id="SearchBox1"')
 $SortableTable
 $htmlTable1
 $JumpToTop
