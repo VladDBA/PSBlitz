@@ -257,7 +257,7 @@ param(
 ###Internal params
 #Version
 $Vers = "4.2.1"
-$VersDate = "2024-06-13"
+$VersDate = "2024-06-14"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -1346,7 +1346,6 @@ if ($ToHTML -eq "Y") {
 		</div>
 "@
 	$Footer = @"
-	<br>
 	<br>
 	<footer>  
 	<p>Report generated with <a href='https://github.com/VladDBA/PSBlitz' target='_blank'>PSBlitz</a> - created by <a href='https://vladdba.com/?ref=PSBlitz' target='_blank'>Vlad Drumea</a></p>
@@ -3476,13 +3475,14 @@ $JumpToTop
 				"FirstSampleValue", 
 				@{Name = "LastSampleTime"; Expression = { if ($_."LastSampleTime" -ne [System.DBNull]::Value) { [string]$DateTepm = $_."LastSampleTime"; $DateForExcel = $DateTepm | Get-Date; $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss") }else { $_."LastSampleTime" } } }, 
 				"LastSampleValue", "ValueDelta", "ValuePerSecond" | ConvertTo-Html -As Table -Fragment
-				$htmlTable = $htmlTable -replace '<table>', '<table class="Perfmon sortable">'
+				$htmlTable = $htmlTable -replace '<table>', '<table id="PerfmonTable" class="Perfmon sortable">'
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
 </head>
 <body>
 <h1>$HtmlTabName</h1>
+$($SearchDiv -replace 'ReplaceSearchFunction','SearchPerfmon' -replace 'object', 'counter')
 $SortableTable
 $htmlTable
 $JumpToTop
@@ -4772,6 +4772,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					@{Name = "Oldest Create Date"; Expression = { if ($_."Oldest Create Date" -ne [System.DBNull]::Value) { ($_."Oldest Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Oldest Create Date" } } }, 
 					@{Name = "Most Recent Create Date"; Expression = { if ($_."Most Recent Create Date" -ne [System.DBNull]::Value) { ($_."Most Recent Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Most Recent Create Date" } } }, 
 					@{Name = "Most Recent Modify Date"; Expression = { if ($_."Most Recent Modify Date" -ne [System.DBNull]::Value) { ($_."Most Recent Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Most Recent Modify Date" } } } | Where-Object "Number Objects" -NotLike "sp_BlitzIndex*" | ConvertTo-Html -As Table -Fragment
+					$htmlTable = $htmlTable -replace '<table>', '<table id="IndexSummaryTable">'
 				}
 				elseif ($Mode -eq "2") {
 					$BlitzIxTbl.Columns["Definition: [Property] ColumnName {datatype maxbytes}"].ColumnName = "Definition"
@@ -4811,8 +4812,11 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$(if($Mode -eq "2"){
 					$SearchDiv -replace 'ReplaceSearchFunction', 'SearchIndexUsage'
 					$SortableTable				
-				}elseif("0","4" -Contains $Mode){
+				}elseif(("0","4" -Contains $Mode) -and (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false))){
 					$SearchDiv -replace 'ReplaceSearchFunction', 'SearchIndexUsage' -replace 'object', 'database'
+					"<br>"
+				}elseif(($Mode -eq "1") -and ($BlitzIxTbl.Rows.Count -ge 5)){
+					$SearchDiv -replace 'ReplaceSearchFunction', 'SearchIndexSummary' -replace 'object', 'database'
 					"<br>"
 				})
 				$htmlTable 
