@@ -38,16 +38,19 @@ CREATE TABLE #FSFiles
 
 /*Cursor to get FILESTREAM files and their sizes for databases that use FS*/
 DECLARE DBsWithFS CURSOR LOCAL STATIC READ_ONLY FORWARD_ONLY FOR
-SELECT DISTINCT DB_NAME(mf.database_id)
-FROM   sys.master_files AS mf
-INNER JOIN sys.databases AS d ON mf.database_id = d.database_id
-WHERE  mf.[type] = 2
-AND d.[state] = 0
-AND d.[user_access] = 0
-AND  mf.database_id = CASE WHEN @DatabaseName <> N'' 
-                        THEN DB_ID(@DatabaseName)
-						ELSE mf.database_id
-						END;
+SELECT DISTINCT DB_NAME([mf].[database_id])
+FROM   sys.[master_files] AS [mf]
+       INNER JOIN sys.[databases] AS [d]
+               ON [mf].[database_id] = [d].[database_id]
+WHERE  [mf].[type] = 2
+       AND [d].[state] = 0
+       AND [d].[user_access] = 0
+       AND
+       ([mf].[database_id] IN ( 1, 2, 3, 4 )
+          OR [mf].[database_id] = CASE
+                                WHEN @DatabaseName <> N'' THEN DB_ID(@DatabaseName)
+                                ELSE [mf].[database_id]
+                              END);
 
 OPEN DBsWithFS; 
 
@@ -156,7 +159,7 @@ SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],d.[create_date] AS [Creat
 						   + @LineFeed + N'LEFT JOIN sys.dm_database_encryption_keys AS ek'
 						   + @LineFeed + N'ON d.[database_id] = ek.[database_id]'
                     END
-                  + @LineFeed + N'WHERE d.[database_id] = '
+                  + @LineFeed + N'WHERE d.[database_id] IN (1,2,3,4) OR d.[database_id] = '
                   + CASE
                       WHEN @DatabaseName <> N'' THEN CAST(DB_ID(@DatabaseName) AS NVARCHAR(10))
                       ELSE N'd.[database_id]'
@@ -247,7 +250,8 @@ SELECT DB_NAME(f.database_id)                                     AS [Database],
        END                                                        AS [GrowthIncrement]
 FROM   sys.master_files AS f
 LEFT JOIN #AvailableSpace AS [as] ON f.[database_id] = [as].[DatabaseID] AND f.[file_id] = [as].[FileID]
-WHERE [database_id] = CASE WHEN @DatabaseName <> N'' 
+WHERE [database_id] IN (1,2,3,4) 
+  OR [database_id] = CASE WHEN @DatabaseName <> N'' 
                         THEN DB_ID(@DatabaseName)
 						ELSE [database_id]
 						END

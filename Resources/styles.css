@@ -1,0 +1,222 @@
+body {
+	background-color: #FFFFFF;
+	font-family: Tahoma;
+	font-size: 11pt;
+}
+
+table.sortable thead {
+	background-color: transparent;
+	color: white;
+	font-weight: bold;
+	text-align: center;
+}
+
+.sortable th {
+	cursor: pointer;
+}
+
+th.tooltip {
+	cursor: help;
+}
+
+table {
+	margin-left: auto;
+	margin-right: auto;
+	border-collapse: collapse;
+	box-shadow: 0 0 20px rgba(0, 0, 0, 0.25);
+}
+
+th {
+	background-color: dodgerblue;
+	color: white;
+	font-weight: bold;
+	padding: 7px;
+	text-align: center;
+	position: sticky;
+	top: 0;
+	z-index: 1;
+}
+
+th:first-child {
+	border-top-left-radius: 10px;
+}
+
+th:last-child {
+	border-top-right-radius: 10px;
+}
+
+td {
+	padding: 8px 7px 7px 10px;
+	border: 1px solid black;
+	vertical-align: top;
+}
+
+tr:hover {
+	background-color: rgba(255, 255, 0, 0.4);
+}
+
+tr:last-of-type {
+	border-bottom: 2px solid dodgerblue;
+}
+
+td:first-child {
+	font-weight: bold;
+	text-align: left;
+}
+
+.QueryStoreTab {
+	td:nth-child(6) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+}
+
+.ActiveSessionsTab {
+	td:nth-child(6) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+}
+
+.IndexUsageTable {
+	td:nth-child(6) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+}
+
+.DatabaseInfoTable {
+	td:nth-child(1) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+}
+
+.DeadlockDetailsTable {
+	td:nth-child(5) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+
+	td:first-child {
+		font-weight: normal;
+		text-align: left;
+	}
+
+	td:nth-child(2) {
+		font-weight: bold;
+		text-align: left;
+	}
+}
+
+.Perfmon {
+	td:first-child {
+		font-weight: normal;
+	}
+
+}
+
+.WaitStats {
+	td:first-child {
+		font-weight: normal;
+	}
+
+	td:nth-child(5) {
+		font-weight: bold;
+	}
+
+	td:nth-child(7) {
+		font-weight: bold;
+	}
+
+}
+
+.InstanceInfoTbl {
+	td {
+		font-weight: normal;
+		text-align: center;
+	}
+}
+
+.InstanceInfoTbl {
+	td {
+		font-weight: normal;
+		text-align: center;
+	}
+
+	td:nth-child(6) {
+		white-space: nowrap;
+	}
+}
+
+.RsrcInfoTbl {
+	td {
+		font-weight: normal;
+		text-align: center;
+	}
+}
+
+.Top10ClientConnTbl {
+	td:nth-child(2) {
+		text-align: center;
+	}
+}
+
+.SessOptTbl {
+	td:nth-child(2) {
+		text-align: center;
+	}
+
+	td:nth-child(3) {
+		text-align: center;
+	}
+}
+
+.TempdbInfoTbl {
+	td {
+		font-weight: normal;
+		text-align: center;
+	}
+}
+
+h1 {
+	text-align: center;
+}
+
+h2 {
+	text-align: center;
+}
+
+h3 {
+	text-align: center;
+}
+
+p {
+	text-align: center;
+}
+
+footer {
+	text-align: center;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+div {
+	text-align: center;
+}
+
+input.SearchBox {
+	font-size: 16px;
+	text-align: left;
+	border: 3px solid #778899;
+	margin: 0 auto;
+	margin-left: auto;
+	margin-right: auto;
+	width: 220px;
+	border-radius: 10px;
+}
