@@ -4776,7 +4776,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				}
 				elseif ($Mode -eq "2") {
 					$BlitzIxTbl.Columns["Definition: [Property] ColumnName {datatype maxbytes}"].ColumnName = "Definition"
-					if(([string]::IsNullOrEmpty($CheckDB)) -and ($RecordsReturned -gt 3)){
+					if(([string]::IsNullOrEmpty($CheckDB)) -and ($RecordsReturned -gt 30000)){
 						Write-Host "  ->More than 30k records returned `n  ->limiting output the databases found in the plan cache results."
 						Add-LogRow "->sp_BlitzIndex mode $Mode" "More than 30k records" "Output limited to databases found in the plan cache results"
 						$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Schema Name", "Object Name", 
