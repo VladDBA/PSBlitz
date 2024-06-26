@@ -256,8 +256,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.2.1"
-$VersDate = "2024-06-14"
+$Vers = "4.2.2"
+$VersDate = "2024-06-27"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -502,7 +502,7 @@ function Format-ExceptionMsg {
 				Write-Output "PS Error: Script Line $PSErrLine `n Message $PSErrMsg `n Statement $PSErrStatement"
 			}
 			else {
-				Write-Output "No exceptions ecnountered."
+				Write-Output "No exceptions encountered."
 			}			
 		}
 	}
@@ -620,7 +620,7 @@ $InitScriptBlock = {
 					Write-Output "PS Error: Script Line $PSErrLine `n Message $PSErrMsg `n Statement $PSErrStatement"
 				}
 				else {
-					Write-Output "No exceptions ecnountered."
+					Write-Output "No exceptions encountered."
 				}			
 			}
 		}
@@ -4776,6 +4776,34 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				}
 				elseif ($Mode -eq "2") {
 					$BlitzIxTbl.Columns["Definition: [Property] ColumnName {datatype maxbytes}"].ColumnName = "Definition"
+					if(([string]::IsNullOrEmpty($CheckDB)) -and ($RecordsReturned -gt 3)){
+						Write-Host "  ->More than 30k records returned `n  ->limiting output the databases found in the plan cache results."
+						Add-LogRow "->sp_BlitzIndex mode $Mode" "More than 30k records" "Output limited to databases found in the plan cache results"
+						$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Schema Name", "Object Name", 
+					"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
+					"Object Type", "Definition", 
+					"Key Column Names With Sort", "Count Key Columns", "Include Column Names", 
+					"Count Included Columns", "Secret Column Names", "Count Secret Columns", 
+					"Partition Key Column Name", "Filter Definition", "Is Indexed View", 
+					"Is Primary Key", "Is XML", "Is Spatial", "Is NC Columnstore", 
+					"Is CX Columnstore", "Is Disabled", "Is Hypothetical", "Is Padded", 
+					"Fill Factor", "Is Reference by Foreign Key", 
+					@{Name = "Last User Seek"; Expression = { if ($_."Last User Seek" -ne [System.DBNull]::Value) { ($_."Last User Seek").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Seek" } } }, 
+					@{Name = "Last User Scan"; Expression = { if ($_."Last User Scan" -ne [System.DBNull]::Value) { ($_."Last User Scan").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Scan" } } }, 
+					@{Name = "Last User Lookup"; Expression = { if ($_."Last User Lookup" -ne [System.DBNull]::Value) { ($_."Last User Lookup").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Lookup" } } }, 
+					@{Name = "Last User Update"; Expression = { if ($_."Last User Update" -ne [System.DBNull]::Value) { ($_."Last User Update").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Update" } } }, 
+					"Total Reads", 
+					"User Updates", "Reads Per Write", "Index Usage", "Partition Count", 
+					"Rows", "Reserved MB", "Reserved LOB MB", "Reserved Row Overflow MB", 
+					"Index Size", "Row Lock Count", "Row Lock Wait Count", "Row Lock Wait ms", 
+					"Avg Row Lock Wait ms", "Page Lock Count", "Page Lock Wait Count", 
+					"Page Lock Wait ms", "Avg Page Lock Wait ms", "Lock Escalation Attempts", 
+					"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
+					"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
+					@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
+					@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } }, 
+					"More Info" | Where-Object {$DBArray  -contains $_."Database Name"} | ConvertTo-Html -As Table -Fragment}
+					else{
 					$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Schema Name", "Object Name", 
 					"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
 					"Object Type", "Definition", 
@@ -4800,6 +4828,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
 					@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } }, 
 					"More Info" | ConvertTo-Html -As Table -Fragment
+					}
 					#add table specify style
 					$htmlTable = $htmlTable -replace '<table>', '<table id="IndexUsgTable" class="IndexUsageTable sortable">'
 				}
@@ -5765,7 +5794,7 @@ finally {
 		Write-Host " Script execution was interrupted." -Fore yellow
 		Write-Host " ->Latest exception (if any):"
 		[string]$TerminatingErrorMessage = Format-ExceptionMsg
-		if ($TerminatingErrorMessage -eq "No exceptions ecnountered.") {
+		if ($TerminatingErrorMessage -eq "No exceptions encountered.") {
 			Write-Host " $TerminatingErrorMessage" -Fore green
 		}
 		else {
@@ -6792,7 +6821,7 @@ finally {
 	$SqlConnection.Close()
 	$SqlConnection.Dispose()
 	Remove-Variable -Name SqlConnection
-	if (!([string]::IsNullOrEmpty($SQLLogin)) ) {
+	if ((!([string]::IsNullOrEmpty($SQLLogin))) -and (!([string]::IsNullOrEmpty($BSTR))) ) {
 		#remove plain text password from memory
 		[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
 	}
