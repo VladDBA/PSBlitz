@@ -70,7 +70,9 @@ SELECT
 	IF OBJECT_ID('tempdb..#grps') IS NOT NULL
 		DROP TABLE #grps;
 	IF OBJECT_ID('tempdb..#index_includes') IS NOT NULL
-		DROP TABLE #index_includes;	
+		DROP TABLE #index_includes;
+	IF OBJECT_ID('tempdb.dbo.#Mode2Temp', 'U') IS NOT NULL
+		DROP TABLE #Mode2Temp
 
 /*
 Everything beyond this point is straight from sp_BlitzIndex except for the commented block 
@@ -81,7 +83,7 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-SELECT @Version = '8.20', @VersionDate = '20240522';
+SELECT @Version = '8.21', @VersionDate = '20240701';
 SET @OutputType  = UPPER(@OutputType);
 
 IF(@VersionCheckMode = 1)

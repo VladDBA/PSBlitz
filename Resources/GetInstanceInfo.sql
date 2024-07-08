@@ -43,6 +43,7 @@ SELECT ISNULL(SERVERPROPERTY('MachineName'),'N/A')                              
          ELSE 'N/A'
        END                                                                                 AS [fulltext_installed],
        SERVERPROPERTY('Collation')                                                         AS [instance_collation],
+	   (SELECT COUNT([database_id]) FROM [sys].[databases] WHERE [database_id] > 4)        AS [user_db_count],
        [sqlserver_start_time]                                                              AS [instance_last_startup],
        SERVERPROPERTY('ProcessID')                                                         AS [process_id],
        CAST(DATEDIFF(HH, [sqlserver_start_time], GETDATE()) / 24.00 AS NUMERIC(23, 2))     AS [uptime_days],
