@@ -257,7 +257,7 @@ param(
 ###Internal params
 #Version
 $Vers = "4.2.3"
-$VersDate = "2024-07-08"
+$VersDate = "2024-07-10"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -431,10 +431,10 @@ function Invoke-BlitzWho {
 		[string]$IsInLoop
 	)
 	if ($IsInLoop -eq "Y") {
-		Write-Host " ->Running sp_BlitzWho - pass $BlitzWhoPass... " -NoNewLine
+		Write-Host " ->Active session data capture - pass $BlitzWhoPass... " -NoNewLine
 	}
  else {
-		Write-Host " Running sp_BlitzWho - pass $BlitzWhoPass... " -NoNewLine
+		Write-Host " Active session data capture - pass $BlitzWhoPass... " -NoNewLine
 	}
 	$StepStart = Get-Date
 	$StepName = "sp_BlitzWho - pass $BlitzWhoPass"
@@ -1458,7 +1458,7 @@ try {
 	$StartDate = get-date
 	###Collecting first pass of sp_BlitzWho data
 	$JobName = "BlitzWho"
-	Write-Host " Starting BlitzWho background process... " -NoNewline
+	Write-Host " Starting session activity collection process... " -NoNewline
 	
 	$Job = Start-Job -Name $JobName -InitializationScript $InitScriptBlock -ScriptBlock $MainScriptblock -ArgumentList $ConnString, $BlitzWhoRepl, $DirDate, $BlitzWhoDelay
 	$JobStatus = $Job | Select-Object -ExpandProperty State
@@ -1479,7 +1479,7 @@ try {
 			Write-Host ""
 		}
 		Add-LogRow "Start sp_BlitzWho background process" $JobStatus
-		Write-Host " ->sp_BlitzWho will collect data every $BlitzWhoDelay seconds."
+		Write-Host " ->Active session data will be captured every $BlitzWhoDelay seconds."
 
 	}
 
@@ -1641,7 +1641,7 @@ $htmlTable4
 			#List of columns that should be returned from the data set
 			$DataSetCols = @("machine_name", "instance_name", "product_version", "product_level",
 				"patch_level", "edition", "is_clustered", "always_on_enabled", "filestream_access_level",
-				"mem_optimized_tempdb_metadata", "fulltext_installed", "instance_collation", "user_db_count","process_id",
+				"mem_optimized_tempdb_metadata", "fulltext_installed", "instance_collation", "user_db_count", "process_id",
 				"instance_last_startup", "uptime_days", "client_connections", "net_latency", "server_time")
 
 			if ($DebugInfo) {
@@ -2129,7 +2129,7 @@ $htmlTable2
 	#####################################################################################
 	#						Open transaction info										#
 	#####################################################################################
-	Write-Host " Getting open transaction info" -NoNewline
+	Write-Host " Retrieving open transaction info" -NoNewline
 	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetOpenTransactions.sql")
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace "SET @DatabaseName = N'';", "SET @DatabaseName = N'$CheckDB';"
@@ -2349,7 +2349,7 @@ $JumpToTop
 		#Write-Host " Azure SQL DB - skipping database info."
 		#Add-LogRow "Database Info" "Skipped" "Azure SQL DB"
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetAzureSQLDBInfo.sql")
-		Write-Host " Getting database info for $ASDBName... " -NoNewLine 
+		Write-Host " Retrieving database info for $ASDBName... " -NoNewLine 
 		$CmdTimeout = 600
 		$DBInfoQuery = new-object System.Data.SqlClient.SqlCommand
 		$DBInfoQuery.CommandText = $Query
@@ -2872,11 +2872,11 @@ $JumpToTop
 		#if it's not Azure SQL DB
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetDbInfo.sql")	
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
-			Write-Host " Getting database info for $CheckDB... " -NoNewLine
+			Write-Host " Retrieving database info for $CheckDB... " -NoNewLine
 			[string]$Query = $Query -replace "SET @DatabaseName = N'';", "SET @DatabaseName = N'$CheckDB';"
 		}
 		else {
-			Write-Host " Getting database info... " -NoNewLine
+			Write-Host " Retrieving database info... " -NoNewLine
 		}
 		$CmdTimeout = 600
 		$DBInfoQuery = new-object System.Data.SqlClient.SqlCommand
@@ -3125,11 +3125,11 @@ $htmlBlock
 	if ($IsAzureSQLDB) {
 		$StepStart = get-date
 		$StepEnd = get-date
-		Write-Host " Azure SQL DB - skipping sp_Blitz."
+		Write-Host " Azure SQL DB - skipping instance health."
 		Add-LogRow "sp_Blitz" "Skipped" "Azure SQL DB"
 	}
  else {
-		Write-Host " Running sp_Blitz... " -NoNewLine
+		Write-Host " Retrieving instance health data... " -NoNewLine
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitz_NonSPLatest.sql")
 		if (($IsIndepth -eq "Y") -and ([string]::IsNullOrEmpty($CheckDB))) {
 			[string]$Query = $Query -replace ";SET @CheckUserDatabaseObjects = 0;", ";SET @CheckUserDatabaseObjects = 1;"
@@ -3261,7 +3261,7 @@ $JumpToTop
 	#####################################################################################
 	#						sp_BlitzFirst 30 seconds									#
 	#####################################################################################
-	Write-Host " Running sp_BlitzFirst @Seconds = 30... " -NoNewLine
+	Write-Host " What's happening in a 30 seconds time-frame... " -NoNewLine
 	$CmdTimeout = 600
 	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzFirst_NonSPLatest.sql")
 	$BlitzFirstQuery = new-object System.Data.SqlClient.SqlCommand
@@ -3382,7 +3382,7 @@ $htmlTable
 	#						sp_BlitzFirst since startup									#
 	#####################################################################################
 	if ($IsIndepth -eq "Y") {
-		Write-Host " Running sp_BlitzFirst @SinceStartup = 1... " -NoNewLine
+		Write-Host " Retrieving waits recorded since instance startup... " -NoNewLine
 		$CmdTimeout = 600
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzFirst_NonSPLatest.sql")
 		[string]$Query = $Query -replace ";SET @SinceStartup = 0;", ";SET @SinceStartup = 1;"
@@ -3715,13 +3715,13 @@ $JumpToTop
 	#Set specific database to check if a name was provided
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
-		Write-Host " Running sp_BlitzCache for $CheckDB"
+		Write-Host " Retrieving plan cache info for $CheckDB"
 	}
  elseif ($IsAzureSQLDB) {
-		Write-Host " Running sp_BlitzCache for $ASDBName"
+		Write-Host " Retrieving plan cache info for $ASDBName"
 	}
  else {
-		Write-Host " Running sp_BlitzCache for all user databases"
+		Write-Host " Retrieving plan cache info for all user databases"
 		#Create array to store database names
 		$DBArray = New-Object System.Collections.ArrayList
 		[int]$BlitzCacheRecs = 0
@@ -3753,7 +3753,7 @@ $JumpToTop
 		}		
 
 		[string]$Query = $Query -replace $OldSortString, $NewSortString
-		Write-Host " ->Running sp_BlitzCache with @SortOrder = $SortOrder... " -NoNewLine
+		Write-Host " ->Top $(if($SortOrder -eq "'recent compilations'"){"50"}else{$CacheTop}) queries by $($SortOrder -replace "'",'')... " -NoNewLine
 		$BlitzCacheQuery = new-object System.Data.SqlClient.SqlCommand
 		$BlitzCacheQuery.CommandText = $Query
 		$BlitzCacheQuery.CommandTimeout = $CmdTimeout
@@ -4240,7 +4240,7 @@ $JumpToTop
 		[string]$DBName = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Name | Select-Object -Last 1
 		[int]$DBCount = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Count | Select-Object -Last 1
 		if (($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --") -and (!([string]::IsNullOrEmpty($DBName)))) {
-			Write-Host " $DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
+			Write-Host " $DBName accounts for 2/3 of the records returned from cache"
 			Write-Host " ->" -NoNewLine
 			$StepStart = get-date
 			[string]$CheckDB = $DBName
@@ -4258,7 +4258,7 @@ $JumpToTop
 		}
 		$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
-			Write-Host "Checking if $CheckDB is eligible for sp_BlitzQueryStore..."
+			Write-Host "Checking if $CheckDB is eligible for Query Store check..."
 			$DBQuery = @" 
 		IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSION')), 4)) < 13 )
   BEGIN
@@ -4287,7 +4287,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$CheckDBQuery.Parameters["@DBName"].Value = $CheckDB
 		}
 		elseif ($IsAzureSQLDB) {
-			Write-Host "Checking if $ASDBName is eligible for sp_BlitzQueryStore..."
+			Write-Host "Checking if $ASDBName is eligible for Query Store check..."
 			$DBQuery = @"
 			IF ( (SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128))) = N'SQL Azure' )
 			BEGIN
@@ -4327,23 +4327,23 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				else {
 					Write-Host " ->$CheckDB - " -NoNewLine -ErrorAction Stop
 				}
-				Write-Host "is eligible for sp_BlitzQueryStore" -ErrorAction Stop
+				Write-Host "is eligible for Query Store check" -ErrorAction Stop
 				$CheckQueryStore = 'Y'
 			}
 			elseif ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "No") {
 				$StepEnd = Get-Date
 				if ($IsAzureSQLDB) {
-					Write-Host " ->$ASDBName - is not eligible for sp_BlitzQueryStore" -NoNewLine -ErrorAction Stop
+					Write-Host " ->$ASDBName - is not eligible for Query Store check" -NoNewLine -ErrorAction Stop
 				}
 				else {
-					Write-Host " ->$CheckDB - is not eligible for sp_BlitzQueryStore"
+					Write-Host " ->$CheckDB - is not eligible for Query Store check"
 				}
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" "$CheckDB is not eligible"
 			}
 			else {
 				$StepEnd = Get-Date
 				$QSCheckResult = $CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] 
-				Write-Host " ->$ASDBName - is not eligible for sp_BlitzQueryStore" -NoNewLine -ErrorAction Stop
+				Write-Host " ->$ASDBName - is not eligible for Query Store check" -NoNewLine -ErrorAction Stop
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" $QSCheckResult
 
 			}
@@ -4359,14 +4359,14 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzQueryStore_NonSPLatest.sql")
 
 			if ($IsAzureSQLDB) {
-				Write-Host " Running sp_BlitzQueryStore for $ASDBName..." -NoNewline
+				Write-Host " Retrieving Query Store info for $ASDBName..." -NoNewline
 			}
 			else {
 				if ($DBSwitched -eq "Y") {
 					$OldCheckDBStr = ";SET @DatabaseName = NULL;"
 					$NewCheckDBStr = ";SET @DatabaseName = '" + $CheckDB + "';"
 				}
-				Write-Host " Running sp_BlitzQueryStore for $CheckDB..." -NoNewline
+				Write-Host " Retrieving Query Store info for $CheckDB..." -NoNewline
 				[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 			}
 			
@@ -4689,18 +4689,27 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 		[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
-		Write-Host " Running sp_BlitzIndex for $CheckDB"
+		Write-Host " Retrieving index info for $CheckDB"
 	}
 	elseif ($IsAzureSQLDB) {
 		[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
-		Write-Host " Running sp_BlitzIndex for $ASDBName"
+		Write-Host " Retrieving index info for $ASDBName"
 	}
  else {
-		Write-Host " Running sp_BlitzIndex for all user databases"
+		Write-Host " Retrieving index info for all user databases"
 	}
 	#Loop through $Modes
 	foreach ($Mode in $Modes) {
-		Write-Host " ->Running sp_BlitzIndex with @Mode = $Mode... " -NoNewLine
+		if ($Mode -eq "0") {
+			Write-Host " ->Index diagnosis... " -NoNewLine
+		}
+		elseif ($Mode -eq "1") {
+			Write-Host " ->Index summary... " -NoNewLine
+		}elseif ($Mode -eq "2") {
+			Write-Host " ->Index usage details... " -NoNewLine
+		}elseif ($Mode -eq "4") {
+			Write-Host " ->Detailed index diagnosis... " -NoNewLine
+		}
 		$NewMode = ";SET @Mode = " + $Mode + ";"
 		[string]$Query = $Query -replace $OldMode, $NewMode
 		$BlitzIndexQuery = new-object System.Data.SqlClient.SqlCommand
@@ -4874,7 +4883,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
 						"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
 						@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
-						@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } }| 
+						@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } } | 
 						ConvertTo-Html -As Table -Fragment
 					}
 					#add table specify style
@@ -5038,13 +5047,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	$CurrTime = get-date
 	$CurrRunTime = (New-TimeSpan -Start $StartDate -End $CurrTime).TotalMinutes
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		Write-Host " Running sp_BlitzLock for $CheckDB... " -NoNewLine
+		Write-Host " Retrieving deadlock info for $CheckDB... " -NoNewLine
 	}
  elseif ($IsAzureSQLDB) {
-		Write-Host " Running sp_BlitzLock for $ASDBName... " -NoNewLine
+		Write-Host " Retrieving deadlock info for $ASDBName... " -NoNewLine
 	}
  else {
-		Write-Host " Running sp_BlitzLock for all user databases... " -NoNewLine
+		Write-Host " Retrieving deadlock info for all user databases... " -NoNewLine
 	}
 	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzLock_NonSPLatest.sql")
 	$CmdTimeout = $MaxTimeout
@@ -5418,8 +5427,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$DataSetCols = @("database_name", "query_text", "PlanID", "creation_time",
 				 "last_execution_time", "execution_count",
 					"executions_per_second", "total_worker_time_ms",
-				 "avg_worker_time_ms", "max_worker_time_ms","total_elapsed_time_ms",
-					"avg_elapsed_time_ms", "max_elapsed_time_ms","total_logical_reads_mb", 
+				 "avg_worker_time_ms", "max_worker_time_ms", "total_elapsed_time_ms",
+					"avg_elapsed_time_ms", "max_elapsed_time_ms", "total_logical_reads_mb", 
 					"total_physical_reads_mb", "total_logical_writes_mb", 
 					"min_grant_mb", "max_grant_mb", "min_used_grant_mb", "max_used_grant_mb", 
 					"min_reserved_threads", "max_reserved_threads", "min_used_threads",
@@ -5485,7 +5494,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		if db was switched for querystore we can switch it again without doing all the math again
 	#>
 	if ($DBSwitched -eq "Y") {
-		Write-Host " $DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
+		Write-Host " $DBName accounts for 2/3 of the records returned from cache"
 		$StepStart = get-date
 		Write-Host " ->" -NoNewline
 		[string]$CheckDB = $DBName
@@ -5501,12 +5510,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		}
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetStatsInfoForWholeDB.sql")
 		if ($IsAzureSQLDB) {
-			Write-Host "Getting stats info for $ASDBName... " -NoNewLine
+			Write-Host "Retrieving stats info for $ASDBName... " -NoNewLine
 			#if it's Azure SQL DB, we can't switch databases
 			[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
 		}
 		else {
-			Write-Host "Getting stats info for $CheckDB... " -NoNewLine		
+			Write-Host "Retrieving stats info for $CheckDB... " -NoNewLine		
 			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
 		}
 		$CmdTimeout = $MaxTimeout
@@ -5675,13 +5684,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			Write-Host " ->" -NoNewLine
 		}
 		if ($IsAzureSQLDB) { 
-			Write-Host "Getting index fragmentation info for $ASDBName... " -NoNewLine
+			Write-Host "Retrieving index fragmentation info for $ASDBName... " -NoNewLine
 			#if it's Azure SQL DB, we can't switch databases
 			[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
 			[string]$Query = $Query -replace "AzureSQLDBReplace", "$DirDate"
 		}
 		else {
-			Write-Host "Getting index fragmentation info for $CheckDB... " -NoNewLine
+			Write-Host "Retrieving index fragmentation info for $CheckDB... " -NoNewLine
 		
 			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
 		}
@@ -5956,10 +5965,10 @@ finally {
 		}
 	}
 	if ($TryCompleted -eq "N") {
-		Write-Host	" Attempting to retrieve sp_BlitzWho data... " -NoNewLine
+		Write-Host	" Attempting to retrieve session actvity data... " -NoNewLine
 	}
 	else {
-		Write-Host " Retrieving sp_BlitzWho data... " -NoNewLine
+		Write-Host " Retrieving session actvity data... " -NoNewLine
 	}
 	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetBlitzWhoData.sql")
 	[string]$Query = $Query -replace "BlitzWho_..BlitzWhoOut.." , "BlitzWho_$DirDate"

@@ -57,8 +57,6 @@ If PSBlitz detects an exclusive lock being held on a table it will automatically
 2. If you want the report to be in Excel format, then the MS Office suite needs to be installed on the machine where you're executing PSBlitz, otherwise use the HTML format.
 3. Sufficient permissions to query DMVs, server state, and get database objects' definitions.
 
-This should be ran from your workstation and not from the instance's host itself (why would you have the MS Word suite installed on a database server anyway?)
-
 You don't need to have any of the sp_Blitz stored procedures present on the instance that you're executing PSBlitz.ps1 for, all the scripts are contained in the `PSBlitz\Resources` directory in non-stored procedure format.
 
 Limitations:
