@@ -256,8 +256,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.2.3"
-$VersDate = "2024-07-10"
+$Vers = "4.3.0"
+$VersDate = "2024-07-11"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -6652,7 +6652,7 @@ finally {
 				$PageName = "Top $CacheTop Queries - $SortOrder"
 				$AdditionalInfo = "Outputs execution plans as .sqlplan files."
 				if ($SortOrder -eq "Mem_Recent_Comp") {
-					$PageName = "Top $CacheTop Queries - Memory and Recently Compiled"
+					$PageName = "Top $CacheTop Queries - Memory and Top 50 - Recently Compiled"
 					$QuerySource = "sp_BlitzCache @SortOrder = 'memory grant', @Top = $CacheTop/'recent compilations' , @Top = 50"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
