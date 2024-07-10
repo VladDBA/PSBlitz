@@ -6644,6 +6644,7 @@ finally {
 				elseif ($File.Name -like "BlitzIndex_2*") {
 					$PageName = "Index Usage"
 					$Description = "Index usage details."
+					$AdditionalInfo += "Output limited to 30k records"
 				}
 			}
 			elseif ($File.Name -like "BlitzCache*") {
