@@ -44,7 +44,7 @@ DECLARE
 ;SET @SinceStartup = 0;
 
 	SELECT
-	    @LogMessage = NULL,
+	@LogMessage = NULL,
     @Help = 0,
     @AsOf = NULL,
     @ExpertMode = 1,
@@ -96,7 +96,7 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-SELECT @Version = '8.20', @VersionDate = '20240522';
+SELECT @Version = '8.21', @VersionDate = '20240701';
 
 IF(@VersionCheckMode = 1)
 BEGIN

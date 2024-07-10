@@ -256,8 +256,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.2.2"
-$VersDate = "2024-06-27"
+$Vers = "4.3.0"
+$VersDate = "2024-07-11"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -431,10 +431,10 @@ function Invoke-BlitzWho {
 		[string]$IsInLoop
 	)
 	if ($IsInLoop -eq "Y") {
-		Write-Host " ->Running sp_BlitzWho - pass $BlitzWhoPass... " -NoNewLine
+		Write-Host " ->Active session data capture - pass $BlitzWhoPass... " -NoNewLine
 	}
  else {
-		Write-Host " Running sp_BlitzWho - pass $BlitzWhoPass... " -NoNewLine
+		Write-Host " Active session data capture - pass $BlitzWhoPass... " -NoNewLine
 	}
 	$StepStart = Get-Date
 	$StepName = "sp_BlitzWho - pass $BlitzWhoPass"
@@ -669,6 +669,7 @@ $InitScriptBlock = {
 			$CleanupCommand.Connection = $SqlConnection
 			$CleanupCommand.ExecuteNonQuery() | Out-Null 
 			$SqlConnection.Close()
+			$SqlConnection.Dispose()
 		}
 		return $IsFlagTbl
 	}
@@ -1457,7 +1458,7 @@ try {
 	$StartDate = get-date
 	###Collecting first pass of sp_BlitzWho data
 	$JobName = "BlitzWho"
-	Write-Host " Starting BlitzWho background process... " -NoNewline
+	Write-Host " Starting session activity collection process... " -NoNewline
 	
 	$Job = Start-Job -Name $JobName -InitializationScript $InitScriptBlock -ScriptBlock $MainScriptblock -ArgumentList $ConnString, $BlitzWhoRepl, $DirDate, $BlitzWhoDelay
 	$JobStatus = $Job | Select-Object -ExpandProperty State
@@ -1478,7 +1479,7 @@ try {
 			Write-Host ""
 		}
 		Add-LogRow "Start sp_BlitzWho background process" $JobStatus
-		Write-Host " ->sp_BlitzWho will collect data every $BlitzWhoDelay seconds."
+		Write-Host " ->Active session data will be captured every $BlitzWhoDelay seconds."
 
 	}
 
@@ -1546,6 +1547,7 @@ try {
 			@{Name = "Tempdb Metadata Memory Optimized"; Expression = { $_."mem_optimized_tempdb_metadata" } },
 			@{Name = "Fulltext Instaled"; Expression = { $_."fulltext_installed" } },
 			@{Name = "Instance Collation"; Expression = { $_."instance_collation" } },
+			@{Name = "User Databases"; Expression = { $_."user_db_count" } },
 			@{Name = "Process ID"; Expression = { $_."process_id" } },
 			@{Name = "Last Startup"; Expression = { ($_."instance_last_startup").ToString("yyyy-MM-dd HH:mm:ss") } },
 			@{Name = "Uptime (days)"; Expression = { $_."uptime_days" } },
@@ -1639,7 +1641,7 @@ $htmlTable4
 			#List of columns that should be returned from the data set
 			$DataSetCols = @("machine_name", "instance_name", "product_version", "product_level",
 				"patch_level", "edition", "is_clustered", "always_on_enabled", "filestream_access_level",
-				"mem_optimized_tempdb_metadata", "fulltext_installed", "instance_collation", "process_id",
+				"mem_optimized_tempdb_metadata", "fulltext_installed", "instance_collation", "user_db_count", "process_id",
 				"instance_last_startup", "uptime_days", "client_connections", "net_latency", "server_time")
 
 			if ($DebugInfo) {
@@ -1802,10 +1804,15 @@ $htmlTable4
 			$ExcelFile.Save()
 		}
 		##Cleaning up variables 
+		Clear-Variable -Name ResourceInfoTbl
 		Remove-Variable -Name ResourceInfoTbl
+		Clear-Variable -Name InstanceInfoTbl
 		Remove-Variable -Name InstanceInfoTbl
+		Clear-Variable -Name ConnectionsInfoTbl
 		Remove-Variable -Name ConnectionsInfoTbl
+		Clear-Variable -Name SessOptTbl
 		Remove-Variable -Name SessOptTbl
+		Clear-Variable -Name InstanceInfoSet
 		Remove-Variable -Name InstanceInfoSet
 	}
 
@@ -2104,9 +2111,13 @@ $htmlTable2
 			$ExcelFile.Save()
 		}
 		##Cleaning up variables
+		Clear-Variable -Name TempDBSessTbl 
 		Remove-Variable -Name TempDBSessTbl
+		Clear-Variable -Name TempTabTbl
 		Remove-Variable -Name TempTabTbl
+		Clear-Variable -Name TempDBTbl
 		Remove-Variable -Name TempDBTbl
+		Clear-Variable -Name TempDBSet
 		Remove-Variable -Name TempDBSet		
 	}
 
@@ -2118,7 +2129,7 @@ $htmlTable2
 	#####################################################################################
 	#						Open transaction info										#
 	#####################################################################################
-	Write-Host " Getting open transaction info" -NoNewline
+	Write-Host " Retrieving open transaction info" -NoNewline
 	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetOpenTransactions.sql")
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace "SET @DatabaseName = N'';", "SET @DatabaseName = N'$CheckDB';"
@@ -2317,7 +2328,9 @@ $JumpToTop
 					
 		}
 		##Cleaning up variables 
+		Clear-Variable -Name AcTranTbl
 		Remove-Variable -Name AcTranTbl
+		Clear-Variable -Name AcTranSet
 		Remove-Variable -Name AcTranSet
 	}
 
@@ -2336,7 +2349,7 @@ $JumpToTop
 		#Write-Host " Azure SQL DB - skipping database info."
 		#Add-LogRow "Database Info" "Skipped" "Azure SQL DB"
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetAzureSQLDBInfo.sql")
-		Write-Host " Getting database info for $ASDBName... " -NoNewLine 
+		Write-Host " Retrieving database info for $ASDBName... " -NoNewLine 
 		$CmdTimeout = 600
 		$DBInfoQuery = new-object System.Data.SqlClient.SqlCommand
 		$DBInfoQuery.CommandText = $Query
@@ -2838,12 +2851,19 @@ $JumpToTop
 				##Saving file 
 				$ExcelFile.Save()
 			}
+			Clear-Variable -Name DBInfoTbl
 			Remove-Variable -Name DBInfoTbl
+			Clear-Variable -Name DBFileInfoTbl
 			Remove-Variable -Name DBFileInfoTbl
+			Clear-Variable -Name RsrcGovTbl
 			Remove-Variable -Name RsrcGovTbl
+			Clear-Variable -Name RsrcUsageTbl
 			Remove-Variable -Name RsrcUsageTbl
+			Clear-Variable -Name ObjImpUpgrTbl
 			Remove-Variable -Name ObjImpUpgrTbl
+			Clear-Variable -Name DBConfigTbl
 			Remove-Variable -Name DBConfigTbl
+			Clear-Variable -Name DBInfoSet
 			Remove-Variable -Name DBInfoSet
 		}
 
@@ -2852,11 +2872,11 @@ $JumpToTop
 		#if it's not Azure SQL DB
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetDbInfo.sql")	
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
-			Write-Host " Getting database info for $CheckDB... " -NoNewLine
+			Write-Host " Retrieving database info for $CheckDB... " -NoNewLine
 			[string]$Query = $Query -replace "SET @DatabaseName = N'';", "SET @DatabaseName = N'$CheckDB';"
 		}
 		else {
-			Write-Host " Getting database info... " -NoNewLine
+			Write-Host " Retrieving database info... " -NoNewLine
 		}
 		$CmdTimeout = 600
 		$DBInfoQuery = new-object System.Data.SqlClient.SqlCommand
@@ -2927,7 +2947,7 @@ $JumpToTop
 				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 					$htmlTable2 = $DBConfigTbl | Select-Object "Database", "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
 					#$htmlTable2 = $htmlTable2 -replace '<td>No</td>', '<td bgcolor="yellow">No</td>'
-					$htmlTable2 = $htmlTable2 -replace '<table>','<table class="sortable">'
+					$htmlTable2 = $htmlTable2 -replace '<table>', '<table class="sortable">'
 					$htmlBlock = "`n<br>`n <h2>Database Scoped Configuration for $CheckDB</h2>"
 					$htmlBlock += '<p><a href="https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-scoped-configuration-transact-sql?view=sql-server-ver16" target="_blank">More Info</a></p>'
 					$htmlBlock += "`n $SortableTable `n $htmlTable2 `n"
@@ -3086,8 +3106,11 @@ $htmlBlock
 				##Saving file 
 				$ExcelFile.Save()
 			}
+			Clear-Variable -Name DBInfoTbl
 			Remove-Variable -Name DBInfoTbl
+			Clear-Variable -Name DBFileInfoTbl
 			Remove-Variable -Name DBFileInfoTbl
+			Clear-Variable -Name DBInfoSet
 			Remove-Variable -Name DBInfoSet
 		}
 	}
@@ -3102,11 +3125,11 @@ $htmlBlock
 	if ($IsAzureSQLDB) {
 		$StepStart = get-date
 		$StepEnd = get-date
-		Write-Host " Azure SQL DB - skipping sp_Blitz."
+		Write-Host " Azure SQL DB - skipping instance health."
 		Add-LogRow "sp_Blitz" "Skipped" "Azure SQL DB"
 	}
  else {
-		Write-Host " Running sp_Blitz... " -NoNewLine
+		Write-Host " Retrieving instance health data... " -NoNewLine
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitz_NonSPLatest.sql")
 		if (($IsIndepth -eq "Y") -and ([string]::IsNullOrEmpty($CheckDB))) {
 			[string]$Query = $Query -replace ";SET @CheckUserDatabaseObjects = 0;", ";SET @CheckUserDatabaseObjects = 1;"
@@ -3221,8 +3244,10 @@ $JumpToTop
 				##Saving file 
 				$ExcelFile.Save()
 			}
-			##Cleaning up variables 
+			##Cleaning up variables
+			Clear-Variable -Name BlitzTbl
 			Remove-Variable -Name BlitzTbl
+			Clear-Variable -Name BlitzSet
 			Remove-Variable -Name BlitzSet		
 		}
 	}
@@ -3236,7 +3261,7 @@ $JumpToTop
 	#####################################################################################
 	#						sp_BlitzFirst 30 seconds									#
 	#####################################################################################
-	Write-Host " Running sp_BlitzFirst @Seconds = 30... " -NoNewLine
+	Write-Host " What's happening in a 30 seconds time-frame... " -NoNewLine
 	$CmdTimeout = 600
 	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzFirst_NonSPLatest.sql")
 	$BlitzFirstQuery = new-object System.Data.SqlClient.SqlCommand
@@ -3343,7 +3368,9 @@ $htmlTable
 			##Saving file 
 			$ExcelFile.Save()
 		}
+		Clear-Variable -Name BlitzFirstTbl
 		Remove-Variable -Name BlitzFirstTbl
+		Clear-Variable -Name BlitzFirstSet
 		Remove-Variable -Name BlitzFirstSet
 	}
 	if ($JobStatus -ne "Running") {
@@ -3355,7 +3382,7 @@ $htmlTable
 	#						sp_BlitzFirst since startup									#
 	#####################################################################################
 	if ($IsIndepth -eq "Y") {
-		Write-Host " Running sp_BlitzFirst @SinceStartup = 1... " -NoNewLine
+		Write-Host " Retrieving waits recorded since instance startup... " -NoNewLine
 		$CmdTimeout = 600
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzFirst_NonSPLatest.sql")
 		[string]$Query = $Query -replace ";SET @SinceStartup = 0;", ";SET @SinceStartup = 1;"
@@ -3647,9 +3674,13 @@ $JumpToTop
 			}
 
 			##Cleaning up variables
+			Clear-Variable -Name WaitsTbl
 			Remove-Variable -Name WaitsTbl
+			Clear-Variable -Name StorageTbl
 			Remove-Variable -Name StorageTbl
+			Clear-Variable -Name PerfmonTbl
 			Remove-Variable -Name PerfmonTbl
+			Clear-Variable -Name BlitzFirstSet
 			Remove-Variable -Name BlitzFirstSet
 		}
 		if ($JobStatus -ne "Running") {
@@ -3684,13 +3715,13 @@ $JumpToTop
 	#Set specific database to check if a name was provided
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
-		Write-Host " Running sp_BlitzCache for $CheckDB"
+		Write-Host " Retrieving plan cache info for $CheckDB"
 	}
  elseif ($IsAzureSQLDB) {
-		Write-Host " Running sp_BlitzCache for $ASDBName"
+		Write-Host " Retrieving plan cache info for $ASDBName"
 	}
  else {
-		Write-Host " Running sp_BlitzCache for all user databases"
+		Write-Host " Retrieving plan cache info for all user databases"
 		#Create array to store database names
 		$DBArray = New-Object System.Collections.ArrayList
 		[int]$BlitzCacheRecs = 0
@@ -3722,7 +3753,7 @@ $JumpToTop
 		}		
 
 		[string]$Query = $Query -replace $OldSortString, $NewSortString
-		Write-Host " ->Running sp_BlitzCache with @SortOrder = $SortOrder... " -NoNewLine
+		Write-Host " ->Top $(if($SortOrder -eq "'recent compilations'"){"50"}else{$CacheTop}) queries by $($SortOrder -replace "'",'')... " -NoNewLine
 		$BlitzCacheQuery = new-object System.Data.SqlClient.SqlCommand
 		$BlitzCacheQuery.CommandText = $Query
 		$BlitzCacheQuery.CommandTimeout = $CmdTimeout
@@ -4175,8 +4206,11 @@ $JumpToTop
 				$ExcelFile.Save()
 			}	
 			##Cleaning up variables 
+			Clear-Variable -Name BlitzCacheWarnTbl
 			Remove-Variable -Name BlitzCacheWarnTbl
+			Clear-Variable -Name BlitzCacheTbl
 			Remove-Variable -Name BlitzCacheTbl
+			Clear-Variable -Name BlitzCacheSet
 			Remove-Variable -Name BlitzCacheSet
 
 		}
@@ -4206,7 +4240,7 @@ $JumpToTop
 		[string]$DBName = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Name | Select-Object -Last 1
 		[int]$DBCount = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Count | Select-Object -Last 1
 		if (($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --") -and (!([string]::IsNullOrEmpty($DBName)))) {
-			Write-Host " $DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
+			Write-Host " $DBName accounts for 2/3 of the records returned from cache"
 			Write-Host " ->" -NoNewLine
 			$StepStart = get-date
 			[string]$CheckDB = $DBName
@@ -4224,7 +4258,7 @@ $JumpToTop
 		}
 		$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
-			Write-Host "Checking if $CheckDB is eligible for sp_BlitzQueryStore..."
+			Write-Host "Checking if $CheckDB is eligible for Query Store check..."
 			$DBQuery = @" 
 		IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSION')), 4)) < 13 )
   BEGIN
@@ -4253,7 +4287,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$CheckDBQuery.Parameters["@DBName"].Value = $CheckDB
 		}
 		elseif ($IsAzureSQLDB) {
-			Write-Host "Checking if $ASDBName is eligible for sp_BlitzQueryStore..."
+			Write-Host "Checking if $ASDBName is eligible for Query Store check..."
 			$DBQuery = @"
 			IF ( (SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128))) = N'SQL Azure' )
 			BEGIN
@@ -4293,23 +4327,23 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				else {
 					Write-Host " ->$CheckDB - " -NoNewLine -ErrorAction Stop
 				}
-				Write-Host "is eligible for sp_BlitzQueryStore" -ErrorAction Stop
+				Write-Host "is eligible for Query Store check" -ErrorAction Stop
 				$CheckQueryStore = 'Y'
 			}
 			elseif ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "No") {
 				$StepEnd = Get-Date
 				if ($IsAzureSQLDB) {
-					Write-Host " ->$ASDBName - is not eligible for sp_BlitzQueryStore" -NoNewLine -ErrorAction Stop
+					Write-Host " ->$ASDBName - is not eligible for Query Store check" -NoNewLine -ErrorAction Stop
 				}
 				else {
-					Write-Host " ->$CheckDB - is not eligible for sp_BlitzQueryStore"
+					Write-Host " ->$CheckDB - is not eligible for Query Store check"
 				}
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" "$CheckDB is not eligible"
 			}
 			else {
 				$StepEnd = Get-Date
 				$QSCheckResult = $CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] 
-				Write-Host " ->$ASDBName - is not eligible for sp_BlitzQueryStore" -NoNewLine -ErrorAction Stop
+				Write-Host " ->$ASDBName - is not eligible for Query Store check" -NoNewLine -ErrorAction Stop
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" $QSCheckResult
 
 			}
@@ -4325,14 +4359,14 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzQueryStore_NonSPLatest.sql")
 
 			if ($IsAzureSQLDB) {
-				Write-Host " Running sp_BlitzQueryStore for $ASDBName..." -NoNewline
+				Write-Host " Retrieving Query Store info for $ASDBName..." -NoNewline
 			}
 			else {
 				if ($DBSwitched -eq "Y") {
 					$OldCheckDBStr = ";SET @DatabaseName = NULL;"
 					$NewCheckDBStr = ";SET @DatabaseName = '" + $CheckDB + "';"
 				}
-				Write-Host " Running sp_BlitzQueryStore for $CheckDB..." -NoNewline
+				Write-Host " Retrieving Query Store info for $CheckDB..." -NoNewline
 				[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 			}
 			
@@ -4614,9 +4648,11 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					}
 					
 				}
-				
+				Clear-Variable -Name BlitzQSTbl
 				Remove-Variable -Name BlitzQSTbl
+				Clear-Variable -Name BlitzQSSumTbl
 				Remove-Variable -Name BlitzQSSumTbl
+				Clear-Variable -Name BlitzQSSet
 				Remove-Variable -Name BlitzQSSet
 
 
@@ -4653,18 +4689,27 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 		[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
-		Write-Host " Running sp_BlitzIndex for $CheckDB"
+		Write-Host " Retrieving index info for $CheckDB"
 	}
 	elseif ($IsAzureSQLDB) {
 		[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
-		Write-Host " Running sp_BlitzIndex for $ASDBName"
+		Write-Host " Retrieving index info for $ASDBName"
 	}
  else {
-		Write-Host " Running sp_BlitzIndex for all user databases"
+		Write-Host " Retrieving index info for all user databases"
 	}
 	#Loop through $Modes
 	foreach ($Mode in $Modes) {
-		Write-Host " ->Running sp_BlitzIndex with @Mode = $Mode... " -NoNewLine
+		if ($Mode -eq "0") {
+			Write-Host " ->Index diagnosis... " -NoNewLine
+		}
+		elseif ($Mode -eq "1") {
+			Write-Host " ->Index summary... " -NoNewLine
+		}elseif ($Mode -eq "2") {
+			Write-Host " ->Index usage details... " -NoNewLine
+		}elseif ($Mode -eq "4") {
+			Write-Host " ->Detailed index diagnosis... " -NoNewLine
+		}
 		$NewMode = ";SET @Mode = " + $Mode + ";"
 		[string]$Query = $Query -replace $OldMode, $NewMode
 		$BlitzIndexQuery = new-object System.Data.SqlClient.SqlCommand
@@ -4752,10 +4797,21 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					and it's 2AM and I'm done with trying to find elegant ways around this
 					#>
 					$BlitzIxTbl.Columns["Definition: [Property] ColumnName {datatype maxbytes}"].ColumnName = "Definition"
-					$htmlTable = $BlitzIxTbl | Select-Object "Priority", "Finding", "Database Name", 
-					"Details: schema.table.index(indexid)",   
-					"Definition", 
-					"Secret Columns", "Usage", "Size", "More Info", "Create TSQL", "Sample Plan File", "URL" | Where-Object "Finding" -NotLike "sp_BlitzIndex*" | ConvertTo-Html -As Table -Fragment
+					if (([string]::IsNullOrEmpty($CheckDB)) -and ($RecordsReturned -gt 30000)) {
+						Write-Host "  ->More than 30k records returned `n  ->limiting output to databases found in the plan cache results and excluding priority 250."
+						Add-LogRow "->sp_BlitzIndex mode $Mode" "More than 30k records" "Output limited to databases found in the plan cache results and excluded priority 250"
+						$htmlTable = $BlitzIxTbl | Select-Object "Priority", "Finding", "Database Name", 
+						"Details: schema.table.index(indexid)",   
+						"Definition", 
+						"Secret Columns", "Usage", "Size", "Create TSQL", "Sample Plan File", "URL" |  Where-Object -FilterScript { ($DBArray -contains $_."Database Name") -and ($_."Priority" -ne 250) -and ($_."Finding" -NotLike "sp_BlitzIndex*") } | ConvertTo-Html -As Table -Fragment
+
+					}
+					else {
+						$htmlTable = $BlitzIxTbl | Select-Object "Priority", "Finding", "Database Name", 
+						"Details: schema.table.index(indexid)",   
+						"Definition", 
+						"Secret Columns", "Usage", "Size", "Create TSQL", "Sample Plan File", "URL" | Where-Object "Finding" -NotLike "sp_BlitzIndex*" | ConvertTo-Html -As Table -Fragment
+					}
 					#don't pay attention to that table id, it lies because it's late and I'm lazy
 					$htmlTable = $htmlTable -replace '<table>', '<table id="IndexUsgTable">'		
 					$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
@@ -4776,58 +4832,59 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				}
 				elseif ($Mode -eq "2") {
 					$BlitzIxTbl.Columns["Definition: [Property] ColumnName {datatype maxbytes}"].ColumnName = "Definition"
-					if(([string]::IsNullOrEmpty($CheckDB)) -and ($RecordsReturned -gt 30000)){
-						Write-Host "  ->More than 30k records returned `n  ->limiting output the databases found in the plan cache results."
-						Add-LogRow "->sp_BlitzIndex mode $Mode" "More than 30k records" "Output limited to databases found in the plan cache results"
+					if (([string]::IsNullOrEmpty($CheckDB)) -and ($RecordsReturned -gt 30000)) {
+						Write-Host "  ->More than 30k records returned `n  ->limiting output to first 30k records based on databases found in the plan cache results."
+						Add-LogRow "->sp_BlitzIndex mode $Mode" "More than 30k records" "Output limited to first 30k records based on databases found in the plan cache results"
 						$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Schema Name", "Object Name", 
-					"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
-					"Object Type", "Definition", 
-					"Key Column Names With Sort", "Count Key Columns", "Include Column Names", 
-					"Count Included Columns", "Secret Column Names", "Count Secret Columns", 
-					"Partition Key Column Name", "Filter Definition", "Is Indexed View", 
-					"Is Primary Key", "Is XML", "Is Spatial", "Is NC Columnstore", 
-					"Is CX Columnstore", "Is Disabled", "Is Hypothetical", "Is Padded", 
-					"Fill Factor", "Is Reference by Foreign Key", 
-					@{Name = "Last User Seek"; Expression = { if ($_."Last User Seek" -ne [System.DBNull]::Value) { ($_."Last User Seek").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Seek" } } }, 
-					@{Name = "Last User Scan"; Expression = { if ($_."Last User Scan" -ne [System.DBNull]::Value) { ($_."Last User Scan").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Scan" } } }, 
-					@{Name = "Last User Lookup"; Expression = { if ($_."Last User Lookup" -ne [System.DBNull]::Value) { ($_."Last User Lookup").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Lookup" } } }, 
-					@{Name = "Last User Update"; Expression = { if ($_."Last User Update" -ne [System.DBNull]::Value) { ($_."Last User Update").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Update" } } }, 
-					"Total Reads", 
-					"User Updates", "Reads Per Write", "Index Usage", "Partition Count", 
-					"Rows", "Reserved MB", "Reserved LOB MB", "Reserved Row Overflow MB", 
-					"Index Size", "Row Lock Count", "Row Lock Wait Count", "Row Lock Wait ms", 
-					"Avg Row Lock Wait ms", "Page Lock Count", "Page Lock Wait Count", 
-					"Page Lock Wait ms", "Avg Page Lock Wait ms", "Lock Escalation Attempts", 
-					"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
-					"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
-					@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
-					@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } }, 
-					"More Info" | Where-Object {$DBArray  -contains $_."Database Name"} | ConvertTo-Html -As Table -Fragment}
-					else{
-					$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Schema Name", "Object Name", 
-					"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
-					"Object Type", "Definition", 
-					"Key Column Names With Sort", "Count Key Columns", "Include Column Names", 
-					"Count Included Columns", "Secret Column Names", "Count Secret Columns", 
-					"Partition Key Column Name", "Filter Definition", "Is Indexed View", 
-					"Is Primary Key", "Is XML", "Is Spatial", "Is NC Columnstore", 
-					"Is CX Columnstore", "Is Disabled", "Is Hypothetical", "Is Padded", 
-					"Fill Factor", "Is Reference by Foreign Key", 
-					@{Name = "Last User Seek"; Expression = { if ($_."Last User Seek" -ne [System.DBNull]::Value) { ($_."Last User Seek").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Seek" } } }, 
-					@{Name = "Last User Scan"; Expression = { if ($_."Last User Scan" -ne [System.DBNull]::Value) { ($_."Last User Scan").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Scan" } } }, 
-					@{Name = "Last User Lookup"; Expression = { if ($_."Last User Lookup" -ne [System.DBNull]::Value) { ($_."Last User Lookup").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Lookup" } } }, 
-					@{Name = "Last User Update"; Expression = { if ($_."Last User Update" -ne [System.DBNull]::Value) { ($_."Last User Update").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Update" } } }, 
-					"Total Reads", 
-					"User Updates", "Reads Per Write", "Index Usage", "Partition Count", 
-					"Rows", "Reserved MB", "Reserved LOB MB", "Reserved Row Overflow MB", 
-					"Index Size", "Row Lock Count", "Row Lock Wait Count", "Row Lock Wait ms", 
-					"Avg Row Lock Wait ms", "Page Lock Count", "Page Lock Wait Count", 
-					"Page Lock Wait ms", "Avg Page Lock Wait ms", "Lock Escalation Attempts", 
-					"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
-					"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
-					@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
-					@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } }, 
-					"More Info" | ConvertTo-Html -As Table -Fragment
+						"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
+						"Object Type", "Definition", 
+						"Key Column Names With Sort", "Count Key Columns", "Include Column Names", 
+						"Count Included Columns", "Secret Column Names", "Count Secret Columns", 
+						"Partition Key Column Name", "Filter Definition", "Is Indexed View", 
+						"Is Primary Key", "Is XML", "Is Spatial", "Is NC Columnstore", 
+						"Is CX Columnstore", "Is Disabled", "Is Hypothetical", "Is Padded", 
+						"Fill Factor", "Is Reference by Foreign Key", 
+						@{Name = "Last User Seek"; Expression = { if ($_."Last User Seek" -ne [System.DBNull]::Value) { ($_."Last User Seek").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Seek" } } }, 
+						@{Name = "Last User Scan"; Expression = { if ($_."Last User Scan" -ne [System.DBNull]::Value) { ($_."Last User Scan").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Scan" } } }, 
+						@{Name = "Last User Lookup"; Expression = { if ($_."Last User Lookup" -ne [System.DBNull]::Value) { ($_."Last User Lookup").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Lookup" } } }, 
+						@{Name = "Last User Update"; Expression = { if ($_."Last User Update" -ne [System.DBNull]::Value) { ($_."Last User Update").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Update" } } }, 
+						"Total Reads", 
+						"User Updates", "Reads Per Write", "Index Usage", "Partition Count", 
+						"Rows", "Reserved MB", "Reserved LOB MB", "Reserved Row Overflow MB", 
+						"Index Size", "Row Lock Count", "Row Lock Wait Count", "Row Lock Wait ms", 
+						"Avg Row Lock Wait ms", "Page Lock Count", "Page Lock Wait Count", 
+						"Page Lock Wait ms", "Avg Page Lock Wait ms", "Lock Escalation Attempts", 
+						"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
+						"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
+						@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
+						@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } } | 
+						Where-Object -FilterScript { $DBArray -contains $_."Database Name" } | Select-Object -First 30000 | ConvertTo-Html -As Table -Fragment
+     }
+					else {
+						$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Schema Name", "Object Name", 
+						"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
+						"Object Type", "Definition", 
+						"Key Column Names With Sort", "Count Key Columns", "Include Column Names", 
+						"Count Included Columns", "Secret Column Names", "Count Secret Columns", 
+						"Partition Key Column Name", "Filter Definition", "Is Indexed View", 
+						"Is Primary Key", "Is XML", "Is Spatial", "Is NC Columnstore", 
+						"Is CX Columnstore", "Is Disabled", "Is Hypothetical", "Is Padded", 
+						"Fill Factor", "Is Reference by Foreign Key", 
+						@{Name = "Last User Seek"; Expression = { if ($_."Last User Seek" -ne [System.DBNull]::Value) { ($_."Last User Seek").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Seek" } } }, 
+						@{Name = "Last User Scan"; Expression = { if ($_."Last User Scan" -ne [System.DBNull]::Value) { ($_."Last User Scan").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Scan" } } }, 
+						@{Name = "Last User Lookup"; Expression = { if ($_."Last User Lookup" -ne [System.DBNull]::Value) { ($_."Last User Lookup").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Lookup" } } }, 
+						@{Name = "Last User Update"; Expression = { if ($_."Last User Update" -ne [System.DBNull]::Value) { ($_."Last User Update").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Update" } } }, 
+						"Total Reads", 
+						"User Updates", "Reads Per Write", "Index Usage", "Partition Count", 
+						"Rows", "Reserved MB", "Reserved LOB MB", "Reserved Row Overflow MB", 
+						"Index Size", "Row Lock Count", "Row Lock Wait Count", "Row Lock Wait ms", 
+						"Avg Row Lock Wait ms", "Page Lock Count", "Page Lock Wait Count", 
+						"Page Lock Wait ms", "Avg Page Lock Wait ms", "Lock Escalation Attempts", 
+						"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
+						"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
+						@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
+						@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } } | 
+						ConvertTo-Html -As Table -Fragment
 					}
 					#add table specify style
 					$htmlTable = $htmlTable -replace '<table>', '<table id="IndexUsgTable" class="IndexUsageTable sortable">'
@@ -4881,7 +4938,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$DataSetCols = @("Priority", "Finding", "Database Name", 
 						"Details: schema.table.index(indexid)",   
 						"Definition: [Property] ColumnName {datatype maxbytes}", 
-						"Secret Columns", "Usage", "Size", "More Info", "Create TSQL", "Sample Plan File", "URL")
+						"Secret Columns", "Usage", "Size", "Create TSQL", "Sample Plan File", "URL")
 				}
 				elseif ($Mode -eq "1") {
 					$DataSetCols = @("Database Name", "Number Objects", "All GB", 
@@ -4913,7 +4970,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						"Page Lock Wait ms", "Avg Page Lock Wait ms", "Lock Escalation Attempts", 
 						"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
 						"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
-						"Create Date", "Modify Date", "More Info")
+						"Create Date", "Modify Date")
 				}
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = $DefaultStartRow
@@ -4969,7 +5026,11 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				##Saving file 
 				$ExcelFile.Save()
 			}
+			##Cleaning up variables
+			Clear-Variable -Name BlitzIxTbl
 			Remove-Variable -Name BlitzIxTbl
+			Clear-Variable -Name BlitzIndexSet
+			Remove-Variable -Name BlitzIndexSet
 		}
 		#Update $OldMode
 		$OldMode = $NewMode
@@ -4978,9 +5039,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop Y
 			$BlitzWhoPass += 1
 		}
-	}
-	##Cleaning up variables
-	Remove-Variable -Name BlitzIndexSet
+	}	
 
 	####################################################################
 	#						sp_BlitzLock
@@ -4988,13 +5047,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	$CurrTime = get-date
 	$CurrRunTime = (New-TimeSpan -Start $StartDate -End $CurrTime).TotalMinutes
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		Write-Host " Running sp_BlitzLock for $CheckDB... " -NoNewLine
+		Write-Host " Retrieving deadlock info for $CheckDB... " -NoNewLine
 	}
  elseif ($IsAzureSQLDB) {
-		Write-Host " Running sp_BlitzLock for $ASDBName... " -NoNewLine
+		Write-Host " Retrieving deadlock info for $ASDBName... " -NoNewLine
 	}
  else {
-		Write-Host " Running sp_BlitzLock for all user databases... " -NoNewLine
+		Write-Host " Retrieving deadlock info for all user databases... " -NoNewLine
 	}
 	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzLock_NonSPLatest.sql")
 	$CmdTimeout = $MaxTimeout
@@ -5174,8 +5233,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				@{Name = "Executions / Second"; Expression = { $_."executions_per_second" } },
 				@{Name = "Total Worker Time(ms)"; Expression = { $_."total_worker_time_ms" } },
 				@{Name = "Avg Worker Time(ms)"; Expression = { $_."avg_worker_time_ms" } },
+				@{Name = "Max Worker Time(ms)"; Expression = { $_."max_worker_time_ms" } },
 				@{Name = "Total Duration(ms)"; Expression = { $_."total_elapsed_time_ms" } },
 				@{Name = "Avg Duration(ms)"; Expression = { $_."avg_elapsed_time_ms" } },
+				@{Name = "Max Duration(ms)"; Expression = { $_."max_elapsed_time_ms" } },
 				@{Name = "Total Logical Reads(MB)"; Expression = { $_."total_logical_reads_mb" } },
 				@{Name = "Total Physical Reads(MB)"; Expression = { $_."total_physical_reads_mb" } },
 				@{Name = "Total Logical Writes(MB)"; Expression = { $_."total_logical_writes_mb" } },
@@ -5366,8 +5427,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$DataSetCols = @("database_name", "query_text", "PlanID", "creation_time",
 				 "last_execution_time", "execution_count",
 					"executions_per_second", "total_worker_time_ms",
-				 "avg_worker_time_ms", "total_elapsed_time_ms",
-					"avg_elapsed_time", "total_logical_reads_mb", 
+				 "avg_worker_time_ms", "max_worker_time_ms", "total_elapsed_time_ms",
+					"avg_elapsed_time_ms", "max_elapsed_time_ms", "total_logical_reads_mb", 
 					"total_physical_reads_mb", "total_logical_writes_mb", 
 					"min_grant_mb", "max_grant_mb", "min_used_grant_mb", "max_used_grant_mb", 
 					"min_reserved_threads", "max_reserved_threads", "min_used_threads",
@@ -5408,9 +5469,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$ExcelFile.Save()
 			}
 			##Cleaning up variables
+			Clear-Variable -Name TblLockOver
 			Remove-Variable -Name TblLockOver
+			Clear-Variable -Name TblLockDtl
 			Remove-Variable -Name TblLockDtl
+			Clear-Variable -Name TblLockPlans
 			Remove-Variable -Name TblLockPlans
+			Clear-Variable -Name BlitzLockSet
 			Remove-Variable -Name BlitzLockSet
 		}
 	}
@@ -5429,7 +5494,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		if db was switched for querystore we can switch it again without doing all the math again
 	#>
 	if ($DBSwitched -eq "Y") {
-		Write-Host " $DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
+		Write-Host " $DBName accounts for 2/3 of the records returned from cache"
 		$StepStart = get-date
 		Write-Host " ->" -NoNewline
 		[string]$CheckDB = $DBName
@@ -5445,12 +5510,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		}
 		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetStatsInfoForWholeDB.sql")
 		if ($IsAzureSQLDB) {
-			Write-Host "Getting stats info for $ASDBName... " -NoNewLine
+			Write-Host "Retrieving stats info for $ASDBName... " -NoNewLine
 			#if it's Azure SQL DB, we can't switch databases
 			[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
 		}
 		else {
-			Write-Host "Getting stats info for $CheckDB... " -NoNewLine		
+			Write-Host "Retrieving stats info for $CheckDB... " -NoNewLine		
 			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
 		}
 		$CmdTimeout = $MaxTimeout
@@ -5599,7 +5664,9 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				}
 			}
 			##Cleaning up variables
+			Clear-Variable -Name StatsTbl
 			Remove-Variable -Name StatsTbl
+			Clear-Variable -Name StatsSet
 			Remove-Variable -Name StatsSet
 		
 		}
@@ -5617,13 +5684,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			Write-Host " ->" -NoNewLine
 		}
 		if ($IsAzureSQLDB) { 
-			Write-Host "Getting index fragmentation info for $ASDBName... " -NoNewLine
+			Write-Host "Retrieving index fragmentation info for $ASDBName... " -NoNewLine
 			#if it's Azure SQL DB, we can't switch databases
 			[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
 			[string]$Query = $Query -replace "AzureSQLDBReplace", "$DirDate"
 		}
 		else {
-			Write-Host "Getting index fragmentation info for $CheckDB... " -NoNewLine
+			Write-Host "Retrieving index fragmentation info for $CheckDB... " -NoNewLine
 		
 			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
 		}
@@ -5765,7 +5832,9 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$ExcelFile.Save()
 				}
 				##Cleaning up variables
+				Clear-Variable -Name IndexTbl
 				Remove-Variable -Name IndexTbl
+				Clear-Variable -Name IndexSet
 				Remove-Variable -Name IndexSet
 
 			} 
@@ -5896,10 +5965,10 @@ finally {
 		}
 	}
 	if ($TryCompleted -eq "N") {
-		Write-Host	" Attempting to retrieve sp_BlitzWho data... " -NoNewLine
+		Write-Host	" Attempting to retrieve session actvity data... " -NoNewLine
 	}
 	else {
-		Write-Host " Retrieving sp_BlitzWho data... " -NoNewLine
+		Write-Host " Retrieving session actvity data... " -NoNewLine
 	}
 	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetBlitzWhoData.sql")
 	[string]$Query = $Query -replace "BlitzWho_..BlitzWhoOut.." , "BlitzWho_$DirDate"
@@ -6273,8 +6342,11 @@ finally {
 			}
 		}
 		##Cleaning up variables
+		Clear-Variable -Name BlitzWhoTbl
 		Remove-Variable -Name BlitzWhoTbl
+		Clear-Variable -Name BlitzWhoAggTbl
 		Remove-Variable -Name BlitzWhoAggTbl
+		Clear-Variable -Name BlitzWhoSet
 		Remove-Variable -Name BlitzWhoSet
 	}
 	$SqlConnection.Close()
@@ -6580,7 +6652,7 @@ finally {
 				$PageName = "Top $CacheTop Queries - $SortOrder"
 				$AdditionalInfo = "Outputs execution plans as .sqlplan files."
 				if ($SortOrder -eq "Mem_Recent_Comp") {
-					$PageName = "Top $CacheTop Queries - Memory and Recently Compiled"
+					$PageName = "Top $CacheTop Queries - Memory and Top 50 - Recently Compiled"
 					$QuerySource = "sp_BlitzCache @SortOrder = 'memory grant', @Top = $CacheTop/'recent compilations' , @Top = 50"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
