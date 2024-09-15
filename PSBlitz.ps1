@@ -1189,46 +1189,30 @@ $sdate = get-date
 $DirDate = $sdate.ToString("yyyyMMddHHmm")
 #Set output directory
 if ((!([string]::IsNullOrEmpty($OutputDir))) -and (Test-Path $OutputDir)) {
-	if ($OutputDir -notlike "*\") {
-		$OutputDir = $OutputDir + "\"
-	}
+
 	$OutDir = $OutputDir
+} else {
+	$OutDir = $scriptPath
+}
 	if ($IsAzureSQLDB) {
-		$OutDir += "AzureSQLDB_$ASDBName" + "_"
+		$SubDir = "AzureSQLDB_$ASDBName" + "_"
 	}
 	elseif ($IsAzureSQLMI) {
-		$OutDir += $InstName.Replace('.database.windows.net', '') + "_"
+		$SubDir = $InstName.Replace('.database.windows.net', '') + "_"
 	}
 	elseif ($HostName -ne $InstName) {
-		$OutDir += $HostName + "_" + $InstName + "_"
+		$SubDir = $HostName + "_" + $InstName + "_"
 	}
 	else {
-		$OutDir += $InstName + "_"
+		$SubDir = $InstName + "_"
 	}
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		$OutDir += $CheckDB + "_"
+		$SubDir = $CheckDB + "_"
 	}
-	$OutDir += $DirDate
-}
-else {
-	$OutDir = $scriptPath + "\"
-	if ($IsAzureSQLDB) {
-		$OutDir += "AzureSQLDB_$ASDBName" + "_"
-	}
-	elseif ($IsAzureSQLMI) {
-		$OutDir += $InstName.Replace('.database.windows.net', '') + "_"
-	}
- elseif ($HostName -ne $InstName) {
-		$OutDir += $HostName + "_" + $InstName + "_"
-	}
-	else {
-		$OutDir += $InstName + "_"
-	}
-	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		$OutDir += $CheckDB + "_"
-	}
-	$OutDir += $DirDate
-}
+	$SubDir += $DirDate
+
+	$OutDir = Join-Path -Path $OutDir -ChildPath $SubDir
+
 if ($ZipOutput -eq "Y") {
 	if ($IsAzureSQLDB) {
 		$ZipFile = "AzureSQLDB_$ASDBName" + "_"
@@ -1246,9 +1230,9 @@ if ($ZipOutput -eq "Y") {
 		$ZipFile += $CheckDB + "_" 
 	}
 	$ZipFile += $DirDate + ".zip"
-	if ($DebugInfo) {
-		Write-Host " Output directory: $OutDir" -Fore Yellow
-	}
+}
+if ($DebugInfo) {
+	Write-Host " Output directory: $OutDir" -Fore Yellow
 }
 
 
@@ -1257,13 +1241,13 @@ if (!(Test-Path $OutDir)) {
 	New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 }
 #Set plan output directory
-$PlanOutDir = $OutDir + "\" + "Plans"
+$PlanOutDir = Join-Path -Path $OutDir -ChildPath "Plans"
 #Check if plan output directory exists
 if (!(Test-Path $PlanOutDir)) {
 	New-Item -ItemType Directory -Force -Path $PlanOutDir | Out-Null
 }
 #Set deadlock graph output directory
-$XDLOutDir = $OutDir + "\" + "Deadlocks"
+$XDLOutDir = Join-Path -Path $OutDir -ChildPath "Deadlocks"
 #Check if deadlock graph output directory exists
 if (!(Test-Path $XDLOutDir)) {
 	New-Item -ItemType Directory -Force -Path $XDLOutDir | Out-Null
@@ -1302,7 +1286,7 @@ if (($ToHTML -ne "Y") -and ($CacheTop -ne 10)) {
 
 if ($ToHTML -eq "Y") {
 	#Set HTML files output directory
-	$HTMLOutDir = $OutDir + "\" + "HTMLFiles"
+	$HTMLOutDir = Join-Path -Path $OutDir -ChildPath "HTMLFiles"
 	if (!(Test-Path $HTMLOutDir)) {
 		New-Item -ItemType Directory -Force -Path $HTMLOutDir | Out-Null
 	}
@@ -1363,7 +1347,7 @@ else {
 	else {
 		$OutExcelFName = "Active_$InstName.xlsx"
 	}
-	$OutExcelF = $OutDir + "\" + $OutExcelFName
+	$OutExcelF = Join-Path -Path $OutDir -ChildPath $OutExcelFName
 	###Copy Excel template to output directory
 	<#
 	This is a fix for https://github.com/VladDBA/PSBlitz/issues/4
