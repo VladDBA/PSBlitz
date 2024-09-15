@@ -265,7 +265,7 @@ $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #clear previous errors
 $error.Clear();
 #Set resources path
-$ResourcesPath = $ScriptPath + "\Resources"
+$ResourcesPath = Join-Path -Path $ScriptPath -ChildPath "Resources"
 #Set name of the input Excel file
 $OrigExcelFName = "PSBlitzOutput.xlsx"
 $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
@@ -279,7 +279,7 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"spBlitzQueryStore_NonSPLatest.sql", "searchtable.js", "sorttable.js",
 	"styles.css")
 #Set path+name of the input Excel file
-$OrigExcelF = $ResourcesPath + "\" + $OrigExcelFName
+$OrigExcelF = Join-Path -Path $ResourcesPath -ChildPath $OrigExcelFName
 #Set default start row for Excel output
 $DefaultStartRow = 2
 #BlitzWho initial pass number
@@ -768,7 +768,7 @@ if (!(Test-Path $ResourcesPath )) {
 #Check individual files
 $MissingFiles = @()
 foreach ($Rsc in $ResourceList) {
-	$FileToTest = $ResourcesPath + "\" + $Rsc
+	$FileToTest = Join-Path -Path $ResourcesPath -ChildPath $Rsc
 	if (!(Test-Path $FileToTest -PathType Leaf)) {
 		$MissingFiles += $Rsc
 	}			
