@@ -256,8 +256,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.3.0"
-$VersDate = "2024-07-11"
+$Vers = "4.3.1"
+$VersDate = "2024-09-17"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -1193,6 +1193,7 @@ if ((!([string]::IsNullOrEmpty($OutputDir))) -and (Test-Path $OutputDir)) {
 	$OutDir = $OutputDir
 } else {
 	$OutDir = $scriptPath
+	$OutputDir = $scriptPath
 }
 	if ($IsAzureSQLDB) {
 		$SubDir = "AzureSQLDB_$ASDBName" + "_"
@@ -1338,6 +1339,7 @@ if ($ToHTML -eq "Y") {
 	<br>
 
 "@
+$htmlResources = @("styles.css", "sorttable.js", "searchtable.js")
 }
 else {
 	###Set output Excel name and destination
@@ -6564,8 +6566,9 @@ finally {
 			# Get the file name without the extension and replace any underscores with spaces for the description.
 			$Description = $File.BaseName.Replace("_", " ")
 			# Create a row in the table with a link to the file and its description.
-			$RelativePath = $File.Name
-			$RelativePath = ".\HTMLFiles\" + $RelativePath
+			#$RelativePath = $File.Name
+			$RelativePath = Join-Path -Path . -ChildPath "HTMLFiles" 
+			$RelativePath = Join-Path -Path $RelativePath -ChildPath $File.Name
 			if ($File.Name -eq "spBlitz.html") {
 				$Description = "Instance-level health information"
 				$PageName = "Instance Health"
@@ -6819,20 +6822,24 @@ finally {
 		$IndexContent | Out-File -Encoding utf8 -FilePath "$OutDir\$IndexFile"
 
 		#copy js resources
-		Copy-Item -Path "$ResourcesPath\sorttable.js" -Destination "$HTMLOutDir\"
-		Copy-Item -Path "$ResourcesPath\searchtable.js" -Destination "$HTMLOutDir\"
-		Copy-Item -Path "$ResourcesPath\styles.css" -Destination "$HTMLOutDir\"
+		foreach ($htmlResource in $HtmlResources) {
+			$htmlResource = Join-Path -Path $ResourcesPath -ChildPath $htmlResource
+			Copy-Item -Path "$htmlResource" -Destination "$HTMLOutDir"
+		}
+		#Copy-Item -Path "$ResourcesPath\sorttable.js" -Destination "$HTMLOutDir\"
+		#Copy-Item -Path "$ResourcesPath\searchtable.js" -Destination "$HTMLOutDir\"
+		#Copy-Item -Path "$ResourcesPath\styles.css" -Destination "$HTMLOutDir\"
 	}
 	Write-Host $("-" * 80)
 	Write-Host "Execution completed in: " -NoNewLine
 	Write-Host $ExecTime -fore green
 	if ($OutDir.Length -gt 40) {
 		Write-Host "Generated files have been saved in: "
-		Write-Host " $OutDir\"
+		Write-Host " $OutDir"
 	}
  else {
 		Write-Host "Generated files have been saved in: " -NoNewLine
-		Write-Host "$OutDir\"
+		Write-Host "$OutDir"
 	}
 	
 	if ($ToHTML -ne "Y") {
@@ -6853,7 +6860,8 @@ finally {
 		Rename-Item -Path $OutExcelF -NewName $OutExcelFName -Force
 	}
 	if ($ZipOutput -eq "Y") {
-		Compress-Archive -Path "$OutDir" -DestinationPath "$OutDir\..\$ZipFile"
+		$ZipFilePath = Join-Path -Path $OutputDir -ChildPath $ZipFile
+		Compress-Archive -Path "$OutDir" -DestinationPath "$ZipFilePath"
 		
 		if ($ZipFile.Length -gt 30) {
 			Write-Host "The following zip archive has also been created: "
