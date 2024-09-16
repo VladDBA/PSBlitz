@@ -47,7 +47,7 @@ Exports the following files:
 
 ### Note
 If the execution of PSBlitz took longer than 15 minutes up until the call to sp_BlitzLock, the timeframe for sp_BlitzLock will be narrowed down to the last 7 days in order to keep execution time within a reasonable amount.<br>
-If PSBlitz detects an exclusive lock being held on a table it will automatically skip index fragmentation information retrieval.
+If PSBlitz detects an exclusive lock being held on a table or index it will automatically skip that table/index from the index fragmentation information and will make a note of that in the Execution Log.
 
 ## Prerequisites
 1. In order to be able to run the PSBlitz.ps1 script, you'll need to unblock it:

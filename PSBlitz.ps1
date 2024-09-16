@@ -256,8 +256,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.3.0"
-$VersDate = "2024-07-11"
+$Vers = "4.3.1"
+$VersDate = "2024-09-17"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -265,7 +265,7 @@ $ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
 #clear previous errors
 $error.Clear();
 #Set resources path
-$ResourcesPath = $ScriptPath + "\Resources"
+$ResourcesPath = Join-Path -Path $ScriptPath -ChildPath "Resources"
 #Set name of the input Excel file
 $OrigExcelFName = "PSBlitzOutput.xlsx"
 $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
@@ -279,7 +279,7 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"spBlitzQueryStore_NonSPLatest.sql", "searchtable.js", "sorttable.js",
 	"styles.css")
 #Set path+name of the input Excel file
-$OrigExcelF = $ResourcesPath + "\" + $OrigExcelFName
+$OrigExcelF = Join-Path -Path $ResourcesPath -ChildPath $OrigExcelFName
 #Set default start row for Excel output
 $DefaultStartRow = 2
 #BlitzWho initial pass number
@@ -768,7 +768,7 @@ if (!(Test-Path $ResourcesPath )) {
 #Check individual files
 $MissingFiles = @()
 foreach ($Rsc in $ResourceList) {
-	$FileToTest = $ResourcesPath + "\" + $Rsc
+	$FileToTest = Join-Path -Path $ResourcesPath -ChildPath $Rsc
 	if (!(Test-Path $FileToTest -PathType Leaf)) {
 		$MissingFiles += $Rsc
 	}			
@@ -1189,46 +1189,31 @@ $sdate = get-date
 $DirDate = $sdate.ToString("yyyyMMddHHmm")
 #Set output directory
 if ((!([string]::IsNullOrEmpty($OutputDir))) -and (Test-Path $OutputDir)) {
-	if ($OutputDir -notlike "*\") {
-		$OutputDir = $OutputDir + "\"
-	}
+
 	$OutDir = $OutputDir
+} else {
+	$OutDir = $scriptPath
+	$OutputDir = $scriptPath
+}
 	if ($IsAzureSQLDB) {
-		$OutDir += "AzureSQLDB_$ASDBName" + "_"
+		$SubDir = "AzureSQLDB_$ASDBName" + "_"
 	}
 	elseif ($IsAzureSQLMI) {
-		$OutDir += $InstName.Replace('.database.windows.net', '') + "_"
+		$SubDir = $InstName.Replace('.database.windows.net', '') + "_"
 	}
 	elseif ($HostName -ne $InstName) {
-		$OutDir += $HostName + "_" + $InstName + "_"
+		$SubDir = $HostName + "_" + $InstName + "_"
 	}
 	else {
-		$OutDir += $InstName + "_"
+		$SubDir = $InstName + "_"
 	}
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		$OutDir += $CheckDB + "_"
+		$SubDir = $CheckDB + "_"
 	}
-	$OutDir += $DirDate
-}
-else {
-	$OutDir = $scriptPath + "\"
-	if ($IsAzureSQLDB) {
-		$OutDir += "AzureSQLDB_$ASDBName" + "_"
-	}
-	elseif ($IsAzureSQLMI) {
-		$OutDir += $InstName.Replace('.database.windows.net', '') + "_"
-	}
- elseif ($HostName -ne $InstName) {
-		$OutDir += $HostName + "_" + $InstName + "_"
-	}
-	else {
-		$OutDir += $InstName + "_"
-	}
-	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		$OutDir += $CheckDB + "_"
-	}
-	$OutDir += $DirDate
-}
+	$SubDir += $DirDate
+
+	$OutDir = Join-Path -Path $OutDir -ChildPath $SubDir
+
 if ($ZipOutput -eq "Y") {
 	if ($IsAzureSQLDB) {
 		$ZipFile = "AzureSQLDB_$ASDBName" + "_"
@@ -1246,9 +1231,9 @@ if ($ZipOutput -eq "Y") {
 		$ZipFile += $CheckDB + "_" 
 	}
 	$ZipFile += $DirDate + ".zip"
-	if ($DebugInfo) {
-		Write-Host " Output directory: $OutDir" -Fore Yellow
-	}
+}
+if ($DebugInfo) {
+	Write-Host " Output directory: $OutDir" -Fore Yellow
 }
 
 
@@ -1257,13 +1242,13 @@ if (!(Test-Path $OutDir)) {
 	New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
 }
 #Set plan output directory
-$PlanOutDir = $OutDir + "\" + "Plans"
+$PlanOutDir = Join-Path -Path $OutDir -ChildPath "Plans"
 #Check if plan output directory exists
 if (!(Test-Path $PlanOutDir)) {
 	New-Item -ItemType Directory -Force -Path $PlanOutDir | Out-Null
 }
 #Set deadlock graph output directory
-$XDLOutDir = $OutDir + "\" + "Deadlocks"
+$XDLOutDir = Join-Path -Path $OutDir -ChildPath "Deadlocks"
 #Check if deadlock graph output directory exists
 if (!(Test-Path $XDLOutDir)) {
 	New-Item -ItemType Directory -Force -Path $XDLOutDir | Out-Null
@@ -1302,7 +1287,7 @@ if (($ToHTML -ne "Y") -and ($CacheTop -ne 10)) {
 
 if ($ToHTML -eq "Y") {
 	#Set HTML files output directory
-	$HTMLOutDir = $OutDir + "\" + "HTMLFiles"
+	$HTMLOutDir = Join-Path -Path $OutDir -ChildPath "HTMLFiles"
 	if (!(Test-Path $HTMLOutDir)) {
 		New-Item -ItemType Directory -Force -Path $HTMLOutDir | Out-Null
 	}
@@ -1354,6 +1339,7 @@ if ($ToHTML -eq "Y") {
 	<br>
 
 "@
+$htmlResources = @("styles.css", "sorttable.js", "searchtable.js")
 }
 else {
 	###Set output Excel name and destination
@@ -1363,7 +1349,7 @@ else {
 	else {
 		$OutExcelFName = "Active_$InstName.xlsx"
 	}
-	$OutExcelF = $OutDir + "\" + $OutExcelFName
+	$OutExcelF = Join-Path -Path $OutDir -ChildPath $OutExcelFName
 	###Copy Excel template to output directory
 	<#
 	This is a fix for https://github.com/VladDBA/PSBlitz/issues/4
@@ -6580,8 +6566,9 @@ finally {
 			# Get the file name without the extension and replace any underscores with spaces for the description.
 			$Description = $File.BaseName.Replace("_", " ")
 			# Create a row in the table with a link to the file and its description.
-			$RelativePath = $File.Name
-			$RelativePath = ".\HTMLFiles\" + $RelativePath
+			#$RelativePath = $File.Name
+			$RelativePath = Join-Path -Path . -ChildPath "HTMLFiles" 
+			$RelativePath = Join-Path -Path $RelativePath -ChildPath $File.Name
 			if ($File.Name -eq "spBlitz.html") {
 				$Description = "Instance-level health information"
 				$PageName = "Instance Health"
@@ -6835,20 +6822,24 @@ finally {
 		$IndexContent | Out-File -Encoding utf8 -FilePath "$OutDir\$IndexFile"
 
 		#copy js resources
-		Copy-Item -Path "$ResourcesPath\sorttable.js" -Destination "$HTMLOutDir\"
-		Copy-Item -Path "$ResourcesPath\searchtable.js" -Destination "$HTMLOutDir\"
-		Copy-Item -Path "$ResourcesPath\styles.css" -Destination "$HTMLOutDir\"
+		foreach ($htmlResource in $HtmlResources) {
+			$htmlResource = Join-Path -Path $ResourcesPath -ChildPath $htmlResource
+			Copy-Item -Path "$htmlResource" -Destination "$HTMLOutDir"
+		}
+		#Copy-Item -Path "$ResourcesPath\sorttable.js" -Destination "$HTMLOutDir\"
+		#Copy-Item -Path "$ResourcesPath\searchtable.js" -Destination "$HTMLOutDir\"
+		#Copy-Item -Path "$ResourcesPath\styles.css" -Destination "$HTMLOutDir\"
 	}
 	Write-Host $("-" * 80)
 	Write-Host "Execution completed in: " -NoNewLine
 	Write-Host $ExecTime -fore green
 	if ($OutDir.Length -gt 40) {
 		Write-Host "Generated files have been saved in: "
-		Write-Host " $OutDir\"
+		Write-Host " $OutDir"
 	}
  else {
 		Write-Host "Generated files have been saved in: " -NoNewLine
-		Write-Host "$OutDir\"
+		Write-Host "$OutDir"
 	}
 	
 	if ($ToHTML -ne "Y") {
@@ -6869,7 +6860,8 @@ finally {
 		Rename-Item -Path $OutExcelF -NewName $OutExcelFName -Force
 	}
 	if ($ZipOutput -eq "Y") {
-		Compress-Archive -Path "$OutDir" -DestinationPath "$OutDir\..\$ZipFile"
+		$ZipFilePath = Join-Path -Path $OutputDir -ChildPath $ZipFile
+		Compress-Archive -Path "$OutDir" -DestinationPath "$ZipFilePath"
 		
 		if ($ZipFile.Length -gt 30) {
 			Write-Host "The following zip archive has also been created: "
