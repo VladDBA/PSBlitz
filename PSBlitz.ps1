@@ -1215,22 +1215,8 @@ if ((!([string]::IsNullOrEmpty($OutputDir))) -and (Test-Path $OutputDir)) {
 	$OutDir = Join-Path -Path $OutDir -ChildPath $SubDir
 
 if ($ZipOutput -eq "Y") {
-	if ($IsAzureSQLDB) {
-		$ZipFile = "AzureSQLDB_$ASDBName" + "_"
-	}
-	elseif ($IsAzureSQLMI) {
-		$OutDir += $InstName.Replace('.database.windows.net', '') + "_"
-	}
-	elseif ($HostName -ne $InstName) {
-		$ZipFile = $HostName + "_" + $InstName + "_" 
-	}
-	else {
-		$ZipFile = $InstName + "_"
-	}
-	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		$ZipFile += $CheckDB + "_" 
-	}
-	$ZipFile += $DirDate + ".zip"
+
+	$ZipFile = $SubDir + ".zip"
 }
 if ($DebugInfo) {
 	Write-Host " Output directory: $OutDir" -Fore Yellow
