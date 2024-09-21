@@ -256,8 +256,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.3.1"
-$VersDate = "2024-09-17"
+$Vers = "4.3.2"
+$VersDate = "2024-09-22"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -1191,28 +1191,29 @@ $DirDate = $sdate.ToString("yyyyMMddHHmm")
 if ((!([string]::IsNullOrEmpty($OutputDir))) -and (Test-Path $OutputDir)) {
 
 	$OutDir = $OutputDir
-} else {
+}
+else {
 	$OutDir = $scriptPath
 	$OutputDir = $scriptPath
 }
-	if ($IsAzureSQLDB) {
-		$SubDir = "AzureSQLDB_$ASDBName" + "_"
-	}
-	elseif ($IsAzureSQLMI) {
-		$SubDir = $InstName.Replace('.database.windows.net', '') + "_"
-	}
-	elseif ($HostName -ne $InstName) {
-		$SubDir = $HostName + "_" + $InstName + "_"
-	}
-	else {
-		$SubDir = $InstName + "_"
-	}
-	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		$SubDir = $CheckDB + "_"
-	}
-	$SubDir += $DirDate
+if ($IsAzureSQLDB) {
+	$SubDir = "AzureSQLDB_$ASDBName" + "_"
+}
+elseif ($IsAzureSQLMI) {
+	$SubDir = $InstName.Replace('.database.windows.net', '') + "_"
+}
+elseif ($HostName -ne $InstName) {
+	$SubDir = $HostName + "_" + $InstName + "_"
+}
+else {
+	$SubDir = $InstName + "_"
+}
+if (!([string]::IsNullOrEmpty($CheckDB))) {
+	$SubDir = $CheckDB + "_"
+}
+$SubDir += $DirDate
 
-	$OutDir = Join-Path -Path $OutDir -ChildPath $SubDir
+$OutDir = Join-Path -Path $OutDir -ChildPath $SubDir
 
 if ($ZipOutput -eq "Y") {
 
@@ -1314,7 +1315,7 @@ if ($ToHTML -eq "Y") {
 	$JumpToTop = '<p><a href="#top">Jump to top</a></p>'
 	$SearchDiv = @" 
 	    <div>
-		<input type=`"text`" id=`"SearchBox`" class=`"SearchBox`" onkeyup=`"ReplaceSearchFunction()`" placeholder=`" Search by object name...`">
+		<input type=`"text`" id=`"SearchBox`" class=`"SearchBox`" onkeyup=`"ReplaceSearchFunction()`" placeholder=`" Filter by object name...`">
 		</div>
 "@
 	$Footer = @"
@@ -1325,7 +1326,7 @@ if ($ToHTML -eq "Y") {
 	<br>
 
 "@
-$htmlResources = @("styles.css", "sorttable.js", "searchtable.js")
+	$htmlResources = @("styles.css", "sorttable.js", "searchtable.js")
 }
 else {
 	###Set output Excel name and destination
@@ -1596,8 +1597,9 @@ $htmlTable4
 "@
 			if ($DebugInfo) {
 				Write-Host " ->Writing HTML file." -fore yellow
-			} 			
-			$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\InstanceInfo.html"
+			}
+			$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "InstanceInfo.html"
+			$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 		}
 		else {
 			###Populating the "Instance Info" sheet
@@ -1954,7 +1956,8 @@ $htmlTable2
 			if ($DebugInfo) {
 				Write-Host " ->Writing HTML file." -fore yellow
 			}
-			$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\TempDBInfo.html"
+			$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "TempDBInfo.html"
+			$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 
 		}
 		else {
@@ -2237,8 +2240,9 @@ $JumpToTop
 
 				if ($DebugInfo) {
 					Write-Host " ->Writing HTML file." -fore yellow
-				} 
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\OpenTransactions.html"
+				}
+				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "OpenTransactions.html" 
+				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 
 			}
 			else {
@@ -2457,8 +2461,9 @@ $JumpToTop
 "@
 				if ($DebugInfo) {
 					Write-Host " ->Writing HTML file." -fore yellow
-				} 
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\AzureSQLDBInfo.html"
+				}
+				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "AzureSQLDBInfo.html" 
+				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 
 
 
@@ -2951,8 +2956,9 @@ $htmlBlock
 "@
 				if ($DebugInfo) {
 					Write-Host " ->Writing HTML file." -fore yellow
-				} 
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\DatabaseInfo.html"
+				}
+				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "DatabaseInfo.html" 
+				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 			}
 			else {
 				##Populating the "Database Info" sheet with the database files data first because 
@@ -3163,7 +3169,8 @@ $JumpToTop
 				if ($DebugInfo) {
 					Write-Host " ->Writing HTML file." -fore yellow
 				} 
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\spBlitz.html"
+				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "spBlitz.html"
+				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 
 			}
 			else {
@@ -3292,7 +3299,8 @@ $htmlTable
 			if ($DebugInfo) {
 				Write-Host " ->Writing HTML file." -fore yellow
 			} 
-			$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\BlitzFirst30s.html"
+			$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzFirst30s.html"
+			$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 		}
 		else {
 
@@ -3428,7 +3436,8 @@ $JumpToTop
 				if ($DebugInfo) {
 					Write-Host " ->Writing HTML file." -fore yellow
 				} 
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\BlitzFirst_Waits.html"
+				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzFirst_Waits.html"
+				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 			 
 				#Storage
 				if ($DebugInfo) {
@@ -3459,7 +3468,8 @@ $JumpToTop
 				if ($DebugInfo) {
 					Write-Host " ->Writing HTML file." -fore yellow
 				} 
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDIr\BlitzFirst_Storage.html"
+				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzFirst_Storage.html"
+				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 			 
 				#Perfmon
 				if ($DebugInfo) {
@@ -3492,7 +3502,8 @@ $JumpToTop
 				if ($DebugInfo) {
 					Write-Host " ->Writing HTML file." -fore yellow
 				} 
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDIr\BlitzFirst_Perfmon.html"
+				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzFirst_Perfmon.html"
+				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 			}
 			else { 
 				##Populating the "Wait Stats" sheet
@@ -4003,7 +4014,8 @@ $JumpToTop
 					</html>
 "@
 					$SecondHalf = "Done"
-					$html3 | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\$HtmlFileName"
+					$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "$HtmlFileName"
+					$html3 | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 				}
 				if ($DebugInfo) {
 					Write-Host " ->Writing HTML file." -fore yellow
@@ -4015,7 +4027,8 @@ $JumpToTop
 					</body>
 					</html>
 "@
-					$html3 | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\$HtmlFileName"
+					$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "$HtmlFileName"
+					$html3 | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 				}
 
 			}
@@ -4518,7 +4531,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					</body>
 					</html>
 "@
-					$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\BlitzQueryStore.html"
+					$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzQueryStore.html"
+					$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 
 				}
 				else {
@@ -4677,9 +4691,11 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		}
 		elseif ($Mode -eq "1") {
 			Write-Host " ->Index summary... " -NoNewLine
-		}elseif ($Mode -eq "2") {
+		}
+		elseif ($Mode -eq "2") {
 			Write-Host " ->Index usage details... " -NoNewLine
-		}elseif ($Mode -eq "4") {
+		}
+		elseif ($Mode -eq "4") {
 			Write-Host " ->Detailed index diagnosis... " -NoNewLine
 		}
 		$NewMode = ";SET @Mode = " + $Mode + ";"
@@ -4887,7 +4903,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				if ($DebugInfo) {
 					Write-Host " ->Writing HTML file." -fore yellow
 				} 
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDIr\BlitzIndex_$Mode.html"        
+				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzIndex_$Mode.html"
+				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"        
 			}
 			else {
 			
@@ -5290,7 +5307,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					Write-Host " - >Writing HTML file." -fore yellow
 				}
 				if ($TblLockDtl.Rows.Count -gt 0) {
-					$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\BlitzLock.html"
+					$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzLock.html"
+					$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 				}
 			}
 			else {
@@ -5586,11 +5604,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						Write-Host " - >Writing HTML file." -fore yellow
 					}
 					if ($IsAzureSQLDB) {
-						$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\StatsInfo_$ASDBName.html"
+						$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "StatsInfo_$ASDBName.html"						
 					}
 					else {
-						$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\StatsInfo_$CheckDB.html"
+						$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "StatsInfo_$CheckDB.html"						
 					}
+					$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 				
 				
 				}
@@ -5769,11 +5788,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						Write-Host " - >Writing HTML file." -fore yellow
 					} 
 					if ($IsAzureSQLDB) {
-						$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\IndexFragInfo_$ASDBName.html"
+						$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "IndexFragInfo_$ASDBName.html"						
 					}
 					else {
-						$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\IndexFragInfo_$CheckDB.html"
+						$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "IndexFragInfo_$CheckDB.html"						
 					}
+					$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 						
 				}
 				else {
@@ -5892,7 +5912,8 @@ finally {
 				$StepEnd = Get-Date
 				$JobOutcome = Stop-Job $JobName
 				Write-Host $JobOutcome 
-				$JobOutcome | Out-File utf8 -FilePath "$OutDir\sp_BlitzWhoBackgroundJobLog.txt" -Append
+				$LogtxtFilePath = Join-Path -Path $OutDir -ChildPath "sp_BlitzWhoBackgroundJobLog.txt"
+				$JobOutcome | Out-File utf8 -FilePath "$LogtxtFilePath" -Append
 				if ($DebugInfo) {
 					Write-Host ""
 					Write-Host " ->Failed to create " -NoNewline -Fore Yellow
@@ -5926,7 +5947,8 @@ finally {
 				}
 				$JobOutcome = Receive-Job -Name $JobName
 				Write-Host $JobOutcome
-				$JobOutcome | Out-File utf8 -FilePath "$OutDir\sp_BlitzWhoBackgroundJobLog.txt" -Append
+				$LogtxtFilePath = Join-Path -Path $OutDir -ChildPath "sp_BlitzWhoBackgroundJobLog.txt"
+				$JobOutcome | Out-File utf8 -FilePath "$LogtxtFilePath" -Append
 				Add-LogRow "sp_BlitzWho background process" $JobStatus $JobOutcome
 				#temp lines(2)
 				#Write-Host $JobName.JobStateInfo.Reason.Message
@@ -6071,8 +6093,8 @@ finally {
 				if ($DebugInfo) {
 					Write-Host " - >Writing HTML file." -fore yellow
 				} 
-
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\BlitzWho.html"
+				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzWho.html"
+				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 
 				if ($DebugInfo) {
 					Write-Host " ->Converting sp_BlitzWho aggregate output to HTML" -fore yellow
@@ -6168,7 +6190,8 @@ finally {
 				if ($DebugInfo) {
 					Write-Host " - >Writing HTML file." -fore yellow
 				}
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\BlitzWho_Agg.html"
+				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzWho_Agg.html"
+				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 
 			}
 			else {
@@ -6494,7 +6517,8 @@ finally {
 						</body>
 						</html>
 "@ 
-		$html | Out-File -Encoding utf8 -FilePath "$HTMLOutDir\ExecutionLog.html"
+$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "ExecutionLog.html"		
+$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 		$AzureEnv = ""
 		if ($IsAzureSQLMI) {
 			$AzureEnv = "- Azure SQL MI"
@@ -6805,16 +6829,14 @@ finally {
 		if ($DebugInfo) {
 			Write-Host " ->Writing HTML file." -fore yellow
 		} 
-		$IndexContent | Out-File -Encoding utf8 -FilePath "$OutDir\$IndexFile"
+		$HTMLFilePath = Join-Path -Path $OutDir -ChildPath "$IndexFile"
+		$IndexContent | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 
 		#copy js resources
 		foreach ($htmlResource in $HtmlResources) {
 			$htmlResource = Join-Path -Path $ResourcesPath -ChildPath $htmlResource
 			Copy-Item -Path "$htmlResource" -Destination "$HTMLOutDir"
 		}
-		#Copy-Item -Path "$ResourcesPath\sorttable.js" -Destination "$HTMLOutDir\"
-		#Copy-Item -Path "$ResourcesPath\searchtable.js" -Destination "$HTMLOutDir\"
-		#Copy-Item -Path "$ResourcesPath\styles.css" -Destination "$HTMLOutDir\"
 	}
 	Write-Host $("-" * 80)
 	Write-Host "Execution completed in: " -NoNewLine
