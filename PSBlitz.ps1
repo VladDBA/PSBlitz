@@ -256,8 +256,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.3.2"
-$VersDate = "2024-09-22"
+$Vers = "4.3.3"
+$VersDate = "2024-10-04"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -965,7 +965,8 @@ if ($NowDate -ge $TwoMonthsFromRelease) {
 }
 
 ### If Azure and database name was not provided, do a preliminary test for the type of env
-if (($IsAzure) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzureSQLDB -eq $false)) {
+#Turning this into a fallback check in case the server name doesn't match the standard Azure SQL format
+if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzureSQLDB -eq $false)) {
 	$SqlConnection = New-Object System.Data.SqlClient.SqlConnection
 	$AppName = "PSBlitz " + $Vers
 	if (!([string]::IsNullOrEmpty($SQLLogin))) {
@@ -978,7 +979,7 @@ if (($IsAzure) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzureSQLDB -eq
 	$SqlConnection.ConnectionString = $ConnString
 
 	[int]$CmdTimeout = 100
-	Write-Host "Detecting type of Azure environment... " -NoNewLine
+	Write-Host "Detecting type of environment... " -NoNewLine
 	$AzCheckQuery = new-object System.Data.SqlClient.SqlCommand
 	$Query = "SELECT CAST(SERVERPROPERTY('EngineEdition') AS INT) AS [EngineEdition],"
 	$Query += "`nCAST(SERVERPROPERTY('Edition') AS NVARCHAR(128)) AS [Edition];"
@@ -1028,7 +1029,9 @@ if (($IsAzure) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzureSQLDB -eq
 			elseif ($EngineEdition -eq 5) {
 				$IsAzureSQLDB = $true
 				Write-Host " ->Azure SQL DB"
-			}
+			} 
+		} elseif($EngineEdition -in 2,3,4){
+			Write-Host " ->SQL Server $Edition"
 		}
 		else {
 			Write-Host " ->Well this is awquard, use the following info to debug:"
