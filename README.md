@@ -17,7 +17,15 @@
 
 Since I'm a big fan of [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) and I've found myself in many situations where I would have liked a quick way to easily export the output of sp_Blitz, sp_BlitzCache, sp_BlitzFirst, sp_BlitzIndex, sp_BlitzLock, and sp_BlitzWho to Excel, as well as saving to disk the execution plans identified by sp_BlitzCache and deadlock graphs from sp_BlitzLock, I've decided to put together a PowerShell script that does just that.<br>
 As of version 3.0.0, PSBlitz is also capable of exporting the report to HTML making Excel/Office no longer a hard requirement for running PSBlitz.<br>
-As of version 4.0.1, PSBlitz is also compatible with Azure SQL DB and Azure SQL Managed Instance.
+As of version 4.0.1, PSBlitz is also compatible with Azure SQL DB and Azure SQL Managed Instance. <br>
+As of version 4.3.4, PSBlitz can be executed using PowerShell on Linux, the output will default to HTML regardless of the option used.
+
+## Compatibility 
+
+PSBlitz can be executed with:
+- Windows PowerShell  5.1
+- PowerShell
+- PowerShell on Linux
 
 ## What it does
 
