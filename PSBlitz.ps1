@@ -256,8 +256,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.3.3"
-$VersDate = "2024-10-04"
+$Vers = "4.3.4"
+$VersDate = "2024-10-08"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -1426,7 +1426,8 @@ try {
 	}
 
 	###Load sp_BlitzWho in memory
-	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzWho_NonSPLatest.sql")
+	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzWho_NonSPLatest.sql"
+	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	#Replace output table name
 	[string]$BlitzWhoRepl = $Query -replace $OldBlitzWhoOut, $NewBlitzWhoOut
 
@@ -1465,7 +1466,8 @@ try {
 	#####################################################################################
 	Write-Host " Retrieving instance information... " -NoNewLine
 	$CmdTimeout = 600
-	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetInstanceInfo.sql")
+	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetInstanceInfo.sql"
+	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	$InstanceInfoQuery = new-object System.Data.SqlClient.SqlCommand
 	$InstanceInfoQuery.CommandText = $Query
 	$InstanceInfoQuery.Connection = $SqlConnection
@@ -1803,7 +1805,8 @@ $htmlTable4
 	#####################################################################################
 	Write-Host " Retrieving TempDB usage data... " -NoNewLine
 	$CmdTimeout = 600
-	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetTempDBUsageInfo.sql")
+	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetTempDBUsageInfo.sql"
+	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	[string]$Query = $Query -replace '..PSBlitzReplace..', "$DirDate"
 	$TempDBSelect = new-object System.Data.SqlClient.SqlCommand
 	$TempDBSelect.CommandText = $Query
@@ -2108,7 +2111,8 @@ $htmlTable2
 	#						Open transaction info										#
 	#####################################################################################
 	Write-Host " Retrieving open transaction info" -NoNewline
-	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetOpenTransactions.sql")
+	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetOpenTransactions.sql"
+	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace "SET @DatabaseName = N'';", "SET @DatabaseName = N'$CheckDB';"
 		Write-Host " for $CheckDB" -NoNewline
@@ -2327,7 +2331,8 @@ $JumpToTop
 		#$StepEnd = get-date
 		#Write-Host " Azure SQL DB - skipping database info."
 		#Add-LogRow "Database Info" "Skipped" "Azure SQL DB"
-		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetAzureSQLDBInfo.sql")
+		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetAzureSQLDBInfo.sql"
+		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		Write-Host " Retrieving database info for $ASDBName... " -NoNewLine 
 		$CmdTimeout = 600
 		$DBInfoQuery = new-object System.Data.SqlClient.SqlCommand
@@ -2850,7 +2855,9 @@ $JumpToTop
 	}
  else {
 		#if it's not Azure SQL DB
-		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetDbInfo.sql")	
+		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetDbInfo.sql"
+		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
+			
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
 			Write-Host " Retrieving database info for $CheckDB... " -NoNewLine
 			[string]$Query = $Query -replace "SET @DatabaseName = N'';", "SET @DatabaseName = N'$CheckDB';"
@@ -3111,7 +3118,8 @@ $htmlBlock
 	}
  else {
 		Write-Host " Retrieving instance health data... " -NoNewLine
-		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitz_NonSPLatest.sql")
+		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitz_NonSPLatest.sql"
+		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		if (($IsIndepth -eq "Y") -and ([string]::IsNullOrEmpty($CheckDB))) {
 			[string]$Query = $Query -replace ";SET @CheckUserDatabaseObjects = 0;", ";SET @CheckUserDatabaseObjects = 1;"
 		}
@@ -3245,7 +3253,8 @@ $JumpToTop
 	#####################################################################################
 	Write-Host " What's happening in a 30 seconds time-frame... " -NoNewLine
 	$CmdTimeout = 600
-	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzFirst_NonSPLatest.sql")
+	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzFirst_NonSPLatest.sql"
+	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	$BlitzFirstQuery = new-object System.Data.SqlClient.SqlCommand
 	$BlitzFirstQuery.CommandText = $Query
 	$BlitzFirstQuery.Connection = $SqlConnection
@@ -3367,7 +3376,8 @@ $htmlTable
 	if ($IsIndepth -eq "Y") {
 		Write-Host " Retrieving waits recorded since instance startup... " -NoNewLine
 		$CmdTimeout = 600
-		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzFirst_NonSPLatest.sql")
+		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzFirst_NonSPLatest.sql"
+		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		[string]$Query = $Query -replace ";SET @SinceStartup = 0;", ";SET @SinceStartup = 1;"
 		$BlitzFirstQuery = new-object System.Data.SqlClient.SqlCommand
 		$BlitzFirstQuery.CommandText = $Query
@@ -3696,7 +3706,8 @@ $JumpToTop
 	}
 	#Set initial SortOrder value
 	$OldSortOrder = "'CPU'"
-	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzCache_NonSPLatest.sql")
+	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzCache_NonSPLatest.sql"
+	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	$CmdTimeout = $MaxTimeout
 	#Set specific database to check if a name was provided
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
@@ -4344,7 +4355,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 
 		}
 		if ($CheckQueryStore -eq 'Y') {
-			[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzQueryStore_NonSPLatest.sql")
+			$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzQueryStore_NonSPLatest.sql"
+			[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 
 			if ($IsAzureSQLDB) {
 				Write-Host " Retrieving Query Store info for $ASDBName..." -NoNewline
@@ -4672,7 +4684,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	}
 	# Set OldMode variable 
 	$OldMode = ";SET @Mode = 0;"
-	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzIndex_NonSPLatest.sql")
+	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzIndex_NonSPLatest.sql"
+	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	$CmdTimeout = $MaxTimeout
 	#Set specific database to check if a name was provided
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
@@ -5047,7 +5060,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
  else {
 		Write-Host " Retrieving deadlock info for all user databases... " -NoNewLine
 	}
-	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\spBlitzLock_NonSPLatest.sql")
+	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzLock_NonSPLatest.sql"
+	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	$CmdTimeout = $MaxTimeout
 	#Set specific database to check if a name was provided
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
@@ -5501,7 +5515,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		if ($DBSwitched -ne "Y") {
 			Write-Host " " -NoNewLine
 		}
-		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetStatsInfoForWholeDB.sql")
+		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetStatsInfoForWholeDB.sql"
+		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		if ($IsAzureSQLDB) {
 			Write-Host "Retrieving stats info for $ASDBName... " -NoNewLine
 			#if it's Azure SQL DB, we can't switch databases
@@ -5670,7 +5685,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$BlitzWhoPass += 1
 		}
 		### get index frag info
-		[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetIndexInfoForWholeDB.sql")
+		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetIndexInfoForWholeDB.sql"
+		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		if ($DBSwitched -ne "Y") {
 			Write-Host " " -NoNewLine
 		}
@@ -5967,7 +5983,8 @@ finally {
 	else {
 		Write-Host " Retrieving session actvity data... " -NoNewLine
 	}
-	[string]$Query = [System.IO.File]::ReadAllText("$ResourcesPath\GetBlitzWhoData.sql")
+	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetBlitzWhoData.sql"
+	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	[string]$Query = $Query -replace "BlitzWho_..BlitzWhoOut.." , "BlitzWho_$DirDate"
 	[string]$Query = $Query -replace "BlitzWhoOutFlag_..BlitzWhoOut.." , "BlitzWhoOutFlag_$DirDate"
 	if ($IsAzureSQLDB) {
