@@ -24,8 +24,8 @@ As of version 4.3.4, PSBlitz can be executed using PowerShell on Linux, the outp
 
 PSBlitz can be executed with:
 - Windows PowerShell  5.1
-- PowerShell
-- PowerShell on Linux
+- PowerShell 7.x
+- PowerShell 7.x on Linux
 
 ## What it does
 
