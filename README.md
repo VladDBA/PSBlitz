@@ -115,6 +115,7 @@ You can find the all the scripts in the repository's [Resources](/Resources) dir
 |`-IsIndepth` | Providing Y as a value will tell PSBlitz.ps1 to run a more in-depth check against the instance/database. Omit for default check. |
 |`-CheckDB` | Used to provide the name of a specific database against which sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock will be ran. Omit to run against the whole instance.|
 |`-CacheTop`| Used to specify if more/less than the default top 10 queries should be returned for the sp_BlitzCache step. Only works for HTML output (`-ToHTM Y`). Has no effect on the `recent compilations` sort order.|
+|`-CacheMinutesBack`| Used to specify how many minutes back to begin plan cache analysis. Defaults to entire contents of the plan cache since instance startup.<br> In order to avoid missing the desired timeframe, the value is dynamically adjusted based on the runtime of PSBlitz up until the plan cache analysis point.|
 |`-OutputDir`| Used to provide a path where the output directory should be saved to. Defaults to PSBlitz.ps1's directory if not specified or a non-existent path is provided.|
 |`-ToHTML`| Providing Y as a value will tell PSBlitz.ps1 to output the report as HTML instead of an Excel file. This is perfect when running PSBlitz from a machine that doesn't have Office installed.|
 |`-ZipOutput`| Providing Y as a value will tell PSBlitz.ps1 to also create a zip archive of the output files.|

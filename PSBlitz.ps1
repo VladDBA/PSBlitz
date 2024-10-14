@@ -129,6 +129,12 @@
  Used to specify if more/less than the default top 10 queries should be returned for the 
  sp_BlitzCache step. Only works for HTML output (-ToHTM Y).
 
+.PARAMETER CacheMinutesBack
+ Used to specify how many minutes back to begin plan cache analysis. 
+ Defaults to entire contents of the plan cache since instance startup.
+ In order to avoid missing the desired timeframe, the value is dynamically adjusted based on 
+ the runtime of PSBlitz up until the plan cache analysis point.
+
 .PARAMETER OutputDir
  Used to provide a path where the output directory should be saved to. Defaults to PSBlitz.ps1's directory 
  if not specified or a non-existent path is provided.
@@ -251,13 +257,15 @@ param(
 	[Parameter(Mandatory = $False)]
 	[string]$ZipOutput = "N",
 	[Parameter(Mandatory = $False)]
-	[int]$CacheTop = 10
+	[int]$CacheTop = 10,
+	[Parameter(Mandatory = $False)]
+	[int]$CacheMinutesBack = 0
 )
 
 ###Internal params
 #Version
-$Vers = "4.3.4"
-$VersDate = "2024-10-08"
+$Vers = "4.3.5"
+$VersDate = "2024-10-15"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -383,6 +391,10 @@ function Get-PSBlitzHelp {
 		Defaults to 10 if not specified
 -CacheTop       - used to specify if more/less than the default top 10 queries should be returned 
         for the sp_BlitzCache step. Only works for HTML output (-ToHTM Y).
+-CacheMinutesBack	- used to specify how many minutes back to begin plan cache analysis.
+		Defaults to entire contents of the plan cache since instance startup.
+		In order to avoid missing the desired timeframe, the value is dynamically adjusted based on 
+		the runtime of PSBlitz up until the plan cache analysis point.
 -MaxTimeout		- can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info
 		retrieval. Defaults to 1000 (16.6 minutes)
 -ConnTimeout	- used to increased the timeout limit in seconds for connecting to SQL Server.
@@ -1030,7 +1042,8 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 				$IsAzureSQLDB = $true
 				Write-Host " ->Azure SQL DB"
 			} 
-		} elseif($EngineEdition -in 2,3,4){
+		}
+		elseif ($EngineEdition -in 2, 3, 4) {
 			Write-Host " ->SQL Server $Edition"
 		}
 		else {
@@ -1043,9 +1056,15 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 
 #If Azure SQL DB make sure database name is provided regardless of mode
 if (($IsAzureSQLDB) -and ([string]::IsNullOrEmpty($ASDBName))) {
-	Write-Host " The environment has been identified as Azure SQL DB, but a database name was not provide." -Fore yellow
-	while ([string]::IsNullOrEmpty($ASDBName)) {
-		$ASDBName = Read-Host -Prompt "Name of the Azure SQL DB database (cannot be empty)"
+	if (!([string]::IsNullOrEmpty($CheckDB))) {
+		$ASDBName = $CheckDB
+		$CheckDB = ""
+	}
+	else {
+		Write-Host " The environment has been identified as Azure SQL DB, but a database name was not provide." -Fore yellow
+		while ([string]::IsNullOrEmpty($ASDBName)) {
+			$ASDBName = Read-Host -Prompt "Name of the Azure SQL DB database (cannot be empty)"
+		}
 	}
 }
 elseif (($IsAzureSQLMI) -and ($InteractiveMode -eq 1) -and ([string]::IsNullOrEmpty($CheckDB))) {
@@ -1395,7 +1414,7 @@ $LogTbl.Columns.Add("ErrorMsg", [string]) | Out-Null
 $StepStart = get-date
 $StepEnd = Get-Date
 $ParametersUsed = "IsIndepth:$IsIndepth; CheckDB:$CheckDB; BlitzWhoDelay:$BlitzWhoDelay; MaxTimeout:$MaxTimeout"
-$ParametersUsed += "; ConnTimeout:$ConnTimeout; CacheTop:$CacheTop; ASDBName:$ASDBName"
+$ParametersUsed += "; ConnTimeout:$ConnTimeout; CacheTop:$CacheTop; ASDBName:$ASDBName; CacheMinutesBack:$CacheMinutesBack"
 Add-LogRow "Check start" "Started" $ParametersUsed
 try {
 	###Set completion flag
@@ -3712,16 +3731,28 @@ $JumpToTop
 	#Set specific database to check if a name was provided
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
-		Write-Host " Retrieving plan cache info for $CheckDB"
+		Write-Host " Retrieving plan cache info for $CheckDB" -NoNewline
 	}
  elseif ($IsAzureSQLDB) {
-		Write-Host " Retrieving plan cache info for $ASDBName"
+		Write-Host " Retrieving plan cache info for $ASDBName" -NoNewline
 	}
  else {
-		Write-Host " Retrieving plan cache info for all user databases"
+		Write-Host " Retrieving plan cache info for all user databases" -NoNewline
 		#Create array to store database names
 		$DBArray = New-Object System.Collections.ArrayList
 		[int]$BlitzCacheRecs = 0
+	}
+	$OrigCacheMinutesBack = $CacheMinutesBack
+	if ($CacheMinutesBack -gt 0) {
+		
+		$OrigCacheMinutesBack = $CacheMinutesBack
+		$OldCacheMinutesBackStr = ";SET @MinutesBack = NULL;"
+		$NewCacheMinutesBackStr = ";SET @MinutesBack = " + $CacheMinutesBack + ";"
+		[string]$Query = $Query -replace $OldCacheMinutesBackStr, $NewCacheMinutesBackStr
+		Write-Host " for the past $CacheMinutesBack minutes + current execution time"
+	}
+ else { 
+		Write-Host "" 
 	}
 	#Loop through sort orders
 	foreach ($SortOrder in $SortOrders) {
@@ -3744,6 +3775,20 @@ $JumpToTop
 			#we only have to change @Top once if it's not the default
 			$OldSortString = $OldSortString + ", @Top = 10;"
 			$NewSortString = $NewSortString + ", @Top = $CacheTop;"
+		}
+		#Adjust the value of -CacheMinutesBack/@MinutesBack to the current runtime
+		if ($OrigCacheMinutesBack -gt 0) {
+			$CurrTime = get-date
+			$CurrRunTime = (New-TimeSpan -Start $StartDate -End $CurrTime).TotalMinutes
+			$CurrMin = [Math]::Round($CurrRunTime)
+			
+			$CacheMinutesBack = $CurrMin + $OrigCacheMinutesBack
+			if ($DebugInfo) {
+				Write-Host " ->Adjusting the value of -CacheMinutesBack to the current runtime of $CurrMin minutes" -fore yellow
+				Write-Host "  ->The past $CacheMinutesBack mintes ($CurrMin + $OrigCacheMinutesBack) will now be analyzed" -fore yellow
+			}			
+			$NewCacheMinutesBackStr = ";SET @MinutesBack = " + $CacheMinutesBack + ";"
+			[string]$Query = $Query -replace $OldCacheMinutesBackStr, $NewCacheMinutesBackStr
 		}
 		if ($DebugInfo) {
 			Write-Host " ->Replacing $OldSortString with $NewSortString" -fore yellow
@@ -3772,7 +3817,12 @@ $JumpToTop
 			$PreviousOutcome = $StepOutcome
 			$StepOutcome = "Success"
 			$RecordsReturned = $BlitzCacheSet.Tables[0].Rows.Count
-			Add-LogRow "sp_BlitzCache $SortOrder" $StepOutcome "$RecordsReturned records returned"
+			if($OrigCacheMinutesBack -ne 0){
+				$AdditionalInfo = ", MinutesBack=$CacheMinutesBack"
+			} else {
+				$AdditionalInfo = ""
+			}
+			Add-LogRow "sp_BlitzCache $SortOrder $AdditionalInfo" $StepOutcome "$RecordsReturned records returned"
 		}
 	 Catch {
 			$StepEnd = get-date
@@ -4215,8 +4265,16 @@ $JumpToTop
 		}
 
 		$OldSortOrder = $SortOrder
-		if ($DebugInfo) {
+		if (($DebugInfo) -and ($SortOrder -ne "'Recent Compilations'")) {
 			Write-Host " ->old sort order is now $OldSortOrder" -fore yellow
+		}
+
+		# Set @MinutesBack to NULL for the next sort order
+		if (($OrigCacheMinutesBack -gt 0) -and $SortOrder -ne "'Recent Compilations'") {
+			if ($DebugInfo) {
+				Write-Host " ->Setting @MinutesBack to NULL for the next sort order" -fore yellow
+			}
+			[string]$Query = $Query -replace $NewCacheMinutesBackStr, $OldCacheMinutesBackStr
 		}
 
 		if ($JobStatus -ne "Running") {
@@ -4503,7 +4561,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					@{Name = "Context Settings"; Expression = { ($_."context_settings") } } | ConvertTo-Html -As Table -Fragment
 
 
-					$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="QueryStoreTab">'
+					$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="QueryStoreTab sortable">'
 					$QExt = '.query'
 					$FileSOrder = "QueryStore"
 					$AnchorRegex = "$FileSOrder(_\d+)$QExt"
@@ -6537,8 +6595,8 @@ finally {
 						</body>
 						</html>
 "@ 
-$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "ExecutionLog.html"		
-$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+		$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "ExecutionLog.html"		
+		$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 		$AzureEnv = ""
 		if ($IsAzureSQLMI) {
 			$AzureEnv = "- Azure SQL MI"
