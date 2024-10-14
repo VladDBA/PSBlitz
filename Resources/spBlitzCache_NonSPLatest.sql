@@ -43,6 +43,7 @@ DECLARE
 /*Making it easier to replace the value of @SortOrder and @Top via PS*/
 ;SELECT @SortOrder = 'CPU', @Top = 10;
 ;SET @DatabaseName = NULL;
+;SET @MinutesBack = NULL;
 SELECT
     @Help = 0,
     @UseTriggersAnyway = NULL,
@@ -72,7 +73,6 @@ SELECT
     @MinimumExecutionCount = 0,
     @Debug = 0,
     @CheckDateOverride = NULL,
-    @MinutesBack = NULL,
     @Version = NULL ,
     @VersionDate = NULL ,
     @VersionCheckMode = 0;
