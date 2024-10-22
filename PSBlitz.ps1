@@ -124,6 +124,7 @@
 .PARAMETER CheckDB
  Used to provide the name of a specific database against which sp_BlitzIndex, sp_BlitzCache, 
  and sp_BlitzLock will be ran. Omit to run against the whole instance.
+ Also used to provide the name of the Azure SQL DB database.
 
 .PARAMETER CacheTop
  Used to specify if more/less than the default top 10 queries should be returned for the 
@@ -264,8 +265,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.4.0"
-$VersDate = "2024-10-15"
+$Vers = "4.4.1"
+$VersDate = "2024-10-22"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
