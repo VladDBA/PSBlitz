@@ -1088,6 +1088,7 @@ if (!([string]::IsNullOrEmpty($SQLLogin))) {
  else {
 		$ConnString = "Server=$ServerName;Database=master;User Id=$SQLLogin;Password=$SQLPass;Connection Timeout=$ConnTimeout;Application Name=$AppName"
 	}
+	$Auth="SQL"
 }
 else {
 	if ($IsAzureSQLDB) {
@@ -1096,6 +1097,7 @@ else {
  else {
 		$ConnString = "Server=$ServerName;Database=master;trusted_connection=true;Connection Timeout=$ConnTimeout;Application Name=$AppName"
 	}
+	$Auth="Trusted"
 }
 $SqlConnection.ConnectionString = $ConnString
 
@@ -1416,6 +1418,7 @@ $StepStart = get-date
 $StepEnd = Get-Date
 $ParametersUsed = "IsIndepth:$IsIndepth; CheckDB:$CheckDB; BlitzWhoDelay:$BlitzWhoDelay; MaxTimeout:$MaxTimeout"
 $ParametersUsed += "; ConnTimeout:$ConnTimeout; CacheTop:$CacheTop; ASDBName:$ASDBName; CacheMinutesBack:$CacheMinutesBack"
+$ParametersUsed += "; Auth:$Auth; DebugInfo:$DebugInfo"
 Add-LogRow "Check start" "Started" $ParametersUsed
 try {
 	###Set completion flag
