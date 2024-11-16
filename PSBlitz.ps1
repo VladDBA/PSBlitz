@@ -1205,7 +1205,41 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 		}
 	}
 	Remove-Variable -Name CheckDBSet
+	Remove-Variable -Name CheckDBAdapter
+	Remove-Variable -Name CheckDBQuery
 
+}elseif(([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB=$false)){
+	#if we're not in Azure SQL DB mode and no database was provided, get a user database count
+	Write-Host "Checking user database count..."
+	$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
+	$DBQuery = "SELECT COUNT([name]) AS [DBCount] from sys.databases WHERE [state] = 0 AND [user_access_desc] = 'MULTI_USER'"
+	$DBQuery += " AND [name] NOT IN ('master', 'tempdb', 'model', 'msdb');"
+	$CheckDBQuery.CommandText = $DBQuery
+	$CheckDBQuery.Connection = $SqlConnection
+	$CheckDBQuery.CommandTimeout = 100
+	$CheckDBAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+	$CheckDBAdapter.SelectCommand = $CheckDBQuery
+	$CheckDBSet = new-object System.Data.DataSet
+	$CheckDBAdapter.Fill($CheckDBSet) | Out-Null
+	$SqlConnection.Close()
+	[int]$UsrDBCount = $CheckDBSet.Tables[0].Rows[0]["DBCount"]
+	if ($UsrDBCount -ge 50) {
+		Write-Host "->Instance has $UsrDBCount user databases" -Fore Yellow
+		$DbSpecific = Read-Host -Prompt " Switch to database-specific plan cache, index, and deadlock check?[Y/N]"
+		if($DbSpecific -eq "Y"){
+			while ([string]::IsNullOrEmpty($CheckDB)) {
+				$CheckDB = Read-Host -Prompt " Name of the database to check"
+			}
+			
+		}
+		else {
+			Write-Host "Continuing with an instance-wide check..."
+			Write-Host "->The following checks will be limited to the database that accounts for min. 50% of plan cache results:"
+			Write-Host "   - Index Usage"
+			Write-Host "   - Index Diagnostics"			
+		}
+	}
+	
 }
 
 ###Create directories
