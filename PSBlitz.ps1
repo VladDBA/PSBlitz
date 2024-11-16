@@ -277,6 +277,8 @@ $error.Clear();
 $ResourcesPath = Join-Path -Path $ScriptPath -ChildPath "Resources"
 #Set name of the input Excel file
 $OrigExcelFName = "PSBlitzOutput.xlsx"
+#Set maximum limit of user databases
+[int]$MaxUsrDBs = 50
 $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"spBlitzCache_NonSPLatest.sql", "spBlitzFirst_NonSPLatest.sql",
 	"spBlitzIndex_NonSPLatest.sql", "spBlitzLock_NonSPLatest.sql",
@@ -1223,7 +1225,7 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 	$CheckDBAdapter.Fill($CheckDBSet) | Out-Null
 	$SqlConnection.Close()
 	[int]$UsrDBCount = $CheckDBSet.Tables[0].Rows[0]["DBCount"]
-	if ($UsrDBCount -ge 50) {
+	if($UsrDBCount -ge $MaxUsrDBs) {
 		Write-Host "->Instance has $UsrDBCount user databases" -Fore Yellow
 		$DbSpecific = Read-Host -Prompt " Switch to database-specific plan cache, index, and deadlock check?[Y/N]"
 		if($DbSpecific -eq "Y"){
@@ -1234,9 +1236,14 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 		}
 		else {
 			Write-Host "Continuing with an instance-wide check..."
-			Write-Host "->The following checks will be limited to the database that accounts for min. 50% of plan cache results:"
-			Write-Host "   - Index Usage"
-			Write-Host "   - Index Diagnostics"			
+			Write-Host "->The following checks will be limited to the database that shows up the most in the plan cache results:"
+			if($IsIndepth -eq "Y"){
+				Write-Host "   - Index Summary"
+				Write-Host "   - Index Usage Details"
+				Write-Host "   - Detailed Index Diagnosis"
+			} else {
+			Write-Host "   - Index Diagnosis"
+			}		
 		}
 	}
 	
@@ -4792,9 +4799,21 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	elseif ($IsAzureSQLDB) {
 		[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
 		Write-Host " Retrieving index info for $ASDBName"
-	}
+	} elseif($UsrDBCount -ge $MaxUsrDBs) {
+		#If the number of user databases >= MaxUsrDBs
+		#set the database to the one that accounts for the most records in the plan cache
+	$TopDBinCache = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Name | Select-Object -Last 1
+	Write-Host " You're trying to get index info on an instance with  $UsrDBCount databases." -ForegroundColor Yellow
+	Write-Host " Doing so an instance with $MaxUsrDBs+ may cause temporary problems for the server and/or PSBlitz" -ForegroundColor Yellow
+	Write-Host " Limiting index info to $($TopDBinCache.Name) which accounts for $($TopDBinCache.Count) records in the plan cache results"
+	Write-Host " Retrieving index info for $($TopDBinCache.Name)"
+	[string]$Query = $Query -replace $OldCheckDBStr, ";SET @DatabaseName = '$($TopDBinCache.Name)';"
+	Add-LogRow "sp_BlitzIndex" "User database count>= $MaxUsrDBs" "Limiting index info to $TopDBinCache.Name which accounts for $($TopDBinCache.Count) records in the plan cache results"
+ }
+ 
  else {
 		Write-Host " Retrieving index info for all user databases"
+
 	}
 	#Loop through $Modes
 	foreach ($Mode in $Modes) {
