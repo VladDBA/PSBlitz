@@ -1210,7 +1210,7 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 	Remove-Variable -Name CheckDBAdapter
 	Remove-Variable -Name CheckDBQuery
 
-}elseif(([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB=$false)){
+}elseif($IsAzureSQLDB -eq $false){
 	#if we're not in Azure SQL DB mode and no database was provided, get a user database count
 	Write-Host "Checking user database count..."
 	$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
@@ -1227,7 +1227,7 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 	[int]$UsrDBCount = $CheckDBSet.Tables[0].Rows[0]["DBCount"]
 	if($UsrDBCount -ge $MaxUsrDBs) {
 		Write-Host "->Instance has $UsrDBCount user databases" -Fore Yellow
-		$DbSpecific = Read-Host -Prompt " Switch to database-specific plan cache, index, and deadlock check?[Y/N]"
+		$DbSpecific = Read-Host -Prompt "Switch to database-specific plan cache, index, and deadlock check?[Y/N]"
 		if($DbSpecific -eq "Y"){
 			while ([string]::IsNullOrEmpty($CheckDB)) {
 				$CheckDB = Read-Host -Prompt " Name of the database to check"
@@ -4802,10 +4802,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	} elseif($UsrDBCount -ge $MaxUsrDBs) {
 		#If the number of user databases >= MaxUsrDBs
 		#set the database to the one that accounts for the most records in the plan cache
-	$TopDBinCache = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Name | Select-Object -Last 1
+	$TopDBinCache = $DBArray | Group-Object | Sort-Object Count -Descending | Select-Object -First 1
 	Write-Host " You're trying to get index info on an instance with  $UsrDBCount databases." -ForegroundColor Yellow
 	Write-Host " Doing so an instance with $MaxUsrDBs+ may cause temporary problems for the server and/or PSBlitz" -ForegroundColor Yellow
-	Write-Host " Limiting index info to $($TopDBinCache.Name) which accounts for $($TopDBinCache.Count) records in the plan cache results"
+	Write-Host " Limiting index info to $($TopDBinCache.Name) which accounts for $($TopDBinCache.Count) records returned from cache"
 	Write-Host " Retrieving index info for $($TopDBinCache.Name)"
 	[string]$Query = $Query -replace $OldCheckDBStr, ";SET @DatabaseName = '$($TopDBinCache.Name)';"
 	Add-LogRow "sp_BlitzIndex" "User database count>= $MaxUsrDBs" "Limiting index info to $TopDBinCache.Name which accounts for $($TopDBinCache.Count) records in the plan cache results"
