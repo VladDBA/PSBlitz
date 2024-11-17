@@ -994,7 +994,7 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 	$SqlConnection.ConnectionString = $ConnString
 
 	[int]$CmdTimeout = 100
-	Write-Host "Detecting type of environment... " -NoNewLine
+	Write-Host "Detecting environment type... " -NoNewLine
 	$AzCheckQuery = new-object System.Data.SqlClient.SqlCommand
 	$Query = "SELECT CAST(SERVERPROPERTY('EngineEdition') AS INT) AS [EngineEdition],"
 	$Query += "`nCAST(SERVERPROPERTY('Edition') AS NVARCHAR(128)) AS [Edition];"
@@ -1039,18 +1039,18 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 		if ($Edition -eq "SQL Azure") {
 			if ($EngineEdition -eq 8) {
 				$IsAzureSQLMI = $true
-				Write-Host " ->Azure SQL MI"
+				Write-Host "->Azure SQL MI"
 			}
 			elseif ($EngineEdition -eq 5) {
 				$IsAzureSQLDB = $true
-				Write-Host " ->Azure SQL DB"
+				Write-Host "->Azure SQL DB"
 			} 
 		}
 		elseif ($EngineEdition -in 2, 3, 4) {
-			Write-Host " ->SQL Server $Edition"
+			Write-Host "->SQL Server $Edition"
 		}
 		else {
-			Write-Host " ->Well this is awquard, use the following info to debug:"
+			Write-Host "->Well this is awquard, use the following info to debug:"
 			Write-Host " Edition - $Edition; EngineEdition - $EngineEdition"
 		}
 	}
@@ -1090,7 +1090,7 @@ if (!([string]::IsNullOrEmpty($SQLLogin))) {
  else {
 		$ConnString = "Server=$ServerName;Database=master;User Id=$SQLLogin;Password=$SQLPass;Connection Timeout=$ConnTimeout;Application Name=$AppName"
 	}
-	$Auth="SQL"
+	$Auth = "SQL"
 }
 else {
 	if ($IsAzureSQLDB) {
@@ -1099,7 +1099,7 @@ else {
  else {
 		$ConnString = "Server=$ServerName;Database=master;trusted_connection=true;Connection Timeout=$ConnTimeout;Application Name=$AppName"
 	}
-	$Auth="Trusted"
+	$Auth = "Trusted"
 }
 $SqlConnection.ConnectionString = $ConnString
 
@@ -1210,7 +1210,8 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 	Remove-Variable -Name CheckDBAdapter
 	Remove-Variable -Name CheckDBQuery
 
-}elseif($IsAzureSQLDB -eq $false){
+}
+elseif ($IsAzureSQLDB -eq $false) {
 	#if we're not in Azure SQL DB mode and no database was provided, get a user database count
 	Write-Host "Checking user database count..."
 	$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
@@ -1225,28 +1226,18 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 	$CheckDBAdapter.Fill($CheckDBSet) | Out-Null
 	$SqlConnection.Close()
 	[int]$UsrDBCount = $CheckDBSet.Tables[0].Rows[0]["DBCount"]
-	if($UsrDBCount -ge $MaxUsrDBs) {
+	if ($UsrDBCount -ge $MaxUsrDBs) {
 		Write-Host "->Instance has $UsrDBCount user databases" -Fore Yellow
-		$DbSpecific = Read-Host -Prompt "Switch to database-specific plan cache, index, and deadlock check?[Y/N]"
-		if($DbSpecific -eq "Y"){
-			while ([string]::IsNullOrEmpty($CheckDB)) {
-				$CheckDB = Read-Host -Prompt " Name of the database to check"
-			}
-			
+		Write-Host "->The following checks will be limited to the database that shows up the most in the cache results:"
+		if ($IsIndepth -eq "Y") {
+			Write-Host "   - Index Summary"
+			Write-Host "   - Index Usage Details"
+			Write-Host "   - Detailed Index Diagnosis"
 		}
 		else {
-			Write-Host "Continuing with an instance-wide check..."
-			Write-Host "->The following checks will be limited to the database that shows up the most in the plan cache results:"
-			if($IsIndepth -eq "Y"){
-				Write-Host "   - Index Summary"
-				Write-Host "   - Index Usage Details"
-				Write-Host "   - Detailed Index Diagnosis"
-			} else {
 			Write-Host "   - Index Diagnosis"
-			}		
-		}
-	}
-	
+		}			
+	}	
 }
 
 ###Create directories
@@ -2979,7 +2970,7 @@ $JumpToTop
 				$htmlTable = $DBInfoTbl | Select-Object "Database", @{Name = "Created"; Expression = { if ($_."Created" -ne [System.DBNull]::Value) { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Created" } } }, 
 				"DatabaseState", "UserAccess", "DataFiles", "DataFilesSizeGB", "LogFiles",
 				"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
-				"DatabaseSizeGB", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", 
+				"DatabaseSizeGB", "CachedSizeMB", "BufferPool%", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", 
 				"SnapshotIsolationState", "ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
 				"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn", "IsEncrypted", "EncryptionState" | ConvertTo-Html -As Table -Fragment
 				
@@ -3083,7 +3074,7 @@ $htmlBlock
 				#List of columns that should be returned from the data set
 				$DataSetCols = @("Database", "Created", "DatabaseState", "UserAccess", "DataFiles", "DataFilesSizeGB", "LogFiles",
 					"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
-					"DatabaseSizeGB", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", "SnapshotIsolationState", 
+					"DatabaseSizeGB", "CachedSizeMB", "BufferPool%", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", "SnapshotIsolationState", 
 					"ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
 					"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn", "IsEncrypted", "EncryptionState")
 				if ($DebugInfo) {
@@ -3862,9 +3853,10 @@ $JumpToTop
 			$PreviousOutcome = $StepOutcome
 			$StepOutcome = "Success"
 			$RecordsReturned = $BlitzCacheSet.Tables[0].Rows.Count
-			if($OrigCacheMinutesBack -ne 0){
+			if ($OrigCacheMinutesBack -ne 0) {
 				$AdditionalInfo = ", MinutesBack=$CacheMinutesBack"
-			} else {
+			}
+			else {
 				$AdditionalInfo = ""
 			}
 			Add-LogRow "sp_BlitzCache $SortOrder $AdditionalInfo" $StepOutcome "$RecordsReturned records returned"
@@ -4799,16 +4791,18 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	elseif ($IsAzureSQLDB) {
 		[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
 		Write-Host " Retrieving index info for $ASDBName"
-	} elseif($UsrDBCount -ge $MaxUsrDBs) {
+	}
+ elseif ($UsrDBCount -ge $MaxUsrDBs) {
 		#If the number of user databases >= MaxUsrDBs
 		#set the database to the one that accounts for the most records in the plan cache
-	$TopDBinCache = $DBArray | Group-Object | Sort-Object Count -Descending | Select-Object -First 1
-	Write-Host " You're trying to get index info on an instance with  $UsrDBCount databases." -ForegroundColor Yellow
-	Write-Host " Doing so an instance with $MaxUsrDBs+ may cause temporary problems for the server and/or PSBlitz" -ForegroundColor Yellow
-	Write-Host " Limiting index info to $($TopDBinCache.Name) which accounts for $($TopDBinCache.Count) records returned from cache"
-	Write-Host " Retrieving index info for $($TopDBinCache.Name)"
-	[string]$Query = $Query -replace $OldCheckDBStr, ";SET @DatabaseName = '$($TopDBinCache.Name)';"
-	Add-LogRow "sp_BlitzIndex" "User database count>= $MaxUsrDBs" "Limiting index info to $TopDBinCache.Name which accounts for $($TopDBinCache.Count) records in the plan cache results"
+		$TopDBinCache = $DBArray | Group-Object | Sort-Object Count -Descending | Select-Object -First 1
+		Write-Host " You're trying to get index info on an instance with  $UsrDBCount databases." -ForegroundColor Yellow
+		Write-Host " Doing so an instance may cause temporary problems for the server and/or PSBlitz." -ForegroundColor Yellow
+		Write-Host " Limiting index info to $($TopDBinCache.Name) which accounts for $($TopDBinCache.Count) records returned from cache"
+		Write-Host " Retrieving index info for $($TopDBinCache.Name)"
+		[string]$Query = $Query -replace $OldCheckDBStr, ";SET @DatabaseName = '$($TopDBinCache.Name)';"
+		[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
+		Add-LogRow "sp_BlitzIndex" "User database count>= $MaxUsrDBs" "Limiting index info to $($TopDBinCache.Name) which accounts for $($TopDBinCache.Count) records in the plan cache results"
  }
  
  else {
@@ -6756,6 +6750,8 @@ finally {
 				$QuerySource = "sp_BlitzIndex @Mode = $Mode"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$QuerySource += ", @DatabaseName = '$CheckDB'; "
+				}elseif ($UsrDBCount -ge $MaxUsrDBs){
+					$QuerySource += ", @DatabaseName = '$($TopDBinCache.Name)'; "
 				}
 				else {
 					$QuerySource += ", @GetAllDatabases = 1; "

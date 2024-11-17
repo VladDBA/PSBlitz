@@ -27,14 +27,21 @@ SELECT @SkipThis = CASE
                      ELSE 0
                    END;
 
-/*Make sure temp table doesn't exist*/
+/*Make sure temp tables don't exist*/
 IF OBJECT_ID(N'tempdb.dbo.#FSFiles', N'U') IS NOT NULL
     DROP TABLE #FSFiles;
-/*Create temp table*/
+IF OBJECT_ID(N'tempdb.dbo.#BufferPoolInfo', N'U') IS NOT NULL
+    DROP TABLE #BufferPoolInfo;
+/*Create temp tables*/
 CREATE TABLE #FSFiles
   (  [DatabaseID]    [SMALLINT] NULL,
      [FSFilesCount]  [INT] NULL,
      [FSFilesSizeGB] [NUMERIC](23, 3) NULL);
+
+CREATE TABLE #BufferPoolInfo(
+	[database_id] [int] NULL,
+	[CachedSizeMB] [numeric](23, 3) NULL,
+	[BufferPool%] [decimal](5, 2) NULL);
 
 /*Cursor to get FILESTREAM files and their sizes for databases that use FS*/
 DECLARE DBsWithFS CURSOR LOCAL STATIC READ_ONLY FORWARD_ONLY FOR
@@ -73,6 +80,22 @@ WHILE @@FETCH_STATUS = 0
 
 CLOSE DBsWithFS;
 DEALLOCATE DBsWithFS;
+
+/*Populate BufferPoolInfo table
+I'm not filtering by database name here*/
+WITH AggBPInfo
+AS
+(SELECT [database_id],
+CAST(COUNT(*) * 8/1024.0 AS NUMERIC(23, 3))  AS [CachedSizeMB]
+FROM sys.dm_os_buffer_descriptors
+WHERE [database_id] <> 32767 
+GROUP BY [database_id])
+INSERT INTO #BufferPoolInfo([database_id],[CachedSizeMB],[BufferPool%])
+SELECT 
+        [database_id], 
+        [CachedSizeMB],
+        CAST([CachedSizeMB] / SUM([CachedSizeMB]) OVER() * 100.0 AS DECIMAL(5,2)) AS [BufferPool%]
+FROM AggBPInfo
 
 /*Return database files and size info*/
 SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],d.[create_date] AS [Created],' AS NVARCHAR(MAX))
@@ -144,12 +167,16 @@ SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],d.[create_date] AS [Creat
 					  + @LineFeed + N'WHEN ek.[encryption_state] = 6 THEN ''Protection change in progress'''
 					  + @LineFeed + N'END AS [EncryptionState]'
 					  END
+                  + @LineFeed
+				  + N',bpi.[CachedSizeMB],bpi.[BufferPool%]'
                   + @LineFeed + N'FROM   sys.master_files AS f'
                   + @LineFeed
                   + N'INNER JOIN sys.databases AS d  ON f.database_id = d.database_id'
                   + @LineFeed
                   + N'LEFT JOIN #FSFiles AS fs ON f.database_id = fs.DatabaseID'
                   + @LineFeed
+				  + N'LEFT JOIN #BufferPoolInfo AS bpi ON d.database_id = bpi.database_id'
+				  + @LineFeed
                   + CASE
                       WHEN @SkipThis = 1 THEN ''
                       ELSE 'CROSS APPLY (SELECT [file_id],'
@@ -175,6 +202,7 @@ SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],d.[create_date] AS [Creat
                   + @LineFeed
                   + N'[d].[containment_desc],[d].[page_verify_option_desc],[d].[is_query_store_on], [d].[is_trustworthy_on], d.[is_trustworthy_on],d.[is_encrypted]'
                   + @LineFeed
+				  + N',bpi.[CachedSizeMB],bpi.[BufferPool%]'
                   + CASE
                       WHEN @SkipThis = 1 THEN ''
                       ELSE ',[l].[VirtualLogFiles], ek.[encryption_state]'
