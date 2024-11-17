@@ -1213,7 +1213,7 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 }
 elseif ($IsAzureSQLDB -eq $false) {
 	#if we're not in Azure SQL DB mode and no database was provided, get a user database count
-	Write-Host "Checking user database count..."
+	Write-Host "Checking user database count..." -NoNewline
 	$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
 	$DBQuery = "SELECT COUNT([name]) AS [DBCount] from sys.databases WHERE [state] = 0 AND [user_access_desc] = 'MULTI_USER'"
 	$DBQuery += " AND [name] NOT IN ('master', 'tempdb', 'model', 'msdb');"
@@ -1227,8 +1227,9 @@ elseif ($IsAzureSQLDB -eq $false) {
 	$SqlConnection.Close()
 	[int]$UsrDBCount = $CheckDBSet.Tables[0].Rows[0]["DBCount"]
 	if ($UsrDBCount -ge $MaxUsrDBs) {
+		Write-Host " !" -Fore Yellow
 		Write-Host "->Instance has $UsrDBCount user databases" -Fore Yellow
-		Write-Host "->The following checks will be limited to the database that shows up the most in the cache results:"
+		Write-Host "->The following checks will be limited to the database that shows up the most in plan cache info:"
 		if ($IsIndepth -eq "Y") {
 			Write-Host "   - Index Summary"
 			Write-Host "   - Index Usage Details"
@@ -1237,6 +1238,8 @@ elseif ($IsAzureSQLDB -eq $false) {
 		else {
 			Write-Host "   - Index Diagnosis"
 		}			
+	} else {
+		Write-Host @GreenCheck
 	}	
 }
 
@@ -3753,6 +3756,7 @@ $JumpToTop
 		$SortOrders = @("'CPU'", "'Average CPU'", "'Reads'", "'Average Reads'",
 			"'Duration'", "'Average Duration'", "'Executions'", "'Executions per Minute'",
 			"'Writes'", "'Average Writes'", "'Spills'", "'Average Spills'",
+			"'Duplicate'","'Query Hash'",
 			"'Memory Grant'", "'Recent Compilations'")
 	}
  else {
@@ -3821,7 +3825,7 @@ $JumpToTop
 			$CacheMinutesBack = $CurrMin + $OrigCacheMinutesBack
 			if ($DebugInfo) {
 				Write-Host " ->Adjusting the value of -CacheMinutesBack to the current runtime of $CurrMin minutes" -fore yellow
-				Write-Host "  ->The past $CacheMinutesBack mintes ($CurrMin + $OrigCacheMinutesBack) will now be analyzed" -fore yellow
+				Write-Host "  ->The past $CacheMinutesBack minutes ($CurrMin + $OrigCacheMinutesBack) will now be analyzed" -fore yellow
 			}			
 			$NewCacheMinutesBackStr = ";SET @MinutesBack = " + $CacheMinutesBack + ";"
 			[string]$Query = $Query -replace $OldCacheMinutesBackStr, $NewCacheMinutesBackStr
@@ -3938,6 +3942,10 @@ $JumpToTop
 				$SheetName = $SheetName + "Spills"
 				$HighlightCol = 58
 			}
+			elseif("'Duplicate'","'Query Hash'" -contains $SortOrder){
+				$SheetName = $SheetName + "Dupl & Single Use"
+				$HighlightCol = 0
+			}
 			elseif ($SortOrder -like '*Memory*') {
 				$SheetName = $SheetName + "Mem & Recent Comp"
 				$HighlightCol = 52
@@ -4017,7 +4025,7 @@ $JumpToTop
 		
 				#pairing up related tables in the same HTML file
 				if ("'CPU'", "'Reads'", "'Duration'", "'Executions'", "'Writes'",
-					"'Spills'", "'Memory Grant'" -contains $SortOrder) {
+					"'Spills'","'Duplicate'", "'Memory Grant'" -contains $SortOrder) {
 					#Handling CSS
 					$CacheHTMLPre = $HTMLPre
 					$CacheHTMLPre = $CacheHTMLPre -replace 'CacheTab1High', $HighlightCol
@@ -4025,6 +4033,8 @@ $JumpToTop
 					
 					if ($SheetName -eq "Mem & Recent Comp") {
 						$HtmlTabName = "Queries by Memory Grants & Recent Compilations"
+					}elseif ($SheetName -eq "Dupl & Single Use") {
+						$HtmlTabName = "Queries by Duplicate Plans & Query Hash"
 					}
 					else {
 						$HtmlTabName = "Queries by $SheetName"
@@ -4071,7 +4081,7 @@ $JumpToTop
 				}
 		
 				#adding the second half of each html page and writing to file
-				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'")) {
+				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'") -or ($SortOrder -eq "'Query Hash'")) {
 					$HtmlTabName2 = $SortOrder -replace "'", ""
 					#Handling CSS
 					$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="CacheTable2">'
@@ -4140,7 +4150,7 @@ $JumpToTop
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = 3
 				#$SortOrder containing avg or xpm will export data starting with row 16
-				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'")) {
+				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'") -or ($SortOrder -eq "'Query Hash'")) {
 					$ExcelStartRow = 17
 				}
 				#Set counter used for row retrieval
@@ -4795,14 +4805,17 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
  elseif ($UsrDBCount -ge $MaxUsrDBs) {
 		#If the number of user databases >= MaxUsrDBs
 		#set the database to the one that accounts for the most records in the plan cache
-		$TopDBinCache = $DBArray | Group-Object | Sort-Object Count -Descending | Select-Object -First 1
+		$TopDBinCache = $DBArray | Where-Object { $_ -ne "-- N/A --" }| Group-Object | Sort-Object Count -Descending | Select-Object -First 1
+		[string]$TopCacheDB = $TopDBinCache.Name
+		[int]$TopCacheDBCount = $TopDBinCache.Count
+		$TopCacheReplace = ";SET @DatabaseName = '"+$TopCacheDB+"';"
 		Write-Host " You're trying to get index info on an instance with  $UsrDBCount databases." -ForegroundColor Yellow
-		Write-Host " Doing so an instance may cause temporary problems for the server and/or PSBlitz." -ForegroundColor Yellow
-		Write-Host " Limiting index info to $($TopDBinCache.Name) which accounts for $($TopDBinCache.Count) records returned from cache"
+		Write-Host " Doing so may cause temporary problems for the server and/or PSBlitz." -ForegroundColor Yellow
+		Write-Host " Limiting index info to $($TopDBinCache.Name) which accounts for $TopCacheDBCount records returned from cache"
 		Write-Host " Retrieving index info for $($TopDBinCache.Name)"
-		[string]$Query = $Query -replace $OldCheckDBStr, ";SET @DatabaseName = '$($TopDBinCache.Name)';"
-		[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
-		Add-LogRow "sp_BlitzIndex" "User database count>= $MaxUsrDBs" "Limiting index info to $($TopDBinCache.Name) which accounts for $($TopDBinCache.Count) records in the plan cache results"
+		[string]$Query = $Query -replace ';SET @DatabaseName = NULL;', $TopCacheReplace
+		[string]$Query = $Query -replace ';SET @GetAllDatabases = 1;', ';SET @GetAllDatabases = 0;'
+		Add-LogRow "sp_BlitzIndex" "User database count>= $MaxUsrDBs" "Limiting index info to $TopCacheDB which accounts for $TopCacheDBCount records in the plan cache results"
  }
  
  else {
@@ -6751,7 +6764,7 @@ finally {
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$QuerySource += ", @DatabaseName = '$CheckDB'; "
 				}elseif ($UsrDBCount -ge $MaxUsrDBs){
-					$QuerySource += ", @DatabaseName = '$($TopDBinCache.Name)'; "
+					$QuerySource += ", @DatabaseName = '$TopCacheDB'; "
 				}
 				else {
 					$QuerySource += ", @GetAllDatabases = 1; "
@@ -6799,9 +6812,28 @@ finally {
 					else {
 						$Description += "."
 					}
+				}elseif($SortOrder -eq "Dupl_Single_Use"){
+					$PageName = "Top $CacheTop Queries - Duplicates and Single Use"
+					$QuerySource = "sp_BlitzCache @Top = $CacheTop, @SortOrder = 'Duplicate'/'Query Hash'"
+					if (!([string]::IsNullOrEmpty($CheckDB))) {
+						$QuerySource += ", @DatabaseName = '$CheckDB'; "
+					}
+					else {
+						$QuerySource += "; "
+					}
+					$Description = "Contains the top $CacheTop queries, found in the plan cache, sorted by number of cached plans and query hash. Helps finding queries that have multiple plans and potential parameterization problems"
+					if ($IsAzureSQLDB) {
+						$Description += " for $ASDBName."
+					}
+					elseif (!([string]::IsNullOrEmpty($CheckDB))) {
+						$Description += " for $CheckDB."
+					}
+					else {
+						$Description += "."
+					}
 				}
 				else {
-					$QuerySource = "sp_BlitzCache , @Top = $CacheTop, @SortOrder = '$SortOrder'/'avg $SortOrder'"
+					$QuerySource = "sp_BlitzCache , @Top = $CacheTop, @SortOrder = '$SortOrder'/'Avg $SortOrder'"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
 					}
