@@ -265,8 +265,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.4.1"
-$VersDate = "2024-10-22"
+$Vers = "4.5.0"
+$VersDate = "2024-11-19"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -1608,6 +1608,7 @@ try {
 				@{Name = "Max Server Memory GB"; Expression = { $_."max_server_memory_GB" } }, 
 				@{Name = "Target Server Memory GB"; Expression = { $_."target_server_memory_GB" } },
 				@{Name = "Total Memory Used GB"; Expression = { $_."total_memory_used_GB" } },
+				@{Name = "Buffer Pool Usage GB"; Expression = { $_."buffer_pool_usage_GB" } },
 				@{Name = "Process physical memory low"; Expression = { $_."proc_physical_memory_low" } },
 				@{Name = "Process virtual memory low"; Expression = { $_."proc_virtual_memory_low" } },
 				@{Name = "Available Physical Memory GB"; Expression = { $_."available_physical_memory_GB" } },
@@ -1727,7 +1728,7 @@ $htmlTable4
 
 			#List of columns that should be returned from the data set
 			$DataSetCols = @("logical_cpu_cores", "physical_cpu_cores", "physical_memory_GB", "max_server_memory_GB", "target_server_memory_GB",
-				"total_memory_used_GB", "proc_physical_memory_low", "proc_virtual_memory_low", "available_physical_memory_GB", "os_memory_state" , "CTP", "MAXDOP")
+				"total_memory_used_GB", "buffer_pool_usage_GB", "proc_physical_memory_low", "proc_virtual_memory_low", "available_physical_memory_GB", "os_memory_state" , "CTP", "MAXDOP")
 
 			if ($DebugInfo) {
 				Write-Host " ->Writing resource info to Excel" -fore yellow
