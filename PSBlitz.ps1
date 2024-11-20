@@ -156,6 +156,11 @@
 .PARAMETER MaxTimeout
  Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. Defaults to 1000 (16.6 minutes)
 
+.PARAMETER MaxUsrDBs
+ Can be used to tell PSBlitz to raise the limit of user databases based on which index-related info is 
+ limited to only the "loudest" database in the cache results. Defaults to 50 - only change it if you're using using HTML output
+ and have enough RAM to handle the increased data that PS will have to process.
+
 .PARAMETER DebugInfo
  Switch used to get more information for debugging and troubleshooting purposes.
 
@@ -260,13 +265,15 @@ param(
 	[Parameter(Mandatory = $False)]
 	[int]$CacheTop = 10,
 	[Parameter(Mandatory = $False)]
-	[int]$CacheMinutesBack = 0
+	[int]$CacheMinutesBack = 0,
+	[Parameter(Mandatory = $False)]
+	[int]$MaxUsrDBs = 50
 )
 
 ###Internal params
 #Version
-$Vers = "4.4.1"
-$VersDate = "2024-10-22"
+$Vers = "4.5.0"
+$VersDate = "2024-11-20"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -277,6 +284,7 @@ $error.Clear();
 $ResourcesPath = Join-Path -Path $ScriptPath -ChildPath "Resources"
 #Set name of the input Excel file
 $OrigExcelFName = "PSBlitzOutput.xlsx"
+
 $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"spBlitzCache_NonSPLatest.sql", "spBlitzFirst_NonSPLatest.sql",
 	"spBlitzIndex_NonSPLatest.sql", "spBlitzLock_NonSPLatest.sql",
@@ -992,7 +1000,7 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 	$SqlConnection.ConnectionString = $ConnString
 
 	[int]$CmdTimeout = 100
-	Write-Host "Detecting type of environment... " -NoNewLine
+	Write-Host "Detecting environment type... " -NoNewLine
 	$AzCheckQuery = new-object System.Data.SqlClient.SqlCommand
 	$Query = "SELECT CAST(SERVERPROPERTY('EngineEdition') AS INT) AS [EngineEdition],"
 	$Query += "`nCAST(SERVERPROPERTY('Edition') AS NVARCHAR(128)) AS [Edition];"
@@ -1037,18 +1045,18 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 		if ($Edition -eq "SQL Azure") {
 			if ($EngineEdition -eq 8) {
 				$IsAzureSQLMI = $true
-				Write-Host " ->Azure SQL MI"
+				Write-Host "->Azure SQL MI"
 			}
 			elseif ($EngineEdition -eq 5) {
 				$IsAzureSQLDB = $true
-				Write-Host " ->Azure SQL DB"
+				Write-Host "->Azure SQL DB"
 			} 
 		}
 		elseif ($EngineEdition -in 2, 3, 4) {
-			Write-Host " ->SQL Server $Edition"
+			Write-Host "->SQL Server $Edition"
 		}
 		else {
-			Write-Host " ->Well this is awquard, use the following info to debug:"
+			Write-Host "->Well this is awquard, use the following info to debug:"
 			Write-Host " Edition - $Edition; EngineEdition - $EngineEdition"
 		}
 	}
@@ -1088,6 +1096,7 @@ if (!([string]::IsNullOrEmpty($SQLLogin))) {
  else {
 		$ConnString = "Server=$ServerName;Database=master;User Id=$SQLLogin;Password=$SQLPass;Connection Timeout=$ConnTimeout;Application Name=$AppName"
 	}
+	$Auth = "SQL"
 }
 else {
 	if ($IsAzureSQLDB) {
@@ -1096,6 +1105,7 @@ else {
  else {
 		$ConnString = "Server=$ServerName;Database=master;trusted_connection=true;Connection Timeout=$ConnTimeout;Application Name=$AppName"
 	}
+	$Auth = "Trusted"
 }
 $SqlConnection.ConnectionString = $ConnString
 
@@ -1203,7 +1213,40 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 		}
 	}
 	Remove-Variable -Name CheckDBSet
+	Remove-Variable -Name CheckDBAdapter
+	Remove-Variable -Name CheckDBQuery
 
+}
+elseif ($IsAzureSQLDB -eq $false) {
+	#if we're not in Azure SQL DB mode and no database was provided, get a user database count
+	Write-Host "Checking user database count..." -NoNewline
+	$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
+	$DBQuery = "SELECT COUNT([name]) AS [DBCount] from sys.databases WHERE [state] = 0 AND [user_access_desc] = 'MULTI_USER'"
+	$DBQuery += " AND [name] NOT IN ('master', 'tempdb', 'model', 'msdb');"
+	$CheckDBQuery.CommandText = $DBQuery
+	$CheckDBQuery.Connection = $SqlConnection
+	$CheckDBQuery.CommandTimeout = 100
+	$CheckDBAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+	$CheckDBAdapter.SelectCommand = $CheckDBQuery
+	$CheckDBSet = new-object System.Data.DataSet
+	$CheckDBAdapter.Fill($CheckDBSet) | Out-Null
+	$SqlConnection.Close()
+	[int]$UsrDBCount = $CheckDBSet.Tables[0].Rows[0]["DBCount"]
+	if ($UsrDBCount -ge $MaxUsrDBs) {
+		Write-Host " !" -Fore Yellow
+		Write-Host "->Instance has $UsrDBCount user databases" -Fore Yellow
+		Write-Host "->The following checks will be limited to the database that shows up the most in plan cache info:"
+		if ($IsIndepth -eq "Y") {
+			Write-Host "   - Index Summary"
+			Write-Host "   - Index Usage Details"
+			Write-Host "   - Detailed Index Diagnosis"
+		}
+		else {
+			Write-Host "   - Index Diagnosis"
+		}			
+	} else {
+		Write-Host @GreenCheck
+	}	
 }
 
 ###Create directories
@@ -1416,6 +1459,7 @@ $StepStart = get-date
 $StepEnd = Get-Date
 $ParametersUsed = "IsIndepth:$IsIndepth; CheckDB:$CheckDB; BlitzWhoDelay:$BlitzWhoDelay; MaxTimeout:$MaxTimeout"
 $ParametersUsed += "; ConnTimeout:$ConnTimeout; CacheTop:$CacheTop; ASDBName:$ASDBName; CacheMinutesBack:$CacheMinutesBack"
+$ParametersUsed += "; Auth:$Auth; DebugInfo:$DebugInfo"
 Add-LogRow "Check start" "Started" $ParametersUsed
 try {
 	###Set completion flag
@@ -1570,6 +1614,7 @@ try {
 				@{Name = "Max Server Memory GB"; Expression = { $_."max_server_memory_GB" } }, 
 				@{Name = "Target Server Memory GB"; Expression = { $_."target_server_memory_GB" } },
 				@{Name = "Total Memory Used GB"; Expression = { $_."total_memory_used_GB" } },
+				@{Name = "Buffer Pool Usage GB"; Expression = { $_."buffer_pool_usage_GB" } },
 				@{Name = "Process physical memory low"; Expression = { $_."proc_physical_memory_low" } },
 				@{Name = "Process virtual memory low"; Expression = { $_."proc_virtual_memory_low" } },
 				@{Name = "Available Physical Memory GB"; Expression = { $_."available_physical_memory_GB" } },
@@ -1689,7 +1734,7 @@ $htmlTable4
 
 			#List of columns that should be returned from the data set
 			$DataSetCols = @("logical_cpu_cores", "physical_cpu_cores", "physical_memory_GB", "max_server_memory_GB", "target_server_memory_GB",
-				"total_memory_used_GB", "proc_physical_memory_low", "proc_virtual_memory_low", "available_physical_memory_GB", "os_memory_state" , "CTP", "MAXDOP")
+				"total_memory_used_GB", "buffer_pool_usage_GB", "proc_physical_memory_low", "proc_virtual_memory_low", "available_physical_memory_GB", "os_memory_state" , "CTP", "MAXDOP")
 
 			if ($DebugInfo) {
 				Write-Host " ->Writing resource info to Excel" -fore yellow
@@ -2935,7 +2980,7 @@ $JumpToTop
 				$htmlTable = $DBInfoTbl | Select-Object "Database", @{Name = "Created"; Expression = { if ($_."Created" -ne [System.DBNull]::Value) { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Created" } } }, 
 				"DatabaseState", "UserAccess", "DataFiles", "DataFilesSizeGB", "LogFiles",
 				"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
-				"DatabaseSizeGB", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", 
+				"DatabaseSizeGB", "CachedSizeMB", "BufferPool%", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", 
 				"SnapshotIsolationState", "ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
 				"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn", "IsEncrypted", "EncryptionState" | ConvertTo-Html -As Table -Fragment
 				
@@ -3039,7 +3084,7 @@ $htmlBlock
 				#List of columns that should be returned from the data set
 				$DataSetCols = @("Database", "Created", "DatabaseState", "UserAccess", "DataFiles", "DataFilesSizeGB", "LogFiles",
 					"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
-					"DatabaseSizeGB", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", "SnapshotIsolationState", 
+					"DatabaseSizeGB", "CachedSizeMB", "BufferPool%", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", "SnapshotIsolationState", 
 					"ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
 					"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn", "IsEncrypted", "EncryptionState")
 				if ($DebugInfo) {
@@ -3718,6 +3763,7 @@ $JumpToTop
 		$SortOrders = @("'CPU'", "'Average CPU'", "'Reads'", "'Average Reads'",
 			"'Duration'", "'Average Duration'", "'Executions'", "'Executions per Minute'",
 			"'Writes'", "'Average Writes'", "'Spills'", "'Average Spills'",
+			"'Duplicate'","'Query Hash'",
 			"'Memory Grant'", "'Recent Compilations'")
 	}
  else {
@@ -3786,7 +3832,7 @@ $JumpToTop
 			$CacheMinutesBack = $CurrMin + $OrigCacheMinutesBack
 			if ($DebugInfo) {
 				Write-Host " ->Adjusting the value of -CacheMinutesBack to the current runtime of $CurrMin minutes" -fore yellow
-				Write-Host "  ->The past $CacheMinutesBack mintes ($CurrMin + $OrigCacheMinutesBack) will now be analyzed" -fore yellow
+				Write-Host "  ->The past $CacheMinutesBack minutes ($CurrMin + $OrigCacheMinutesBack) will now be analyzed" -fore yellow
 			}			
 			$NewCacheMinutesBackStr = ";SET @MinutesBack = " + $CacheMinutesBack + ";"
 			[string]$Query = $Query -replace $OldCacheMinutesBackStr, $NewCacheMinutesBackStr
@@ -3818,9 +3864,10 @@ $JumpToTop
 			$PreviousOutcome = $StepOutcome
 			$StepOutcome = "Success"
 			$RecordsReturned = $BlitzCacheSet.Tables[0].Rows.Count
-			if($OrigCacheMinutesBack -ne 0){
+			if ($OrigCacheMinutesBack -ne 0) {
 				$AdditionalInfo = ", MinutesBack=$CacheMinutesBack"
-			} else {
+			}
+			else {
 				$AdditionalInfo = ""
 			}
 			Add-LogRow "sp_BlitzCache $SortOrder $AdditionalInfo" $StepOutcome "$RecordsReturned records returned"
@@ -3902,6 +3949,10 @@ $JumpToTop
 				$SheetName = $SheetName + "Spills"
 				$HighlightCol = 58
 			}
+			elseif("'Duplicate'","'Query Hash'" -contains $SortOrder){
+				$SheetName = $SheetName + "Dupl & Single Use"
+				$HighlightCol = 0
+			}
 			elseif ($SortOrder -like '*Memory*') {
 				$SheetName = $SheetName + "Mem & Recent Comp"
 				$HighlightCol = 52
@@ -3981,7 +4032,7 @@ $JumpToTop
 		
 				#pairing up related tables in the same HTML file
 				if ("'CPU'", "'Reads'", "'Duration'", "'Executions'", "'Writes'",
-					"'Spills'", "'Memory Grant'" -contains $SortOrder) {
+					"'Spills'","'Duplicate'", "'Memory Grant'" -contains $SortOrder) {
 					#Handling CSS
 					$CacheHTMLPre = $HTMLPre
 					$CacheHTMLPre = $CacheHTMLPre -replace 'CacheTab1High', $HighlightCol
@@ -3989,6 +4040,8 @@ $JumpToTop
 					
 					if ($SheetName -eq "Mem & Recent Comp") {
 						$HtmlTabName = "Queries by Memory Grants & Recent Compilations"
+					}elseif ($SheetName -eq "Dupl & Single Use") {
+						$HtmlTabName = "Queries by Duplicate Plans & Query Hash"
 					}
 					else {
 						$HtmlTabName = "Queries by $SheetName"
@@ -4035,7 +4088,7 @@ $JumpToTop
 				}
 		
 				#adding the second half of each html page and writing to file
-				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'")) {
+				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'") -or ($SortOrder -eq "'Query Hash'")) {
 					$HtmlTabName2 = $SortOrder -replace "'", ""
 					#Handling CSS
 					$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="CacheTable2">'
@@ -4104,7 +4157,7 @@ $JumpToTop
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = 3
 				#$SortOrder containing avg or xpm will export data starting with row 16
-				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'")) {
+				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'") -or ($SortOrder -eq "'Query Hash'")) {
 					$ExcelStartRow = 17
 				}
 				#Set counter used for row retrieval
@@ -4756,8 +4809,25 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
 		Write-Host " Retrieving index info for $ASDBName"
 	}
+ elseif ($UsrDBCount -ge $MaxUsrDBs) {
+		#If the number of user databases >= MaxUsrDBs
+		#set the database to the one that accounts for the most records in the plan cache
+		$TopDBinCache = $DBArray | Where-Object { $_ -ne "-- N/A --" }| Group-Object | Sort-Object Count -Descending | Select-Object -First 1
+		[string]$TopCacheDB = $TopDBinCache.Name
+		[int]$TopCacheDBCount = $TopDBinCache.Count
+		$TopCacheReplace = ";SET @DatabaseName = '"+$TopCacheDB+"';"
+		Write-Host " You're trying to get index info on an instance with  $UsrDBCount databases." -ForegroundColor Yellow
+		Write-Host " Doing so may cause temporary problems for the server and/or PSBlitz." -ForegroundColor Yellow
+		Write-Host " Limiting index info to $($TopDBinCache.Name) which accounts for $TopCacheDBCount records returned from cache"
+		Write-Host " Retrieving index info for $($TopDBinCache.Name)"
+		[string]$Query = $Query -replace ';SET @DatabaseName = NULL;', $TopCacheReplace
+		[string]$Query = $Query -replace ';SET @GetAllDatabases = 1;', ';SET @GetAllDatabases = 0;'
+		Add-LogRow "sp_BlitzIndex" "User database count>= $MaxUsrDBs" "Limiting index info to $TopCacheDB which accounts for $TopCacheDBCount records in the plan cache results"
+ }
+ 
  else {
 		Write-Host " Retrieving index info for all user databases"
+
 	}
 	#Loop through $Modes
 	foreach ($Mode in $Modes) {
@@ -6700,6 +6770,8 @@ finally {
 				$QuerySource = "sp_BlitzIndex @Mode = $Mode"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$QuerySource += ", @DatabaseName = '$CheckDB'; "
+				}elseif ($UsrDBCount -ge $MaxUsrDBs){
+					$QuerySource += ", @DatabaseName = '$TopCacheDB'; "
 				}
 				else {
 					$QuerySource += ", @GetAllDatabases = 1; "
@@ -6747,9 +6819,28 @@ finally {
 					else {
 						$Description += "."
 					}
+				}elseif($SortOrder -eq "Dupl_Single_Use"){
+					$PageName = "Top $CacheTop Queries - Duplicates and Single Use"
+					$QuerySource = "sp_BlitzCache @Top = $CacheTop, @SortOrder = 'Duplicate'/'Query Hash'"
+					if (!([string]::IsNullOrEmpty($CheckDB))) {
+						$QuerySource += ", @DatabaseName = '$CheckDB'; "
+					}
+					else {
+						$QuerySource += "; "
+					}
+					$Description = "Contains the top $CacheTop queries, found in the plan cache, sorted by number of cached plans and query hash. Helps finding queries that have multiple plans and potential parameterization problems"
+					if ($IsAzureSQLDB) {
+						$Description += " for $ASDBName."
+					}
+					elseif (!([string]::IsNullOrEmpty($CheckDB))) {
+						$Description += " for $CheckDB."
+					}
+					else {
+						$Description += "."
+					}
 				}
 				else {
-					$QuerySource = "sp_BlitzCache , @Top = $CacheTop, @SortOrder = '$SortOrder'/'avg $SortOrder'"
+					$QuerySource = "sp_BlitzCache , @Top = $CacheTop, @SortOrder = '$SortOrder'/'Avg $SortOrder'"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
 					}

@@ -102,6 +102,10 @@ SELECT @SQL = CASE
                      + @LineFeed
                      + N'AND [counter_name] LIKE N''Total Server Memory (KB)%'') AS [total_memory_used_GB],'
                      + @LineFeed
+					 + N'(SELECT CAST(COUNT(*) * 8/1024.0/1024.0 AS DECIMAL (15,2))'
+                     + @LineFeed
+					 + N' FROM sys.dm_os_buffer_descriptors WHERE database_id <> 32767)   AS [buffer_pool_usage_GB],'
+					 + @LineFeed
                      + N'(SELECT CASE WHEN [process_physical_memory_low] = 1 THEN ''Yes'''
                      + @LineFeed
                      + N'ELSE ''No'' END FROM sys.dm_os_process_memory) AS [proc_physical_memory_low],'

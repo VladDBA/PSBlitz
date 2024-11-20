@@ -54,8 +54,15 @@ Exports the following files:
 - Execution plans (as .sqlplan files) - from sp_BlitzQueryStore in the case of a database-specific check on an eligible database
 
 ### Note
-If the execution of PSBlitz took longer than 15 minutes up until the call to sp_BlitzLock, the timeframe for sp_BlitzLock will be narrowed down to the last 7 days in order to keep execution time within a reasonable amount.<br>
-If PSBlitz detects an exclusive lock being held on a table or index it will automatically skip that table/index from the index fragmentation information and will make a note of that in the Execution Log.
+- If the execution of PSBlitz took longer than 15 minutes up until the call to sp_BlitzLock, the timeframe for sp_BlitzLock will be narrowed down to the last 7 days in order to keep execution time within a reasonable amount.<br>
+- If PSBlitz detects an exclusive lock being held on a table or index it will automatically skip that table/index from the index fragmentation information and will make a note of that in the Execution Log.
+- If the instance has 50 or more user databases, PSBlitz will automatically limit the following checks to the database that appears the most in the data returned by the cache related checks:
+   - Index Summary
+   - Index Usage Details
+   - (Detailed) Index Diagnosis
+
+  The behavior can be controlled via the `-MaxUsrDBs` parameter, but only change the value if most of those databases don't have too many tables, or you've opted to output to HTML and have enough RAM for PS to handle the data (PSBlitz will limit the output to 30k records if more rows are returned)
+
 
 ## Prerequisites
 1. In order to be able to run the PSBlitz.ps1 script, you'll need to unblock it:
@@ -114,14 +121,15 @@ You can find the all the scripts in the repository's [Resources](/Resources) dir
 |`-SQLPass` | The password for the SQL login provided via the -SQLLogin parameter, omit if `-SQLLogin` was not used. |
 |`-IsIndepth` | Providing Y as a value will tell PSBlitz.ps1 to run a more in-depth check against the instance/database. Omit for default check. |
 |`-CheckDB` | Used to provide the name of a specific database against which sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock will be ran. Omit to run against the whole instance.<br><br>__For Azure SQL DB__<br>Can also be used to provide the name of the Azure SQL DB database if you haven't provided it as part of the <br>`-ServerName` paramter.<br>If the database name is not provided here, nor as part of the `-ServerName`, and the environment is detected as Azure SQL DB, then you'll be prompted to provide the database name.|
-|`-CacheTop`| Used to specify if more/less than the default top 10 queries should be returned for the sp_BlitzCache step. Only works for HTML output (`-ToHTM Y`). Has no effect on the `recent compilations` sort order.|
-|`-CacheMinutesBack`| Used to specify how many minutes back to begin plan cache analysis. Defaults to entire contents of the plan cache since instance startup.<br> In order to avoid missing the desired timeframe, the value is dynamically adjusted based on the runtime of PSBlitz up until the plan cache analysis point.|
-|`-OutputDir`| Used to provide a path where the output directory should be saved to. Defaults to PSBlitz.ps1's directory if not specified or a non-existent path is provided.|
+|`-CacheTop`| Used to specify if more/less than the default top 10 queries should be returned for the sp_BlitzCache step. Only works for HTML output (`-ToHTM Y`). Has no effect on the `recent compilations` sort order.<br>Defaults to 10.|
+|`-CacheMinutesBack`| Used to specify how many minutes back to begin plan cache analysis. <br>Defaults to entire contents of the plan cache since instance startup.<br> In order to avoid missing the desired timeframe, the value is dynamically adjusted based on the runtime of PSBlitz up until the plan cache analysis point.|
+|`-OutputDir`| Used to provide a path where the output directory should be saved to. <br>Defaults to PSBlitz.ps1's directory if not specified or a non-existent path is provided.|
 |`-ToHTML`| Providing Y as a value will tell PSBlitz.ps1 to output the report as HTML instead of an Excel file. This is perfect when running PSBlitz from a machine that doesn't have Office installed.|
-|`-ZipOutput`| Providing Y as a value will tell PSBlitz.ps1 to also create a zip archive of the output files.|
-|`-BlitzWhoDelay` | Used to sepcify the number of seconds between each sp_BlitzWho execution. Defaults to 10 if not specified.|
-|`-ConnTimeout`| Can be used to increased the timeout limit in seconds for connecting to SQL Server. Defaults to 15 seconds if not specified.|
-|`-MaxTimeout`| Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. Defaults to 1000 (16.6 minutes)|
+|`-ZipOutput`| Providing Y as a value will tell PSBlitz.ps1 to also create a zip archive of the output files.<br>Defaults to N.|
+|`-BlitzWhoDelay` | Used to sepcify the number of seconds between each sp_BlitzWho execution. <br>Defaults to 10 if not specified.|
+|`-ConnTimeout`| Can be used to increased the timeout limit in seconds for connecting to SQL Server. <br>Defaults to 15 seconds if not specified.|
+|`-MaxTimeout`| Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. <br>Defaults to 1000 (16.6 minutes).|
+|`-MaxUsrDBs`| Can be used to tell PSBlitz to raise the limit of user databases based on which index-related info is limited to only the "loudest" database in the cache results. <br>Defaults to 50. <br>Only change it if you're using using HTML output and have enough RAM to handle the increased data that PS will have to process.|
 |`-DebugInfo`| Switch used to get more information for debugging and troubleshooting purposes.|
 
 [*Back to top*](#header1)
