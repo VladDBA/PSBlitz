@@ -156,6 +156,11 @@
 .PARAMETER MaxTimeout
  Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. Defaults to 1000 (16.6 minutes)
 
+.PARAMETER MaxUsrDBs
+ Can be used to tell PSBlitz to raise the limit of user databases based on which index-related info is 
+ limited to only the "loudest" database in the cache results. Defaults to 50 - only change it if you're using using HTML output
+ and have enough RAM to handle the increased data that PS will have to process.
+
 .PARAMETER DebugInfo
  Switch used to get more information for debugging and troubleshooting purposes.
 
@@ -260,13 +265,15 @@ param(
 	[Parameter(Mandatory = $False)]
 	[int]$CacheTop = 10,
 	[Parameter(Mandatory = $False)]
-	[int]$CacheMinutesBack = 0
+	[int]$CacheMinutesBack = 0,
+	[Parameter(Mandatory = $False)]
+	[int]$MaxUsrDBs = 50
 )
 
 ###Internal params
 #Version
 $Vers = "4.5.0"
-$VersDate = "2024-11-19"
+$VersDate = "2024-11-20"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -277,8 +284,7 @@ $error.Clear();
 $ResourcesPath = Join-Path -Path $ScriptPath -ChildPath "Resources"
 #Set name of the input Excel file
 $OrigExcelFName = "PSBlitzOutput.xlsx"
-#Set maximum limit of user databases
-[int]$MaxUsrDBs = 50
+
 $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"spBlitzCache_NonSPLatest.sql", "spBlitzFirst_NonSPLatest.sql",
 	"spBlitzIndex_NonSPLatest.sql", "spBlitzLock_NonSPLatest.sql",
