@@ -272,8 +272,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "4.5.0"
-$VersDate = "2024-11-20"
+$Vers = "4.5.1"
+$VersDate = "2024-12-19"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -284,6 +284,7 @@ $error.Clear();
 $ResourcesPath = Join-Path -Path $ScriptPath -ChildPath "Resources"
 #Set name of the input Excel file
 $OrigExcelFName = "PSBlitzOutput.xlsx"
+$DefaultTimeout = 600
 
 $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"spBlitzCache_NonSPLatest.sql", "spBlitzFirst_NonSPLatest.sql",
@@ -378,6 +379,7 @@ function Get-HexString {
 	}
 	Write-Output $HexString
 }
+
 #Function to return a brief help menu
 function Get-PSBlitzHelp {
 	Write-Host "`n######	PSBlitz		######`n Version $Vers - $VersDate
@@ -596,7 +598,71 @@ function Add-LogRow {
 	$LogTbl.Rows.Add($LogRow)
 }
 
-###Job preparation
+function Invoke-PSBlitzQuery {
+	param (
+		[Parameter(Position = 0, Mandatory = $true)]
+		[string]$QueryIn,
+		[Parameter(Position = 1, Mandatory = $true)]
+		[string]$StepNameIn,
+		[Parameter(Position = 2, Mandatory = $true)]
+		[string]$ConnStringIn,
+		[Parameter(Position = 3, Mandatory = $true)]
+		[int]$CmdTimeoutIn
+	)
+	$global:PSBlitzSet = New-Object System.Data.DataSet
+	$IBQConnection = New-Object System.Data.SqlClient.SqlConnection
+	$IBQConnection.ConnectionString = $ConnStringIn
+	$IBQCommand = $IBQConnection.CreateCommand()
+	$IBQCommand.CommandText = $QueryIn
+	$IBQCommand.CommandTimeout = $CmdTimeoutIn
+	$IBQAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+	$IBQAdapter.SelectCommand = $IBQCommand
+
+	Try {
+		$StepStart = get-date
+		$IBQConnection.Open()
+		$IBQAdapter.Fill($global:PSBlitzSet) | Out-Null -ErrorAction Stop
+		$StepEnd = get-date
+		Write-Host @GreenCheck
+		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
+		$RunTime = [Math]::Round($StepRunTime, 2)
+		if ($DebugInfo) {
+			Write-Host " - $RunTime seconds" -Fore Yellow
+		}
+		$global:StepOutcome = "Success"
+		if (($StepNameIn -like "sp_BlitzCache*") -or ($StepNameIn -like "sp_BlitzQueryStore*") -or 
+		($StepNameIn -like "sp_BlitzIndex*") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info")) {
+			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
+			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
+
+		}
+		else {
+			Add-LogRow $StepNameIn $global:StepOutcome
+		}
+	}
+ Catch {
+		$StepEnd = get-date
+		Invoke-ErrMsg
+		$global:StepOutcome = "Failure"
+		Add-LogRow $StepNameIn $global:StepOutcome
+	}
+	Finally {
+		$IBQConnection.Close()
+		$IBQConnection.Dispose()
+	}
+}
+
+function Invoke-ClearVariables {
+	[Parameter(Position = 0, Mandatory = $true)]
+	[string[]]$VarNames
+
+	foreach ($Var in $VarNames) {
+		Clear-Variable -Name $Var #-ErrorAction SilentlyContinue
+		Remove-Variable -Name $Var #-ErrorAction SilentlyContinue
+	}
+}
+
+###Background Job preparation
 #sp_BlitzWho
 $InitScriptBlock = {
 	function Invoke-BlitzWho {
@@ -1244,7 +1310,8 @@ elseif ($IsAzureSQLDB -eq $false) {
 		else {
 			Write-Host "   - Index Diagnosis"
 		}			
-	} else {
+	}
+ else {
 		Write-Host @GreenCheck
 	}	
 }
@@ -1528,47 +1595,21 @@ try {
 	#####################################################################################
 	#						Instance Info												#
 	#####################################################################################
+	$StepOutcome = "Failure"
 	Write-Host " Retrieving instance information... " -NoNewLine
-	$CmdTimeout = 600
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetInstanceInfo.sql"
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-	$InstanceInfoQuery = new-object System.Data.SqlClient.SqlCommand
-	$InstanceInfoQuery.CommandText = $Query
-	$InstanceInfoQuery.Connection = $SqlConnection
-	$InstanceInfoQuery.CommandTimeout = $CmdTimeout
-	$InstanceInfoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-	$InstanceInfoAdapter.SelectCommand = $InstanceInfoQuery
-	$InstanceInfoSet = new-object System.Data.DataSet
-	try {
-		$StepStart = get-date
-		$InstanceInfoAdapter.Fill($InstanceInfoSet) | Out-Null -ErrorAction Stop
-		$SqlConnection.Close()
-		$StepEnd = get-date
-		Write-Host @GreenCheck
-		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-		$RunTime = [Math]::Round($StepRunTime, 2)
-		if ($DebugInfo) {
-			Write-Host " - $RunTime seconds" -Fore Yellow
-		}
-		$StepOutcome = "Success"
-		Add-LogRow "Instance Info" $StepOutcome
-	}
-	Catch {
-		$StepEnd = get-date
-		Invoke-ErrMsg
-		$StepOutcome = "Failure"
-		Add-LogRow "Instance Info" $StepOutcome
-	}
+	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Instance Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		
-	if ($StepOutcome -eq "Success") {
+	if ($global:StepOutcome -eq "Success") {
 		$InstanceInfoTbl = New-Object System.Data.DataTable
-		$InstanceInfoTbl = $InstanceInfoSet.Tables[0]
+		$InstanceInfoTbl = $global:PSBlitzSet.Tables[0]
 		$ResourceInfoTbl = New-Object System.Data.DataTable
-		$ResourceInfoTbl = $InstanceInfoSet.Tables[1]
+		$ResourceInfoTbl = $global:PSBlitzSet.Tables[1]
 		$ConnectionsInfoTbl = New-Object System.Data.DataTable
-		$ConnectionsInfoTbl = $InstanceInfoSet.Tables[2]
+		$ConnectionsInfoTbl = $global:PSBlitzSet.Tables[2]
 		$SessOptTbl = New-Object System.Data.DataTable
-		$SessOptTbl = $InstanceInfoSet.Tables[3]
+		$SessOptTbl = $global:PSBlitzSet.Tables[3]
 		
 		if ($ToHTML -eq "Y") {
 			if ($DebugInfo) {
@@ -1847,17 +1888,8 @@ $htmlTable4
 			##Saving file 
 			$ExcelFile.Save()
 		}
-		##Cleaning up variables 
-		Clear-Variable -Name ResourceInfoTbl
-		Remove-Variable -Name ResourceInfoTbl
-		Clear-Variable -Name InstanceInfoTbl
-		Remove-Variable -Name InstanceInfoTbl
-		Clear-Variable -Name ConnectionsInfoTbl
-		Remove-Variable -Name ConnectionsInfoTbl
-		Clear-Variable -Name SessOptTbl
-		Remove-Variable -Name SessOptTbl
-		Clear-Variable -Name InstanceInfoSet
-		Remove-Variable -Name InstanceInfoSet
+		##Cleaning up variables
+		Invoke-ClearVariables ResourceInfoTbl,InstanceInfoTbl, ConnectionsInfoTbl, SessOptTbl, PSBlitzSet
 	}
 
 	if ($JobStatus -ne "Running") {
@@ -1869,47 +1901,20 @@ $htmlTable4
 	#						TempDB usage info	 										#
 	#####################################################################################
 	Write-Host " Retrieving TempDB usage data... " -NoNewLine
-	$CmdTimeout = 600
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetTempDBUsageInfo.sql"
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	[string]$Query = $Query -replace '..PSBlitzReplace..', "$DirDate"
-	$TempDBSelect = new-object System.Data.SqlClient.SqlCommand
-	$TempDBSelect.CommandText = $Query
-	$TempDBSelect.Connection = $SqlConnection
-	$TempDBSelect.CommandTimeout = $CmdTimeout
-	$TempDBAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-	$TempDBAdapter.SelectCommand = $TempDBSelect
-	$TempDBSet = new-object System.Data.DataSet
-	try {
-		$StepStart = get-date
-		$TempDBAdapter.Fill($TempDBSet) | Out-Null -ErrorAction Stop
-		$SqlConnection.Close()
-		$StepEnd = get-date
-		Write-Host @GreenCheck
-		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-		$RunTime = [Math]::Round($StepRunTime, 2)
-		if ($DebugInfo) {
-			Write-Host " - $RunTime seconds" -Fore Yellow
-		}
-		$StepOutcome = "Success"
-		Add-LogRow "TempDB Info" $StepOutcome
-	}
- Catch {
-		$StepEnd = get-date
-		Invoke-ErrMsg
-		$StepOutcome = "Failure"
-		Add-LogRow "TempDB Info" $StepOutcome
-	}
+	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "TempDB Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		
-	if ($StepOutcome -eq "Success") {
+	if ($global:StepOutcome -eq "Success") {
 		$TempDBTbl = New-Object System.Data.DataTable
-		$TempDBTbl = $TempDBSet.Tables[0]
+		$TempDBTbl = $global:PSBlitzSet.Tables[0]
 		
 		$TempTabTbl = New-Object System.Data.DataTable
-		$TempTabTbl = $TempDBSet.Tables[1]
+		$TempTabTbl = $global:PSBlitzSet.Tables[1]
 
 		$TempDBSessTbl = New-Object System.Data.DataTable
-		$TempDBSessTbl = $TempDBSet.Tables[2]
+		$TempDBSessTbl = $global:PSBlitzSet.Tables[2]
 
 		if ($ToHTML -eq "Y") {
 			if ($DebugInfo) {
@@ -2157,14 +2162,7 @@ $htmlTable2
 			$ExcelFile.Save()
 		}
 		##Cleaning up variables
-		Clear-Variable -Name TempDBSessTbl 
-		Remove-Variable -Name TempDBSessTbl
-		Clear-Variable -Name TempTabTbl
-		Remove-Variable -Name TempTabTbl
-		Clear-Variable -Name TempDBTbl
-		Remove-Variable -Name TempDBTbl
-		Clear-Variable -Name TempDBSet
-		Remove-Variable -Name TempDBSet		
+		Invoke-ClearVariables TempDBTbl, TempTabTbl, TempDBSessTbl, PSBlitzSet
 	}
 
 	if ($JobStatus -ne "Running") {
@@ -2186,37 +2184,11 @@ $htmlTable2
 		Write-Host " for $ASDBName" -NoNewline
 	}
 	Write-Host "... " -NoNewline
-	$CmdTimeout = 600
-	$AcTranQuery = new-object System.Data.SqlClient.SqlCommand
-	$AcTranQuery.CommandText = $Query
-	$AcTranQuery.Connection = $SqlConnection
-	$AcTranQuery.CommandTimeout = $CmdTimeout
-	$AcTranAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-	$AcTranAdapter.SelectCommand = $AcTranQuery
-	$AcTranSet = new-object System.Data.DataSet
-	Try {
-		$StepStart = get-date
-		$AcTranAdapter.Fill($AcTranSet) | Out-Null -ErrorAction Stop
-		$SqlConnection.Close()
-		$StepEnd = get-date
-		Write-Host @GreenCheck
-		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-		$RunTime = [Math]::Round($StepRunTime, 2)
-		if ($DebugInfo) {
-			Write-Host " - $RunTime seconds" -Fore Yellow
-		}
-		$StepOutcome = "Success"
-		Add-LogRow "Open Transacion Info" $StepOutcome
-	}
- Catch {
-		$StepEnd = get-date
-		Invoke-ErrMsg
-		$StepOutcome = "Failure"
-		Add-LogRow "Open Transacion Info" $StepOutcome
-	}
-	if ($StepOutcome -eq "Success") {
+	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Open Transacion Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
+	
+	if ($global:StepOutcome -eq "Success") {
 		$AcTranTbl = New-Object System.Data.DataTable
-		$AcTranTbl = $AcTranSet.Tables[0]
+		$AcTranTbl = $global:PSBlitzSet.Tables[0]
 		[int]$RowsReturned = $AcTranTbl.Rows.Count
 		if ($RowsReturned -le 0) {
 			Write-Host " ->No open transactions found."
@@ -2376,10 +2348,7 @@ $JumpToTop
 					
 		}
 		##Cleaning up variables 
-		Clear-Variable -Name AcTranTbl
-		Remove-Variable -Name AcTranTbl
-		Clear-Variable -Name AcTranSet
-		Remove-Variable -Name AcTranSet
+		Invoke-ClearVariables AcTranTbl, PSBlitzSet
 	}
 
 	if ($JobStatus -ne "Running") {
@@ -2387,61 +2356,24 @@ $JumpToTop
 		$BlitzWhoPass += 1
 	}
 
-
 	#####################################################################################
 	#						Database info												#
 	#####################################################################################
 	if ($IsAzureSQLDB) {
-		#$StepStart = get-date
-		#$StepEnd = get-date
-		#Write-Host " Azure SQL DB - skipping database info."
-		#Add-LogRow "Database Info" "Skipped" "Azure SQL DB"
+
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetAzureSQLDBInfo.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		Write-Host " Retrieving database info for $ASDBName... " -NoNewLine 
-		$CmdTimeout = 600
-		$DBInfoQuery = new-object System.Data.SqlClient.SqlCommand
-		$DBInfoQuery.CommandText = $Query
-		$DBInfoQuery.Connection = $SqlConnection
-		$DBInfoQuery.CommandTimeout = $CmdTimeout
-		$DBInfoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-		$DBInfoAdapter.SelectCommand = $DBInfoQuery
-		$DBInfoSet = new-object System.Data.DataSet
-		Try {
-			$StepStart = get-date
-			$DBInfoAdapter.Fill($DBInfoSet) | Out-Null -ErrorAction Stop
-			$SqlConnection.Close()
-			$StepEnd = get-date
-			Write-Host @GreenCheck
-			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-			$RunTime = [Math]::Round($StepRunTime, 2)
-			if ($DebugInfo) {
-				Write-Host " - $RunTime seconds" -Fore Yellow
-			}
-			$StepOutcome = "Success"
-			Add-LogRow "Azure SQL DB Info" $StepOutcome
-		}
-		Catch {
-			$StepEnd = get-date
-			Invoke-ErrMsg
-			$StepOutcome = "Failure"
-			Add-LogRow "Azure SQL DB Info" $StepOutcome
-		}
-		if ($StepOutcome -eq "Success") {
-			$RsrcGovTbl = New-Object System.Data.DataTable
-			$RsrcGovTbl = $DBInfoSet.Tables[0]
-			$DBInfoTbl = New-Object System.Data.DataTable
-			$DBInfoTbl = $DBInfoSet.Tables[1]
-			$RsrcUsageTbl = New-Object System.Data.DataTable
-			$RsrcUsageTbl = $DBInfoSet.Tables[2]
-			$Top10WaitsTbl = New-Object System.Data.DataTable
-			$Top10WaitsTbl = $DBInfoSet.Tables[3]
-			$DBFileInfoTbl = New-Object System.Data.DataTable
-			$DBFileInfoTbl = $DBInfoSet.Tables[4]
-			$ObjImpUpgrTbl = New-Object System.Data.DataTable
-			$ObjImpUpgrTbl = $DBInfoSet.Tables[5]
-			$DBConfigTbl = New-Object System.Data.DataTable
-			$DBConfigTbl = $DBInfoSet.Tables[6]
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Azure SQL DB Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
+		
+		if ($global:StepOutcome -eq "Success") {
+			$RsrcGovTbl = $global:PSBlitzSet.Tables[0]
+			$DBInfoTbl = $global:PSBlitzSet.Tables[1]
+			$RsrcUsageTbl = $global:PSBlitzSet.Tables[2]
+			$Top10WaitsTbl = $global:PSBlitzSet.Tables[3]
+			$DBFileInfoTbl = $global:PSBlitzSet.Tables[4]
+			$ObjImpUpgrTbl = $global:PSBlitzSet.Tables[5]
+			$DBConfigTbl = $global:PSBlitzSet.Tables[6]
 
 			if ($ToHTML -eq "Y") {
 				$tableName = "Azure SQL Database Info"
@@ -2901,20 +2833,7 @@ $JumpToTop
 				##Saving file 
 				$ExcelFile.Save()
 			}
-			Clear-Variable -Name DBInfoTbl
-			Remove-Variable -Name DBInfoTbl
-			Clear-Variable -Name DBFileInfoTbl
-			Remove-Variable -Name DBFileInfoTbl
-			Clear-Variable -Name RsrcGovTbl
-			Remove-Variable -Name RsrcGovTbl
-			Clear-Variable -Name RsrcUsageTbl
-			Remove-Variable -Name RsrcUsageTbl
-			Clear-Variable -Name ObjImpUpgrTbl
-			Remove-Variable -Name ObjImpUpgrTbl
-			Clear-Variable -Name DBConfigTbl
-			Remove-Variable -Name DBConfigTbl
-			Clear-Variable -Name DBInfoSet
-			Remove-Variable -Name DBInfoSet
+			Invoke-ClearVariables DBInfoTbl,DBFileInfoTbl,RsrcGovTbl,RsrcUsageTbl,ObjImpUpgrTbl,DBConfigTbl,PSBlitzSet
 		}
 
 	}
@@ -2930,43 +2849,15 @@ $JumpToTop
 		else {
 			Write-Host " Retrieving database info... " -NoNewLine
 		}
-		$CmdTimeout = 600
-		$DBInfoQuery = new-object System.Data.SqlClient.SqlCommand
-		$DBInfoQuery.CommandText = $Query
-		$DBInfoQuery.Connection = $SqlConnection
-		$DBInfoQuery.CommandTimeout = $CmdTimeout
-		$DBInfoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-		$DBInfoAdapter.SelectCommand = $DBInfoQuery
-		$DBInfoSet = new-object System.Data.DataSet
-		Try {
-			$StepStart = get-date
-			$DBInfoAdapter.Fill($DBInfoSet) | Out-Null -ErrorAction Stop
-			$SqlConnection.Close()
-			$StepEnd = get-date
-			Write-Host @GreenCheck
-			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-			$RunTime = [Math]::Round($StepRunTime, 2)
-			if ($DebugInfo) {
-				Write-Host " - $RunTime seconds" -Fore Yellow
-			}
-			$StepOutcome = "Success"
-			Add-LogRow "Database Info" $StepOutcome
-		}
-		Catch {
-			$StepEnd = get-date
-			Invoke-ErrMsg
-			$StepOutcome = "Failure"
-			Add-LogRow "Database Info" $StepOutcome
-		}
-		if ($StepOutcome -eq "Success") {
-			$DBInfoTbl = New-Object System.Data.DataTable
-			$DBInfoTbl = $DBInfoSet.Tables[0]
-			$DBFileInfoTbl = New-Object System.Data.DataTable
-			$DBFileInfoTbl = $DBInfoSet.Tables[1]
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Database Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
+		
+		if ($global:StepOutcome -eq "Success") {
+			$DBInfoTbl = $global:PSBlitzSet.Tables[0]
+			$DBFileInfoTbl = $global:PSBlitzSet.Tables[1]
 			if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 				#the 3rd result set exists only for SQL Server 2016 and above
-				$DBConfigTbl = New-Object System.Data.DataTable
-				$DBConfigTbl = $DBInfoSet.Tables[2]
+				#$DBConfigTbl = New-Object System.Data.DataTable
+				$DBConfigTbl = $global:PSBlitzSet.Tables[2]
 			}
 			elseif (($MajorVers -lt 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 				Add-LogRow "->Database Scoped Config" "Skipped" "Major Version is $MajorVers"
@@ -3159,12 +3050,7 @@ $htmlBlock
 				##Saving file 
 				$ExcelFile.Save()
 			}
-			Clear-Variable -Name DBInfoTbl
-			Remove-Variable -Name DBInfoTbl
-			Clear-Variable -Name DBFileInfoTbl
-			Remove-Variable -Name DBFileInfoTbl
-			Clear-Variable -Name DBInfoSet
-			Remove-Variable -Name DBInfoSet
+			Invoke-ClearVariables DBInfoTbl, DBFileInfoTbl, PSBlitzSet
 		}
 	}
 
@@ -3188,38 +3074,10 @@ $htmlBlock
 		if (($IsIndepth -eq "Y") -and ([string]::IsNullOrEmpty($CheckDB))) {
 			[string]$Query = $Query -replace ";SET @CheckUserDatabaseObjects = 0;", ";SET @CheckUserDatabaseObjects = 1;"
 		}
-		$CmdTimeout = 600
-		$BlitzQuery = new-object System.Data.SqlClient.SqlCommand
-		$BlitzQuery.CommandText = $Query
-		$BlitzQuery.Connection = $SqlConnection
-		$BlitzQuery.CommandTimeout = $CmdTimeout
-		$BlitzAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-		$BlitzAdapter.SelectCommand = $BlitzQuery
-		$BlitzSet = new-object System.Data.DataSet
-		Try {
-			$StepStart = get-date
-			$BlitzAdapter.Fill($BlitzSet) | Out-Null -ErrorAction Stop
-			$SqlConnection.Close()
-			$StepEnd = get-date
-			Write-Host @GreenCheck
-			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-			$RunTime = [Math]::Round($StepRunTime, 2)
-			if ($DebugInfo) {
-				Write-Host " - $RunTime seconds" -Fore Yellow
-			}
-			$StepOutcome = "Success"
-			Add-LogRow "sp_Blitz" $StepOutcome
-		}
-		Catch {
-			$StepEnd = get-date
-			Invoke-ErrMsg
-			$StepOutcome = "Failure"
-			Add-LogRow "sp_Blitz" $StepOutcome
-		}
-		
-		if ($StepOutcome -eq "Success") {
-			$BlitzTbl = New-Object System.Data.DataTable
-			$BlitzTbl = $BlitzSet.Tables[0]
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_Blitz" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
+		if ($global:StepOutcome -eq "Success") {
+			#$BlitzTbl = New-Object System.Data.DataTable
+			$BlitzTbl = $global:PSBlitzSet.Tables[0]
 
 			if ($ToHTML -eq "Y") {
 				$tableName = "Instance Health"
@@ -3300,10 +3158,7 @@ $JumpToTop
 				$ExcelFile.Save()
 			}
 			##Cleaning up variables
-			Clear-Variable -Name BlitzTbl
-			Remove-Variable -Name BlitzTbl
-			Clear-Variable -Name BlitzSet
-			Remove-Variable -Name BlitzSet		
+			Invoke-ClearVariables BlitzTbl, PSBlitzSet		
 		}
 	}
 
@@ -3317,40 +3172,11 @@ $JumpToTop
 	#						sp_BlitzFirst 30 seconds									#
 	#####################################################################################
 	Write-Host " What's happening in a 30 seconds time-frame... " -NoNewLine
-	$CmdTimeout = 600
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzFirst_NonSPLatest.sql"
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-	$BlitzFirstQuery = new-object System.Data.SqlClient.SqlCommand
-	$BlitzFirstQuery.CommandText = $Query
-	$BlitzFirstQuery.Connection = $SqlConnection
-	$BlitzFirstQuery.CommandTimeout = $CmdTimeout
-	$BlitzFirstAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-	$BlitzFirstAdapter.SelectCommand = $BlitzFirstQuery
-	$BlitzFirstSet = new-object System.Data.DataSet
-	Try {
-		$StepStart = get-date
-		$BlitzFirstAdapter.Fill($BlitzFirstSet) | Out-Null -ErrorAction Stop
-		$SqlConnection.Close()
-		$StepEnd = get-date
-		Write-Host @GreenCheck
-		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-		$RunTime = [Math]::Round($StepRunTime, 2)
-		if ($DebugInfo) {
-			Write-Host " - $RunTime seconds" -Fore Yellow
-		}
-		$StepOutcome = "Success"
-		Add-LogRow "sp_BlitzFirst 30 seconds" $StepOutcome
-	}
- Catch {
-		$StepEnd = get-date
-		Invoke-ErrMsg
-		$StepOutcome = "Failure"
-		Add-LogRow "sp_BlitzFirst 30 seconds" $StepOutcome
-	}
-		
-	if ($StepOutcome -eq "Success") {
-		$BlitzFirstTbl = New-Object System.Data.DataTable
-		$BlitzFirstTbl = $BlitzFirstSet.Tables[0]
+	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzFirst 30 seconds" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
+	if ($global:StepOutcome -eq "Success") {
+		$BlitzFirstTbl = $global:PSBlitzSet.Tables[0]
 
 		if ($ToHTML -eq "Y") {
 			if ($DebugInfo) {
@@ -3425,10 +3251,7 @@ $htmlTable
 			##Saving file 
 			$ExcelFile.Save()
 		}
-		Clear-Variable -Name BlitzFirstTbl
-		Remove-Variable -Name BlitzFirstTbl
-		Clear-Variable -Name BlitzFirstSet
-		Remove-Variable -Name BlitzFirstSet
+		Invoke-ClearVariables BlitzFirstTbl,PSBlitzSet
 	}
 	if ($JobStatus -ne "Running") {
 		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
@@ -3440,48 +3263,14 @@ $htmlTable
 	#####################################################################################
 	if ($IsIndepth -eq "Y") {
 		Write-Host " Retrieving waits recorded since instance startup... " -NoNewLine
-		$CmdTimeout = 600
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzFirst_NonSPLatest.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		[string]$Query = $Query -replace ";SET @SinceStartup = 0;", ";SET @SinceStartup = 1;"
-		$BlitzFirstQuery = new-object System.Data.SqlClient.SqlCommand
-		$BlitzFirstQuery.CommandText = $Query
-		$BlitzFirstQuery.Connection = $SqlConnection
-		$BlitzFirstQuery.CommandTimeout = $CmdTimeout 
-		$BlitzFirstAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-		$BlitzFirstAdapter.SelectCommand = $BlitzFirstQuery
-		$BlitzFirstSet = new-object System.Data.DataSet
-		Try {
-			$StepStart = get-date
-			$BlitzFirstAdapter.Fill($BlitzFirstSet) | Out-Null -ErrorAction Stop
-			$SqlConnection.Close()
-			$StepEnd = get-date
-			Write-Host @GreenCheck
-			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-			$RunTime = [Math]::Round($StepRunTime, 2)
-			if ($DebugInfo) {
-				Write-Host " - $RunTime seconds" -Fore Yellow
-			}
-			$StepOutcome = "Success"
-			Add-LogRow "sp_BlitzFirst since startup" $StepOutcome
-		}
-	 Catch {
-			$StepEnd = get-date
-			Invoke-ErrMsg
-			$StepOutcome = "Failure"
-			Add-LogRow "sp_BlitzFirst since startup" $StepOutcome
-		}
-			
-		if ($StepOutcome -eq "Success") {
-			$WaitsTbl = New-Object System.Data.DataTable
-			$WaitsTbl = $BlitzFirstSet.Tables[0]
-
-			$StorageTbl = New-Object System.Data.DataTable
-			$StorageTbl = $BlitzFirstSet.Tables[1]
-
-			$PerfmonTbl = New-Object System.Data.DataTable
-			$PerfmonTbl = $BlitzFirstSet.Tables[2]
-
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzFirst since startup" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
+		if ($global:StepOutcome -eq "Success") {
+			$WaitsTbl = $global:PSBlitzSet.Tables[0]
+			$StorageTbl = $global:PSBlitzSet.Tables[1]
+			$PerfmonTbl = $global:PSBlitzSet.Tables[2]
 
 			if ($ToHTML -eq "Y") {
 				#Waits
@@ -3735,14 +3524,7 @@ $JumpToTop
 			}
 
 			##Cleaning up variables
-			Clear-Variable -Name WaitsTbl
-			Remove-Variable -Name WaitsTbl
-			Clear-Variable -Name StorageTbl
-			Remove-Variable -Name StorageTbl
-			Clear-Variable -Name PerfmonTbl
-			Remove-Variable -Name PerfmonTbl
-			Clear-Variable -Name BlitzFirstSet
-			Remove-Variable -Name BlitzFirstSet
+			Invoke-ClearVariables WaitsTbl, StorageTbl, PerfmonTbl, PSBlitzSet
 		}
 		if ($JobStatus -ne "Running") {
 			Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
@@ -3763,7 +3545,7 @@ $JumpToTop
 		$SortOrders = @("'CPU'", "'Average CPU'", "'Reads'", "'Average Reads'",
 			"'Duration'", "'Average Duration'", "'Executions'", "'Executions per Minute'",
 			"'Writes'", "'Average Writes'", "'Spills'", "'Average Spills'",
-			"'Duplicate'","'Query Hash'",
+			"'Duplicate'", "'Query Hash'",
 			"'Memory Grant'", "'Recent Compilations'")
 	}
  else {
@@ -3774,7 +3556,6 @@ $JumpToTop
 	$OldSortOrder = "'CPU'"
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzCache_NonSPLatest.sql"
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-	$CmdTimeout = $MaxTimeout
 	#Set specific database to check if a name was provided
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
@@ -3843,47 +3624,18 @@ $JumpToTop
 
 		[string]$Query = $Query -replace $OldSortString, $NewSortString
 		Write-Host " ->Top $(if($SortOrder -eq "'recent compilations'"){"50"}else{$CacheTop}) queries by $($SortOrder -replace "'",'')... " -NoNewLine
-		$BlitzCacheQuery = new-object System.Data.SqlClient.SqlCommand
-		$BlitzCacheQuery.CommandText = $Query
-		$BlitzCacheQuery.CommandTimeout = $CmdTimeout
-		$BlitzCacheQuery.Connection = $SqlConnection
-		$BlitzCacheAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-		$BlitzCacheAdapter.SelectCommand = $BlitzCacheQuery
-		$BlitzCacheSet = new-object System.Data.DataSet
-		Try {
-			$StepStart = get-date
-			$BlitzCacheAdapter.Fill($BlitzCacheSet) | Out-Null -ErrorAction Stop
-			$SqlConnection.Close()
-			$StepEnd = get-date
-			Write-Host @GreenCheck
-			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-			$RunTime = [Math]::Round($StepRunTime, 2)
-			if ($DebugInfo) {
-				Write-Host " - $RunTime seconds" -Fore Yellow
-			}
-			$PreviousOutcome = $StepOutcome
-			$StepOutcome = "Success"
-			$RecordsReturned = $BlitzCacheSet.Tables[0].Rows.Count
-			if ($OrigCacheMinutesBack -ne 0) {
-				$AdditionalInfo = ", MinutesBack=$CacheMinutesBack"
-			}
-			else {
-				$AdditionalInfo = ""
-			}
-			Add-LogRow "sp_BlitzCache $SortOrder $AdditionalInfo" $StepOutcome "$RecordsReturned records returned"
+		if ($OrigCacheMinutesBack -ne 0) {
+			$AdditionalInfo = ", MinutesBack=$CacheMinutesBack"
 		}
-	 Catch {
-			$StepEnd = get-date
-			Invoke-ErrMsg
-			$StepOutcome = "Failure"
-			Add-LogRow "sp_BlitzCache $SortOrder" $StepOutcome
+		else {
+			$AdditionalInfo = ""
 		}
-			
-		if ($StepOutcome -eq "Success") {
-			$BlitzCacheTbl = New-Object System.Data.DataTable
-			$BlitzCacheTbl = $BlitzCacheSet.Tables[0]
-			$BlitzCacheWarnTbl = New-Object System.Data.DataTable
-			$BlitzCacheWarnTbl = $BlitzCacheSet.Tables[1]
+		$PreviousOutcome = $global:StepOutcome
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzCache $SortOrder  $AdditionalInfo" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
+	
+		if ($global:StepOutcome -eq "Success") {
+			$BlitzCacheTbl = $global:PSBlitzSet.Tables[0]
+			$BlitzCacheWarnTbl = $global:PSBlitzSet.Tables[1]
 
 			##Exporting execution plans to file
 			if ($DebugInfo) {
@@ -3949,7 +3701,7 @@ $JumpToTop
 				$SheetName = $SheetName + "Spills"
 				$HighlightCol = 58
 			}
-			elseif("'Duplicate'","'Query Hash'" -contains $SortOrder){
+			elseif ("'Duplicate'", "'Query Hash'" -contains $SortOrder) {
 				$SheetName = $SheetName + "Dupl & Single Use"
 				$HighlightCol = 0
 			}
@@ -4032,7 +3784,7 @@ $JumpToTop
 		
 				#pairing up related tables in the same HTML file
 				if ("'CPU'", "'Reads'", "'Duration'", "'Executions'", "'Writes'",
-					"'Spills'","'Duplicate'", "'Memory Grant'" -contains $SortOrder) {
+					"'Spills'", "'Duplicate'", "'Memory Grant'" -contains $SortOrder) {
 					#Handling CSS
 					$CacheHTMLPre = $HTMLPre
 					$CacheHTMLPre = $CacheHTMLPre -replace 'CacheTab1High', $HighlightCol
@@ -4040,7 +3792,8 @@ $JumpToTop
 					
 					if ($SheetName -eq "Mem & Recent Comp") {
 						$HtmlTabName = "Queries by Memory Grants & Recent Compilations"
-					}elseif ($SheetName -eq "Dupl & Single Use") {
+					}
+					elseif ($SheetName -eq "Dupl & Single Use") {
 						$HtmlTabName = "Queries by Duplicate Plans & Query Hash"
 					}
 					else {
@@ -4309,12 +4062,7 @@ $JumpToTop
 				$ExcelFile.Save()
 			}	
 			##Cleaning up variables 
-			Clear-Variable -Name BlitzCacheWarnTbl
-			Remove-Variable -Name BlitzCacheWarnTbl
-			Clear-Variable -Name BlitzCacheTbl
-			Remove-Variable -Name BlitzCacheTbl
-			Clear-Variable -Name BlitzCacheSet
-			Remove-Variable -Name BlitzCacheSet
+			Invoke-ClearVariables BlitzCacheWarnTbl, BlitzCacheTbl, PSBlitzSet
 
 		}
 
@@ -4482,52 +4230,17 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 			}
 			
-			$CmdTimeout = $MaxTimeout
-			$BlitzQSQuery = new-object System.Data.SqlClient.SqlCommand
-			$BlitzQSQuery.CommandText = $Query
-			$BlitzQSQuery.CommandTimeout = $CmdTimeout
-			$BlitzQSQuery.Connection = $SqlConnection
-			$BlitzQSAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-			$BlitzQSAdapter.SelectCommand = $BlitzQSQuery
-			$BlitzQSSet = new-object System.Data.DataSet
-			Try {
-				$StepStart = get-date
-				$BlitzQSAdapter.Fill($BlitzQSSet) | Out-Null -ErrorAction Stop
-				$SqlConnection.Close()
-				$StepEnd = get-date
-				Write-Host @GreenCheck
-				$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-				$RunTime = [Math]::Round($StepRunTime, 2)
-				if ($DebugInfo) {
-					Write-Host " - $RunTime seconds" -Fore Yellow
-				}
-				$StepOutcome = "Success"
-				$RecordsReturned = $BlitzQSSet.Tables[0].Rows.Count
-				if ($IsAzureSQLDB) {
-					Add-LogRow "sp_BlitzQueryStore for $ASDBName" $StepOutcome "$RecordsReturned records returned"
-				}
-				else {
-					Add-LogRow "sp_BlitzQueryStore for $CheckDB" $StepOutcome "$RecordsReturned records returned"
-				}
+			if ($IsAzureSQLDB) {
+				
+				Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzQueryStore for $ASDBName" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout 
 			}
-			Catch {
-				$StepEnd = get-date
-				Invoke-ErrMsg
-				$StepOutcome = "Failure"
-				if ($IsAzureSQLDB) {
-					Add-LogRow "sp_BlitzQueryStore for $ASDBName" $StepOutcome
-				}
-				else {
-					Add-LogRow "sp_BlitzQueryStore for $CheckDB" $StepOutcome
-				}
+			else {
+				Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzQueryStore for $CheckDB" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
 			}
-
-			if ($StepOutcome -eq "Success") {
+			if ($global:StepOutcome -eq "Success") {
 			
-				$BlitzQSTbl = New-Object System.Data.DataTable
-				$BlitzQSTbl = $BlitzQSSet.Tables[0]
-				$BlitzQSSumTbl = New-Object System.Data.DataTable
-				$BlitzQSSumTbl = $BlitzQSSet.Tables[1]
+				$BlitzQSTbl = $global:PSBlitzSet.Tables[0]
+				$BlitzQSSumTbl = $global:PSBlitzSet.Tables[1]
 				##Exporting execution plans to file
 				if ($DebugInfo) {
 					Write-Host " ->Exporting execution plans" -fore yellow
@@ -4761,16 +4474,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					}
 					
 				}
-				Clear-Variable -Name BlitzQSTbl
-				Remove-Variable -Name BlitzQSTbl
-				Clear-Variable -Name BlitzQSSumTbl
-				Remove-Variable -Name BlitzQSSumTbl
-				Clear-Variable -Name BlitzQSSet
-				Remove-Variable -Name BlitzQSSet
-
-
+				Invoke-ClearVariables BlitzQSTbl, BlitzQSSumTbl, PSBlitzSet
 			}
-
 		}
 		if ($DBSwitched -eq "Y") {
 			$StepStart = get-date
@@ -4798,7 +4503,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	$OldMode = ";SET @Mode = 0;"
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzIndex_NonSPLatest.sql"
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-	$CmdTimeout = $MaxTimeout
 	#Set specific database to check if a name was provided
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
@@ -4812,10 +4516,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
  elseif ($UsrDBCount -ge $MaxUsrDBs) {
 		#If the number of user databases >= MaxUsrDBs
 		#set the database to the one that accounts for the most records in the plan cache
-		$TopDBinCache = $DBArray | Where-Object { $_ -ne "-- N/A --" }| Group-Object | Sort-Object Count -Descending | Select-Object -First 1
+		$TopDBinCache = $DBArray | Where-Object { $_ -ne "-- N/A --" } | Group-Object | Sort-Object Count -Descending | Select-Object -First 1
 		[string]$TopCacheDB = $TopDBinCache.Name
 		[int]$TopCacheDBCount = $TopDBinCache.Count
-		$TopCacheReplace = ";SET @DatabaseName = '"+$TopCacheDB+"';"
+		$TopCacheReplace = ";SET @DatabaseName = '" + $TopCacheDB + "';"
 		Write-Host " You're trying to get index info on an instance with  $UsrDBCount databases." -ForegroundColor Yellow
 		Write-Host " Doing so may cause temporary problems for the server and/or PSBlitz." -ForegroundColor Yellow
 		Write-Host " Limiting index info to $($TopDBinCache.Name) which accounts for $TopCacheDBCount records returned from cache"
@@ -4845,38 +4549,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		}
 		$NewMode = ";SET @Mode = " + $Mode + ";"
 		[string]$Query = $Query -replace $OldMode, $NewMode
-		$BlitzIndexQuery = new-object System.Data.SqlClient.SqlCommand
-		$BlitzIndexQuery.CommandText = $Query
-		$BlitzIndexQuery.CommandTimeout = $CmdTimeout
-		$BlitzIndexQuery.Connection = $SqlConnection
-		$BlitzIndexAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-		$BlitzIndexAdapter.SelectCommand = $BlitzIndexQuery
-		$BlitzIndexSet = new-object System.Data.DataSet
-		Try {
-			$StepStart = get-date
-			$BlitzIndexAdapter.Fill($BlitzIndexSet) | Out-Null -ErrorAction Stop
-			$SqlConnection.Close()
-			$StepEnd = get-date
-			Write-Host @GreenCheck
-			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-			$RunTime = [Math]::Round($StepRunTime, 2)
-			if ($DebugInfo) {
-				Write-Host " - $RunTime seconds" -Fore Yellow
-			}
-			$StepOutcome = "Success"
-			$RecordsReturned = $BlitzIndexSet.Tables[0].Rows.Count
-			Add-LogRow "sp_BlitzIndex mode $Mode" $StepOutcome "$RecordsReturned records returned"
-		}
-	 Catch {
-			$StepEnd = get-date
-			Invoke-ErrMsg
-			$StepOutcome = "Failure"
-			Add-LogRow "sp_BlitzIndex mode $Mode" $StepOutcome
-		}
-			
-		if ($StepOutcome -eq "Success") {
-			$BlitzIxTbl = New-Object System.Data.DataTable
-			$BlitzIxTbl = $BlitzIndexSet.Tables[0]
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzIndex mode $Mode" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
+		
+		if ($global:StepOutcome -eq "Success") {
+			$BlitzIxTbl = $global:PSBlitzSet.Tables[0]
 			if ("0", "4" -Contains $Mode) {
 				#Export sample execution plans for missing indexes (SQL Server 2019 only)
 				#Since we're already looping through the result set here, might as well add and
@@ -5161,10 +4837,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$ExcelFile.Save()
 			}
 			##Cleaning up variables
-			Clear-Variable -Name BlitzIxTbl
-			Remove-Variable -Name BlitzIxTbl
-			Clear-Variable -Name BlitzIndexSet
-			Remove-Variable -Name BlitzIndexSet
+			Invoke-ClearVariables BlitzIxTbl, PSBlitzSet
 		}
 		#Update $OldMode
 		$OldMode = $NewMode
@@ -5191,7 +4864,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	}
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzLock_NonSPLatest.sql"
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-	$CmdTimeout = $MaxTimeout
 	#Set specific database to check if a name was provided
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
@@ -5204,46 +4876,16 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		Write-Host " ->Retrieving deadlock info for the last 7 days instead of 15... " -NoNewLine
 		[string]$Query = $Query -replace "@StartDate = DATEADD(DAY,-15, GETDATE()),", "@StartDate = DATEADD(DAY,-7, GETDATE()),"
 	}
-	$BlitzLockQuery = new-object System.Data.SqlClient.SqlCommand
-	$BlitzLockQuery.CommandText = $Query
-	$BlitzLockQuery.Connection = $SqlConnection
-	$BlitzLockQuery.CommandTimeout = $CmdTimeout
-	$BlitzLockAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-	$BlitzLockAdapter.SelectCommand = $BlitzLockQuery
-	$BlitzLockSet = new-object System.Data.DataSet
-	Try {
-		$StepStart = get-date
-		$BlitzLockAdapter.Fill($BlitzLockSet) | Out-Null -ErrorAction Stop
-		$SqlConnection.Close()
-		$StepEnd = get-date
-		Write-Host @GreenCheck
-		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-		$RunTime = [Math]::Round($StepRunTime, 2)
-		if ($DebugInfo) {
-			Write-Host " - $RunTime seconds" -Fore Yellow
-		}
-		$StepOutcome = "Success"
-		Add-LogRow "sp_BlitzLock" $StepOutcome
-	}
- Catch {
-		$StepEnd = get-date
-		Invoke-ErrMsg
-		$StepOutcome = "Failure"
-		Add-LogRow "sp_BlitzLock" $StepOutcome
-	}
+	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzLock" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
 		
-	if ($StepOutcome -eq "Success") {
-		$TblLockDtl = New-Object System.Data.DataTable
-		$TblLockPlans = New-Object System.Data.DataTable
-		$TblLockOver = New-Object System.Data.DataTable
-
-		$TblLockDtl = $BlitzLockSet.Tables[0]
-		$TblLockPlans = $BlitzLockSet.Tables[1]
-		$TblLockOver = $BlitzLockSet.Tables[2]
+	if ($global:StepOutcome -eq "Success") {
+		$TblLockDtl = $global:PSBlitzSet.Tables[0]
+		$TblLockPlans = $global:PSBlitzSet.Tables[1]
+		$TblLockOver = $global:PSBlitzSet.Tables[2]
 		[int]$RowsReturned = $TblLockDtl.Rows.Count
 		if ($RowsReturned -le 0) {
-			Write-Host " ->No deadlocks found."
 			$StepOutcome = "No deadlocks found"
+			Write-Host " ->$StepOutcome."
 			Add-LogRow "->sp_BlitzLock" $StepOutcome
 		}
 		else {
@@ -5605,14 +5247,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$ExcelFile.Save()
 			}
 			##Cleaning up variables
-			Clear-Variable -Name TblLockOver
-			Remove-Variable -Name TblLockOver
-			Clear-Variable -Name TblLockDtl
-			Remove-Variable -Name TblLockDtl
-			Clear-Variable -Name TblLockPlans
-			Remove-Variable -Name TblLockPlans
-			Clear-Variable -Name BlitzLockSet
-			Remove-Variable -Name BlitzLockSet
+			Invoke-ClearVariables TblLockDtl, TblLockPlans, TblLockOver, PSBlitzSet
 		}
 	}
 
@@ -5655,48 +5290,16 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			Write-Host "Retrieving stats info for $CheckDB... " -NoNewLine		
 			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
 		}
-		$CmdTimeout = $MaxTimeout
-
-		$StatsQuery = new-object System.Data.SqlClient.SqlCommand
-		$StatsQuery.CommandText = $Query
-		$StatsQuery.Connection = $SqlConnection
-		$StatsQuery.CommandTimeout = $CmdTimeout
-		$StatsAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-		$StatsAdapter.SelectCommand = $StatsQuery
-		$StatsSet = new-object System.Data.DataSet
-		Try {
-			$StepStart = get-date
-			$StatsAdapter.Fill($StatsSet) | Out-Null -ErrorAction Stop
-			$SqlConnection.Close()
-			$StepEnd = get-date
-			Write-Host @GreenCheck
-			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-			$RunTime = [Math]::Round($StepRunTime, 2)
-			if ($DebugInfo) {
-				Write-Host " - $RunTime seconds" -Fore Yellow
-			}
-			$StepOutcome = "Success"
-			$RecordsReturned = $StatsSet.Tables[0].Rows.Count
-			Add-LogRow "Stats Info" $StepOutcome "$RecordsReturned records returned"
-		}
-	 Catch {
-			$StepEnd = get-date
-			Invoke-ErrMsg
-			$StepOutcome = "Failure"
-			Add-LogRow "Stats Info" $StepOutcome
-		}
-			
-		if ($StepOutcome -eq "Success") {
-			$StatsTbl = New-Object System.Data.DataTable
-			$StatsTbl = $StatsSet.Tables[0]
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Stats Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
+		
+		if ($global:StepOutcome -eq "Success") {
+			$StatsTbl = $global:PSBlitzSet.Tables[0]
 			[int]$RowsReturned = $StatsTbl.Rows.Count
 			if ($RowsReturned -le 0) {
 				Write-Host " ->No rows returned."
 				Add-LogRow "->Stats Info" "No rows returned"
 			}
 			else {
-
-
 				if ($ToHTML -eq "Y") {
 					if ($DebugInfo) {
 						Write-Host " ->Converting stats info to HTML" -fore yellow
@@ -5756,9 +5359,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					else {
 						$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "StatsInfo_$CheckDB.html"						
 					}
-					$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
-				
-				
+					$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"				
 				}
 				else {
 
@@ -5795,18 +5396,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						$RowNum += 1
 						$ExcelColNum = 1
 					}
-
-
 					##Saving file
 					$ExcelFile.Save()
 				}
 			}
 			##Cleaning up variables
-			Clear-Variable -Name StatsTbl
-			Remove-Variable -Name StatsTbl
-			Clear-Variable -Name StatsSet
-			Remove-Variable -Name StatsSet
-		
+			Invoke-ClearVariables StatsTbl, PSBlitzSet		
 		}
 
 		if ($JobStatus -ne "Running") {
@@ -5833,43 +5428,11 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		
 			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
 		}
-		$CmdTimeout = $MaxTimeout
-
-		$IndexQuery = new-object System.Data.SqlClient.SqlCommand
-		$IndexQuery.CommandText = $Query
-		$IndexQuery.Connection = $SqlConnection
-		$IndexQuery.CommandTimeout = $CmdTimeout
-		$IndexAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-		$IndexAdapter.SelectCommand = $IndexQuery
-		$IndexSet = new-object System.Data.DataSet
-		Try {
-			$StepStart = get-date
-			$IndexAdapter.Fill($IndexSet) | Out-Null -ErrorAction Stop
-			$SqlConnection.Close()
-			$StepEnd = get-date
-			Write-Host @GreenCheck
-			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-			$RunTime = [Math]::Round($StepRunTime, 2)
-			if ($DebugInfo) {
-				Write-Host " - $RunTime seconds" -Fore Yellow
-			}
-			$StepOutcome = "Success"
-			[int]$RecordsReturned = $IndexSet.Tables[0].Rows.Count
-			Add-LogRow "Index Frag Info" $StepOutcome "$RecordsReturned records returned"
-		}
-	 Catch {
-			$StepEnd = get-date
-			Invoke-ErrMsg
-			$StepOutcome = "Failure"
-			Add-LogRow "Index Frag Info" $StepOutcome
-		}
-			
-		if ($StepOutcome -eq "Success") {
-
-			$IndexTbl = New-Object System.Data.DataTable
-			$IndexTbl = $IndexSet.Tables[0]
-			$IndexLckTbl = New-Object System.Data.DataTable
-			$IndexLckTbl = $IndexSet.Tables[1]
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Index Frag Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout	
+		if ($global:StepOutcome -eq "Success") {
+			$IndexTbl = $global:PSBlitzSet.Tables[0]
+			$IndexLckTbl = $global:PSBlitzSet.Tables[1]
+			$RecordsReturned = $IndexTbl.Rows.Count
 			if ($RecordsReturned -le 0) {
 				Write-Host " ->No rows returned."
 				Add-LogRow "->Index Frag Info" "No rows returned."
@@ -5894,8 +5457,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				
 					Add-LogRow "->Index Frag Info" "Skipped XLocked Tables" "$LockedTabLogMsg $LockedTabList"
 				}
-
-
 				if ($ToHTML -eq "Y") {
 				
 					if ($DebugInfo) {
@@ -5941,12 +5502,9 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					else {
 						$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "IndexFragInfo_$CheckDB.html"						
 					}
-					$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
-						
+					$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"		
 				}
 				else {
-
-				
 					$ExcelSheet = $ExcelFile.Worksheets.Item("Index Fragmentation")
 					$ExcelStartRow = $DefaultStartRow
 					$ExcelColNum = 1
@@ -5972,11 +5530,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$ExcelFile.Save()
 				}
 				##Cleaning up variables
-				Clear-Variable -Name IndexTbl
-				Remove-Variable -Name IndexTbl
-				Clear-Variable -Name IndexSet
-				Remove-Variable -Name IndexSet
-
+				Invoke-ClearVariables IndexTbl,PSBlitzSet
 			} 
 		}
 	
@@ -6120,47 +5674,18 @@ finally {
 		[string]$Query = $Query.replace('[tempdb].[dbo].', '')
 		[string]$Query = $Query.replace('tempdb.dbo.', '')
 	}
-	$CmdTimeout = 800
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace "SET @DatabaseName = N''; " , "SET @DatabaseName = N'$CheckDB'; "
 	}
-	$BlitzWhoSelect = new-object System.Data.SqlClient.SqlCommand
-	$BlitzWhoSelect.CommandText = $Query
-	$BlitzWhoSelect.Connection = $SqlConnection
-	$BlitzWhoSelect.CommandTimeout = $CmdTimeout 
-	$BlitzWhoAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-	$BlitzWhoAdapter.SelectCommand = $BlitzWhoSelect
-	$BlitzWhoSet = new-object System.Data.DataSet
-	Try {
-		$StepStart = get-date
-		$BlitzWhoAdapter.Fill($BlitzWhoSet) | Out-Null -ErrorAction Stop
-		$SqlConnection.Close()
-		$StepEnd = get-date
-		Write-Host @GreenCheck
-		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-		$RunTime = [Math]::Round($StepRunTime, 2)
-		if ($DebugInfo) {
-			Write-Host " - $RunTime seconds" -Fore Yellow
-		}
-		$StepOutcome = "Success"
-		Add-LogRow "Return sp_BlitzWho" $StepOutcome
-	}
- Catch {
-		$StepEnd = get-date
-		Invoke-ErrMsg
-		$StepOutcome = "Failure"
-		Add-LogRow "Return sp_BlitzWho" $StepOutcome
-	}
-		
-	if ($StepOutcome -eq "Success") {
-		$BlitzWhoTbl = New-Object System.Data.DataTable
-		$BlitzWhoTbl = $BlitzWhoSet.Tables[0]
-		$BlitzWhoAggTbl = New-Object System.Data.DataTable
-		$BlitzWhoAggTbl = $BlitzWhoSet.Tables[1]
+	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Return sp_BlitzWho" -ConnStringIn $ConnString -CmdTimeoutIn 800
+	
+	if ($global:StepOutcome -eq "Success") {
+		$BlitzWhoTbl = $global:PSBlitzSet.Tables[0]
+		$BlitzWhoAggTbl = $global:PSBlitzSet.Tables[1]
 		[int]$RowsReturned = $BlitzWhoTbl.Rows.Count
 		if ($RowsReturned -le 0) {
-			Write-Host " ->No active sessions found."
 			$StepOutcome = "No active sessions"
+			Write-Host " ->$StepOutcome."
 			Add-LogRow "->Return sp_BlitzWho" $StepOutcome
 		}
 		else {
@@ -6486,12 +6011,7 @@ finally {
 			}
 		}
 		##Cleaning up variables
-		Clear-Variable -Name BlitzWhoTbl
-		Remove-Variable -Name BlitzWhoTbl
-		Clear-Variable -Name BlitzWhoAggTbl
-		Remove-Variable -Name BlitzWhoAggTbl
-		Clear-Variable -Name BlitzWhoSet
-		Remove-Variable -Name BlitzWhoSet
+		Invoke-ClearVariables BlitzWhoTbl, BlitzWhoAggTbl, PSBlitzSet
 	}
 	$SqlConnection.Close()
 	$SqlConnection.Dispose()
@@ -6770,7 +6290,8 @@ finally {
 				$QuerySource = "sp_BlitzIndex @Mode = $Mode"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$QuerySource += ", @DatabaseName = '$CheckDB'; "
-				}elseif ($UsrDBCount -ge $MaxUsrDBs){
+				}
+				elseif ($UsrDBCount -ge $MaxUsrDBs) {
 					$QuerySource += ", @DatabaseName = '$TopCacheDB'; "
 				}
 				else {
@@ -6819,7 +6340,8 @@ finally {
 					else {
 						$Description += "."
 					}
-				}elseif($SortOrder -eq "Dupl_Single_Use"){
+				}
+				elseif ($SortOrder -eq "Dupl_Single_Use") {
 					$PageName = "Top $CacheTop Queries - Duplicates and Single Use"
 					$QuerySource = "sp_BlitzCache @Top = $CacheTop, @SortOrder = 'Duplicate'/'Query Hash'"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
