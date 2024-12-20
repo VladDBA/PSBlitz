@@ -651,6 +651,66 @@ function Invoke-PSBlitzQuery {
 		$IBQConnection.Dispose()
 	}
 }
+function Convert-TableToHtml {
+    param (
+        [Parameter(Position = 0, Mandatory = $true)]
+        [System.Data.DataTable]$DataTable,
+        [Parameter(Mandatory = $false)]
+        [switch]$DebugInfo,
+		[Parameter(Mandatory = $false)]
+        [switch]$HasURLs,
+		[Parameter(Mandatory = $false)]
+        [string[]]$ExclCols,
+		[Parameter(Mandatory = $false)]
+        [string[]]$DateTimeCols,
+		[Parameter(Mandatory = $false)]
+        [string]$CSSClass
+    )
+
+    Try {
+		# Create an array to store the properties of the DataTable
+        $properties = @()
+        foreach ($column in $DataTable.Columns) {
+			#Write-Output "column name $($column.ColumnName)"
+			if ($ExclCols -contains $column.ColumnName) {
+                continue
+            }
+			$colName = $column.ColumnName
+			$formattedName = if ($colName -like "*_*") {
+				# Replace underscores with spaces and capitalize each word
+				($colName -replace "_", " ") -replace '\b(\w)', { $_.Value.ToUpper() }
+			} else {
+				$colName
+			}
+
+				$properties += @{
+					Name       = $formattedName
+					Expression = 
+						$colName
+					
+				}
+			
+
+        }
+
+        # Convert the DataTable to HTML
+        $htmlTableOut = $DataTable | Select-Object $properties | ConvertTo-Html -As Table -Fragment
+		if(![string]::IsNullOrEmpty($CSSClass)) {
+			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class='$CSSClass'>"
+		}
+		if($HasURLs){
+			$URLRegex = '(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\".,<>?«»“”]))'
+			$htmlTableOut = $htmlTableOut -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+		}
+        return $htmlTableOut
+		#Write-Output $properties
+
+        #Write-Host "HTML table conversion successful." -ForegroundColor Green
+    }
+    Catch {
+        Write-Host "Error converting table to HTML: $_" -ForegroundColor Red
+    }
+}
 
 function Invoke-ClearVariables {
 	[Parameter(Position = 0, Mandatory = $true)]
@@ -1278,9 +1338,7 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 			}
 		}
 	}
-	Remove-Variable -Name CheckDBSet
-	Remove-Variable -Name CheckDBAdapter
-	Remove-Variable -Name CheckDBQuery
+	Invoke-ClearVariables CheckDBSet, CheckDBAdapter, CheckDBQuery
 
 }
 elseif ($IsAzureSQLDB -eq $false) {
@@ -1602,13 +1660,9 @@ try {
 	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Instance Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		
 	if ($global:StepOutcome -eq "Success") {
-		$InstanceInfoTbl = New-Object System.Data.DataTable
 		$InstanceInfoTbl = $global:PSBlitzSet.Tables[0]
-		$ResourceInfoTbl = New-Object System.Data.DataTable
 		$ResourceInfoTbl = $global:PSBlitzSet.Tables[1]
-		$ConnectionsInfoTbl = New-Object System.Data.DataTable
 		$ConnectionsInfoTbl = $global:PSBlitzSet.Tables[2]
-		$SessOptTbl = New-Object System.Data.DataTable
 		$SessOptTbl = $global:PSBlitzSet.Tables[3]
 		
 		if ($ToHTML -eq "Y") {
@@ -1618,26 +1672,27 @@ try {
 			$InstanceInfoTbl.Columns.Add("Estimated Response Latency (Sec)", [decimal]) | Out-Null
 			$InstanceInfoTbl.Rows[0]["Estimated Response Latency (Sec)"] = $ConnTest
 
-			$htmlTable1 = $InstanceInfoTbl | Select-Object  @{Name = "Machine Name"; Expression = { $_."machine_name" } },
-			@{Name = "Instance Name"; Expression = { $_."instance_name" } }, 
-			@{Name = "Version"; Expression = { $_."product_version" } }, 
-			@{Name = "Product Level"; Expression = { $_."product_level" } },
-			@{Name = "Patch Level"; Expression = { $_."patch_level" } },
-			@{Name = "Edition"; Expression = { $_."edition" } }, 
-			@{Name = "Is Clustered?"; Expression = { $_."is_clustered" } }, 
-			@{Name = "Is AlwaysOnAG?"; Expression = { $_."always_on_enabled" } },
-			@{Name = "FILESTREAM Access Level"; Expression = { $_."filestream_access_level" } },
-			@{Name = "Tempdb Metadata Memory Optimized"; Expression = { $_."mem_optimized_tempdb_metadata" } },
-			@{Name = "Fulltext Instaled"; Expression = { $_."fulltext_installed" } },
-			@{Name = "Instance Collation"; Expression = { $_."instance_collation" } },
-			@{Name = "User Databases"; Expression = { $_."user_db_count" } },
-			@{Name = "Process ID"; Expression = { $_."process_id" } },
-			@{Name = "Last Startup"; Expression = { ($_."instance_last_startup").ToString("yyyy-MM-dd HH:mm:ss") } },
-			@{Name = "Uptime (days)"; Expression = { $_."uptime_days" } },
-			@{Name = "Client Connections"; Expression = { $_."client_connections" } },
-			"Estimated Response Latency (Sec)", 
-			@{Name = "Server Time"; Expression = { ($_."server_time").ToString("yyyy-MM-dd HH:mm:ss") } } | ConvertTo-Html -As Table -Fragment
-			$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="InstanceInfoTbl">'
+			#$htmlTable1 = $InstanceInfoTbl | Select-Object  @{Name = "Machine Name"; Expression = { $_."machine_name" } },
+			#@{Name = "Instance Name"; Expression = { $_."instance_name" } }, 
+			#@{Name = "Version"; Expression = { $_."product_version" } }, 
+			#@{Name = "Product Level"; Expression = { $_."product_level" } },
+			#@{Name = "Patch Level"; Expression = { $_."patch_level" } },
+			#@{Name = "Edition"; Expression = { $_."edition" } }, 
+			#@{Name = "Is Clustered?"; Expression = { $_."is_clustered" } }, 
+			#@{Name = "Is AlwaysOnAG?"; Expression = { $_."always_on_enabled" } },
+			#@{Name = "FILESTREAM Access Level"; Expression = { $_."filestream_access_level" } },
+			#@{Name = "Tempdb Metadata Memory Optimized"; Expression = { $_."mem_optimized_tempdb_metadata" } },
+			#@{Name = "Fulltext Instaled"; Expression = { $_."fulltext_installed" } },
+			#@{Name = "Instance Collation"; Expression = { $_."instance_collation" } },
+			#@{Name = "User Databases"; Expression = { $_."user_db_count" } },
+			#@{Name = "Process ID"; Expression = { $_."process_id" } },
+			#@{Name = "Last Startup"; Expression = { ($_."instance_last_startup").ToString("yyyy-MM-dd HH:mm:ss") } },
+			#@{Name = "Uptime (days)"; Expression = { $_."uptime_days" } },
+			#@{Name = "Client Connections"; Expression = { $_."client_connections" } },
+			#"Estimated Response Latency (Sec)", 
+			#@{Name = "Server Time"; Expression = { ($_."server_time").ToString("yyyy-MM-dd HH:mm:ss") } } | ConvertTo-Html -As Table -Fragment
+			#$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="InstanceInfoTbl">'
+			$htmlTable1 = Convert-TableToHtml $InstanceInfoTbl -CSSClass InstanceInfoTbl -DebugInfo:$DebugInfo -DateTimeCols instance_last_startup
 
 			if (($DebugInfo) -and ($IsAzureSQLDB -eq $false)) {
 				Write-Host " ->Converting resource info to HTML" -fore yellow
@@ -1649,41 +1704,44 @@ try {
 				$htmlTable2 = '<p>Instance resource information is not available for Azure SQL DB.</p>'
 			}
 			else {
-				$htmlTable2 = $ResourceInfoTbl | Select-Object  @{Name = "Logical Cores"; Expression = { $_."logical_cpu_cores" } }, 
-				@{Name = "Physical Cores"; Expression = { $_."physical_cpu_cores" } }, 
-				@{Name = "Physical memory GB"; Expression = { $_."physical_memory_GB" } }, 
-				@{Name = "Max Server Memory GB"; Expression = { $_."max_server_memory_GB" } }, 
-				@{Name = "Target Server Memory GB"; Expression = { $_."target_server_memory_GB" } },
-				@{Name = "Total Memory Used GB"; Expression = { $_."total_memory_used_GB" } },
-				@{Name = "Buffer Pool Usage GB"; Expression = { $_."buffer_pool_usage_GB" } },
-				@{Name = "Process physical memory low"; Expression = { $_."proc_physical_memory_low" } },
-				@{Name = "Process virtual memory low"; Expression = { $_."proc_virtual_memory_low" } },
-				@{Name = "Available Physical Memory GB"; Expression = { $_."available_physical_memory_GB" } },
-				@{Name = "OS Memory State"; Expression = { $_."os_memory_state" } },
-				"CTP",	"MAXDOP" | ConvertTo-Html -As Table -Fragment
-				$htmlTable2 = $htmlTable2 -replace '<table>', '<table class="RsrcInfoTbl">'
+				#$htmlTable2 = $ResourceInfoTbl | Select-Object  @{Name = "Logical Cores"; Expression = { $_."logical_cpu_cores" } }, 
+				#@{Name = "Physical Cores"; Expression = { $_."physical_cpu_cores" } }, 
+				#@{Name = "Physical memory GB"; Expression = { $_."physical_memory_GB" } }, 
+				#@{Name = "Max Server Memory GB"; Expression = { $_."max_server_memory_GB" } }, 
+				#@{Name = "Target Server Memory GB"; Expression = { $_."target_server_memory_GB" } },
+				#@{Name = "Total Memory Used GB"; Expression = { $_."total_memory_used_GB" } },
+				#@{Name = "Buffer Pool Usage GB"; Expression = { $_."buffer_pool_usage_GB" } },
+				#@{Name = "Process physical memory low"; Expression = { $_."proc_physical_memory_low" } },
+				#@{Name = "Process virtual memory low"; Expression = { $_."proc_virtual_memory_low" } },
+				#@{Name = "Available Physical Memory GB"; Expression = { $_."available_physical_memory_GB" } },
+				#@{Name = "OS Memory State"; Expression = { $_."os_memory_state" } },
+				#"CTP",	"MAXDOP" | ConvertTo-Html -As Table -Fragment
+				#$htmlTable2 = $htmlTable2 -replace '<table>', '<table class="RsrcInfoTbl">'
+				$htmlTable2 = Convert-TableToHtml $ResourceInfoTbl -CSSClass RsrcInfoTbl -DebugInfo:$DebugInfo
 			}
 
 			if ($DebugInfo) {
 				Write-Host " ->Converting connections info to HTML" -fore yellow
 			}    
-			$htmlTable3 = $ConnectionsInfoTbl | Select-Object  "Database", 
-			@{Name = "Connections Count"; Expression = { $_."ConnectionsCount" } }, 
-			@{Name = "Login Name"; Expression = { $_."LoginName" } }, 
-			@{Name = "Client Hostname"; Expression = { $_."ClientHostName" } }, 
-			@{Name = "Client IP"; Expression = { $_."ClientIP" } },
-			@{Name = "Protocol"; Expression = { $_."ProtocolUsed" } },
-			@{Name = "Oldest Connection Time"; Expression = { ($_."OldestConnectionTime").ToString("yyyy-MM-dd HH:mm:ss") } },
-			@{Name = "Program"; Expression = { $_."Program" } }  | ConvertTo-Html -As Table -Fragment
-			$htmlTable3 = $htmlTable3 -replace '<table>', '<table class="Top10ClientConnTbl">'
+			#$htmlTable3 = $ConnectionsInfoTbl | Select-Object  "Database", 
+			#@{Name = "Connections Count"; Expression = { $_."ConnectionsCount" } }, 
+			#@{Name = "Login Name"; Expression = { $_."LoginName" } }, 
+			#@{Name = "Client Hostname"; Expression = { $_."ClientHostName" } }, 
+			#@{Name = "Client IP"; Expression = { $_."ClientIP" } },
+			#@{Name = "Protocol"; Expression = { $_."ProtocolUsed" } },
+			#@{Name = "Oldest Connection Time"; Expression = { ($_."OldestConnectionTime").ToString("yyyy-MM-dd HH:mm:ss") } },
+			#@{Name = "Program"; Expression = { $_."Program" } }  | ConvertTo-Html -As Table -Fragment
+			#$htmlTable3 = $htmlTable3 -replace '<table>', '<table class="Top10ClientConnTbl">'
+			$htmlTable3 = Convert-TableToHtml $ConnectionsInfoTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
 
 			if ($DebugInfo) {
 				Write-Host " ->Converting session level options info to HTML" -fore yellow
 			}
 
-			$htmlTable4 = $SessOptTbl | Select-Object "Option", "SessionSetting", "InstanceSetting", "Description", "URL" | ConvertTo-Html -As Table -Fragment
-			$htmlTable4 = $htmlTable4 -replace '<table>', '<table class="SessOptTbl sortable">'
-			$htmlTable4 = $htmlTable4 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+			#$htmlTable4 = $SessOptTbl | Select-Object "Option", "SessionSetting", "InstanceSetting", "Description", "URL" | ConvertTo-Html -As Table -Fragment
+			#$htmlTable4 = $htmlTable4 -replace '<table>', '<table class="SessOptTbl sortable">'
+			#$htmlTable4 = $htmlTable4 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+			$htmlTable4 = Convert-TableToHtml $SessOptTbl -CSSClass 'SessOptTbl sortable' -HasURLs -DebugInfo:$DebugInfo
 
 
 			$HtmlTabName = "Instance Overview"
