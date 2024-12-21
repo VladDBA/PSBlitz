@@ -680,7 +680,8 @@ function Convert-TableToHtml {
 				# Replace underscores with spaces and capitalize each word
 				($colName -replace "_", " ") -replace '\b(\w)', { $_.Value.ToUpper() }
 			} else {
-				$colName
+				# Capitalize the first letter of the column name
+                $colName -replace '^(.)', { $_.Value.ToUpper() }
 			}
 
 				$properties += @{
@@ -1670,7 +1671,7 @@ try {
 				Write-Host " ->Converting instance info to HTML" -fore yellow
 			}
 			#$InstanceInfoTbl.Columns.Add("Estimated Response Latency (Sec)", [decimal]) | Out-Null
-			$InstanceInfoTbl.Rows[0]["Estimated Response Latency (Sec)"] = $ConnTest
+			$InstanceInfoTbl.Rows[0]["estimated_response_latency(sec)"] = $ConnTest
 
 			#$htmlTable1 = $InstanceInfoTbl | Select-Object  @{Name = "Machine Name"; Expression = { $_."machine_name" } },
 			#@{Name = "Instance Name"; Expression = { $_."instance_name" } }, 
@@ -1784,7 +1785,7 @@ $htmlTable4
 			#List of columns that should be returned from the data set
 			$DataSetCols = @("machine_name", "instance_name", "product_version", "product_level",
 				"patch_level", "edition", "is_clustered", "always_on_enabled", "filestream_access_level",
-				"mem_optimized_tempdb_metadata", "fulltext_installed", "instance_collation", "user_db_count", "process_id",
+				"tempdb_metadata_memory_optimized", "fulltext_installed", "instance_collation", "user_db_count", "process_id",
 				"instance_last_startup", "uptime_days", "client_connections", "net_latency", "server_time")
 
 			if ($DebugInfo) {
@@ -1803,12 +1804,12 @@ $htmlTable4
 					if ($col -eq "net_latency") {
 						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnTest
 					}
-					elseif (("instance_last_startup", "server_time" -contains $col) -and ($InstanceInfoTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-						
-						$DateForExcel = $InstanceInfoTbl.Rows[$RowNum][$col] | Get-Date
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-						
-					}
+					#elseif (("instance_last_startup", "server_time" -contains $col) -and ($InstanceInfoTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+					#	
+					#	$DateForExcel = $InstanceInfoTbl.Rows[$RowNum][$col] | Get-Date
+					#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+					#	
+					#}
 					else {
 						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $InstanceInfoTbl.Rows[$RowNum][$col]
 					}
@@ -1833,7 +1834,7 @@ $htmlTable4
 
 			#List of columns that should be returned from the data set
 			$DataSetCols = @("logical_cpu_cores", "physical_cpu_cores", "physical_memory_GB", "max_server_memory_GB", "target_server_memory_GB",
-				"total_memory_used_GB", "buffer_pool_usage_GB", "proc_physical_memory_low", "proc_virtual_memory_low", "available_physical_memory_GB", "os_memory_state" , "CTP", "MAXDOP")
+				"total_memory_used_GB", "buffer_pool_usage_GB", "process_physical_memory_low", "process_virtual_memory_low", "available_physical_memory_GB", "os_memory_state" , "CTP", "MAXDOP")
 
 			if ($DebugInfo) {
 				Write-Host " ->Writing resource info to Excel" -fore yellow
@@ -1869,8 +1870,8 @@ $htmlTable4
 			$RowNum = 0
 
 			#List of columns that should be returned from the data set
-			$DataSetCols = @("Database", "ConnectionsCount", "LoginName", "ClientHostName", "ClientIP", "ProtocolUsed", 
-				"OldestConnectionTime", "Program")
+			$DataSetCols = @("Database", "connections_count", "login_name", "client_host_name", "client_IP", "Protocol", 
+				"oldest_connection_time", "Program")
 
 			if ($DebugInfo) {
 				Write-Host " ->Writing Top 10 clients by connections to Excel" -fore yellow
@@ -1885,13 +1886,13 @@ $htmlTable4
 					[string]$DebugCol = $col
 					[string]$DebugValue = $ConnectionsInfoTbl.Rows[$RowNum][$col]			
 					#Fill Excel cell with value from the data set
-					if (($col -eq "OldestConnectionTime" -and ($ConnectionsInfoTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value))) {
-						$DateForExcel = $ConnectionsInfoTbl.Rows[$RowNum][$col] | Get-Date
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-					}
-					else {
+					#if (($col -eq "OldestConnectionTime" -and ($ConnectionsInfoTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value))) {
+					#	$DateForExcel = $ConnectionsInfoTbl.Rows[$RowNum][$col] | Get-Date
+					#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+					#}
+					#else {
 						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col]
-					}
+					#}
 					$ExcelColNum += 1
 				}
 
@@ -1908,7 +1909,7 @@ $htmlTable4
 			$ExcelColNum = 10
 			$RowNum = 0
 
-			$DataSetCols = @("Option", "SessionSetting", "InstanceSetting", "Description", "URL")
+			$DataSetCols = @("Option", "Session_Setting", "Instance_Setting", "Description", "URL")
 			if ($DebugInfo) {
 				Write-Host " ->Writing Session level options to Excel" -fore yellow
 			}
