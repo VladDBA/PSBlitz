@@ -664,7 +664,9 @@ function Convert-TableToHtml {
         [Parameter(Mandatory = $false)]
         [string[]] $DateTimeCols,
         [Parameter(Mandatory = $false)]
-        [string] $CSSClass
+        [string] $CSSClass,
+		[Parameter(Mandatory = $false)]
+        [switch] $NoCaseChange
     )
 
     try {
@@ -677,7 +679,9 @@ function Convert-TableToHtml {
             $currentColumn = $column.ColumnName
             $formattedName = if ($currentColumn -like "*_*") {
                 $cultureInfo.TextInfo.ToTitleCase(($currentColumn -replace "_", " "))
-            } else {
+            } elseif ($NoCaseChange -eq $true) {
+				$currentColumn
+			} else {
                 $cultureInfo.TextInfo.ToTitleCase($currentColumn)
             }
 
@@ -2927,16 +2931,18 @@ $JumpToTop
 				if ($DebugInfo) {
 					Write-Host " ->Converting Database Info results to HTML" -fore yellow
 				}
-				$htmlTable = $DBInfoTbl | Select-Object "Database", @{Name = "Created"; Expression = { if ($_."Created" -ne [System.DBNull]::Value) { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Created" } } }, 
-				"DatabaseState", "UserAccess", "DataFiles", "DataFilesSizeGB", "LogFiles",
-				"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
-				"DatabaseSizeGB", "CachedSizeMB", "BufferPool%", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", 
-				"SnapshotIsolationState", "ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
-				"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn", "IsEncrypted", "EncryptionState" | ConvertTo-Html -As Table -Fragment
+				#$htmlTable = $DBInfoTbl | Select-Object "Database", @{Name = "Created"; Expression = { if ($_."Created" -ne [System.DBNull]::Value) { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Created" } } }, 
+				#"DatabaseState", "UserAccess", "DataFiles", "DataFilesSizeGB", "LogFiles",
+				#"LogFilesSizeGB", "VirtualLogFiles", "FILESTREAMContainers", "FSContainersSizeGB",
+				#"DatabaseSizeGB", "CachedSizeMB", "BufferPool%", "CurrentLogReuseWait", "CompatibilityLevel", "PageVerifyOption", "Containment", "Collation", 
+				#"SnapshotIsolationState", "ReadCommittedSnapshotOn", "RecoveryModel", "AutoCloseOn",
+				#"AutoShrinkOn", "QueryStoreOn", "TrustworthyOn", "IsEncrypted", "EncryptionState" | ConvertTo-Html -As Table -Fragment
+				$htmlTable = Convert-TableToHtml $DBInfoTbl -DateTimeCols "Created" -NoCaseChange
 				
 				
-				$htmlTable1 = $DBFileInfoTbl | Select-Object  "Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
-				"AvailableSpaceGB", "MaxFileSizeGB", "GrowthIncrement" | ConvertTo-Html -As Table -Fragment
+				#$htmlTable1 = $DBFileInfoTbl | Select-Object  "Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
+				#"AvailableSpaceGB", "MaxFileSizeGB", "GrowthIncrement" | ConvertTo-Html -As Table -Fragment
+				$htmlTable1 = Convert-TableToHtml $DBFileInfoTbl -NoCaseChange
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable">'
 				}

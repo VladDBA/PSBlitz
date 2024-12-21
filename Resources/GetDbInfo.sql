@@ -111,6 +111,8 @@ SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],d.[create_date] AS [Creat
                   + N' WHEN f.[type] = 0 THEN ( CAST(f.size AS BIGINT) * 8 / 1024.00 / 1024.00 )'
                   + @LineFeed
                   + N' ELSE 0.00 END) AS NUMERIC(23, 3))  AS [DataFilesSizeGB],'
+				  + @LineFeed
+				  + N'bpi.[CachedSizeMB],bpi.[BufferPool%],'
                   + @LineFeed
                   + N'SUM(CASE WHEN f.[type] = 1 THEN 1 ELSE 0 END) AS [LogFiles],'
                   + @LineFeed
@@ -167,8 +169,6 @@ SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],d.[create_date] AS [Creat
 					  + @LineFeed + N'WHEN ek.[encryption_state] = 6 THEN ''Protection change in progress'''
 					  + @LineFeed + N'END AS [EncryptionState]'
 					  END
-                  + @LineFeed
-				  + N',bpi.[CachedSizeMB],bpi.[BufferPool%]'
                   + @LineFeed + N'FROM   sys.master_files AS f'
                   + @LineFeed
                   + N'INNER JOIN sys.databases AS d  ON f.database_id = d.database_id'
