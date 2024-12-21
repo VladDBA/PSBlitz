@@ -49,6 +49,7 @@ SELECT ISNULL(SERVERPROPERTY('MachineName'),'N/A')                              
        CAST(DATEDIFF(HH, [sqlserver_start_time], GETDATE()) / 24.00 AS NUMERIC(23, 2))     AS [uptime_days],
        (SELECT COUNT(*)
         FROM   [sys].[dm_exec_connections])                                                AS [client_connections],
+		CAST(0 AS DECIMAL(6,3)) AS [Estimated Response Latency (Sec)],
 		GETDATE()                                                                          AS [server_time]
 FROM   [sys].[dm_os_sys_info]
 OPTION(RECOMPILE); 

@@ -1669,7 +1669,7 @@ try {
 			if ($DebugInfo) {
 				Write-Host " ->Converting instance info to HTML" -fore yellow
 			}
-			$InstanceInfoTbl.Columns.Add("Estimated Response Latency (Sec)", [decimal]) | Out-Null
+			#$InstanceInfoTbl.Columns.Add("Estimated Response Latency (Sec)", [decimal]) | Out-Null
 			$InstanceInfoTbl.Rows[0]["Estimated Response Latency (Sec)"] = $ConnTest
 
 			#$htmlTable1 = $InstanceInfoTbl | Select-Object  @{Name = "Machine Name"; Expression = { $_."machine_name" } },
