@@ -654,61 +654,61 @@ function Invoke-PSBlitzQuery {
 function Convert-TableToHtml {
     param (
         [Parameter(Position = 0, Mandatory = $true)]
-        [System.Data.DataTable]$DataTable,
+        [System.Data.DataTable] $DataTable,
         [Parameter(Mandatory = $false)]
-        [switch]$DebugInfo,
-		[Parameter(Mandatory = $false)]
-        [switch]$HasURLs,
-		[Parameter(Mandatory = $false)]
-        [string[]]$ExclCols,
-		[Parameter(Mandatory = $false)]
-        [string[]]$DateTimeCols,
-		[Parameter(Mandatory = $false)]
-        [string]$CSSClass
+        [switch] $DebugInfo,
+        [Parameter(Mandatory = $false)]
+        [switch] $HasURLs,
+        [Parameter(Mandatory = $false)]
+        [string[]] $ExclCols,
+        [Parameter(Mandatory = $false)]
+        [string[]] $DateTimeCols,
+        [Parameter(Mandatory = $false)]
+        [string] $CSSClass
     )
 
-    Try {
-		# Create an array to store the properties of the DataTable
+    try {
         $properties = @()
+        $cultureInfo = [System.Globalization.CultureInfo]::CurrentCulture
+        
         foreach ($column in $DataTable.Columns) {
-			#Write-Output "column name $($column.ColumnName)"
-			if ($ExclCols -contains $column.ColumnName) {
-                continue
+            if ($ExclCols -contains $column.ColumnName) { continue }
+            
+            $currentColumn = $column.ColumnName
+            $formattedName = if ($currentColumn -like "*_*") {
+                $cultureInfo.TextInfo.ToTitleCase(($currentColumn -replace "_", " "))
+            } else {
+                $cultureInfo.TextInfo.ToTitleCase($currentColumn)
             }
-			$colName = $column.ColumnName
-			$formattedName = if ($colName -like "*_*") {
-				# Replace underscores with spaces and capitalize each word
-				($colName -replace "_", " ") -replace '\b(\w)', { $_.Value.ToUpper() }
-			} else {
-				# Capitalize the first letter of the column name
-                $colName -replace '^(.)', { $_.Value.ToUpper() }
-			}
 
-				$properties += @{
-					Name       = $formattedName
-					Expression = 
-						$colName
-					
-				}
-			
-
+            $property = if ($DateTimeCols -contains $currentColumn) {
+                @{
+                    Name = $formattedName
+                    Expression = [ScriptBlock]::Create('$_["' + $currentColumn + '"].ToString("yyyy-MM-dd HH:mm:ss")')
+                }
+            } else {
+                @{
+                    Name = $formattedName
+                    Expression = [ScriptBlock]::Create('$_["' + $currentColumn + '"]')
+                }
+            }
+            $properties += $property
         }
 
-        # Convert the DataTable to HTML
-        $htmlTableOut = $DataTable | Select-Object $properties | ConvertTo-Html -As Table -Fragment
-		if(![string]::IsNullOrEmpty($CSSClass)) {
-			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class='$CSSClass'>"
-		}
-		if($HasURLs){
-			$URLRegex = '(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\".,<>?«»“”]))'
-			$htmlTableOut = $htmlTableOut -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
-		}
+        $htmlTableOut = $DataTable | Select-Object -Property $properties | ConvertTo-Html -As Table -Fragment
+        
+        if ($CSSClass) {
+            $htmlTableOut = $htmlTableOut -replace "<table>", "<table class='$CSSClass'>"
+        }
+        
+        if ($HasURLs) {
+            $URLRegex = '(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\".,<>?«»“”]))'
+            $htmlTableOut = $htmlTableOut -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+        }
+        
         return $htmlTableOut
-		#Write-Output $properties
-
-        #Write-Host "HTML table conversion successful." -ForegroundColor Green
     }
-    Catch {
+    catch {
         Write-Host "Error converting table to HTML: $_" -ForegroundColor Red
     }
 }
@@ -1671,7 +1671,7 @@ try {
 				Write-Host " ->Converting instance info to HTML" -fore yellow
 			}
 			#$InstanceInfoTbl.Columns.Add("Estimated Response Latency (Sec)", [decimal]) | Out-Null
-			$InstanceInfoTbl.Rows[0]["estimated_response_latency(sec)"] = $ConnTest
+			$InstanceInfoTbl.Rows[0]["estimated_response_latency(Sec)"] = $ConnTest
 
 			#$htmlTable1 = $InstanceInfoTbl | Select-Object  @{Name = "Machine Name"; Expression = { $_."machine_name" } },
 			#@{Name = "Instance Name"; Expression = { $_."instance_name" } }, 
@@ -1693,7 +1693,7 @@ try {
 			#"Estimated Response Latency (Sec)", 
 			#@{Name = "Server Time"; Expression = { ($_."server_time").ToString("yyyy-MM-dd HH:mm:ss") } } | ConvertTo-Html -As Table -Fragment
 			#$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="InstanceInfoTbl">'
-			$htmlTable1 = Convert-TableToHtml $InstanceInfoTbl -CSSClass InstanceInfoTbl -DebugInfo:$DebugInfo -DateTimeCols instance_last_startup
+			$htmlTable1 = Convert-TableToHtml $InstanceInfoTbl -CSSClass InstanceInfoTbl -DebugInfo:$DebugInfo
 
 			if (($DebugInfo) -and ($IsAzureSQLDB -eq $false)) {
 				Write-Host " ->Converting resource info to HTML" -fore yellow
