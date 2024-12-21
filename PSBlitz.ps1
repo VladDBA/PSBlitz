@@ -666,6 +666,8 @@ function Convert-TableToHtml {
         [Parameter(Mandatory = $false)]
         [string] $CSSClass,
 		[Parameter(Mandatory = $false)]
+        [string] $TblID,
+		[Parameter(Mandatory = $false)]
         [switch] $NoCaseChange
     )
 
@@ -688,7 +690,7 @@ function Convert-TableToHtml {
             $property = if ($DateTimeCols -contains $currentColumn) {
                 @{
                     Name = $formattedName
-                    Expression = [ScriptBlock]::Create('$_["' + $currentColumn + '"].ToString("yyyy-MM-dd HH:mm:ss")')
+                    Expression = [ScriptBlock]::Create('if ($_["' + $currentColumn + '"] -and $_["' + $currentColumn + '"] -ne [System.DBNull]::Value) { $_["' + $currentColumn + '"].ToString("yyyy-MM-dd HH:mm:ss") } else { $_["' + $currentColumn + '"] }')
                 }
             } else {
                 @{
@@ -701,8 +703,13 @@ function Convert-TableToHtml {
 
         $htmlTableOut = $DataTable | Select-Object -Property $properties | ConvertTo-Html -As Table -Fragment
         
-        if ($CSSClass) {
+        if (($CSSClass) -and ($TblID)) {
+            $htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID' class='$CSSClass'>"
+        }
+		elseif ($CSSClass) {
             $htmlTableOut = $htmlTableOut -replace "<table>", "<table class='$CSSClass'>"
+        }elseif ($TblID) {
+            $htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID'>"
         }
         
         if ($HasURLs) {
@@ -2942,20 +2949,20 @@ $JumpToTop
 				
 				#$htmlTable1 = $DBFileInfoTbl | Select-Object  "Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
 				#"AvailableSpaceGB", "MaxFileSizeGB", "GrowthIncrement" | ConvertTo-Html -As Table -Fragment
-				$htmlTable1 = Convert-TableToHtml $DBFileInfoTbl -NoCaseChange
+				$htmlTable1 = Convert-TableToHtml $DBFileInfoTbl -NoCaseChange -TblID "DBFileInfoTable" -CSSClass "sortable"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable">'
 				}
 				else {
 					$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable sortable">'
 				}
-				$htmlTable1 = $htmlTable1 -replace '<table>', '<table id="DBFileInfoTable" class="sortable">'
+				#$htmlTable1 = $htmlTable1 -replace '<table>', '<table id="DBFileInfoTable" class="sortable">'
 				
 
 				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
-					$htmlTable2 = $DBConfigTbl | Select-Object "Database", "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
-					#$htmlTable2 = $htmlTable2 -replace '<td>No</td>', '<td bgcolor="yellow">No</td>'
-					$htmlTable2 = $htmlTable2 -replace '<table>', '<table class="sortable">'
+					#$htmlTable2 = $DBConfigTbl | Select-Object "Database", "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
+					#$htmlTable2 = $htmlTable2 -replace '<table>', '<table class="sortable">'
+					$htmlTable2 = Convert-TableToHtml $DBConfigTbl -NoCaseChange -CSSClass "sortable"
 					$htmlBlock = "`n<br>`n <h2>Database Scoped Configuration for $CheckDB</h2>"
 					$htmlBlock += '<p><a href="https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-scoped-configuration-transact-sql?view=sql-server-ver16" target="_blank">More Info</a></p>'
 					$htmlBlock += "`n $SortableTable `n $htmlTable2 `n"
@@ -3149,9 +3156,10 @@ $htmlBlock
 				if ($DebugInfo) {
 					Write-Host " ->Converting sp_Blitz output to HTML" -fore yellow
 				}
-				$htmlTable = $BlitzTbl | Select-Object "Priority", "FindingsGroup", "Finding", "DatabaseName", "Details", "URL" | Where-Object -FilterScript { ($_."Finding" -ne "SQL Server First Responder Kit" ) -and ("Rundate", "Thanks!" -notcontains $_."FindingsGroup") } | ConvertTo-Html -As Table -Fragment
-				$htmlTable = $htmlTable -replace '<table>', '<table id="InstanceHealthTable">'
-				$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+				#$htmlTable = $BlitzTbl | Select-Object "Priority", "FindingsGroup", "Finding", "DatabaseName", "Details", "URL" | Where-Object -FilterScript { ($_."Finding" -ne "SQL Server First Responder Kit" ) -and ("Rundate", "Thanks!" -notcontains $_."FindingsGroup") } | ConvertTo-Html -As Table -Fragment
+				#$htmlTable = $htmlTable -replace '<table>', '<table id="InstanceHealthTable">'
+				#$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+				$htmlTable = Convert-TableToHtml $BlitzTbl -NoCaseChange -TblID "InstanceHealthTable" -HasURLs
 				$html = $HTMLPre + @"
 <title>$tableName</title>
 </head>
