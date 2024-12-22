@@ -4022,7 +4022,8 @@ $JumpToTop
 					"SET Options", "Cached Plan Size (KB)", "Compile Time (ms)", "Compile CPU (ms)",
 					"Compile memory (KB)""Minimum Memory Grant KB",
 					"Maximum Memory Grant KB", "Minimum Used Grant KB", "Maximum Used Grant KB",
-					"Average Max Memory Grant", "Min Spills", "Max Spills", "Total Spills", "Avg Spills")
+					"Average Max Memory Grant", "Min Spills", "Max Spills", "Total Spills", "Avg Spills",
+					"Remove Plan Handle From Cache","Remove SQL Handle From Cache")
 				if ($DebugInfo) {
 					Write-Host " ->Writing sp_BlitzCache results to sheet $SheetName" -fore yellow
 				}
