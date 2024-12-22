@@ -95,6 +95,8 @@ IF OBJECT_ID('tempdb.dbo.#relop', 'U') IS NOT NULL
 
 /*
 Everything beyond this point is straight from sp_BlitzCache 
+except for column order and data type changes made for PSBlitz as well as replacing the 
+'<?NoNeedToClickMe -- N/A --?>' string with an empty string, and
 without the GO at the end
 */
 
@@ -4138,11 +4140,11 @@ RAISERROR(N'Filling in implicit conversion and cached plan parameter info', 0, 1
 UPDATE b
 SET b.implicit_conversion_info = CASE WHEN b.implicit_conversion_info IS NULL 
 									  OR CONVERT(NVARCHAR(MAX), b.implicit_conversion_info) = N''
-									  THEN '<?NoNeedToClickMe -- N/A --?>' 
+									  THEN '' 
 							     ELSE b.implicit_conversion_info END,
 	b.cached_execution_parameters = CASE WHEN b.cached_execution_parameters IS NULL 
 										 OR CONVERT(NVARCHAR(MAX), b.cached_execution_parameters) = N''
-										 THEN '<?NoNeedToClickMe -- N/A --?>' 
+										 THEN '' 
 									ELSE b.cached_execution_parameters END
 FROM ##BlitzCacheProcs AS b
 WHERE b.SPID = @@SPID
@@ -4362,7 +4364,7 @@ IF EXISTS ( SELECT 1/0
 	UPDATE b
 	SET b.missing_indexes = 
 		CASE WHEN b.missing_indexes IS NULL 
-			 THEN '<?NoNeedToClickMe -- N/A --?>' 
+			 THEN '' 
 			 ELSE b.missing_indexes 
 		END
 	FROM ##BlitzCacheProcs AS b
@@ -6231,15 +6233,16 @@ BEGIN
 	
 		END;            
     
-	
-    SELECT  Priority,
+	/*Vlad - column changes fpr PSBlitz*/
+    SELECT  [Priority],
             FindingsGroup,
             Finding,
-            URL,
-            Details,
-            CheckID
+			Details,
+            URL/*,            
+            CheckID*/
     FROM    ##BlitzCacheResults
     WHERE   SPID = @@SPID
+	AND [Priority] <> 255
     GROUP BY Priority,
             FindingsGroup,
             Finding,

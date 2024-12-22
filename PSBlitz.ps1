@@ -3860,8 +3860,9 @@ $JumpToTop
 				$AnchorURL = '<a href="#$&">$&</a>'
 				$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
 		
-				$htmlTable2 = $BlitzCacheWarnTbl | Select-Object "Priority", "FindingsGroup", "Finding", "Details", "URL" | Where-Object { $_."Priority" -ne 255 } | ConvertTo-Html -As Table -Fragment
-				$htmlTable2 = $htmlTable2 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+				#$htmlTable2 = $BlitzCacheWarnTbl | Select-Object "Priority", "FindingsGroup", "Finding", "Details", "URL" | Where-Object { $_."Priority" -ne 255 } | ConvertTo-Html -As Table -Fragment
+				#$htmlTable2 = $htmlTable2 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+				$htmlTable2 = Convert-TableToHtml $BlitzCacheWarnTbl -NoCaseChange -HasURLs
 
 				$htmlTable3 = $BlitzCacheTbl | Select-Object "Query", 
 				"Query Text" | ConvertTo-Html -As Table -Fragment
@@ -4031,24 +4032,24 @@ $JumpToTop
 						[string]$DebugCol = $col
 						[string]$DebugValue = $BlitzCacheTbl.Rows[$RowNum][$col]
 						#Properly handling Query Hash, Plan Hash, Plan, and SQL Handle hex values 
-						if ("Query Hash", "Query Plan Hash", "Plan Handle", "SQL Handle" -Contains $col) {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $BlitzCacheTbl.Rows[$RowNum][$col]
-							#move to the next column
-							#$ExcelColNum += 1
-							#move to the top of the loop
-							Continue
-						}
-						elseif ($BlitzCacheTbl.Rows[$RowNum][$col] -eq "<?NoNeedToClickMe -- N/A --?>") {
+						#if ("Query Hash", "Query Plan Hash", "Plan Handle", "SQL Handle" -Contains $col) {
+						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $BlitzCacheTbl.Rows[$RowNum][$col]
+						#	#move to the next column
+						#	#$ExcelColNum += 1
+						#	#move to the top of the loop
+						#	Continue
+						#}elseif
+						if($BlitzCacheTbl.Rows[$RowNum][$col] -eq "<?NoNeedToClickMe -- N/A --?>") {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = "   -- N/A --   "
 							#move to the next column
 							#$ExcelColNum += 1
 							#move to the top of the loop
 							#Continue
 						}
-						elseif (("Created At", "Last Execution" -contains $col) -and ($BlitzCacheTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							$DateForExcel = $BlitzCacheTbl.Rows[$RowNum][$col] | Get-Date
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-						}
+						#elseif (("Created At", "Last Execution" -contains $col) -and ($BlitzCacheTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+						#	$DateForExcel = $BlitzCacheTbl.Rows[$RowNum][$col] | Get-Date
+						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						#}
 						else {			
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzCacheTbl.Rows[$RowNum][$col]
 						}
