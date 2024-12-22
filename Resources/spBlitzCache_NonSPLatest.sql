@@ -5028,6 +5028,14 @@ BEGIN
         CONVERT(NVARCHAR(30), CAST((AverageReturnedRows) AS BIGINT), 1) AS [Avg Rows],
         CONVERT(NVARCHAR(30), CAST((MinReturnedRows) AS BIGINT), 1) AS [Min Rows],
         CONVERT(NVARCHAR(30), CAST((MaxReturnedRows) AS BIGINT), 1) AS [Max Rows],
+		CONVERT(NVARCHAR(30), CAST((NumberOfPlans) AS BIGINT), 1) AS [# Plans],
+		CONVERT(NVARCHAR(30), CAST((NumberOfDistinctPlans) AS BIGINT), 1) AS [# Distinct Plans],
+		CONVERT(VARCHAR(25),PlanCreationTime,120) AS [Created At],
+        CONVERT(VARCHAR(25),LastExecutionTime,120) AS [Last Execution],
+		CONVERT(VARCHAR(25),LastCompletionTime,120) AS [Last Completion],
+		CONVERT(VARCHAR(256),QueryHash,1) AS [Query Hash],
+		CONVERT(VARCHAR(256),QueryPlanHash,1) AS [Query Plan Hash],
+		COALESCE(SetOptions, '''') AS [SET Options],
 		CONVERT(NVARCHAR(30), CAST((MinGrantKB) AS BIGINT), 1) AS [Minimum Memory Grant KB],
 		CONVERT(NVARCHAR(30), CAST((MaxGrantKB) AS BIGINT), 1) AS [Maximum Memory Grant KB],
 		CONVERT(NVARCHAR(30), CAST((MinUsedGrantKB) AS BIGINT), 1) AS [Minimum Used Grant KB], 
@@ -5036,26 +5044,22 @@ BEGIN
 		CONVERT(NVARCHAR(30), CAST((MinSpills) AS BIGINT), 1) AS [Min Spills],
 		CONVERT(NVARCHAR(30), CAST((MaxSpills) AS BIGINT), 1) AS [Max Spills],
 		CONVERT(NVARCHAR(30), CAST((TotalSpills) AS BIGINT), 1) AS [Total Spills],
-		CONVERT(NVARCHAR(30), CAST((AvgSpills) AS MONEY), 1) AS [Avg Spills],
-        CONVERT(NVARCHAR(30), CAST((NumberOfPlans) AS BIGINT), 1) AS [# Plans],
-        CONVERT(NVARCHAR(30), CAST((NumberOfDistinctPlans) AS BIGINT), 1) AS [# Distinct Plans],
-        CONVERT(VARCHAR(25),PlanCreationTime,120) AS [Created At],
-        CONVERT(VARCHAR(25),LastExecutionTime,120) AS [Last Execution],
-		CONVERT(VARCHAR(25),LastCompletionTime,120) AS [Last Completion],
+		CONVERT(NVARCHAR(30), CAST((AvgSpills) AS MONEY), 1) AS [Avg Spills],        
+
         CONVERT(NVARCHAR(30), CAST((CachedPlanSize) AS BIGINT), 1) AS [Cached Plan Size (KB)],
         CONVERT(NVARCHAR(30), CAST((CompileTime) AS BIGINT), 1) AS [Compile Time (ms)],
         CONVERT(NVARCHAR(30), CAST((CompileCPU) AS BIGINT), 1) AS [Compile CPU (ms)],
         CONVERT(NVARCHAR(30), CAST((CompileMemory) AS BIGINT), 1) AS [Compile memory (KB)],
-        COALESCE(SetOptions, '''') AS [SET Options],
-		CONVERT(VARCHAR(256),PlanHandle,1) AS [Plan Handle], 
-		CONVERT(VARCHAR(256),SqlHandle,1) AS [SQL Handle], 
+        
+		/*CONVERT(VARCHAR(256),PlanHandle,1) AS [Plan Handle],*/ 
+		/*CONVERT(VARCHAR(256),SqlHandle,1) AS [SQL Handle],  */
 		/*[SQL Handle More Info],*/
-        CONVERT(VARCHAR(256),QueryHash,1) AS [Query Hash],
+        
 		/*[Query Hash More Info],*/
-        CONVERT(VARCHAR(256),QueryPlanHash,1) AS [Query Plan Hash],
-        StatementStartOffset,
-        StatementEndOffset,
-		PlanGenerationNum,
+        
+        /*StatementStartOffset,*/
+        /*StatementEndOffset,  */
+		/*PlanGenerationNum,   */
 		[Remove Plan Handle From Cache],
 		[Remove SQL Handle From Cache]';
 		/*Vlad - column list changes for PSBlitz end here*/
