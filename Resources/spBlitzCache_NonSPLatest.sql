@@ -4912,8 +4912,11 @@ BEGIN
 END;
 ELSE
 BEGIN
+ /*Vlad - column list changes for PSBlitz -- added Query and "SQLPlan File" columns*/
     SET @columns = N' DatabaseName AS [Database],
 		QueryPlanCost AS [Cost],
+		CAST('''' AS VARCHAR(30)) AS [Query],
+		CAST('''' AS VARCHAR(30)) AS [SQLPlan File],
         QueryText AS [Query Text],
         QueryType AS [Query Type],
         Warnings AS [Warnings], 
@@ -4921,6 +4924,7 @@ BEGIN
 		missing_indexes AS [Missing Indexes],
 		implicit_conversion_info AS [Implicit Conversion Info],
 		cached_execution_parameters AS [Cached Execution Parameters], ' + @nl;
+		/*Vlad - column list changes for PSBlitz END*/
 
     IF @ExpertMode = 2 /* Opserver */
     BEGIN
@@ -4994,7 +4998,7 @@ BEGIN
 				  CASE WHEN select_with_writes > 0 THEN '', 66'' ELSE '''' END
 				  , 3, 200000) AS opserver_warning , ' + @nl ;
     END;
-    
+    /*Vlad - column list changes, datetime and varbinary to varchar conversions for PSBlitz*/
     SET @columns += N'        
         CONVERT(NVARCHAR(30), CAST((ExecutionCount) AS BIGINT), 1) AS [# Executions],
         CONVERT(NVARCHAR(30), CAST((ExecutionsPerMinute) AS BIGINT), 1) AS [Executions / Minute],
@@ -5033,25 +5037,26 @@ BEGIN
 		CONVERT(NVARCHAR(30), CAST((AvgSpills) AS MONEY), 1) AS [Avg Spills],
         CONVERT(NVARCHAR(30), CAST((NumberOfPlans) AS BIGINT), 1) AS [# Plans],
         CONVERT(NVARCHAR(30), CAST((NumberOfDistinctPlans) AS BIGINT), 1) AS [# Distinct Plans],
-        PlanCreationTime AS [Created At],
-        LastExecutionTime AS [Last Execution],
-		LastCompletionTime AS [Last Completion],
+        CONVERT(VARCHAR(25),PlanCreationTime,120) AS [Created At],
+        CONVERT(VARCHAR(25),LastExecutionTime,120) AS [Last Execution],
+		CONVERT(VARCHAR(25),LastCompletionTime,120) AS [Last Completion],
         CONVERT(NVARCHAR(30), CAST((CachedPlanSize) AS BIGINT), 1) AS [Cached Plan Size (KB)],
         CONVERT(NVARCHAR(30), CAST((CompileTime) AS BIGINT), 1) AS [Compile Time (ms)],
         CONVERT(NVARCHAR(30), CAST((CompileCPU) AS BIGINT), 1) AS [Compile CPU (ms)],
         CONVERT(NVARCHAR(30), CAST((CompileMemory) AS BIGINT), 1) AS [Compile memory (KB)],
         COALESCE(SetOptions, '''') AS [SET Options],
-		PlanHandle AS [Plan Handle], 
-		SqlHandle AS [SQL Handle], 
-		[SQL Handle More Info],
-        QueryHash AS [Query Hash],
-		[Query Hash More Info],
-        QueryPlanHash AS [Query Plan Hash],
+		CONVERT(VARCHAR(256),PlanHandle,1) AS [Plan Handle], 
+		CONVERT(VARCHAR(256),SqlHandle,1) AS [SQL Handle], 
+		/*[SQL Handle More Info],*/
+        CONVERT(VARCHAR(256),QueryHash,1) AS [Query Hash],
+		/*[Query Hash More Info],*/
+        CONVERT(VARCHAR(256),QueryPlanHash,1) AS [Query Plan Hash],
         StatementStartOffset,
         StatementEndOffset,
 		PlanGenerationNum,
 		[Remove Plan Handle From Cache],
 		[Remove SQL Handle From Cache]';
+		/*Vlad - column list changes for PSBlitz end here*/
 END;
 
 SET @sql = N'

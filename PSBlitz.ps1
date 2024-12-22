@@ -3733,7 +3733,7 @@ $JumpToTop
 			#Setting $i to 0
 			$i = 0
 
-			$BlitzCacheTbl.Columns.Add("SQLPlan File", [string]) | Out-Null
+			#$BlitzCacheTbl.Columns.Add("SQLPlan File", [string]) | Out-Null
 
 			foreach ($row in $BlitzCacheTbl) {
 				#Increment file name counter	
@@ -3808,7 +3808,7 @@ $JumpToTop
 				$i = 0
 			
 				#adding query name
-				$BlitzCacheTbl.Columns.Add("Query", [string]) | Out-Null
+				#$BlitzCacheTbl.Columns.Add("Query", [string]) | Out-Null
 				$RowNum = 0
 				$i = 0
 			
@@ -3826,32 +3826,33 @@ $JumpToTop
 					Write-Host " ->Converting sp_BlitzCache output to HTML" -fore yellow
 				}
 				
-				$htmlTable1 = $BlitzCacheTbl | Select-Object "Database", "Cost", 
-				"Query",
-				"SQLPlan File", 
-				"Query Type", "Warnings", 
-				@{Name = "Missing Indexes"; Expression = { $_."Missing Indexes".Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },	
-				@{Name = "Implicit Conversion Info"; Expression = { $_."Implicit Conversion Info".Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
-				@{Name = "Cached Execution Parameters"; Expression = { $_."Cached Execution Parameters".Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
-				"# Executions", "Executions / Minute", "Execution Weight",
-				"% Executions (Type)", "Serial Desired Memory",
-				"Serial Required Memory", "Total CPU (ms)", "Avg CPU (ms)", "CPU Weight", "% CPU (Type)",
-				"Total Duration (ms)", "Avg Duration (ms)", "Duration Weight", "% Duration (Type)",
-				"Total Reads", "Average Reads", "Read Weight", "% Reads (Type)", "Total Writes",
-				"Average Writes", "Write Weight", "% Writes (Type)", "Total Rows", "Avg Rows", "Min Rows",
-				"Max Rows", "# Plans", "# Distinct Plans", 
-				@{Name = "Created At"; Expression = { if ($_."Created At" -ne [System.DBNull]::Value) { ($_."Created At").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Created At" } } }, 
-				@{Name = "Last Execution"; Expression = { if ($_."Last Execution" -ne [System.DBNull]::Value) { ($_."Last Execution").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last Execution" } } },
-				"StatementStartOffset", "StatementEndOffset", 
-				@{Name = "Query Hash"; Expression = { Get-HexString -HexInput $_."Query Hash" } }, 
-				@{Name = "Query Plan Hash"; Expression = { Get-HexString -HexInput $_."Query Plan Hash" } },
-				"SET Options", "Cached Plan Size (KB)", "Compile Time (ms)", "Compile CPU (ms)",
-				"Compile memory (KB)", 
-				@{Name = "Plan Handle"; Expression = { Get-HexString -HexInput $_."Plan Handle" } }, 
-				@{Name = "SQL Handle"; Expression = { Get-HexString -HexInput $_."SQL Handle" } }, 
-				"Minimum Memory Grant KB",
-				"Maximum Memory Grant KB", "Minimum Used Grant KB", "Maximum Used Grant KB",
-				"Average Max Memory Grant", "Min Spills", "Max Spills", "Total Spills", "Avg Spills" | ConvertTo-Html -As Table -Fragment
+				#$htmlTable1 = $BlitzCacheTbl | Select-Object "Database", "Cost", 
+				#"Query",
+				#"SQLPlan File", 
+				#"Query Type", "Warnings", 
+				#@{Name = "Missing Indexes"; Expression = { $_."Missing Indexes".Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },	
+				#@{Name = "Implicit Conversion Info"; Expression = { $_."Implicit Conversion Info".Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
+				#@{Name = "Cached Execution Parameters"; Expression = { $_."Cached Execution Parameters".Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
+				#"# Executions", "Executions / Minute", "Execution Weight",
+				#"% Executions (Type)", "Serial Desired Memory",
+				#"Serial Required Memory", "Total CPU (ms)", "Avg CPU (ms)", "CPU Weight", "% CPU (Type)",
+				#"Total Duration (ms)", "Avg Duration (ms)", "Duration Weight", "% Duration (Type)",
+				#"Total Reads", "Average Reads", "Read Weight", "% Reads (Type)", "Total Writes",
+				#"Average Writes", "Write Weight", "% Writes (Type)", "Total Rows", "Avg Rows", "Min Rows",
+				#"Max Rows", "# Plans", "# Distinct Plans", 
+				#@{Name = "Created At"; Expression = { if ($_."Created At" -ne [System.DBNull]::Value) { ($_."Created At").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Created At" } } }, 
+				#@{Name = "Last Execution"; Expression = { if ($_."Last Execution" -ne [System.DBNull]::Value) { ($_."Last Execution").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last Execution" } } },
+				#"StatementStartOffset", "StatementEndOffset", 
+				#@{Name = "Query Hash"; Expression = { Get-HexString -HexInput $_."Query Hash" } }, 
+				#@{Name = "Query Plan Hash"; Expression = { Get-HexString -HexInput $_."Query Plan Hash" } },
+				#"SET Options", "Cached Plan Size (KB)", "Compile Time (ms)", "Compile CPU (ms)",
+				#"Compile memory (KB)", 
+				#@{Name = "Plan Handle"; Expression = { Get-HexString -HexInput $_."Plan Handle" } }, 
+				#@{Name = "SQL Handle"; Expression = { Get-HexString -HexInput $_."SQL Handle" } }, 
+				#"Minimum Memory Grant KB",
+				#"Maximum Memory Grant KB", "Minimum Used Grant KB", "Maximum Used Grant KB",
+				#"Average Max Memory Grant", "Min Spills", "Max Spills", "Total Spills", "Avg Spills" | ConvertTo-Html -As Table -Fragment
+				$htmlTable1 = Convert-TableToHtml $BlitzCacheTbl -NoCaseChange -ExclCols "Query Text","Query Plan"
 				
 				#Handling URLs
 				$QExt = '.query'
