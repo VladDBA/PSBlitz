@@ -4847,7 +4847,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                 )
                 SELECT
                     /*'WAIT STATS' AS Pattern,-- Vlad - column changes for PSBlitz */
-                    b.SampleTime AS [Sample Ended],
+                    CONVERT(VARCHAR(25),CAST(b.SampleTime AS DATETIME),120) AS [Sample Ended],
                     CAST(DATEDIFF(mi,wd1.SampleTime, wd2.SampleTime) / 60. AS DECIMAL(18,1)) AS [Hours Sample],
 					CAST(c.[Total Thread Time (Seconds)] / 60. / 60. AS DECIMAL(18,1)) AS [Thread Time (Hours)],
                     wd1.wait_type,
@@ -4891,7 +4891,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                 )
                 SELECT
                    /* 'WAIT STATS' AS Pattern,-- Vlad - column changes for PSBlitz */
-                    b.SampleTime AS [Sample Ended],
+                    CONVERT(VARCHAR(25),CAST(b.SampleTime AS DATETIME),120) AS [Sample Ended],
                     DATEDIFF(ss,wd1.SampleTime, wd2.SampleTime) AS [Seconds Sample],
 					c.[Total Thread Time (Seconds)],
                     wd1.wait_type,
@@ -4975,11 +4975,13 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                   AND wd1.FileID = wd2.FileID
             )
             SELECT
-                Pattern, [Sample Time], [Sample (seconds)], [File Name], [Drive],  [# Reads/Writes],[MB Read/Written],[Avg Stall (ms)], [file physical name], [DatabaseName], [StallRank]
+                Pattern, CONVERT(VARCHAR(25),CAST([Sample Time] AS DATETIME),120) AS [Sample Time]
+				, [Sample (seconds)], [File Name], [Drive],  [# Reads/Writes],[MB Read/Written],[Avg Stall (ms)], [file physical name], [DatabaseName], [StallRank]
             FROM readstats
             WHERE StallRank <=20 AND [MB Read/Written] > 0
             UNION ALL
-            SELECT Pattern, [Sample Time], [Sample (seconds)], [File Name], [Drive],  [# Reads/Writes],[MB Read/Written],[Avg Stall (ms)], [file physical name], [DatabaseName], [StallRank]
+            SELECT Pattern, CONVERT(VARCHAR(25),CAST([Sample Time] AS DATETIME),120) AS [Sample Time], 
+			[Sample (seconds)], [File Name], [Drive],  [# Reads/Writes],[MB Read/Written],[Avg Stall (ms)], [file physical name], [DatabaseName], [StallRank]
             FROM writestats
             WHERE StallRank <=20 AND [MB Read/Written] > 0
             ORDER BY Pattern, StallRank;
@@ -4992,8 +4994,11 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
             IF @OutputResultSets LIKE N'%PerfmonStats%'
                 SELECT /*'PERFMON' AS Pattern, -- Vlad - column changes for PSBlitz */
 				pLast.[object_name], pLast.counter_name, pLast.instance_name,
-                pFirst.SampleTime AS FirstSampleTime, pFirst.cntr_value AS FirstSampleValue,
-                pLast.SampleTime AS LastSampleTime, pLast.cntr_value AS LastSampleValue,
+                CONVERT(VARCHAR(30),pFirst.SampleTime,120) AS FirstSampleTime, /*Vlad - the original version of this column doesn't contain the TZ offset, 
+				so it ends up looking wrong eitherway */
+				pFirst.cntr_value AS FirstSampleValue,
+                CONVERT(VARCHAR(30),pLast.SampleTime,120) AS LastSampleTime, 
+				pLast.cntr_value AS LastSampleValue,
                 pLast.cntr_value - pFirst.cntr_value AS ValueDelta,
                 ((1.0 * pLast.cntr_value - pFirst.cntr_value) / DATEDIFF(ss, pFirst.SampleTime, pLast.SampleTime)) AS ValuePerSecond
                 FROM #PerfmonStats pLast

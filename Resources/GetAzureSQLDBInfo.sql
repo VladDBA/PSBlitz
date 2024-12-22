@@ -32,7 +32,7 @@ SELECT [database_name]                                                     AS [D
          ELSE 'Secondary'
        END                                                                 AS [Replica Type],
        [max_transaction_size]                                              AS [Max TLog Space/Transaction(KB)],
-       [last_updated_date_utc]                                             AS [Settings Last Changed],
+       CONVERT(VARCHAR(25),[last_updated_date_utc],120)                    AS [Settings Last Changed],
        [primary_group_max_workers]                                         AS [User Workload Max Worker Threads],
        CAST([primary_min_log_rate] / 1024.00 / 1024.00 AS NUMERIC(23, 3))  AS [User Workload Min Log Rate MB/s],
        CAST([primary_max_log_rate] / 1024.00 / 1024.00 AS NUMERIC(23, 3))  AS [User Workload Max Log Rate MB/s],
@@ -67,7 +67,7 @@ FROM   sys.[dm_user_db_resource_governance];
          GROUP  BY [type])
 SELECT DB_NAME()                                                                                                       AS [Database],
        DATABASEPROPERTYEX(DB_NAME(), 'ServiceObjective')                                                               AS [Service Objective],
-       [d].[create_date] AS [Created],
+       CONVERT(VARCHAR(25),[d].[create_date],120)                                                                      AS [Created],
        [d].[state_desc]                                                                                                AS [Database State],
        SUM(CASE
              WHEN [f].[type] = 0 THEN 1
@@ -154,8 +154,8 @@ DECLARE @MaxEndTime DATETIME;
 SELECT @MaxEndTime = MAX([end_time])
 FROM   sys.[dm_db_resource_stats];
 
-SELECT DATEADD(SECOND, -15, MIN([end_time]))                  AS [Sample Start],
-       MAX([end_time])                                        AS [Sample end],
+SELECT CONVERT(VARCHAR(25),DATEADD(SECOND, -15, MIN([end_time])),120)   AS [Sample Start],
+       CONVERT(VARCHAR(25),MAX([end_time]),120)                         AS [Sample End],
 	   DATEDIFF(MINUTE, MIN([end_time]), MAX([end_time]))     AS [Sample(Minutes)],
        CAST(AVG([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Avg CPU Usage %],
        CAST(MAX([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Max CPU Usage %],
@@ -167,8 +167,8 @@ SELECT DATEADD(SECOND, -15, MIN([end_time]))                  AS [Sample Start],
        CAST(MAX([avg_memory_usage_percent]) AS NUMERIC(5, 2)) AS [Max Memory Usage %]
 FROM   sys.[dm_db_resource_stats]
 UNION
-SELECT DATEADD(SECOND, -15, MIN([end_time]))                  AS [Sample start],
-       MAX([end_time])                                        AS [Sample end],
+SELECT CONVERT(VARCHAR(25),DATEADD(SECOND, -15, MIN([end_time])),120)   AS [Sample Start],
+       CONVERT(VARCHAR(25),MAX([end_time]),120)                         AS [Sample End],
        DATEDIFF(MINUTE, MIN([end_time]), MAX([end_time]))     AS [Sample(Minutes)],
 	   CAST(AVG([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Avg CPU Usage %],
        CAST(MAX([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Max CPU Usage %],
@@ -181,8 +181,8 @@ SELECT DATEADD(SECOND, -15, MIN([end_time]))                  AS [Sample start],
 FROM   sys.[dm_db_resource_stats]
 WHERE  [end_time] >= DATEADD(MINUTE, -30, @MaxEndTime)
 UNION
-SELECT DATEADD(SECOND, -15, MIN([end_time]))                  AS [Sample start],
-       MAX([end_time])                                        AS [Sample end],
+SELECT CONVERT(VARCHAR(25),DATEADD(SECOND, -15, MIN([end_time])),120)   AS [Sample Start],
+       CONVERT(VARCHAR(25),MAX([end_time]),120)                         AS [Sample End],
 	   DATEDIFF(MINUTE, MIN([end_time]), MAX([end_time]))     AS [Sample(Minutes)],
        CAST(AVG([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Avg CPU Usage %],
        CAST(MAX([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Max CPU Usage %],
@@ -195,8 +195,8 @@ SELECT DATEADD(SECOND, -15, MIN([end_time]))                  AS [Sample start],
 FROM   sys.[dm_db_resource_stats]
 WHERE  [end_time] >= DATEADD(MINUTE, -15, @MaxEndTime)
 UNION
-SELECT DATEADD(SECOND, -15, MIN([end_time]))                  AS [Sample start],
-       MAX([end_time])                                        AS [Sample end],
+SELECT CONVERT(VARCHAR(25),DATEADD(SECOND, -15, MIN([end_time])),120)   AS [Sample Start],
+       CONVERT(VARCHAR(25),MAX([end_time]),120)                         AS [Sample End],
 	   DATEDIFF(MINUTE, MIN([end_time]), MAX([end_time]))     AS [Sample(Minutes)],
        CAST(AVG([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Avg CPU Usage %],
        CAST(MAX([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Max CPU Usage %],
@@ -209,8 +209,8 @@ SELECT DATEADD(SECOND, -15, MIN([end_time]))                  AS [Sample start],
 FROM   sys.[dm_db_resource_stats]
 WHERE  [end_time] >= DATEADD(MINUTE, -5, @MaxEndTime)
 UNION
-SELECT DATEADD(SECOND, -15, MIN([end_time]))                  AS [Sample start],
-       MAX([end_time])                                        AS [Sample end],
+SELECT CONVERT(VARCHAR(25),DATEADD(SECOND, -15, MIN([end_time])),120)   AS [Sample Start],
+       CONVERT(VARCHAR(25),MAX([end_time]),120)                         AS [Sample End],
 	   DATEDIFF(MINUTE, MIN([end_time]), MAX([end_time]))     AS [Sample(Minutes)],
        CAST(AVG([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Avg CPU Usage %],
        CAST(MAX([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Max CPU Usage %],
@@ -244,9 +244,9 @@ WITH [WaitsAgg]
                          OVER(
                            ORDER BY [wait_time_ms] DESC)                    AS [row_num]
          FROM   sys.[dm_db_wait_stats] WITH (NOLOCK))
-SELECT @StartTime                                                                           AS [Sample start],
-       GETDATE()                                                                            AS [Sample End],
-       DATEDIFF(HOUR, @StartTime, GETDATE())                                                [Sample(Hours)],
+SELECT CONVERT(VARCHAR(25),@StartTime,120)                                                  AS [Sample Start],
+       CONVERT(VARCHAR(25),GETDATE(),120)                                                   AS [Sample End],
+       DATEDIFF(HOUR, @StartTime, GETDATE())                                                AS [Sample(Hours)],
        [wa1].[wait_type]                                                                    AS [Wait Type],
        [wa1].[waiting_tasks_count]                                                          AS [Wait Count],
        CAST([wa1].[percent] AS NUMERIC(5, 2))                                               AS [Wait %],

@@ -2304,23 +2304,25 @@ $htmlTable2
 				}
 
 				
-				$htmlTable1 = $AcTranTbl | Select-Object @{Name = "time_of_check"; Expression = { if ($_."time_of_check" -ne [System.DBNull]::Value) { ($_."time_of_check").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."time_of_check" } } },
-				"database_name", "session_id", "blocking_session_id",
-				"current_query", "current_plan_file", "most_recent_query", "most_recent_plan_file", "wait_type",
-				"wait_time_seconds", "wait_resource", "command",
-				"session_status", "current_reuqest_status", "transaction_name",
-			 "open_transaction_count",
-				@{Name = "transaction_begin_time"; Expression = { if ($_."transaction_begin_time" -ne [System.DBNull]::Value) { ($_."transaction_begin_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."transaction_begin_time" } } },
-			 "transaction_type", "transaction_state",
-			 @{Name = "request_start_time"; Expression = { if ($_."request_start_time" -ne [System.DBNull]::Value) { ($_."request_start_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_start_time" } } },
-			 @{Name = "request_end_time"; Expression = { if ($_."request_end_time" -ne [System.DBNull]::Value) { ($_."request_end_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_end_time" } } },
-			 "active_request_elapsed_seconds",
-			 "host_name", "login_name", "program_name", "client_interface_name" | ConvertTo-Html -As Table -Fragment
+			#	$htmlTable1 = $AcTranTbl | Select-Object @{Name = "time_of_check"; Expression = { if ($_."time_of_check" -ne [System.DBNull]::Value) { ($_."time_of_check").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."time_of_check" } } },
+			#	"database_name", "session_id", "blocking_session_id",
+			#	"current_query", "current_plan_file", "most_recent_query", "most_recent_plan_file", "wait_type",
+			#	"wait_time_seconds", "wait_resource", "command",
+			#	"session_status", "current_reuqest_status", "transaction_name",
+			#    "open_transaction_count",
+			#	@{Name = "transaction_begin_time"; Expression = { if ($_."transaction_begin_time" -ne [System.DBNull]::Value) { ($_."transaction_begin_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."transaction_begin_time" } } },
+			#   "transaction_type", "transaction_state",
+			#   @{Name = "request_start_time"; Expression = { if ($_."request_start_time" -ne [System.DBNull]::Value) { ($_."request_start_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_start_time" } } },
+			#   @{Name = "request_end_time"; Expression = { if ($_."request_end_time" -ne [System.DBNull]::Value) { ($_."request_end_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_end_time" } } },
+			#   "active_request_elapsed_seconds",
+			#   "host_name", "login_name", "program_name", "client_interface_name" | ConvertTo-Html -As Table -Fragment
+				$htmlTable1 = Convert-TableToHtml $AcTranTbl -ExclCols "current_sql","current_plan","most_recent_sql","most_recent_plan" -DebugInfo:$DebugInfo
 				$QExt = '.query'
 				$FileSOrder = "Current"
 				$AnchorRegex = "$FileSOrder(_\d+)$QExt"
 				$AnchorURL = '<a href="#$&">$&</a>'
 				$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
+				
 				$htmlTable2 = $AcTranTbl | Select-Object @{Name = "Query"; Expression = { $_."current_query" } }, 
 				@{Name = "Query text"; Expression = { $_."current_sql" } } | Where-Object -FilterScript { $_."Query text" -ne [System.DBNull]::Value } | ConvertTo-Html -As Table -Fragment
 				$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
@@ -2331,7 +2333,6 @@ $htmlTable2
 				$AnchorRegex = "$FileSOrder(_\d+)$QExt"
 				$AnchorURL = '<a href="#$&">$&</a>'
 				$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
-				#@{Name = "Wait Category"; Expression = { $_."wait_category" } },
 
 				$htmlTable3 = $AcTranTbl | Select-Object @{Name = "Query"; Expression = { $_."most_recent_query" } }, 
 				@{Name = "Query text"; Expression = { $_."most_recent_sql" } } | Where-Object -FilterScript { $_."Query text" -ne [System.DBNull]::Value }  | ConvertTo-Html -As Table -Fragment
@@ -2394,14 +2395,14 @@ $JumpToTop
 					foreach ($col in $DataSetCols) {
 						[string]$DebugCol = $col
 						[string]$DebugValue = $AcTranTbl.Rows[$RowNum][$col]
-						if (("time_of_check", "transaction_begin_time", "request_start_time", "request_end_time" -contains $col) -and ($AcTranTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							
-							$DateForExcel = $AcTranTbl.Rows[$RowNum][$col] | Get-Date
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
+						#if (("time_of_check", "transaction_begin_time", "request_start_time", "request_end_time" -contains $col) -and ($AcTranTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+						#	
+						#	$DateForExcel = $AcTranTbl.Rows[$RowNum][$col] | Get-Date
+						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						#}
+						#else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $AcTranTbl.Rows[$RowNum][$col]
-						}
+						#}
 					
 						#move to the next column
 						$ExcelColNum += 1
@@ -2455,42 +2456,47 @@ $JumpToTop
 					Write-Host " ->Converting Azure SQL Database Info results to HTML" -fore yellow
 				}
 
-				$htmlTable = $RsrcGovTbl | Select-Object "Database", "Service level objective", 
-				"DTU limit(empty for vCore)", "vCore limit(empty for DTU databases)", "Min CPU%", "Max CPU%", 
-				"Cap CPU%", "Max DOP", "Min Memory%", "Max Memory%", "Max allowed sessions", "Req Max Memory Grant%", 
-				"Min Max DataFile Size(MB)", "Max Max DataFile Size(MB)", "Default Max DataFile Size(MB)", 
-				"Default DataFile Growth Increment(MB)", "Default Size New DataFile(MB)", "Default Size New LogFile(MB)", 
-				"Instnace Max Log Rate MB/s", "Instance Max Worker Threads", "Replica Type", "Max TLog Space/Transaction(KB)", 
-				@{Name = "Settings Last Changed"; Expression = { if ($_."Settings Last Changed" -ne [System.DBNull]::Value) { ($_."Settings Last Changed").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Settings Last Changed" } } }, 
-				"User Workload Max Worker Threads", "User Workload Min Log Rate MB/s", 
-				"User Workload Max Log Rate MB/s", "User Workload Min IOPS", "User Workload Max IOPS", "User Workload Min CPU%", 
-				"User Workload Max CPU%", "User Workload Max Worker Threads2", "User Workload Pool Max IOPS ", 
-				"Max Local Storage(MB)", "Used Local Storage(MB)", "Max Pool Log Rate MB/s", 
-				"primary_group_max_outbound_connection_workers", "primary_pool_max_outbound_connection_workers", 
-				"Replica Role"	| ConvertTo-Html -As Table -Fragment
+				#$htmlTable = $RsrcGovTbl | Select-Object "Database", "Service level objective", 
+				#"DTU limit(empty for vCore)", "vCore limit(empty for DTU databases)", "Min CPU%", "Max CPU%", 
+				#"Cap CPU%", "Max DOP", "Min Memory%", "Max Memory%", "Max allowed sessions", "Req Max Memory Grant%", 
+				#"Min Max DataFile Size(MB)", "Max Max DataFile Size(MB)", "Default Max DataFile Size(MB)", 
+				#"Default DataFile Growth Increment(MB)", "Default Size New DataFile(MB)", "Default Size New LogFile(MB)", 
+				#"Instnace Max Log Rate MB/s", "Instance Max Worker Threads", "Replica Type", "Max TLog Space/Transaction(KB)", 
+				#@{Name = "Settings Last Changed"; Expression = { if ($_."Settings Last Changed" -ne [System.DBNull]::Value) { ($_."Settings Last Changed").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Settings Last Changed" } } }, 
+				#"User Workload Max Worker Threads", "User Workload Min Log Rate MB/s", 
+				#"User Workload Max Log Rate MB/s", "User Workload Min IOPS", "User Workload Max IOPS", "User Workload Min CPU%", 
+				#"User Workload Max CPU%", "User Workload Max Worker Threads2", "User Workload Pool Max IOPS ", 
+				#"Max Local Storage(MB)", "Used Local Storage(MB)", "Max Pool Log Rate MB/s", 
+				#"primary_group_max_outbound_connection_workers", "primary_pool_max_outbound_connection_workers", 
+				#"Replica Role"	| ConvertTo-Html -As Table -Fragment
+				$htmlTable = Convert-TableToHtml $RsrcGovTbl -DebugInfo:$DebugInfo -NoCaseChange
 
-				$htmlTable1 = $DBInfoTbl | Select-Object "Database", "Service Objective", 
-				@{Name = "Created"; Expression = { if ($_."Created" -ne [System.DBNull]::Value) { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Created" } } }, "Database State", 
-				"Data Files", "Data Files Size GB", "Log Files", "LogFilesSizeGB", "VirtualLogFiles", "FILESTREAM Containers", 
-				"FS Containers Size GB", "Database Size GB", "Database MaxSize GB", "Current Log Reuse Wait", 
-				"Compatibility Level", "Page Verify Option", "Containment", "Collation", "Snapshot Isolation State", 
-				"Read Committed Snapshot On", "Recovery Model", "AutoClose On", "AutoShrink On", "QueryStore On", 
-				"Trustworthy On" | ConvertTo-Html -As Table -Fragment
+				#$htmlTable1 = $DBInfoTbl | Select-Object "Database", "Service Objective", 
+				#@{Name = "Created"; Expression = { if ($_."Created" -ne [System.DBNull]::Value) { ($_."Created").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Created" } } }, "Database State", 
+				#"Data Files", "Data Files Size GB", "Log Files", "LogFilesSizeGB", "VirtualLogFiles", "FILESTREAM Containers", 
+				#"FS Containers Size GB", "Database Size GB", "Database MaxSize GB", "Current Log Reuse Wait", 
+				#"Compatibility Level", "Page Verify Option", "Containment", "Collation", "Snapshot Isolation State", 
+				#"Read Committed Snapshot On", "Recovery Model", "AutoClose On", "AutoShrink On", "QueryStore On", 
+				#"Trustworthy On" | ConvertTo-Html -As Table -Fragment
+				$htmlTable1 = Convert-TableToHtml $DBInfoTbl -DebugInfo:$DebugInfo -NoCaseChange
 
-				$htmlTable2 = $RsrcUsageTbl | Select-Object @{Name = "Sample Start"; Expression = { if ($_."Sample Start" -ne [System.DBNull]::Value) { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample Start" } } }, 
-				@{Name = "Sample End"; Expression = { if ($_."Sample End" -ne [System.DBNull]::Value) { ($_."Sample End").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample End" } } }, 
-				"Sample(Minutes)", "Avg CPU Usage %", "Max CPU Usage %", "Avg Data IO %", "Max Data IO %", "Avg Log Write Usage %",
-				"Max Log Write Usage %", "Avg Memory Usage %", "Max Memory Usage %" | ConvertTo-Html -As Table -Fragment
+				#$htmlTable2 = $RsrcUsageTbl | Select-Object @{Name = "Sample Start"; Expression = { if ($_."Sample Start" -ne [System.DBNull]::Value) { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample Start" } } }, 
+				#@{Name = "Sample End"; Expression = { if ($_."Sample End" -ne [System.DBNull]::Value) { ($_."Sample End").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample End" } } }, 
+				#"Sample(Minutes)", "Avg CPU Usage %", "Max CPU Usage %", "Avg Data IO %", "Max Data IO %", "Avg Log Write Usage %",
+				#"Max Log Write Usage %", "Avg Memory Usage %", "Max Memory Usage %" | ConvertTo-Html -As Table -Fragment
+				$htmlTable2 = Convert-TableToHtml $RsrcUsageTbl -DebugInfo:$DebugInfo -NoCaseChange
 
-				$htmlTable3 = $Top10WaitsTbl | Select-Object @{Name = "Sample Start"; Expression = { if ($_."Sample Start" -ne [System.DBNull]::Value) { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample Start" } } }, 
-				@{Name = "Sample End"; Expression = { if ($_."Sample End" -ne [System.DBNull]::Value) { ($_."Sample End").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample End" } } },
-				"Sample(Hours)", "Wait Type", "Wait Count", "Wait %",
-				"Total Wait Time(Sec)", "Avg Wait Time(Sec)", "Total Resource Time(Sec)", "Avg Resource Time(Sec)",
-				"Total Signal Time(Sec)", "Avg Signal Time(Sec)", "URL" | ConvertTo-Html -As Table -Fragment
-				$htmlTable3 = $htmlTable3 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+				#$htmlTable3 = $Top10WaitsTbl | Select-Object @{Name = "Sample Start"; Expression = { if ($_."Sample Start" -ne [System.DBNull]::Value) { ($_."Sample Start").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample Start" } } }, 
+				#@{Name = "Sample End"; Expression = { if ($_."Sample End" -ne [System.DBNull]::Value) { ($_."Sample End").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample End" } } },
+				#"Sample(Hours)", "Wait Type", "Wait Count", "Wait %",
+				#"Total Wait Time(Sec)", "Avg Wait Time(Sec)", "Total Resource Time(Sec)", "Avg Resource Time(Sec)",
+				#"Total Signal Time(Sec)", "Avg Signal Time(Sec)", "URL" | ConvertTo-Html -As Table -Fragment
+				#$htmlTable3 = $htmlTable3 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+				$htmlTable3 = Convert-TableToHtml $Top10WaitsTbl -DebugInfo:$DebugInfo -NoCaseChange -HasURLs
 
-				$htmlTable4 = $DBFileInfoTbl | Select-Object "Database", "FileID", "File Logical Name", "File Physical Name",
-				"File Type", "State", "SizeGB", "Available SpaceGB", "Max File SizeGB", "Growth Increment" | ConvertTo-Html -As Table -Fragment
+				#$htmlTable4 = $DBFileInfoTbl | Select-Object "Database", "FileID", "File Logical Name", "File Physical Name",
+				#"File Type", "State", "SizeGB", "Available SpaceGB", "Max File SizeGB", "Growth Increment" | ConvertTo-Html -As Table -Fragment
+				$htmlTable4 = Convert-TableToHtml $DBFileInfoTbl -DebugInfo:$DebugInfo -NoCaseChange
 
 				if ($ObjImpUpgrTbl.Rows.Count -gt 0) {
 					$htmlTable5 = $ObjImpUpgrTbl | Select-Objects "Object Type", "Object Name", "Index Name", "Dependency" | ConvertTo-Html -As Table -Fragment
@@ -2583,13 +2589,13 @@ $JumpToTop
 					foreach ($col in $DataSetCols) {
 						[string]$DebugCol = $col
 						[string]$DebugValue = $RsrcGovTbl.Rows[$RowNum][$col]
-						if (($col -eq "Settings Last Changed") -and ($RsrcGovTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							$DateForExcel = $AcTranTbl.Rows[$RowNum][$col] | Get-Date
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
+						#if (($col -eq "Settings Last Changed") -and ($RsrcGovTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+						#	$DateForExcel = $AcTranTbl.Rows[$RowNum][$col] | Get-Date
+						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						#}
+						#else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcGovTbl.Rows[$RowNum][$col]
-						}
+						#}
 					
 						#move to the next column
 						$ExcelColNum += 1
@@ -2632,13 +2638,13 @@ $JumpToTop
 					foreach ($col in $DataSetCols) {
 						[string]$DebugCol = $col
 						[string]$DebugValue = $DBInfoTbl.Rows[$RowNum][$col]
-						if (($col -eq "Created") -and ( $DBInfoTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) { 
-							$DateForExcel = $DBInfoTbl.Rows[$RowNum][$col] | Get-Date
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
+						#if (($col -eq "Created") -and ( $DBInfoTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) { 
+						#	$DateForExcel = $DBInfoTbl.Rows[$RowNum][$col] | Get-Date
+						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						#}
+						#else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
-						}
+						#}
 					
 						#move to the next column
 						$ExcelColNum += 1
@@ -2679,14 +2685,14 @@ $JumpToTop
 						[string]$DebugCol = $col
 						[string]$DebugValue = $RsrcUsageTbl.Rows[$RowNum][$col]
 
-						if (("Sample Start", "Sample End" -contains $col) -and ($RsrcUsageTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							$DateForExcel = $RsrcUsageTbl.Rows[$RowNum][$col] | Get-Date
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
+						#if (("Sample Start", "Sample End" -contains $col) -and ($RsrcUsageTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+						#	$DateForExcel = $RsrcUsageTbl.Rows[$RowNum][$col] | Get-Date
+						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						#}
+						#else {
 							#Fill Excel cell with value from the data set
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcUsageTbl.Rows[$RowNum][$col]
-						}
+						#}
 					
 						#move to the next column
 						$ExcelColNum += 1
@@ -2735,10 +2741,10 @@ $JumpToTop
 									$Top10WaitsTbl.Rows[$RowNum]["Wait Type"]) | Out-Null
 							}
 						}
-						elseif (("Sample Start", "Sample End" -contains $col) -and ($Top10WaitsTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							$DateForExcel = $Top10WaitsTbl.Rows[$RowNum][$col] | Get-Date
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-						}
+						#elseif (("Sample Start", "Sample End" -contains $col) -and ($Top10WaitsTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+						#	$DateForExcel = $Top10WaitsTbl.Rows[$RowNum][$col] | Get-Date
+						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						#}
 						else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $Top10WaitsTbl.Rows[$RowNum][$col]
 						}
@@ -3367,7 +3373,7 @@ $htmlTable
 				#"Avg ms Per Wait", "URL" | ConvertTo-Html -As Table -Fragment
 				#$htmlTable = $htmlTable -replace '<table>', '<table class="WaitStats">'
 				#$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
-				$htmlTable = Convert-TableToHtml $WaitsTbl -DateTimeCols "Sample Ended" -NoCaseChange -HasURLs -CSSClass "WaitStats"				
+				$htmlTable = Convert-TableToHtml $WaitsTbl -NoCaseChange -HasURLs -CSSClass "WaitStats"				
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
@@ -3398,7 +3404,7 @@ $JumpToTop
 				#@{Name = "Physical File Name"; Expression = { $_."file physical name" } },
 				#@{Name = "Database Name"; Expression = { $_."DatabaseName" } } | ConvertTo-Html -As Table -Fragment
 				#$htmlTable = $htmlTable -replace '<table>', '<table id="StorageStatsTable" class="Perfmon sortable">'
-				$htmlTable = Convert-TableToHtml $StorageTbl -DateTimeCols "Sample Time" -NoCaseChange -TblID "StorageStatsTable" -CSSClass "Storage sortable" -ExclCols "StallRank"
+				$htmlTable = Convert-TableToHtml $StorageTbl -NoCaseChange -TblID "StorageStatsTable" -CSSClass "Storage sortable" -ExclCols "StallRank"
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
@@ -3432,7 +3438,7 @@ $JumpToTop
 				#@{Name = "LastSampleTime"; Expression = { if ($_."LastSampleTime" -ne [System.DBNull]::Value) { [string]$DateTepm = $_."LastSampleTime"; $DateForExcel = $DateTepm | Get-Date; $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss") }else { $_."LastSampleTime" } } }, 
 				#"LastSampleValue", "ValueDelta", "ValuePerSecond" | ConvertTo-Html -As Table -Fragment
 				#$htmlTable = $htmlTable -replace '<table>', '<table id="PerfmonTable" class="Perfmon sortable">'
-				$htmlTable = Convert-TableToHtml $PerfmonTbl -DateTimeCols "FirstSampleTime", "LastSampleTime" -NoCaseChange -TblID "PerfmonTable" -CSSClass "Perfmon sortable"
+				$htmlTable = Convert-TableToHtml $PerfmonTbl -NoCaseChange -TblID "PerfmonTable" -CSSClass "Perfmon sortable"
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
@@ -3486,12 +3492,12 @@ $JumpToTop
 									$WaitsTbl.Rows[$RowNum]["wait_type"]) | Out-Null
 							}
 						}
-						elseif (($col -eq "Sample Ended") -and ($WaitsTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							#$DateTemp is a dumb workaround for a dumb problem that caused the hour to always be 00:00:00
-							[string]$DateTemp = $WaitsTbl.Rows[$RowNum][$col]
-							$DateForExcel = $DateTemp | Get-Date
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-						}
+						#elseif (($col -eq "Sample Ended") -and ($WaitsTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+						#	#$DateTemp is a dumb workaround for a dumb problem that caused the hour to always be 00:00:00
+						#	[string]$DateTemp = $WaitsTbl.Rows[$RowNum][$col]
+						#	$DateForExcel = $DateTemp | Get-Date
+						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						#}
 						else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $WaitsTbl.Rows[$RowNum][$col]
 						}
@@ -3532,14 +3538,14 @@ $JumpToTop
 						[string]$DebugCol = $col
 						[string]$DebugValue = $StorageTbl.Rows[$RowNum][$col]
 						#Fill Excel cell with value from the data set
-						if (($col -eq "Sample Time") -and ($StorageTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							[string]$DateTemp = $StorageTbl.Rows[$RowNum][$col]
-							$DateForExcel = $DateTemp | Get-Date
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
+						#if (($col -eq "Sample Time") -and ($StorageTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+						#	[string]$DateTemp = $StorageTbl.Rows[$RowNum][$col]
+						#	$DateForExcel = $DateTemp | Get-Date
+						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						#}
+						#else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StorageTbl.Rows[$RowNum][$col]
-						}
+						#}
 						
 						#move to the next column
 						$ExcelColNum += 1
@@ -3579,14 +3585,14 @@ $JumpToTop
 						[string]$DebugCol = $col
 						[string]$DebugValue = $PerfmonTbl.Rows[$RowNum][$col]
 						#Fill Excel cell with value from the data set
-						if (("FirstSampleTime", "LastSampleTime" -Contains $col) -and ($PerfmonTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value))	{
-							[string]$DateTemp = $PerfmonTbl.Rows[$RowNum][$col]
-							$DateForExcel = $DateTemp | Get-Date
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
+						#if (("FirstSampleTime", "LastSampleTime" -Contains $col) -and ($PerfmonTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value))	{
+						#	[string]$DateTemp = $PerfmonTbl.Rows[$RowNum][$col]
+						#	$DateForExcel = $DateTemp | Get-Date
+						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						#}
+						#else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $PerfmonTbl.Rows[$RowNum][$col]
-						}
+						#}
 						
 						#move to the next column
 						$ExcelColNum += 1
