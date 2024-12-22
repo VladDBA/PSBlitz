@@ -30,6 +30,7 @@ ORDER  BY [reserved_space_MB] DESC;
 
 SELECT TOP(30) [tsu].[session_id],
                [tsu].[request_id],
+			   CAST('' AS VARCHAR(20)) AS [query],
                DB_NAME([tsu].[database_id]) AS [database],
                CAST([tsu].[user_objects_alloc_page_count] / 128 AS DECIMAL(15, 2))                                                                                                   [total_allocation_user_objects_MB],
                CAST(( [tsu].[user_objects_alloc_page_count] - [tsu].[user_objects_dealloc_page_count] ) / 128 AS DECIMAL(15, 2))                                                     [net_allocation_user_objects_MB],
@@ -40,8 +41,8 @@ SELECT TOP(30) [tsu].[session_id],
                CAST(( [tsu].[user_objects_alloc_page_count]
                       + [tsu].[internal_objects_alloc_page_count] - [tsu].[internal_objects_dealloc_page_count] - [tsu].[user_objects_dealloc_page_count] ) / 128 AS DECIMAL(15, 2)) [net_allocation_MB],
                [t].[text]                                                                                                                                                            [query_text],
-               [er].[query_hash],
-               [er].[query_plan_hash]
+               CONVERT(VARCHAR(256),[er].[query_hash],1) AS [query_hash],
+               CONVERT(VARCHAR(256),[er].[query_plan_hash],1) AS [query_plan_hash]
 FROM   [sys].[dm_db_task_space_usage] [tsu]
        INNER JOIN [sys].[dm_exec_requests] [er]
                ON [er].[request_id] = [tsu].[request_id]

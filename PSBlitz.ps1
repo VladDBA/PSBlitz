@@ -2015,7 +2015,7 @@ $htmlTable4
 			}
 			#Add query name column
 			#adding query name
-			$TempDBSessTbl.Columns.Add("Query", [string]) | Out-Null
+			#$TempDBSessTbl.Columns.Add("Query", [string]) | Out-Null
 			$RowNum = 0
 			$i = 0
 		
@@ -2026,22 +2026,23 @@ $htmlTable4
 				
 				}
 				else { $QueryName = "" }
-				$TempDBSessTbl.Rows[$RowNum]["Query"] = $QueryName
+				$TempDBSessTbl.Rows[$RowNum]["query"] = $QueryName
 				$RowNum += 1
 			}
-			$htmlTable3 = $TempDBSessTbl | Select-Object @{Name = "Session ID"; Expression = { $_."session_id" } },
-			@{Name = "Request ID"; Expression = { $_."request_id" } },
-			"Query",
-			@{Name = "Database Name"; Expression = { $_."database" } },
-			@{Name = "Total Allocation User Objects MB"; Expression = { $_."total_allocation_user_objects_MB" } },
-			@{Name = "Net Allocation User Objects MB"; Expression = { $_."net_allocation_user_objects_MB" } },
-			@{Name = "Total Allocation Internal Objects MB"; Expression = { $_."total_allocation_internal_objects_MB" } },
-			@{Name = "Net Allocation Internal Objects MB"; Expression = { $_."net_allocation_internal_objects_MB" } },
-			@{Name = "Total Allocation MB"; Expression = { $_."total_allocation_MB" } },
-			@{Name = "Net Allocation MB"; Expression = { $_."net_allocation_MB" } },
-			#@{Name = "Query Text"; Expression = { $_."query_text" } },
-			@{Name = "Query Hash"; Expression = { Get-HexString -HexInput $_."query_hash" } },
-			@{Name = "Query Plan Hash"; Expression = { Get-HexString -HexInput $_."query_plan_hash" } } | ConvertTo-Html -As Table -Fragment
+			#$htmlTable3 = $TempDBSessTbl | Select-Object @{Name = "Session ID"; Expression = { $_."session_id" } },
+			#@{Name = "Request ID"; Expression = { $_."request_id" } },
+			#"Query",
+			#@{Name = "Database Name"; Expression = { $_."database" } },
+			#@{Name = "Total Allocation User Objects MB"; Expression = { $_."total_allocation_user_objects_MB" } },
+			#@{Name = "Net Allocation User Objects MB"; Expression = { $_."net_allocation_user_objects_MB" } },
+			#@{Name = "Total Allocation Internal Objects MB"; Expression = { $_."total_allocation_internal_objects_MB" } },
+			#@{Name = "Net Allocation Internal Objects MB"; Expression = { $_."net_allocation_internal_objects_MB" } },
+			#@{Name = "Total Allocation MB"; Expression = { $_."total_allocation_MB" } },
+			#@{Name = "Net Allocation MB"; Expression = { $_."net_allocation_MB" } },
+			##@{Name = "Query Text"; Expression = { $_."query_text" } },
+			#@{Name = "Query Hash"; Expression = { Get-HexString -HexInput $_."query_hash" } },
+			#@{Name = "Query Plan Hash"; Expression = { Get-HexString -HexInput $_."query_plan_hash" } } | ConvertTo-Html -As Table -Fragment
+			$htmlTable3 = Convert-TableToHtml $TempDBSessTbl -ExclCols "query_text"
 			
 			$QExt = '.query'
 			$FileSOrder = "TempDB"
@@ -2213,13 +2214,13 @@ $htmlTable2
 					[string]$DebugValue = $TempDBSessTbl.Rows[$RowNum][$col]			
 					#Fill Excel cell with value from the data set
 					#Properly handling Query Hash and Plan Hash hex values 
-					if ("query_hash", "query_plan_hash" -Contains $col) {
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $TempDBSessTbl.Rows[$RowNum][$col]
-						#move to the next column
-						$ExcelColNum += 1
-						#move to the top of the loop
-						Continue
-					}
+					#if ("query_hash", "query_plan_hash" -Contains $col) {
+					#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $TempDBSessTbl.Rows[$RowNum][$col]
+					#	#move to the next column
+					#	$ExcelColNum += 1
+					#	#move to the top of the loop
+					#	Continue
+					#}
 					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TempDBSessTbl.Rows[$RowNum][$col]
 					$ExcelColNum += 1
 				}
