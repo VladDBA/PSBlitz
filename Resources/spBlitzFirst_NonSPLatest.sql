@@ -41,7 +41,7 @@ DECLARE
     @VersionCheckMode BIT;
 
 /*Making it easier to replace the value of @SinceStartup via PS*/
-;SET @SinceStartup = 0;
+;SET @SinceStartup = 1;
 
 	SELECT
 	@LogMessage = NULL,
@@ -88,7 +88,9 @@ IF OBJECT_ID('tempdb..#UpdatedStats') IS NOT NULL
 IF OBJECT_ID('tempdb..#TempdbOperationalStats') IS NOT NULL
 	DROP TABLE #TempdbOperationalStats;
 	
-/*Everything beyond this point is straight from sp_BlitzFirst 
+/*Everything beyond this point is straight from sp_BlitzFirst
+Except for the result set changes marked in comments (can be found by searching for Vlad or PSBlitz) 
+and
 without the GO at the end*/
 
 BEGIN
@@ -4751,16 +4753,19 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
         END;
         ELSE IF @OutputType <> 'NONE' AND @OutputXMLasNVARCHAR = 1 AND @SinceStartup = 0 AND @OutputResultSets LIKE N'%Findings%'
         BEGIN
+		/*Vlad - column changes for PSBlitz*/
             SELECT  [Priority] ,
                     [FindingsGroup] ,
                     [Finding] ,
-                    [URL] ,
-                    CAST(LEFT(@StockDetailsHeader + [Details] + @StockDetailsFooter,32000) AS TEXT) AS Details,
-                    CAST(LEFT([HowToStopIt],32000) AS TEXT) AS HowToStopIt,
+                    /*CAST(LEFT(@StockDetailsHeader + [Details] + @StockDetailsFooter,32000) AS TEXT) AS Details,*/
+					CAST(LEFT([Details],32000) AS TEXT) AS Details,
+					[URL] 
+                    /*CAST(LEFT([HowToStopIt],32000) AS TEXT) AS HowToStopIt,
                     CAST([QueryText] AS NVARCHAR(MAX)) AS QueryText,
-                    CAST([QueryPlan] AS NVARCHAR(MAX)) AS QueryPlan
+                    CAST([QueryPlan] AS NVARCHAR(MAX)) AS QueryPlan*/
             FROM    #BlitzFirstResults
             WHERE (@Seconds > 0 OR (Priority IN (0, 250, 251, 255))) /* For @Seconds = 0, filter out broken checks for now */
+			AND [Priority] NOT IN (0,255)
             ORDER BY Priority ,
                     FindingsGroup ,
                     CASE
@@ -4841,7 +4846,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                     FROM #WaitStats
                 )
                 SELECT
-                    'WAIT STATS' AS Pattern,
+                    /*'WAIT STATS' AS Pattern,-- Vlad - column changes for PSBlitz */
                     b.SampleTime AS [Sample Ended],
                     CAST(DATEDIFF(mi,wd1.SampleTime, wd2.SampleTime) / 60. AS DECIMAL(18,1)) AS [Hours Sample],
 					CAST(c.[Total Thread Time (Seconds)] / 60. / 60. AS DECIMAL(18,1)) AS [Thread Time (Hours)],
@@ -4885,7 +4890,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                     FROM #WaitStats
                 )
                 SELECT
-                    'WAIT STATS' AS Pattern,
+                   /* 'WAIT STATS' AS Pattern,-- Vlad - column changes for PSBlitz */
                     b.SampleTime AS [Sample Ended],
                     DATEDIFF(ss,wd1.SampleTime, wd2.SampleTime) AS [Seconds Sample],
 					c.[Total Thread Time (Seconds)],
@@ -4985,7 +4990,8 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
             -------------------------
 
             IF @OutputResultSets LIKE N'%PerfmonStats%'
-                SELECT 'PERFMON' AS Pattern, pLast.[object_name], pLast.counter_name, pLast.instance_name,
+                SELECT /*'PERFMON' AS Pattern, -- Vlad - column changes for PSBlitz */
+				pLast.[object_name], pLast.counter_name, pLast.instance_name,
                 pFirst.SampleTime AS FirstSampleTime, pFirst.cntr_value AS FirstSampleValue,
                 pLast.SampleTime AS LastSampleTime, pLast.cntr_value AS LastSampleValue,
                 pLast.cntr_value - pFirst.cntr_value AS ValueDelta,
@@ -4994,7 +5000,8 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                     INNER JOIN #PerfmonStats pFirst ON pFirst.[object_name] = pLast.[object_name] AND pFirst.counter_name = pLast.counter_name AND (pFirst.instance_name = pLast.instance_name OR (pFirst.instance_name IS NULL AND pLast.instance_name IS NULL))
                     AND pLast.ID > pFirst.ID
 				WHERE pLast.cntr_value <> pFirst.cntr_value
-                ORDER BY Pattern, pLast.[object_name], pLast.counter_name, pLast.instance_name;
+                ORDER BY /*Pattern, -- Vlad - column changes for PSBlitz */
+				pLast.[object_name], pLast.counter_name, pLast.instance_name;
 
 
             -------------------------

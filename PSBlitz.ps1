@@ -681,7 +681,9 @@ function Convert-TableToHtml {
             $currentColumn = $column.ColumnName
             $formattedName = if ($currentColumn -like "*_*") {
                 $cultureInfo.TextInfo.ToTitleCase(($currentColumn -replace "_", " "))
-            } elseif ($NoCaseChange -eq $true) {
+            } elseif ($currentColumn -like "* *"){
+				$cultureInfo.TextInfo.ToTitleCase($currentColumn)
+			} elseif ($NoCaseChange -eq $true) {
 				$currentColumn
 			} else {
                 $cultureInfo.TextInfo.ToTitleCase($currentColumn)
@@ -3256,10 +3258,11 @@ $JumpToTop
 				Write-Host " ->Converting sp_BlitzFirst output to HTML" -fore yellow
 			}
 			
-			$htmlTable = $BlitzFirstTbl | Select-Object "Priority", "FindingsGroup", 
-			@{Name = "Finding"; Expression = { $_."Finding" -replace "From Your Community.*", "" } }, 
-			@{Name = "Details"; Expression = { $_."Details".Replace('ClickToSeeDetails', '') -replace ".*in-depth checks with sp_Blitz.*", "Nothing to report" } }, "URL" | Where-Object -FilterScript { ( "0", "255" -NotContains $_."Priority" ) } | ConvertTo-Html -As Table -Fragment
-			$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+			#$htmlTable = $BlitzFirstTbl | Select-Object "Priority", "FindingsGroup", 
+			#@{Name = "Finding"; Expression = { $_."Finding" -replace "From Your Community.*", "" } }, 
+			#@{Name = "Details"; Expression = { $_."Details".Replace('ClickToSeeDetails', '') -replace ".*in-depth checks with sp_Blitz.*", "Nothing to report" } }, "URL" | Where-Object -FilterScript { ( "0", "255" -NotContains $_."Priority" ) } | ConvertTo-Html -As Table -Fragment
+			#$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+			$htmlTable = Convert-TableToHtml $BlitzFirstTbl -NoCaseChange -HasURLs
 			$HtmlTabName = "What's happening on the instance now?"
 			$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
@@ -3352,16 +3355,17 @@ $htmlTable
 				}
 				$HtmlTabName = "Wait Stats Since Last Startup"
 
-				$htmlTable = $WaitsTbl | Select-Object "Pattern", 
-				@{Name = "Sample Ended"; Expression = { if ($_."Sample Ended" -ne [System.DBNull]::Value) { ($_."Sample Ended").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample Ended" } } },
-				"Hours Sample", "Thread Time (Hours)",
-				@{Name = "Wait Type"; Expression = { $_."wait_type" } }, 
-				@{Name = "Wait Category"; Expression = { $_."wait_category" } }, 
-				"Wait Time (Hours)", "Per Core Per Hour", 
-				"Signal Wait Time (Hours)", "Percent Signal Waits", "Number of Waits",
-				"Avg ms Per Wait", "URL" | ConvertTo-Html -As Table -Fragment
-				$htmlTable = $htmlTable -replace '<table>', '<table class="WaitStats">'
-				$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'				
+				#$htmlTable = $WaitsTbl | Select-Object "Pattern", 
+				#@{Name = "Sample Ended"; Expression = { if ($_."Sample Ended" -ne [System.DBNull]::Value) { ($_."Sample Ended").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample Ended" } } },
+				#"Hours Sample", "Thread Time (Hours)",
+				#@{Name = "Wait Type"; Expression = { $_."wait_type" } }, 
+				#@{Name = "Wait Category"; Expression = { $_."wait_category" } }, 
+				#"Wait Time (Hours)", "Per Core Per Hour", 
+				#"Signal Wait Time (Hours)", "Percent Signal Waits", "Number of Waits",
+				#"Avg ms Per Wait", "URL" | ConvertTo-Html -As Table -Fragment
+				#$htmlTable = $htmlTable -replace '<table>', '<table class="WaitStats">'
+				#$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+				$htmlTable = Convert-TableToHtml $WaitsTbl -DateTimeCols "Sample Ended" -NoCaseChange -HasURLs				
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
@@ -3384,14 +3388,15 @@ $JumpToTop
 					Write-Host " ->Converting storage info to HTML" -fore yellow
 				}
 				$HtmlTabName = "Storage Throughput Since Instance Startup"
-				$htmlTable = $StorageTbl | Select-Object "Pattern", 
-				@{Name = "Sample Time"; Expression = { if ($_."Sample Time" -ne [System.DBNull]::Value) { ($_."Sample Time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample Time" } } }, 
-				"Sample (seconds)", 
-				"File Name",
-				"Drive", "# Reads/Writes", "MB Read/Written", "Avg Stall (ms)", 
-				@{Name = "Physical File Name"; Expression = { $_."file physical name" } },
-				@{Name = "Database Name"; Expression = { $_."DatabaseName" } } | ConvertTo-Html -As Table -Fragment
-				$htmlTable = $htmlTable -replace '<table>', '<table id="StorageStatsTable" class="Perfmon sortable">'
+				#$htmlTable = $StorageTbl | Select-Object "Pattern", 
+				#@{Name = "Sample Time"; Expression = { if ($_."Sample Time" -ne [System.DBNull]::Value) { ($_."Sample Time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Sample Time" } } }, 
+				#"Sample (seconds)", 
+				#"File Name",
+				#"Drive", "# Reads/Writes", "MB Read/Written", "Avg Stall (ms)", 
+				#@{Name = "Physical File Name"; Expression = { $_."file physical name" } },
+				#@{Name = "Database Name"; Expression = { $_."DatabaseName" } } | ConvertTo-Html -As Table -Fragment
+				#$htmlTable = $htmlTable -replace '<table>', '<table id="StorageStatsTable" class="Perfmon sortable">'
+				$htmlTable = Convert-TableToHtml $StorageTbl -DateTimeCols "Sample Time" -NoCaseChange -TblID "StorageStatsTable" -CSSClass "sortable"
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
@@ -3416,15 +3421,16 @@ $JumpToTop
 					Write-Host " ->Converting perfmon stats to HTML" -fore yellow
 				}
 				$HtmlTabName = "Perfmon Stats Since Instance Startup"
-				$htmlTable = $PerfmonTbl | Select-Object "Pattern", 
-				@{Name = "ObjectName"; Expression = { $_."object_name" } }, 
-				@{Name = "CounterName"; Expression = { $_."counter_name" } }, 
-				@{Name = "InstanceName"; Expression = { $_."instance_name" } }, 
-				@{Name = "FirstSampleTime"; Expression = { if ($_."FirstSampleTime" -ne [System.DBNull]::Value) { [string]$DateTepm = $_."FirstSampleTime"; $DateForExcel = $DateTepm | Get-Date; $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss") }else { $_."FirstSampleTime" } } }, 
-				"FirstSampleValue", 
-				@{Name = "LastSampleTime"; Expression = { if ($_."LastSampleTime" -ne [System.DBNull]::Value) { [string]$DateTepm = $_."LastSampleTime"; $DateForExcel = $DateTepm | Get-Date; $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss") }else { $_."LastSampleTime" } } }, 
-				"LastSampleValue", "ValueDelta", "ValuePerSecond" | ConvertTo-Html -As Table -Fragment
-				$htmlTable = $htmlTable -replace '<table>', '<table id="PerfmonTable" class="Perfmon sortable">'
+				#$htmlTable = $PerfmonTbl | Select-Object "Pattern", 
+				#@{Name = "ObjectName"; Expression = { $_."object_name" } }, 
+				#@{Name = "CounterName"; Expression = { $_."counter_name" } }, 
+				#@{Name = "InstanceName"; Expression = { $_."instance_name" } }, 
+				#@{Name = "FirstSampleTime"; Expression = { if ($_."FirstSampleTime" -ne [System.DBNull]::Value) { [string]$DateTepm = $_."FirstSampleTime"; $DateForExcel = $DateTepm | Get-Date; $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss") }else { $_."FirstSampleTime" } } }, 
+				#"FirstSampleValue", 
+				#@{Name = "LastSampleTime"; Expression = { if ($_."LastSampleTime" -ne [System.DBNull]::Value) { [string]$DateTepm = $_."LastSampleTime"; $DateForExcel = $DateTepm | Get-Date; $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss") }else { $_."LastSampleTime" } } }, 
+				#"LastSampleValue", "ValueDelta", "ValuePerSecond" | ConvertTo-Html -As Table -Fragment
+				#$htmlTable = $htmlTable -replace '<table>', '<table id="PerfmonTable" class="Perfmon sortable">'
+				$htmlTable = Convert-TableToHtml $PerfmonTbl -DateTimeCols "FirstSampleTime", "LastSampleTime" -NoCaseChange -TblID "PerfmonTable" -CSSClass "sortable"
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
@@ -3455,7 +3461,7 @@ $JumpToTop
 				#Set counter used for row retrieval
 				$RowNum = 0
 
-				$DataSetCols = @("Pattern", "Sample Ended", "Hours Sample", "Thread Time (Hours)",
+				$DataSetCols = @("Sample Ended", "Hours Sample", "Thread Time (Hours)",
 					"wait_type", "wait_category", "Wait Time (Hours)", "Per Core Per Hour", 
 					"Signal Wait Time (Hours)", "Percent Signal Waits", "Number of Waits",
 					"Avg ms Per Wait", "URL")
@@ -3556,7 +3562,7 @@ $JumpToTop
 				#Set counter used for row retrieval
 				$RowNum = 0
 
-				$DataSetCols = @("Pattern", "object_name", "counter_name", "instance_name", 
+				$DataSetCols = @("object_name", "counter_name", "instance_name", 
 					"FirstSampleTime", "FirstSampleValue", "LastSampleTime", "LastSampleValue",
 					"ValueDelta", "ValuePerSecond")
 
