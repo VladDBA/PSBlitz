@@ -41,7 +41,7 @@ DECLARE
     @VersionCheckMode BIT;
 
 /*Making it easier to replace the value of @SinceStartup via PS*/
-;SET @SinceStartup = 1;
+;SET @SinceStartup = 0;
 
 	SELECT
 	@LogMessage = NULL,

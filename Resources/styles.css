@@ -119,6 +119,25 @@ td:first-child {
 		font-weight: normal;
 	}
 
+	td:nth-child(2) {
+		font-weight: bold;
+	}
+
+}
+
+.Storage {
+	td:first-child {
+		font-weight: bold;
+	}
+
+	td:nth-child(8) {
+		font-weight: bold;
+	}
+
+	td:nth-child(9) {
+		font-weight: bold;
+	}
+
 }
 
 .WaitStats {
@@ -126,11 +145,15 @@ td:first-child {
 		font-weight: normal;
 	}
 
-	td:nth-child(5) {
+	td:nth-child(4) {
 		font-weight: bold;
 	}
 
-	td:nth-child(7) {
+	td:nth-child(6) {
+		font-weight: bold;
+	}
+
+	td:nth-child(11) {
 		font-weight: bold;
 	}
 

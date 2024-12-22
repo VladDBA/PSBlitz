@@ -722,7 +722,7 @@ function Convert-TableToHtml {
         return $htmlTableOut
     }
     catch {
-        Write-Host "Error converting table to HTML: $_" -ForegroundColor Red
+        Write-Host " Error converting table to HTML: $_" -ForegroundColor Red
     }
 }
 
@@ -1992,23 +1992,24 @@ $htmlTable4
 			if ($DebugInfo) {
 				Write-Host " ->Converting TempDB info to HTML" -fore yellow
 			}
-			$htmlTable1 = $TempDBTbl | Select-Object @{Name = "Data Files"; Expression = { $_."data_files" } },
-			@{Name = "Total Size MB"; Expression = { $_."total_size_MB" } },
-			@{Name = "Free Space MB"; Expression = { $_."free_space_MB" } },
-			@{Name = "% Free"; Expression = { $_."percent_free" } },
-			@{Name = "Internal Objects MB"; Expression = { $_."internal_objects_MB" } },
-			@{Name = "User Objects MB"; Expression = { $_."user_objects_MB" } },
-			@{Name = "Version Store MB"; Expression = { $_."version_store_MB" } } | ConvertTo-Html -As Table -Fragment
-			$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="TempdbInfoTbl">'
+			#$htmlTable1 = $TempDBTbl | Select-Object @{Name = "Data Files"; Expression = { $_."data_files" } },
+			#@{Name = "Total Size MB"; Expression = { $_."total_size_MB" } },
+			#@{Name = "Free Space MB"; Expression = { $_."free_space_MB" } },
+			#@{Name = "% Free"; Expression = { $_."percent_free" } },
+			#@{Name = "Internal Objects MB"; Expression = { $_."internal_objects_MB" } },
+			#@{Name = "User Objects MB"; Expression = { $_."user_objects_MB" } },
+			#@{Name = "Version Store MB"; Expression = { $_."version_store_MB" } } | ConvertTo-Html -As Table -Fragment
+			#$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="TempdbInfoTbl">'
+			$htmlTable1 = Convert-TableToHtml $TempDBTbl -CSSClass "TempdbInfoTbl"
 
 			if ($DebugInfo) {
 				Write-Host " ->Converting TempDB table info to HTML" -fore yellow
 			}
-			$htmlTable2 = $TempTabTbl | Select-Object @{Name = "Table Name"; Expression = { $_."table_name" } }, 
-			@{Name = "Rows"; Expression = { $_."rows" } },
-			@{Name = "Used Space MB"; Expression = { $_."used_space_MB" } }, 
-			@{Name = "Reserved Space MB"; Expression = { $_."reserved_space_MB" } } | ConvertTo-Html -As Table -Fragment
-            
+			#$htmlTable2 = $TempTabTbl | Select-Object @{Name = "Table Name"; Expression = { $_."table_name" } }, 
+			#@{Name = "Rows"; Expression = { $_."rows" } },
+			#@{Name = "Used Space MB"; Expression = { $_."used_space_MB" } }, 
+			#@{Name = "Reserved Space MB"; Expression = { $_."reserved_space_MB" } } | ConvertTo-Html -As Table -Fragment
+            $htmlTable2 = Convert-TableToHtml $TempTabTbl
 			if ($DebugInfo) {
 				Write-Host " ->Converting TempDB session usage info to HTML" -fore yellow
 			}
@@ -3365,7 +3366,7 @@ $htmlTable
 				#"Avg ms Per Wait", "URL" | ConvertTo-Html -As Table -Fragment
 				#$htmlTable = $htmlTable -replace '<table>', '<table class="WaitStats">'
 				#$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
-				$htmlTable = Convert-TableToHtml $WaitsTbl -DateTimeCols "Sample Ended" -NoCaseChange -HasURLs				
+				$htmlTable = Convert-TableToHtml $WaitsTbl -DateTimeCols "Sample Ended" -NoCaseChange -HasURLs -CSSClass "WaitStats"				
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
@@ -3396,7 +3397,7 @@ $JumpToTop
 				#@{Name = "Physical File Name"; Expression = { $_."file physical name" } },
 				#@{Name = "Database Name"; Expression = { $_."DatabaseName" } } | ConvertTo-Html -As Table -Fragment
 				#$htmlTable = $htmlTable -replace '<table>', '<table id="StorageStatsTable" class="Perfmon sortable">'
-				$htmlTable = Convert-TableToHtml $StorageTbl -DateTimeCols "Sample Time" -NoCaseChange -TblID "StorageStatsTable" -CSSClass "sortable"
+				$htmlTable = Convert-TableToHtml $StorageTbl -DateTimeCols "Sample Time" -NoCaseChange -TblID "StorageStatsTable" -CSSClass "Storage sortable" -ExclCols "StallRank"
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
@@ -3430,7 +3431,7 @@ $JumpToTop
 				#@{Name = "LastSampleTime"; Expression = { if ($_."LastSampleTime" -ne [System.DBNull]::Value) { [string]$DateTepm = $_."LastSampleTime"; $DateForExcel = $DateTepm | Get-Date; $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss") }else { $_."LastSampleTime" } } }, 
 				#"LastSampleValue", "ValueDelta", "ValuePerSecond" | ConvertTo-Html -As Table -Fragment
 				#$htmlTable = $htmlTable -replace '<table>', '<table id="PerfmonTable" class="Perfmon sortable">'
-				$htmlTable = Convert-TableToHtml $PerfmonTbl -DateTimeCols "FirstSampleTime", "LastSampleTime" -NoCaseChange -TblID "PerfmonTable" -CSSClass "sortable"
+				$htmlTable = Convert-TableToHtml $PerfmonTbl -DateTimeCols "FirstSampleTime", "LastSampleTime" -NoCaseChange -TblID "PerfmonTable" -CSSClass "Perfmon sortable"
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
