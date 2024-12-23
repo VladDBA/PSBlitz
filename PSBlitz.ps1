@@ -4016,13 +4016,14 @@ $JumpToTop
 					"Serial Required Memory", "Total CPU (ms)", "Avg CPU (ms)", "CPU Weight", "% CPU (Type)",
 					"Total Duration (ms)", "Avg Duration (ms)", "Duration Weight", "% Duration (Type)",
 					"Total Reads", "Average Reads", "Read Weight", "% Reads (Type)", "Total Writes",
-					"Average Writes", "Write Weight", "% Writes (Type)", "Total Rows", "Avg Rows", "Min Rows",
-					"Max Rows", "# Plans", "# Distinct Plans", "Created At", "Last Execution","Last Completion",
+					"Average Writes", "Write Weight", "% Writes (Type)", "Total Rows", "Avg Rows", "Min Rows","Max Rows",
+					"Minimum Memory Grant KB","Maximum Memory Grant KB", "Minimum Used Grant KB", "Maximum Used Grant KB",
+					"Average Max Memory Grant", "Min Spills", "Max Spills", "Total Spills", "Avg Spills",
+					 "# Plans", "# Distinct Plans", "Created At", "Last Execution","Last Completion",
 					"Query Hash", "Query Plan Hash",
 					"SET Options", "Cached Plan Size (KB)", "Compile Time (ms)", "Compile CPU (ms)",
 					"Compile memory (KB)""Minimum Memory Grant KB",
-					"Maximum Memory Grant KB", "Minimum Used Grant KB", "Maximum Used Grant KB",
-					"Average Max Memory Grant", "Min Spills", "Max Spills", "Total Spills", "Avg Spills",
+					
 					"Remove Plan Handle From Cache","Remove SQL Handle From Cache")
 				if ($DebugInfo) {
 					Write-Host " ->Writing sp_BlitzCache results to sheet $SheetName" -fore yellow
