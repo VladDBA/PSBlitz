@@ -17,8 +17,8 @@ DECLARE @DatabaseName NVARCHAR(128);
 SET @DatabaseName = N'';
 
 /*Standard output*/
-SELECT [CheckDate],
-       [start_time],
+SELECT CONVERT(VARCHAR(25),[CheckDate],120) AS [check_date],
+       CONVERT(VARCHAR(25),[start_time],120) AS [start_time],
        [elapsed_time],
        [session_id],
        [database_name],
@@ -80,7 +80,7 @@ SELECT [CheckDate],
        [forced_grant_count],
        [workload_group_name],
        [resource_pool_name],
-	   [query_hash]
+	   CONVERT(VARCHAR(256),[query_hash],1) AS [query_hash]
 FROM   [tempdb].[dbo].[BlitzWho_..BlitzWhoOut..]
 WHERE  [database_name] = CASE
                            WHEN @DatabaseName = N'' THEN [database_name]
@@ -104,14 +104,16 @@ AND [program_name] NOT LIKE N'PSBlitz%';
          GROUP  BY [session_id],
                    [query_hash],
                    [start_time])
-SELECT [agg].[start_time],
+SELECT CONVERT(VARCHAR(25),[agg].[start_time],120) AS [start_time],
        [who].[elapsed_time],
        [agg].[session_id],
        [who].[database_name],
        [who].[query_text],
+	   CAST('' AS VARCHAR(30)) AS [query],
        [who].[outer_command],
        [who].[query_plan],
        [who].[query_cost],
+	   CAST('' AS VARCHAR(30)) AS [sqlplan_file],
        [who].[status],
        [who].[cached_parameter_info],
        [who].[wait_info],
@@ -126,8 +128,8 @@ SELECT [agg].[start_time],
        [who].[program_name],
        [who].[fix_parameter_sniffing],
        [who].[client_interface_name],
-       [who].[login_time],
-       [who].[request_time],
+       CONVERT(VARCHAR(25),[who].[login_time],120) AS [login_time],
+       CONVERT(VARCHAR(25),[who].[request_time],120) AS [request_time],
        [who].[request_cpu_time],
        [who].[request_logical_reads],
        [who].[request_writes],
@@ -168,8 +170,8 @@ SELECT [agg].[start_time],
        [who].[forced_grant_count],
        [who].[workload_group_name],
        [who].[resource_pool_name],
-       [agg].[query_hash],
-       [who].[query_plan_hash]
+       CONVERT(VARCHAR(256),[agg].[query_hash],1) AS [query_hash],
+       CONVERT(VARCHAR(256),[who].[query_plan_hash],1) AS [query_plan_hash]
 FROM   [tempdb].[dbo].[BlitzWho_..BlitzWhoOut..] [who]
        INNER JOIN [agg]
                ON [who].[ID] = [agg].ID

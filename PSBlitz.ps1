@@ -635,13 +635,14 @@ function Invoke-PSBlitzQuery {
 			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
 			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
 
-		}elseif('sp_BlitzIndex mode 0', 'sp_BlitzIndex mode 2', 'sp_BlitzIndex mode 4' -contains $StepNameIn) {
+		}
+		elseif ('Stats Info','sp_BlitzIndex mode 0', 'sp_BlitzIndex mode 2', 'sp_BlitzIndex mode 4' -contains $StepNameIn) {
 			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
 			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
 			$TotalRecords = $global:PSBlitzSet.Tables[1].Rows[0]["RecordCount"]
-			if($TotalRecords -gt $RecordsReturned){
-			Add-LogRow "->$StepNameIn" "Record limit exceeded" "Result was limited to top $RecordsReturned records out of $TotalRecords"
-			Write-Host "  ->Record limit exceeded `n -> Result was limited to top $RecordsReturned records out of $TotalRecords" -Fore Yellow
+			if ($TotalRecords -gt $RecordsReturned) {
+				Add-LogRow "->$StepNameIn" "Record limit exceeded" "Result was limited to top $RecordsReturned records out of $TotalRecords"
+				Write-Host "  ->Record limit exceeded `n -> Result was limited to top $RecordsReturned records out of $TotalRecords" -Fore Yellow
 			}
 		}
 		else {
@@ -660,91 +661,153 @@ function Invoke-PSBlitzQuery {
 	}
 }
 function Convert-TableToHtml {
-    param (
-        [Parameter(Position = 0, Mandatory = $true)]
-        [System.Data.DataTable] $DataTable,
-        [Parameter(Mandatory = $false)]
-        [switch] $DebugInfo,
-        [Parameter(Mandatory = $false)]
-        [switch] $HasURLs,
-        [Parameter(Mandatory = $false)]
-        [string[]] $ExclCols,
-        [Parameter(Mandatory = $false)]
-        [string[]] $DateTimeCols,
-        [Parameter(Mandatory = $false)]
-        [string] $CSSClass,
+	param (
+		[Parameter(Position = 0, Mandatory = $true)]
+		[System.Data.DataTable] $DataTable,
 		[Parameter(Mandatory = $false)]
-        [string] $TblID,
+		[switch] $DebugInfo,
 		[Parameter(Mandatory = $false)]
-        [switch] $NoCaseChange,
+		[switch] $HasURLs,
 		[Parameter(Mandatory = $false)]
-        [switch] $AnchorFromHere,
+		[string[]] $ExclCols,
+		[Parameter(Mandatory = $false)]
+		[string[]] $DateTimeCols,
+		[Parameter(Mandatory = $false)]
+		[string] $CSSClass,
+		[Parameter(Mandatory = $false)]
+		[string] $TblID,
+		[Parameter(Mandatory = $false)]
+		[switch] $NoCaseChange,
+		[Parameter(Mandatory = $false)]
+		[switch] $AnchorFromHere,
 		[Parameter(Mandatory = $false)]
 		[switch] $AnchorToHere,
 		[Parameter(Mandatory = $false)]
 		[string] $AnchorID,
 		[Parameter(Mandatory = $false)]
-		[string] $AnchorExt
-    )
+		[string] $AnchorExt = '.query'
+	)
 
-    try {
-        $properties = @()
-        $cultureInfo = [System.Globalization.CultureInfo]::CurrentCulture
+	try {
+		$properties = @()
+		$cultureInfo = [System.Globalization.CultureInfo]::CurrentCulture
         
-        foreach ($column in $DataTable.Columns) {
-            if ($ExclCols -contains $column.ColumnName) { continue }
+		foreach ($column in $DataTable.Columns) {
+			if ($ExclCols -contains $column.ColumnName) { continue }
             
-            $currentColumn = $column.ColumnName
-            $formattedName = if ($currentColumn -like "*_*") {
-                $cultureInfo.TextInfo.ToTitleCase(($currentColumn -replace "_", " "))
-            } elseif ($currentColumn -like "* *"){
+			$currentColumn = $column.ColumnName
+			$formattedName = if ($currentColumn -like "*_*") {
+				$cultureInfo.TextInfo.ToTitleCase(($currentColumn -replace "_", " "))
+			}
+			elseif ($currentColumn -like "* *") {
 				$cultureInfo.TextInfo.ToTitleCase($currentColumn)
-			} elseif ($NoCaseChange -eq $true) {
+			}
+			elseif ($NoCaseChange -eq $true) {
 				$currentColumn
-			} else {
-                $cultureInfo.TextInfo.ToTitleCase($currentColumn)
-            }
+			}
+			else {
+				$cultureInfo.TextInfo.ToTitleCase($currentColumn)
+			}
 
-            $property = if ($DateTimeCols -contains $currentColumn) {
-                @{
-                    Name = $formattedName
-                    Expression = [ScriptBlock]::Create('if ($_["' + $currentColumn + '"] -and $_["' + $currentColumn + '"] -ne [System.DBNull]::Value) { $_["' + $currentColumn + '"].ToString("yyyy-MM-dd HH:mm:ss") } else { $_["' + $currentColumn + '"] }')
-                }
-            } else {
-                @{
-                    Name = $formattedName
-                    Expression = [ScriptBlock]::Create('$_["' + $currentColumn + '"]')
-                }
-            }
-            $properties += $property
-        }
+			$property = if ($DateTimeCols -contains $currentColumn) {
+				@{
+					Name       = $formattedName
+					Expression = [ScriptBlock]::Create('if ($_["' + $currentColumn + '"] -and $_["' + $currentColumn + '"] -ne [System.DBNull]::Value) { $_["' + $currentColumn + '"].ToString("yyyy-MM-dd HH:mm:ss") } else { $_["' + $currentColumn + '"] }')
+				}
+			}
+			else {
+				@{
+					Name       = $formattedName
+					Expression = [ScriptBlock]::Create('$_["' + $currentColumn + '"]')
+				}
+			}
+			$properties += $property
+		}
 
-        $htmlTableOut = $DataTable | Select-Object -Property $properties | ConvertTo-Html -As Table -Fragment
+		$htmlTableOut = $DataTable | Select-Object -Property $properties | ConvertTo-Html -As Table -Fragment
         
-        if (($CSSClass) -and ($TblID)) {
-            $htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID' class='$CSSClass'>"
-        }
+		if (($CSSClass) -and ($TblID)) {
+			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID' class='$CSSClass'>"
+		}
 		elseif ($CSSClass) {
-            $htmlTableOut = $htmlTableOut -replace "<table>", "<table class='$CSSClass'>"
-        }elseif ($TblID) {
-            $htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID'>"
-        }
+			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class='$CSSClass'>"
+		}
+		elseif ($TblID) {
+			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID'>"
+		}
         
-        if ($HasURLs) {
-            $URLRegex = '(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\".,<>?«»“”]))'
-            $htmlTableOut = $htmlTableOut -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
-        }
-		if($AnchorFromHere) {
-			$AnchorRegex = "$AnchorID(_\d+)$AnchorExt"
+		if ($HasURLs) {
+			$URLRegex = '(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\".,<>?«»“”]))'
+			$htmlTableOut = $htmlTableOut -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+		}
+		if ($AnchorFromHere) {
+			$AnchorRegex = if ($TblID -eq "DeadlockDtlTable") {
+				"DL(\d+)Q(\d+)V{0,}$AnchorExt"
+			} else { "$AnchorID(_\d+)$AnchorExt" }
 			$AnchorURL = '<a href="#$&">$&</a>'
 			$htmlTableOut = $htmlTableOut -replace $AnchorRegex, $AnchorURL
 		}
         
-        return $htmlTableOut
-    }
-    catch {
-        Write-Host " Error converting table to HTML: $_" -ForegroundColor Red
-    }
+		return $htmlTableOut
+	}
+	catch {
+		Write-Host " Error converting table to HTML: $_" -ForegroundColor Red
+	}
+}
+
+function Convert-QueryTableToHtml {
+	param (
+		[Parameter(Position = 0, Mandatory = $true)]
+		[System.Data.DataTable] $DataTable,
+		[Parameter(Mandatory = $false)]
+		[switch] $DebugInfo,
+		[Parameter(Mandatory = $false)]
+		[string[]] $Cols,
+		[Parameter(Mandatory = $false)]
+		[switch] $AnchorToHere,
+		[Parameter(Mandatory = $false)]
+		[string] $AnchorID,
+		[Parameter(Mandatory = $false)]
+		[string] $AnchorExt = '.query'
+	)
+	try {
+		$properties = @()
+		$cultureInfo = [System.Globalization.CultureInfo]::CurrentCulture
+		foreach($column in $Cols) {
+			$currentColumn = $column
+			$formattedName = if ($currentColumn -like "*_*") {
+				$cultureInfo.TextInfo.ToTitleCase(($currentColumn -replace "_", " "))
+			}
+			elseif ($currentColumn -like "* *") {
+				$cultureInfo.TextInfo.ToTitleCase($currentColumn)
+			}
+			else {
+				$cultureInfo.TextInfo.ToTitleCase($currentColumn)
+			}
+			$property = @{
+				Name       = $formattedName
+				Expression = [ScriptBlock]::Create('$_["' + $currentColumn + '"]')
+			}
+			$properties += $property
+		}
+		$htmlTableOut = $DataTable | Select-Object -Property $properties | ConvertTo-Html -As Table -Fragment
+
+		if ($AnchorToHere) {
+			if($AnchorID -eq "DeadlockDtlTable") {
+				$AnchorRegex =  "<td>DL(\d+)Q(\d+)(V{0,})$AnchorExt"
+				$AnchorURL = '<td id=' + "DL" + '$1' + "Q" + '$2' + '$3' + "$AnchorExt>" + "DL" + '$1' + "Q" + '$2' + '$3' + "$AnchorExt"
+			} else {
+				$AnchorRegex = "<td>$AnchorID(_\d+)$AnchorExt"
+				$AnchorURL = '<td id=' + "$AnchorID" + '$1' + "$AnchorExt>" + "$AnchorID" + '$1' + "$AnchorExt"
+			}
+
+			$htmlTableOut = $htmlTableOut -replace $AnchorRegex, $AnchorURL
+		}
+		return $htmlTableOut
+	} catch {
+		Write-Host " Error converting query table to HTML: $_" -ForegroundColor Red
+	}
+
 }
 
 function Invoke-ClearVariables {
@@ -1925,7 +1988,7 @@ $htmlTable4
 					#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 					#}
 					#else {
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col]
+					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col]
 					#}
 					$ExcelColNum += 1
 				}
@@ -1982,7 +2045,7 @@ $htmlTable4
 			$ExcelFile.Save()
 		}
 		##Cleaning up variables
-		Invoke-ClearVariables ResourceInfoTbl,InstanceInfoTbl, ConnectionsInfoTbl, SessOptTbl, PSBlitzSet
+		Invoke-ClearVariables ResourceInfoTbl, InstanceInfoTbl, ConnectionsInfoTbl, SessOptTbl, PSBlitzSet
 	}
 
 	if ($JobStatus -ne "Running") {
@@ -2030,7 +2093,7 @@ $htmlTable4
 			#@{Name = "Rows"; Expression = { $_."rows" } },
 			#@{Name = "Used Space MB"; Expression = { $_."used_space_MB" } }, 
 			#@{Name = "Reserved Space MB"; Expression = { $_."reserved_space_MB" } } | ConvertTo-Html -As Table -Fragment
-            $htmlTable2 = Convert-TableToHtml $TempTabTbl
+			$htmlTable2 = Convert-TableToHtml $TempTabTbl
 			if ($DebugInfo) {
 				Write-Host " ->Converting TempDB session usage info to HTML" -fore yellow
 			}
@@ -2325,19 +2388,19 @@ $htmlTable2
 				}
 
 				
-			#	$htmlTable1 = $AcTranTbl | Select-Object @{Name = "time_of_check"; Expression = { if ($_."time_of_check" -ne [System.DBNull]::Value) { ($_."time_of_check").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."time_of_check" } } },
-			#	"database_name", "session_id", "blocking_session_id",
-			#	"current_query", "current_plan_file", "most_recent_query", "most_recent_plan_file", "wait_type",
-			#	"wait_time_seconds", "wait_resource", "command",
-			#	"session_status", "current_reuqest_status", "transaction_name",
-			#    "open_transaction_count",
-			#	@{Name = "transaction_begin_time"; Expression = { if ($_."transaction_begin_time" -ne [System.DBNull]::Value) { ($_."transaction_begin_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."transaction_begin_time" } } },
-			#   "transaction_type", "transaction_state",
-			#   @{Name = "request_start_time"; Expression = { if ($_."request_start_time" -ne [System.DBNull]::Value) { ($_."request_start_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_start_time" } } },
-			#   @{Name = "request_end_time"; Expression = { if ($_."request_end_time" -ne [System.DBNull]::Value) { ($_."request_end_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_end_time" } } },
-			#   "active_request_elapsed_seconds",
-			#   "host_name", "login_name", "program_name", "client_interface_name" | ConvertTo-Html -As Table -Fragment
-				$htmlTable1 = Convert-TableToHtml $AcTranTbl -ExclCols "current_sql","current_plan","most_recent_sql","most_recent_plan" -DebugInfo:$DebugInfo
+				#	$htmlTable1 = $AcTranTbl | Select-Object @{Name = "time_of_check"; Expression = { if ($_."time_of_check" -ne [System.DBNull]::Value) { ($_."time_of_check").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."time_of_check" } } },
+				#	"database_name", "session_id", "blocking_session_id",
+				#	"current_query", "current_plan_file", "most_recent_query", "most_recent_plan_file", "wait_type",
+				#	"wait_time_seconds", "wait_resource", "command",
+				#	"session_status", "current_reuqest_status", "transaction_name",
+				#    "open_transaction_count",
+				#	@{Name = "transaction_begin_time"; Expression = { if ($_."transaction_begin_time" -ne [System.DBNull]::Value) { ($_."transaction_begin_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."transaction_begin_time" } } },
+				#   "transaction_type", "transaction_state",
+				#   @{Name = "request_start_time"; Expression = { if ($_."request_start_time" -ne [System.DBNull]::Value) { ($_."request_start_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_start_time" } } },
+				#   @{Name = "request_end_time"; Expression = { if ($_."request_end_time" -ne [System.DBNull]::Value) { ($_."request_end_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_end_time" } } },
+				#   "active_request_elapsed_seconds",
+				#   "host_name", "login_name", "program_name", "client_interface_name" | ConvertTo-Html -As Table -Fragment
+				$htmlTable1 = Convert-TableToHtml $AcTranTbl -ExclCols "current_sql", "current_plan", "most_recent_sql", "most_recent_plan" -DebugInfo:$DebugInfo
 				$QExt = '.query'
 				$FileSOrder = "Current"
 				$AnchorRegex = "$FileSOrder(_\d+)$QExt"
@@ -2422,7 +2485,7 @@ $JumpToTop
 						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 						#}
 						#else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $AcTranTbl.Rows[$RowNum][$col]
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $AcTranTbl.Rows[$RowNum][$col]
 						#}
 					
 						#move to the next column
@@ -2615,7 +2678,7 @@ $JumpToTop
 						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 						#}
 						#else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcGovTbl.Rows[$RowNum][$col]
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcGovTbl.Rows[$RowNum][$col]
 						#}
 					
 						#move to the next column
@@ -2664,7 +2727,7 @@ $JumpToTop
 						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 						#}
 						#else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DBInfoTbl.Rows[$RowNum][$col]
 						#}
 					
 						#move to the next column
@@ -2711,8 +2774,8 @@ $JumpToTop
 						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 						#}
 						#else {
-							#Fill Excel cell with value from the data set
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcUsageTbl.Rows[$RowNum][$col]
+						#Fill Excel cell with value from the data set
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $RsrcUsageTbl.Rows[$RowNum][$col]
 						#}
 					
 						#move to the next column
@@ -2934,7 +2997,7 @@ $JumpToTop
 				##Saving file 
 				$ExcelFile.Save()
 			}
-			Invoke-ClearVariables DBInfoTbl,DBFileInfoTbl,RsrcGovTbl,RsrcUsageTbl,ObjImpUpgrTbl,DBConfigTbl,PSBlitzSet
+			Invoke-ClearVariables DBInfoTbl, DBFileInfoTbl, RsrcGovTbl, RsrcUsageTbl, ObjImpUpgrTbl, DBConfigTbl, PSBlitzSet
 		}
 
 	}
@@ -3356,7 +3419,7 @@ $htmlTable
 			##Saving file 
 			$ExcelFile.Save()
 		}
-		Invoke-ClearVariables BlitzFirstTbl,PSBlitzSet
+		Invoke-ClearVariables BlitzFirstTbl, PSBlitzSet
 	}
 	if ($JobStatus -ne "Running") {
 		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
@@ -3565,7 +3628,7 @@ $JumpToTop
 						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 						#}
 						#else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StorageTbl.Rows[$RowNum][$col]
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StorageTbl.Rows[$RowNum][$col]
 						#}
 						
 						#move to the next column
@@ -3612,7 +3675,7 @@ $JumpToTop
 						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 						#}
 						#else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $PerfmonTbl.Rows[$RowNum][$col]
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $PerfmonTbl.Rows[$RowNum][$col]
 						#}
 						
 						#move to the next column
@@ -3873,7 +3936,7 @@ $JumpToTop
 				#"Minimum Memory Grant KB",
 				#"Maximum Memory Grant KB", "Minimum Used Grant KB", "Maximum Used Grant KB",
 				#"Average Max Memory Grant", "Min Spills", "Max Spills", "Total Spills", "Avg Spills" | ConvertTo-Html -As Table -Fragment
-				$htmlTable1 = Convert-TableToHtml $BlitzCacheTbl -NoCaseChange -ExclCols "Query Text","Query Plan"
+				$htmlTable1 = Convert-TableToHtml $BlitzCacheTbl -NoCaseChange -ExclCols "Query Text", "Query Plan"
 				
 				#Handling URLs
 				$QExt = '.query'
@@ -4037,15 +4100,15 @@ $JumpToTop
 					"Serial Required Memory", "Total CPU (ms)", "Avg CPU (ms)", "CPU Weight", "% CPU (Type)",
 					"Total Duration (ms)", "Avg Duration (ms)", "Duration Weight", "% Duration (Type)",
 					"Total Reads", "Average Reads", "Read Weight", "% Reads (Type)", "Total Writes",
-					"Average Writes", "Write Weight", "% Writes (Type)", "Total Rows", "Avg Rows", "Min Rows","Max Rows",
-					"Minimum Memory Grant KB","Maximum Memory Grant KB", "Minimum Used Grant KB", "Maximum Used Grant KB",
+					"Average Writes", "Write Weight", "% Writes (Type)", "Total Rows", "Avg Rows", "Min Rows", "Max Rows",
+					"Minimum Memory Grant KB", "Maximum Memory Grant KB", "Minimum Used Grant KB", "Maximum Used Grant KB",
 					"Average Max Memory Grant", "Min Spills", "Max Spills", "Total Spills", "Avg Spills",
-					 "# Plans", "# Distinct Plans", "Created At", "Last Execution","Last Completion",
+					"# Plans", "# Distinct Plans", "Created At", "Last Execution", "Last Completion",
 					"Query Hash", "Query Plan Hash",
 					"SET Options", "Cached Plan Size (KB)", "Compile Time (ms)", "Compile CPU (ms)",
 					"Compile memory (KB)""Minimum Memory Grant KB",
 					
-					"Remove Plan Handle From Cache","Remove SQL Handle From Cache")
+					"Remove Plan Handle From Cache", "Remove SQL Handle From Cache")
 				if ($DebugInfo) {
 					Write-Host " ->Writing sp_BlitzCache results to sheet $SheetName" -fore yellow
 				}
@@ -4062,7 +4125,7 @@ $JumpToTop
 						#	#move to the top of the loop
 						#	Continue
 						#}elseif
-						if($BlitzCacheTbl.Rows[$RowNum][$col] -eq "<?NoNeedToClickMe -- N/A --?>") {
+						if ($BlitzCacheTbl.Rows[$RowNum][$col] -eq "<?NoNeedToClickMe -- N/A --?>") {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = "   -- N/A --   "
 							#move to the next column
 							#$ExcelColNum += 1
@@ -4572,7 +4635,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 							#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 							#}
 							#else {
-								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzQSTbl.Rows[$RowNum][$col]
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzQSTbl.Rows[$RowNum][$col]
 							#}
 							#move to the next column
 							$ExcelColNum += 1
@@ -4724,7 +4787,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					#	"Details: schema.table.index(indexid)",   
 					#	"Definition", 
 					#	"Secret Columns", "Usage", "Size", "Create TSQL", "Sample Plan File", "URL" |  Where-Object -FilterScript { ($DBArray -contains $_."Database Name") -and ($_."Priority" -ne 250) -and ($_."Finding" -NotLike "sp_BlitzIndex*") } | ConvertTo-Html -As Table -Fragment
-#
+					#
 					#}
 					#else {
 					#	$htmlTable = $BlitzIxTbl | Select-Object "Priority", "Finding", "Database Name", 
@@ -4781,7 +4844,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					#	@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
 					#	@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } } | 
 					#	Where-Object -FilterScript { $DBArray -contains $_."Database Name" } | Select-Object -First 30000 | ConvertTo-Html -As Table -Fragment
-                    #}
+					#}
 					#else {
 					#	$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Schema Name", "Object Name", 
 					#	"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
@@ -5011,7 +5074,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			if ($DebugInfo) {
 				Write-Host " ->Exporting deadlock graphs (if any)" -fore yellow
 			}
-			$TblLockDtl.Columns.Add("deadlock_graph_file", [string]) | Out-Null
+			#$TblLockDtl.Columns.Add("deadlock_graph_file", [string]) | Out-Null
 			foreach ($row in $TblLockDtl) {
 				#Increment file name counter
 				#$i += 1
@@ -5020,8 +5083,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			#>
 				if (($TblLockDtl.Rows[$RowNum]["deadlock_graph"] -ne [System.DBNull]::Value) -and ($TblLockDtl.Rows[$RowNum]["deadlock_group"] -like "*VICTIM*")) {
 					#format the event date to append to file name
-					[string]$DLDate = $TblLockDtl.Rows[$RowNum]["event_date"].ToString("yyyyMMdd_HHmmss")
-					[string]$DLFile = "$DLDate" + "_$i.xdl"
+					#[string]$DLDate = 
+					[string]$DLFile = $TblLockDtl.Rows[$RowNum]["graphfile_date"] + "_$i.xdl"
 					#write .xdl file
 					$TblLockDtl.Rows[$RowNum]["deadlock_graph"] | Format-XML | Set-Content -Path "$XDLOutDir\$DLFile" -Force
 					$TblLockDtl.Rows[$RowNum]["deadlock_graph_file"] = $DLFile
@@ -5037,8 +5100,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			if ($DebugInfo) {
 				Write-Host " ->Exporting execution plans related to deadlocks." -fore yellow
 			}
-			$TblLockPlans.Columns.Add("PlanID", [string]) | Out-Null
-			$TblLockPlans.Columns.Add("Query", [string]) | Out-Null
+			#$TblLockPlans.Columns.Add("PlanID", [string]) | Out-Null
+			#$TblLockPlans.Columns.Add("Query", [string]) | Out-Null
 			#Set counter used for row retrieval
 			$RowNum = 0
 			#Setting $i to 0
@@ -5055,8 +5118,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$QueryName = "DeadlockPlan_" + $i + ".query"
 					$TblLockPlans.Rows[$RowNum]["query_plan"] | Format-XML | Set-Content -Path "$PlanOutDir\$SQLPlanFile" -Force
 				}
-				$TblLockPlans.Rows[$RowNum]["PlanID"] = $SQLPlanFile
-				$TblLockPlans.Rows[$RowNum]["Query"] = $QueryName		
+				$TblLockPlans.Rows[$RowNum]["sqlplan_file"] = $SQLPlanFile
+				$TblLockPlans.Rows[$RowNum]["query"] = $QueryName		
 				#Increment row retrieval counter
 				$RowNum += 1
 			}
@@ -5074,83 +5137,88 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				elseif ($IsAzureSQLDB) {
 					$HtmlTabName += " for $ASDBName"
 				}
-				$htmlTable1 = $TblLockOver | Select-Object @{Name = "Database"; Expression = { $_."database_name" } }, 
-				@{Name = "Object"; Expression = { $_."object_name" } }, 
-				@{Name = "Finding Group"; Expression = { $_."finding_group" } }, 
-				@{Name = "Finding"; Expression = { $_."finding" } } | Where-Object "Database" -NotLike "sp_BlitzLock version*" | ConvertTo-Html -As Table -Fragment
+				#$htmlTable1 = $TblLockOver | Select-Object @{Name = "Database"; Expression = { $_."database_name" } }, 
+				#@{Name = "Object"; Expression = { $_."object_name" } }, 
+				#@{Name = "Finding Group"; Expression = { $_."finding_group" } }, 
+				#@{Name = "Finding"; Expression = { $_."finding" } } | Where-Object "Database" -NotLike "sp_BlitzLock version*" | ConvertTo-Html -As Table -Fragment
+				$htmlTable1 = Convert-TableToHtml $TblLockOver
 			
-				$htmlTable2 = $TblLockDtl | Select-Object @{Name = "Type"; Expression = { $_."deadlock_type" } }, 
-				@{Name = "Event Date"; Expression = { if ($_."event_date" -ne [System.DBNull]::Value) { ($_."event_date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."event_date" } } },
-				@{Name = "Database"; Expression = { $_."database_name" } }, 
-				@{Name = "SPID"; Expression = { $_."spid" } },
-				@{Name = "Deadlock Group"; Expression = { $_."deadlock_group" } },
-				@{Name = "Deadlock Graph File"; Expression = { $_."deadlock_graph_file" } },
-				@{Name = "Query"; Expression = { $_."deadlock_group".Replace('Deadlock #', 'DL').Replace(', Query #', 'Q').Replace(' - VICTIM', 'V') + ".query" } },
-				@{Name = "Object Names"; Expression = { $_."object_names" } }, 
-				@{Name = "Isolation Level"; Expression = { $_."isolation_level" } },
-				@{Name = "Owner Mode"; Expression = { $_."owner_mode" } }, 
-				@{Name = "Waiter Mode"; Expression = { $_."waiter_mode" } }, 
-				@{Name = "Tran Count"; Expression = { $_."transaction_count" } }, 
-				@{Name = "Login"; Expression = { $_."login_name" } },
-				@{Name = "Host Name"; Expression = { $_."host_name" } }, 
-				@{Name = "Client App"; Expression = { $_."client_app" } }, 
-				@{Name = "Wait Time"; Expression = { $_."wait_time" } }, 
-				@{Name = "Wait Resource"; Expression = { $_."wait_resource" } }, 
-				@{Name = "Priority"; Expression = { $_."priority" } }, 
-				@{Name = "Log Used"; Expression = { $_."log_used" } }, 
-				@{Name = "Last Tran Start"; Expression = { if ($_."last_tran_started" -ne [System.DBNull]::Value) { ($_."last_tran_started").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_tran_started" } } }, 
-				@{Name = "Last Batch Start"; Expression = { if ($_."last_batch_started" -ne [System.DBNull]::Value) { ($_."last_batch_started").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_batch_started" } } },
-				@{Name = "Last Batch Completed"; Expression = { if ($_."last_batch_completed" -ne [System.DBNull]::Value) { ($_."last_batch_completed").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_batch_completed" } } },	
-				@{Name = "Tran Name"; Expression = { $_."transaction_name" } } | ConvertTo-Html -As Table -Fragment
-				$htmlTable2 = $htmlTable2 -replace '<table>', '<table id="DeadlockDtlTable" class="DeadlockDetailsTable">'
+				#$htmlTable2 = $TblLockDtl | Select-Object @{Name = "Type"; Expression = { $_."deadlock_type" } }, 
+				#@{Name = "Event Date"; Expression = { if ($_."event_date" -ne [System.DBNull]::Value) { ($_."event_date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."event_date" } } },
+				#@{Name = "Database"; Expression = { $_."database_name" } }, 
+				#@{Name = "SPID"; Expression = { $_."spid" } },
+				#@{Name = "Deadlock Group"; Expression = { $_."deadlock_group" } },
+				#@{Name = "Deadlock Graph File"; Expression = { $_."deadlock_graph_file" } },
+				#@{Name = "Query"; Expression = { $_."deadlock_group".Replace('Deadlock #', 'DL').Replace(', Query #', 'Q').Replace(' - VICTIM', 'V') + ".query" } },
+				#@{Name = "Object Names"; Expression = { $_."object_names" } }, 
+				#@{Name = "Isolation Level"; Expression = { $_."isolation_level" } },
+				#@{Name = "Owner Mode"; Expression = { $_."owner_mode" } }, 
+				#@{Name = "Waiter Mode"; Expression = { $_."waiter_mode" } }, 
+				#@{Name = "Tran Count"; Expression = { $_."transaction_count" } }, 
+				#@{Name = "Login"; Expression = { $_."login_name" } },
+				#@{Name = "Host Name"; Expression = { $_."host_name" } }, 
+				#@{Name = "Client App"; Expression = { $_."client_app" } }, 
+				#@{Name = "Wait Time"; Expression = { $_."wait_time" } }, 
+				#@{Name = "Wait Resource"; Expression = { $_."wait_resource" } }, 
+				#@{Name = "Priority"; Expression = { $_."priority" } }, 
+				#@{Name = "Log Used"; Expression = { $_."log_used" } }, 
+				#@{Name = "Last Tran Start"; Expression = { if ($_."last_tran_started" -ne [System.DBNull]::Value) { ($_."last_tran_started").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_tran_started" } } }, 
+				#@{Name = "Last Batch Start"; Expression = { if ($_."last_batch_started" -ne [System.DBNull]::Value) { ($_."last_batch_started").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_batch_started" } } },
+				#@{Name = "Last Batch Completed"; Expression = { if ($_."last_batch_completed" -ne [System.DBNull]::Value) { ($_."last_batch_completed").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_batch_completed" } } },	
+				#@{Name = "Tran Name"; Expression = { $_."transaction_name" } } | ConvertTo-Html -As Table -Fragment
+				#$htmlTable2 = $htmlTable2 -replace '<table>', '<table id="DeadlockDtlTable" class="DeadlockDetailsTable">'
 
 				$QExt = '.query'
-				$AnchorRegex = "DL(\d+)Q(\d+)V{0,}$QExt"
-				$AnchorURL = '<a href="#$&">$&</a>'
-				$htmlTable2 = $htmlTable2 -replace $AnchorRegex, $AnchorURL
+				#$AnchorRegex = "DL(\d+)Q(\d+)V{0,}$QExt"
+				#$AnchorURL = '<a href="#$&">$&</a>'
+				#$htmlTable2 = $htmlTable2 -replace $AnchorRegex, $AnchorURL
+				$htmlTable2 = Convert-TableToHtml $TblLockDtl -TblID "DeadlockDtlTable" -CSSClass "DeadlockDetailsTable" -AnchorFromHere -ExclCols "graphfile_date","query_text","deadlock_graph"
 
-				$htmlTable3 = $TblLockDtl | 
-				Select-Object @{Name = "Query"; Expression = { $_."deadlock_group".Replace('Deadlock #', 'DL').Replace(', Query #', 'Q').Replace(' - VICTIM', 'V') + ".query" } },
-				@{Name = "Query Text"; Expression = { $_."query" } } | ConvertTo-Html -As Table -Fragment
-				$AnchorRegex = "<td>DL(\d+)Q(\d+)(V{0,})$QExt"
-				$AnchorURL = '<td id=' + "DL" + '$1' + "Q" + '$2' + '$3' + "$QExt>" + "DL" + '$1' + "Q" + '$2' + '$3' + "$QExt"
-				$htmlTable3 = $htmlTable3 -replace $AnchorRegex, $AnchorURL
+				#$htmlTable3 = $TblLockDtl | 
+				#Select-Object @{Name = "Query"; Expression = { $_."query" } },
+				#@{Name = "Query Text"; Expression = { $_."query_text" } } | ConvertTo-Html -As Table -Fragment
+				#$AnchorRegex = "<td>DL(\d+)Q(\d+)(V{0,})$QExt"
+				#$AnchorURL = '<td id=' + "DL" + '$1' + "Q" + '$2' + '$3' + "$QExt>" + "DL" + '$1' + "Q" + '$2' + '$3' + "$QExt"
+				#$htmlTable3 = $htmlTable3 -replace $AnchorRegex, $AnchorURL
+				$htmlTable3 = Convert-QueryTableToHtml $TblLockDtl -Cols "query","query_text" -AnchorToHere -AnchorID "DeadlockDtlTable"
 
-				$htmlTable4 = $TblLockPlans | Select-Object @{Name = "Database"; Expression = { $_."database_name" } },
-				"Query", @{Name = "SQLPlan File"; Expression = { $_."PlanID" } },
-				@{Name = "Created At"; Expression = { if ($_."creation_time" -ne [System.DBNull]::Value) { ($_."creation_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."creation_time" } } },
-				@{Name = "Last Execution"; Expression = { if ($_."last_execution_time" -ne [System.DBNull]::Value) { ($_."last_execution_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_execution_time" } } },
-				@{Name = "Executions"; Expression = { $_."execution_count" } },
-				@{Name = "Executions / Second"; Expression = { $_."executions_per_second" } },
-				@{Name = "Total Worker Time(ms)"; Expression = { $_."total_worker_time_ms" } },
-				@{Name = "Avg Worker Time(ms)"; Expression = { $_."avg_worker_time_ms" } },
-				@{Name = "Max Worker Time(ms)"; Expression = { $_."max_worker_time_ms" } },
-				@{Name = "Total Duration(ms)"; Expression = { $_."total_elapsed_time_ms" } },
-				@{Name = "Avg Duration(ms)"; Expression = { $_."avg_elapsed_time_ms" } },
-				@{Name = "Max Duration(ms)"; Expression = { $_."max_elapsed_time_ms" } },
-				@{Name = "Total Logical Reads(MB)"; Expression = { $_."total_logical_reads_mb" } },
-				@{Name = "Total Physical Reads(MB)"; Expression = { $_."total_physical_reads_mb" } },
-				@{Name = "Total Logical Writes(MB)"; Expression = { $_."total_logical_writes_mb" } },
-				@{Name = "Min Grant(MB)"; Expression = { $_."min_grant_mb" } },
-				@{Name = "Max Grant(MB)"; Expression = { $_."max_grant_mb" } },
-				@{Name = "Min Used Grant(MB)"; Expression = { $_."min_used_grant_mb" } },
-				@{Name = "Max Used Grant(MB)"; Expression = { $_."max_used_grant_mb" } },
-				@{Name = "Min Reserved Threads"; Expression = { $_."min_reserved_threads" } },
-				@{Name = "Max Reserved Threads"; Expression = { $_."max_reserved_threads" } },
-				@{Name = "Min Used Threads"; Expression = { $_."min_used_threads" } },
-				@{Name = "Max Used Threads"; Expression = { $_."max_used_threads" } },
-				@{Name = "Total Rows"; Expression = { $_."total_rows" } } | ConvertTo-Html -As Table -Fragment
-				$QExt = '.query'
-				$FileSOrder = "DeadlockPlan"
-				$AnchorRegex = "$FileSOrder(_\d+)$QExt"
-				$AnchorURL = '<a href="#$&">$&</a>'
-				$htmlTable4 = $htmlTable4 -replace $AnchorRegex, $AnchorURL
+				#$htmlTable4 = $TblLockPlans | Select-Object @{Name = "Database"; Expression = { $_."database_name" } },
+				#"Query", @{Name = "SQLPlan File"; Expression = { $_."PlanID" } },
+				#@{Name = "Created At"; Expression = { if ($_."creation_time" -ne [System.DBNull]::Value) { ($_."creation_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."creation_time" } } },
+				#@{Name = "Last Execution"; Expression = { if ($_."last_execution_time" -ne [System.DBNull]::Value) { ($_."last_execution_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_execution_time" } } },
+				#@{Name = "Executions"; Expression = { $_."execution_count" } },
+				#@{Name = "Executions / Second"; Expression = { $_."executions_per_second" } },
+				#@{Name = "Total Worker Time(ms)"; Expression = { $_."total_worker_time_ms" } },
+				#@{Name = "Avg Worker Time(ms)"; Expression = { $_."avg_worker_time_ms" } },
+				#@{Name = "Max Worker Time(ms)"; Expression = { $_."max_worker_time_ms" } },
+				#@{Name = "Total Duration(ms)"; Expression = { $_."total_elapsed_time_ms" } },
+				#@{Name = "Avg Duration(ms)"; Expression = { $_."avg_elapsed_time_ms" } },
+				#@{Name = "Max Duration(ms)"; Expression = { $_."max_elapsed_time_ms" } },
+				#@{Name = "Total Logical Reads(MB)"; Expression = { $_."total_logical_reads_mb" } },
+				#@{Name = "Total Physical Reads(MB)"; Expression = { $_."total_physical_reads_mb" } },
+				#@{Name = "Total Logical Writes(MB)"; Expression = { $_."total_logical_writes_mb" } },
+				#@{Name = "Min Grant(MB)"; Expression = { $_."min_grant_mb" } },
+				#@{Name = "Max Grant(MB)"; Expression = { $_."max_grant_mb" } },
+				#@{Name = "Min Used Grant(MB)"; Expression = { $_."min_used_grant_mb" } },
+				#@{Name = "Max Used Grant(MB)"; Expression = { $_."max_used_grant_mb" } },
+				#@{Name = "Min Reserved Threads"; Expression = { $_."min_reserved_threads" } },
+				#@{Name = "Max Reserved Threads"; Expression = { $_."max_reserved_threads" } },
+				#@{Name = "Min Used Threads"; Expression = { $_."min_used_threads" } },
+				#@{Name = "Max Used Threads"; Expression = { $_."max_used_threads" } },
+				#@{Name = "Total Rows"; Expression = { $_."total_rows" } } | ConvertTo-Html -As Table -Fragment
+				#$QExt = '.query'
+				#$FileSOrder = "DeadlockPlan"
+				#$AnchorRegex = "$FileSOrder(_\d+)$QExt"
+				#$AnchorURL = '<a href="#$&">$&</a>'
+				#$htmlTable4 = $htmlTable4 -replace $AnchorRegex, $AnchorURL
+				$htmlTable4 = Convert-TableToHtml $TblLockPlans -AnchorFromHere -ExclCols "query_text","query_plan" -AnchorID "DeadlockPlan"
 
-				$htmlTable5 = $TblLockPlans | Select-Object "Query",
-				@{Name = "Query Text"; Expression = { $_."query_text".Replace('<?query ', '').Replace('   ?>', '') } } | ConvertTo-Html -As Table -Fragment
-				$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
-				$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
-				$htmlTable5 = $htmlTable5 -replace $AnchorRegex, $AnchorURL
+				#$htmlTable5 = $TblLockPlans | Select-Object "Query",
+				#@{Name = "Query Text"; Expression = { $_."query_text".Replace('<?query ', '').Replace('   ?>', '') } } | ConvertTo-Html -As Table -Fragment
+				#$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
+				#$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
+				#$htmlTable5 = $htmlTable5 -replace $AnchorRegex, $AnchorURL
+				$htmlTable5 = Convert-QueryTableToHtml $TblLockPlans -Cols "query","query_text" -AnchorToHere -AnchorID "DeadlockPlan"
 		
 				$html = $HTMLPre + @"
 		<title>$HtmlTabName</title>
@@ -5242,13 +5310,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					foreach ($col in $DataSetCols) {
 						[string]$DebugCol = $col
 						[string]$DebugValue = $TblLockDtl.Rows[$RowNum][$col]
-						if (("event_date", "last_tran_started", "last_batch_started",	"last_batch_completed" -contains $col ) -and ($TblLockDtl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							$DateForExcel = $TblLockDtl.Rows[$RowNum][$col] | Get-Date
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
+						#if (("event_date", "last_tran_started", "last_batch_started",	"last_batch_completed" -contains $col ) -and ($TblLockDtl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+						#	$DateForExcel = $TblLockDtl.Rows[$RowNum][$col] | Get-Date
+						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						#}
+						#else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TblLockDtl.Rows[$RowNum][$col]
-						}
+						#}
 						#move to the next column
 						$ExcelColNum += 1
 					}
@@ -5316,7 +5384,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$SQLPlanNum = 1
 
 				#List of columns that should be returned from the data set
-				$DataSetCols = @("database_name", "query_text", "PlanID", "creation_time",
+				$DataSetCols = @("database_name", "query_text", "sqlplan_file", "creation_time",
 				 "last_execution_time", "execution_count",
 					"executions_per_second", "total_worker_time_ms",
 				 "avg_worker_time_ms", "max_worker_time_ms", "total_elapsed_time_ms",
@@ -5334,16 +5402,16 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						[string]$DebugCol = $col
 						[string]$DebugValue = $TblLockPlans.Rows[$RowNum][$col]
 						#Fill Excel cell with value from the data set
-						if ($col -eq "query_text") {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TblLockPlans.Rows[$RowNum][$col].Replace('<?query ', '').Replace('   ?>', '')
-						}
-						elseif (("creation_time", "last_execution_time" -contains $col ) -and ($TblLockPlans.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							$DateForExcel = $TblLockPlans.Rows[$RowNum][$col] | Get-Date
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
+						#if ($col -eq "query_text") {
+						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TblLockPlans.Rows[$RowNum][$col].Replace('<?query ', '').Replace('   ?>', '')
+						#}
+						#elseif (("creation_time", "last_execution_time" -contains $col ) -and ($TblLockPlans.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+						#	$DateForExcel = $TblLockPlans.Rows[$RowNum][$col] | Get-Date
+						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						#}
+						#else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $TblLockPlans.Rows[$RowNum][$col]
-						}
+						#}
 						#move to the next column
 						$ExcelColNum += 1
 
@@ -5418,32 +5486,33 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					if ($DebugInfo) {
 						Write-Host " ->Converting stats info to HTML" -fore yellow
 					}
-					$htmlTable = $StatsTbl | Select-Object @{Name = "Database"; Expression = { $_."database" } },
-					@{Name = "Object Name"; Expression = { $_."object_name" } },
-					@{Name = "Object Type"; Expression = { $_."object_type" } },
-					@{Name = "Stats Name"; Expression = { $_."stats_name" } },
-					@{Name = "Origin"; Expression = { $_."origin" } },
-					@{Name = "Filter Definition"; Expression = { $_."filter_definition" } },
-					@{Name = "Last Updated"; Expression = { if ($_."last_updated" -ne [System.DBNull]::Value) { ($_."last_updated").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_updated" } } },
-					@{Name = "Rows"; Expression = { $_."rows" } },
-					@{Name = "Unfiltered Rows"; Expression = { $_."unfiltered_rows" } },
-					@{Name = "Rows Sampled"; Expression = { $_."rows_sampled" } },
-					@{Name = "Sample %"; Expression = { $_."sample_percent" } },
-					@{Name = "Modifications Count"; Expression = { $_."modification_counter" } },
-					@{Name = "Modified %"; Expression = { $_."modified_percent" } },
-					@{Name = "Steps"; Expression = { $_."steps" } },
-					@{Name = "Incremental"; Expression = { $_."incremental" } },
-					@{Name = "Temporary"; Expression = { $_."temporary" } },
-					@{Name = "With NORECOMPUTE"; Expression = { $_."no_recompute" } },
-					@{Name = "Persisted Sample"; Expression = { $_."persisted_sample" } },
-					@{Name = "Persisted Sample %"; Expression = { $_."persisted_sample_percent" } },
-					@{Name = "Partitioned"; Expression = { $_."partitioned" } },
-					@{Name = "Partition No."; Expression = { $_."partition_number" } },
-					@{Name = "Get Stats Details"; Expression = { $_."get_details" } },
-					@{Name = "Update Table Stats"; Expression = { $_."update_table_stats" } },
-					@{Name = "Update Individual Stats"; Expression = { $_."update_individual_stats" } },
-					@{Name = "Update Partition Stats"; Expression = { $_."update_partition_stats" } } | ConvertTo-Html -As Table -Fragment
-					$htmlTable = $htmlTable -replace '<table>', '<table id="StatsOrIxFragTable" class="sortable">'
+					#$htmlTable = $StatsTbl | Select-Object @{Name = "Database"; Expression = { $_."database" } },
+					#@{Name = "Object Name"; Expression = { $_."object_name" } },
+					#@{Name = "Object Type"; Expression = { $_."object_type" } },
+					#@{Name = "Stats Name"; Expression = { $_."stats_name" } },
+					#@{Name = "Origin"; Expression = { $_."origin" } },
+					#@{Name = "Filter Definition"; Expression = { $_."filter_definition" } },
+					#@{Name = "Last Updated"; Expression = { if ($_."last_updated" -ne [System.DBNull]::Value) { ($_."last_updated").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_updated" } } },
+					#@{Name = "Rows"; Expression = { $_."rows" } },
+					#@{Name = "Unfiltered Rows"; Expression = { $_."unfiltered_rows" } },
+					#@{Name = "Rows Sampled"; Expression = { $_."rows_sampled" } },
+					#@{Name = "Sample %"; Expression = { $_."sample_percent" } },
+					#@{Name = "Modifications Count"; Expression = { $_."modification_counter" } },
+					#@{Name = "Modified %"; Expression = { $_."modified_percent" } },
+					#@{Name = "Steps"; Expression = { $_."steps" } },
+					#@{Name = "Incremental"; Expression = { $_."incremental" } },
+					#@{Name = "Temporary"; Expression = { $_."temporary" } },
+					#@{Name = "With NORECOMPUTE"; Expression = { $_."no_recompute" } },
+					#@{Name = "Persisted Sample"; Expression = { $_."persisted_sample" } },
+					#@{Name = "Persisted Sample %"; Expression = { $_."persisted_sample_percent" } },
+					#@{Name = "Partitioned"; Expression = { $_."partitioned" } },
+					#@{Name = "Partition No."; Expression = { $_."partition_number" } },
+					#@{Name = "Get Stats Details"; Expression = { $_."get_details" } },
+					#@{Name = "Update Table Stats"; Expression = { $_."update_table_stats" } },
+					#@{Name = "Update Individual Stats"; Expression = { $_."update_individual_stats" } },
+					#@{Name = "Update Partition Stats"; Expression = { $_."update_partition_stats" } } | ConvertTo-Html -As Table -Fragment
+					#$htmlTable = $htmlTable -replace '<table>', '<table id="StatsOrIxFragTable" class="sortable">'
+					$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -CSSClass "sortable"
 					#add tooltips
 					$htmlTable = $htmlTable -replace '<th>Update ', '<th class="tooltip" title="The commented options are suggestions based on record counts.">Update '
 					if ($IsAzureSQLDB) {
@@ -5496,13 +5565,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						foreach ($col in $DataSetCols) {
 							[string]$DebugCol = $col
 							[string]$DebugValue = $StatsTbl.Rows[$RowNum][$col]
-							if (($col -eq "last_updated") -and ($StatsTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-								$DateForExcel = $StatsTbl.Rows[$RowNum][$col] | Get-Date
-								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-							}
-							else {		
+							#if (($col -eq "last_updated") -and ($StatsTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+							#	$DateForExcel = $StatsTbl.Rows[$RowNum][$col] | Get-Date
+							#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+							#}
+							#else {		
 								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StatsTbl.Rows[$RowNum][$col]
-							}
+							#}
 							
 							$ExcelColNum += 1
 						}
@@ -5576,18 +5645,19 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					if ($DebugInfo) {
 						Write-Host " ->Converting index info to HTML" -fore yellow
 					}
-					$htmlTable = $IndexTbl | Select-Object @{Name = "Database"; Expression = { $_."database" } },
-					@{Name = "Object Name"; Expression = { $_."object_name" } },
-					@{Name = "Object Type"; Expression = { $_."object_type" } },
-					@{Name = "Index Name"; Expression = { $_."index_name" } }, 
-					@{Name = "Index Type"; Expression = { $_."index_type" } },
-					@{Name = "Partition"; Expression = { $_."partition_number" } }, 
-					@{Name = "Avg. Frag. %"; Expression = { $_."avg_frag_percent" } },
-					@{Name = "Page Count"; Expression = { $_."page_count" } },
-					@{Name = "Size in GB"; Expression = { $_."size_in_GB" } },
-					@{Name = "Record Count"; Expression = { $_."record_count" } },
-					@{Name = "Forwarded Records"; Expression = { $_."forwarded_record_count" } } | ConvertTo-Html -As Table -Fragment
-					$htmlTable = $htmlTable -replace '<table>', '<table id="StatsOrIxFragTable" class="sortable">'
+					#$htmlTable = $IndexTbl | Select-Object @{Name = "Database"; Expression = { $_."database" } },
+					#@{Name = "Object Name"; Expression = { $_."object_name" } },
+					#@{Name = "Object Type"; Expression = { $_."object_type" } },
+					#@{Name = "Index Name"; Expression = { $_."index_name" } }, 
+					#@{Name = "Index Type"; Expression = { $_."index_type" } },
+					#@{Name = "Partition"; Expression = { $_."partition_number" } }, 
+					#@{Name = "Avg. Frag. %"; Expression = { $_."avg_frag_percent" } },
+					#@{Name = "Page Count"; Expression = { $_."page_count" } },
+					#@{Name = "Size in GB"; Expression = { $_."size_in_GB" } },
+					#@{Name = "Record Count"; Expression = { $_."record_count" } },
+					#@{Name = "Forwarded Records"; Expression = { $_."forwarded_record_count" } } | ConvertTo-Html -As Table -Fragment
+					#$htmlTable = $htmlTable -replace '<table>', '<table id="StatsOrIxFragTable" class="sortable">'
+					$htmlTable = Convert-TableToHtml $IndexTbl -TblID "StatsOrIxFragTable" -CSSClass "sortable"
 					if ($IsAzureSQLDB) {
 						$HtmlTabName = "Index fragmentation info for $ASDBName"
 					}
@@ -5644,7 +5714,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$ExcelFile.Save()
 				}
 				##Cleaning up variables
-				Invoke-ClearVariables IndexTbl,PSBlitzSet
+				Invoke-ClearVariables IndexTbl, PSBlitzSet
 			} 
 		}
 	
@@ -5805,7 +5875,7 @@ finally {
 		else {
 
 			##Add plan file column 
-			$BlitzWhoAggTbl.Columns.Add("sqlplan_file", [string]) | Out-Null
+			#$BlitzWhoAggTbl.Columns.Add("sqlplan_file", [string]) | Out-Null
 			##Exporting execution plans to file and setting plan file names
 			if ($DebugInfo) {
 				Write-Host " ->Exporting execution plans" -fore yellow

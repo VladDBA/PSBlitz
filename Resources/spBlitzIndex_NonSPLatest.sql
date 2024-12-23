@@ -76,7 +76,7 @@ SELECT
 
 /*
 Everything beyond this point is straight from sp_BlitzIndex except for the commented block 
-between lines 6507 and 6514 and without the GO at the end
+between lines 6507 and 6514, the result sets changes (column orders, date time to varchar conversion, etc.) for PSBlitz, and without the GO at the end
 */
 
 SET NOCOUNT ON;

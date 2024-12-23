@@ -240,9 +240,10 @@ UPDATE ##PSBlitzStatsInfo SET [update_partition_stats] = CASE
                               END
 WHERE incremental = N'Yes';
 
-SELECT [id], [database], [object_schema]+N'.'+[object_name] AS [object_name], [object_type],
+SELECT TOP(10000) /*[id], */
+       [database], [object_schema]+N'.'+[object_name] AS [object_name], [object_type],
        [stats_name], [origin], [filter_definition],
-       [last_updated], [rows], [unfiltered_rows],
+       CONVERT(VARCHAR(25),[last_updated],120) AS [last_updated], [rows], [unfiltered_rows],
        [rows_sampled], [sample_percent],
        [modification_counter], [modified_percent],
        [incremental], [temporary], [no_recompute],
@@ -252,6 +253,8 @@ SELECT [id], [database], [object_schema]+N'.'+[object_name] AS [object_name], [o
        [update_individual_stats], [update_partition_stats]
 FROM   ##PSBlitzStatsInfo
 ORDER BY [modified_percent] DESC, [object_name] ASC;
+
+SELECT COUNT(1) AS RecordCount FROM ##PSBlitzStatsInfo;
 
 IF OBJECT_ID('tempdb.dbo.##PSBlitzStatsInfo', 'U') IS NOT NULL
     DROP TABLE ##PSBlitzStatsInfo;
