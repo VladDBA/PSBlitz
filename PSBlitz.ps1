@@ -631,10 +631,18 @@ function Invoke-PSBlitzQuery {
 		}
 		$global:StepOutcome = "Success"
 		if (($StepNameIn -like "sp_BlitzCache*") -or ($StepNameIn -like "sp_BlitzQueryStore*") -or 
-		($StepNameIn -like "sp_BlitzIndex*") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info")) {
+		($StepNameIn -eq "sp_BlitzIndex mode 1") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info")) {
 			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
 			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
 
+		}elseif('sp_BlitzIndex mode 0', 'sp_BlitzIndex mode 2', 'sp_BlitzIndex mode 4' -contains $StepNameIn) {
+			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
+			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
+			$TotalRecords = $global:PSBlitzSet.Tables[1].Rows[0]["RecordCount"]
+			if($TotalRecords -gt $RecordsReturned){
+			Add-LogRow "->$StepNameIn" "Record limit exceeded" "Result was limited to top $RecordsReturned records out of $TotalRecords"
+			Write-Host "  ->Record limit exceeded `n -> Result was limited to top $RecordsReturned records out of $TotalRecords" -Fore Yellow
+			}
 		}
 		else {
 			Add-LogRow $StepNameIn $global:StepOutcome
@@ -668,7 +676,15 @@ function Convert-TableToHtml {
 		[Parameter(Mandatory = $false)]
         [string] $TblID,
 		[Parameter(Mandatory = $false)]
-        [switch] $NoCaseChange
+        [switch] $NoCaseChange,
+		[Parameter(Mandatory = $false)]
+        [switch] $AnchorFromHere,
+		[Parameter(Mandatory = $false)]
+		[switch] $AnchorToHere,
+		[Parameter(Mandatory = $false)]
+		[string] $AnchorID,
+		[Parameter(Mandatory = $false)]
+		[string] $AnchorExt
     )
 
     try {
@@ -718,6 +734,11 @@ function Convert-TableToHtml {
             $URLRegex = '(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\".,<>?«»“”]))'
             $htmlTableOut = $htmlTableOut -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
         }
+		if($AnchorFromHere) {
+			$AnchorRegex = "$AnchorID(_\d+)$AnchorExt"
+			$AnchorURL = '<a href="#$&">$&</a>'
+			$htmlTableOut = $htmlTableOut -replace $AnchorRegex, $AnchorURL
+		}
         
         return $htmlTableOut
     }
@@ -4337,7 +4358,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					Write-Host " ->Exporting execution plans" -fore yellow
 				}
 				#Add column to table 
-				$BlitzQSTbl.Columns.Add("SQLPlan File", [string]) | Out-Null
+				#$BlitzQSTbl.Columns.Add("SQLPlan File", [string]) | Out-Null
 				#Set counter used for row retrieval
 				$RowNum = 0
 				#Setting $i to 0
@@ -4360,7 +4381,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				if ($ToHTML -eq "Y") {
 					
 					#adding query name
-					$BlitzQSTbl.Columns.Add("Query", [string]) | Out-Null
+					#$BlitzQSTbl.Columns.Add("Query", [string]) | Out-Null
 					$RowNum = 0
 					$i = 0
 			
@@ -4376,58 +4397,61 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					if ($DebugInfo) {
 						Write-Host " ->Converting sp_BlitzQueryStore output to HTML" -fore yellow
 					}
-					$htmlTable1 = $BlitzQSTbl | Select-Object @{Name = "Database"; Expression = { ($_."database_name") } },
-					@{Name = "Query Cost"; Expression = { ($_."query_cost") } },
-					@{Name = "PlanID"; Expression = { ($_."plan_id") } },
-					@{Name = "QueryID"; Expression = { ($_."query_id") } },
-					@{Name = "QueryID all PlanIDs"; Expression = { ($_."query_id_all_plan_ids") } },
-					"Query",
-					@{Name = "Proc or Function"; Expression = { ($_."proc_or_function_name") } },
-					"SQLPlan File",
-					@{Name = "Warnings"; Expression = { ($_."warnings") } },
-					@{Name = "Pattern"; Expression = { ($_."pattern") } },
-					@{Name = "Parameter Sniffing Symptoms"; Expression = { ($_."parameter_sniffing_symptoms") } },
-					@{Name = "Top Three Waits"; Expression = { ($_."top_three_waits") } },
-					@{Name = "Missing Indexes"; Expression = { ($_."missing_indexes").Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
-					@{Name = "Implicit Conversion Info"; Expression = { ($_."implicit_conversion_info").Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
-					@{Name = "Cached Exec Parameters"; Expression = { ($_."cached_execution_parameters").Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
-					@{Name = "Executions"; Expression = { ($_."count_executions") } },
-					@{Name = "Compiles"; Expression = { ($_."count_compiles") } },
-					@{Name = "Total CPU Time(ms)"; Expression = { ($_."total_cpu_time") } },
-					@{Name = "Avg CPU Time(ms)"; Expression = { ($_."avg_cpu_time") } },
-					@{Name = "Total Duration(ms)"; Expression = { ($_."total_duration") } },
-					@{Name = "Avg Duration(ms)"; Expression = { ($_."avg_duration") } },
-					@{Name = "Total Logical IO Reads MB"; Expression = { ($_."total_logical_io_reads") } },
-					@{Name = "Avg Logical IO Reads MB"; Expression = { ($_."avg_logical_io_reads") } },
-					@{Name = "Total Physical IO Reads MB"; Expression = { ($_."total_physical_io_reads") } },
-					@{Name = "Avg Physical IO Reads MB"; Expression = { ($_."avg_physical_io_reads") } },
-					@{Name = "Total Logical IO Writes MB"; Expression = { ($_."total_logical_io_writes") } },
-					@{Name = "Avg Logical IO Writes MB"; Expression = { ($_."avg_logical_io_writes") } },
-					@{Name = "Total Rows"; Expression = { ($_."total_rowcount") } },
-					@{Name = "Avg Rows"; Expression = { ($_."avg_rowcount") } },
-					@{Name = "Total Query Max Used Memory MB"; Expression = { ($_."total_query_max_used_memory") } },
-					@{Name = "Avg Query Max Used Memory MB"; Expression = { ($_."avg_query_max_used_memory") } },
-					@{Name = "Total TempDB Used MB"; Expression = { ($_."total_tempdb_space_used") } },
-					@{Name = "Avg TempDB Used MB"; Expression = { ($_."avg_tempdb_space_used") } },
-					@{Name = "Total log bytes used"; Expression = { ($_."total_log_bytes_used") } },
-					@{Name = "Avg log bytes used"; Expression = { ($_."avg_log_bytes_used") } },
-					@{Name = "Total Num Physical IO Reads"; Expression = { ($_."total_num_physical_io_reads") } },
-					@{Name = "Avg Num Physical IO Reads"; Expression = { ($_."avg_num_physical_io_reads") } },
-					@{Name = "First Exec Time"; Expression = { if ($_."first_execution_time" -ne [System.DBNull]::Value) { ($_."first_execution_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."first_execution_time" } } },
-					@{Name = "Last Exec Time"; Expression = { if ($_."last_execution_time" -ne [System.DBNull]::Value) { ($_."last_execution_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_execution_time" } } },
-					@{Name = "Last Force Failure Reasson"; Expression = { ($_."last_force_failure_reason_desc") } },
-					@{Name = "Context Settings"; Expression = { ($_."context_settings") } } | ConvertTo-Html -As Table -Fragment
-
-
-					$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="QueryStoreTab sortable">'
+					#$htmlTable1 = $BlitzQSTbl | Select-Object @{Name = "Database"; Expression = { ($_."database_name") } },
+					#@{Name = "Query Cost"; Expression = { ($_."query_cost") } },
+					#@{Name = "PlanID"; Expression = { ($_."plan_id") } },
+					#@{Name = "QueryID"; Expression = { ($_."query_id") } },
+					#@{Name = "QueryID all PlanIDs"; Expression = { ($_."query_id_all_plan_ids") } },
+					#"Query",
+					#@{Name = "Proc or Function"; Expression = { ($_."proc_or_function_name") } },
+					#"SQLPlan File",
+					#@{Name = "Warnings"; Expression = { ($_."warnings") } },
+					#@{Name = "Pattern"; Expression = { ($_."pattern") } },
+					#@{Name = "Parameter Sniffing Symptoms"; Expression = { ($_."parameter_sniffing_symptoms") } },
+					#@{Name = "Top Three Waits"; Expression = { ($_."top_three_waits") } },
+					#@{Name = "Missing Indexes"; Expression = { ($_."missing_indexes").Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
+					#@{Name = "Implicit Conversion Info"; Expression = { ($_."implicit_conversion_info").Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
+					#@{Name = "Cached Exec Parameters"; Expression = { ($_."cached_execution_parameters").Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
+					#@{Name = "Executions"; Expression = { ($_."count_executions") } },
+					#@{Name = "Compiles"; Expression = { ($_."count_compiles") } },
+					#@{Name = "Total CPU Time(ms)"; Expression = { ($_."total_cpu_time") } },
+					#@{Name = "Avg CPU Time(ms)"; Expression = { ($_."avg_cpu_time") } },
+					#@{Name = "Total Duration(ms)"; Expression = { ($_."total_duration") } },
+					#@{Name = "Avg Duration(ms)"; Expression = { ($_."avg_duration") } },
+					#@{Name = "Total Logical IO Reads MB"; Expression = { ($_."total_logical_io_reads") } },
+					#@{Name = "Avg Logical IO Reads MB"; Expression = { ($_."avg_logical_io_reads") } },
+					#@{Name = "Total Physical IO Reads MB"; Expression = { ($_."total_physical_io_reads") } },
+					#@{Name = "Avg Physical IO Reads MB"; Expression = { ($_."avg_physical_io_reads") } },
+					#@{Name = "Total Logical IO Writes MB"; Expression = { ($_."total_logical_io_writes") } },
+					#@{Name = "Avg Logical IO Writes MB"; Expression = { ($_."avg_logical_io_writes") } },
+					#@{Name = "Total Rows"; Expression = { ($_."total_rowcount") } },
+					#@{Name = "Avg Rows"; Expression = { ($_."avg_rowcount") } },
+					#@{Name = "Total Query Max Used Memory MB"; Expression = { ($_."total_query_max_used_memory") } },
+					#@{Name = "Avg Query Max Used Memory MB"; Expression = { ($_."avg_query_max_used_memory") } },
+					#@{Name = "Total TempDB Used MB"; Expression = { ($_."total_tempdb_space_used") } },
+					#@{Name = "Avg TempDB Used MB"; Expression = { ($_."avg_tempdb_space_used") } },
+					#@{Name = "Total log bytes used"; Expression = { ($_."total_log_bytes_used") } },
+					#@{Name = "Avg log bytes used"; Expression = { ($_."avg_log_bytes_used") } },
+					#@{Name = "Total Num Physical IO Reads"; Expression = { ($_."total_num_physical_io_reads") } },
+					#@{Name = "Avg Num Physical IO Reads"; Expression = { ($_."avg_num_physical_io_reads") } },
+					#@{Name = "First Exec Time"; Expression = { if ($_."first_execution_time" -ne [System.DBNull]::Value) { ($_."first_execution_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."first_execution_time" } } },
+					#@{Name = "Last Exec Time"; Expression = { if ($_."last_execution_time" -ne [System.DBNull]::Value) { ($_."last_execution_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_execution_time" } } },
+					#@{Name = "Last Force Failure Reasson"; Expression = { ($_."last_force_failure_reason_desc") } },
+					#@{Name = "Context Settings"; Expression = { ($_."context_settings") } } | ConvertTo-Html -As Table -Fragment
 					$QExt = '.query'
 					$FileSOrder = "QueryStore"
-					$AnchorRegex = "$FileSOrder(_\d+)$QExt"
-					$AnchorURL = '<a href="#$&">$&</a>'
-					$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
+					$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan_xml" -CSSClass "QueryStoreTab sortable" -AnchorFromHere -AnchorID $FileSOrder -AnchorExt $QExt
 
-					$htmlTable2 = $BlitzQSSumTbl | Select-Object "Priority", "FindingsGroup", "Finding", "Details", "URL" | ConvertTo-Html -As Table -Fragment
-					$htmlTable2 = $htmlTable2 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+
+					#$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="QueryStoreTab sortable">'
+					
+					#$AnchorRegex = "$FileSOrder(_\d+)$QExt"
+					#$AnchorURL = '<a href="#$&">$&</a>'
+					#$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
+
+					#$htmlTable2 = $BlitzQSSumTbl | Select-Object "Priority", "FindingsGroup", "Finding", "Details", "URL" | ConvertTo-Html -As Table -Fragment
+					#$htmlTable2 = $htmlTable2 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+					$htmlTable2 = Convert-TableToHtml $BlitzQSSumTbl -HasURLs
 
 					$htmlTable3 = $BlitzQSTbl | Select-Object "Query", 
 					@{Name = "Query Text"; Expression = { ($_."query_sql_text") } } | ConvertTo-Html -As Table -Fragment
@@ -4536,20 +4560,20 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						foreach ($col in $DataSetCols) {
 							[string]$DebugCol = $col
 							[string]$DebugValue = $BlitzQSTbl.Rows[$RowNum][$col]
-							if ($BlitzQSTbl.Rows[$RowNum][$col] -eq "<?NoNeedToClickMe -- N/A --?>") {
-								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = "   -- N/A --   "
-								#move to the next column
-								#$ExcelColNum += 1
-								#move to the top of the loop
-								#Continue
-							}
-							elseif (("first_execution_time", "last_execution_time" -Contains $col ) -and ($BlitzQSTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-								$DateForExcel = $BlitzQSTbl.Rows[$RowNum][$col] | Get-Date
-								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-							}
-							else {
+							#if ($BlitzQSTbl.Rows[$RowNum][$col] -eq "<?NoNeedToClickMe -- N/A --?>") {
+							#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = "   -- N/A --   "
+							#	#move to the next column
+							#	#$ExcelColNum += 1
+							#	#move to the top of the loop
+							#	#Continue
+							#}
+							#elseif (("first_execution_time", "last_execution_time" -Contains $col ) -and ($BlitzQSTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+							#	$DateForExcel = $BlitzQSTbl.Rows[$RowNum][$col] | Get-Date
+							#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+							#}
+							#else {
 								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzQSTbl.Rows[$RowNum][$col]
-							}
+							#}
 							#move to the next column
 							$ExcelColNum += 1
 						}
@@ -4647,11 +4671,11 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			if ("0", "4" -Contains $Mode) {
 				#Export sample execution plans for missing indexes (SQL Server 2019 only)
 				#Since we're already looping through the result set here, might as well add and
-				#populate the plan file name column here
+				#populate the plan file name column as well
 				if ($DebugInfo) {
 					Write-Host " ->Exporting missing index sample execution plans (if any)" -fore yellow
 				}
-				$BlitzIxTbl.Columns.Add("Sample Plan File", [string]) | Out-Null
+				#$BlitzIxTbl.Columns.Add("Sample Plan File", [string]) | Out-Null
 				$RowNum = 0
 				$i = 0
 				foreach ($row in $BlitzIxTbl) {
@@ -4692,102 +4716,101 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		
 		
 				if ("0", "4" -Contains $Mode) {					
-					<#Renaming a column because apparently Select-Object and ConvertTo-HTML can't deal with curly braces or the long column name 
-					or whatever regardless of how I try to escape them
-					and it's 2AM and I'm done with trying to find elegant ways around this
-					#>
-					$BlitzIxTbl.Columns["Definition: [Property] ColumnName {datatype maxbytes}"].ColumnName = "Definition"
-					if (([string]::IsNullOrEmpty($CheckDB)) -and ($RecordsReturned -gt 30000)) {
-						Write-Host "  ->More than 30k records returned `n  ->limiting output to databases found in the plan cache results and excluding priority 250."
-						Add-LogRow "->sp_BlitzIndex mode $Mode" "More than 30k records" "Output limited to databases found in the plan cache results and excluded priority 250"
-						$htmlTable = $BlitzIxTbl | Select-Object "Priority", "Finding", "Database Name", 
-						"Details: schema.table.index(indexid)",   
-						"Definition", 
-						"Secret Columns", "Usage", "Size", "Create TSQL", "Sample Plan File", "URL" |  Where-Object -FilterScript { ($DBArray -contains $_."Database Name") -and ($_."Priority" -ne 250) -and ($_."Finding" -NotLike "sp_BlitzIndex*") } | ConvertTo-Html -As Table -Fragment
 
-					}
-					else {
-						$htmlTable = $BlitzIxTbl | Select-Object "Priority", "Finding", "Database Name", 
-						"Details: schema.table.index(indexid)",   
-						"Definition", 
-						"Secret Columns", "Usage", "Size", "Create TSQL", "Sample Plan File", "URL" | Where-Object "Finding" -NotLike "sp_BlitzIndex*" | ConvertTo-Html -As Table -Fragment
-					}
+					#if (([string]::IsNullOrEmpty($CheckDB)) -and ($RecordsReturned -gt 30000)) {
+					#	Write-Host "  ->More than 30k records returned `n  ->limiting output to databases found in the plan cache results and excluding priority 250."
+					#	Add-LogRow "->sp_BlitzIndex mode $Mode" "More than 30k records" "Output limited to databases found in the plan cache results and excluded priority 250"
+					#	$htmlTable = $BlitzIxTbl | Select-Object "Priority", "Finding", "Database Name", 
+					#	"Details: schema.table.index(indexid)",   
+					#	"Definition", 
+					#	"Secret Columns", "Usage", "Size", "Create TSQL", "Sample Plan File", "URL" |  Where-Object -FilterScript { ($DBArray -contains $_."Database Name") -and ($_."Priority" -ne 250) -and ($_."Finding" -NotLike "sp_BlitzIndex*") } | ConvertTo-Html -As Table -Fragment
+#
+					#}
+					#else {
+					#	$htmlTable = $BlitzIxTbl | Select-Object "Priority", "Finding", "Database Name", 
+					#	"Details: schema.table.index(indexid)",   
+					#	"Definition", 
+					#	"Secret Columns", "Usage", "Size", "Create TSQL", "Sample Plan File", "URL" | Where-Object "Finding" -NotLike "sp_BlitzIndex*" | ConvertTo-Html -As Table -Fragment
+					#}
+					$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols "Sample Query Plan" -NoCaseChange -HasURLs -TblID "IndexUsgTable"
 					#don't pay attention to that table id, it lies because it's late and I'm lazy
-					$htmlTable = $htmlTable -replace '<table>', '<table id="IndexUsgTable">'		
-					$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+					#$htmlTable = $htmlTable -replace '<table>', '<table id="IndexUsgTable">'		
+					#$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
 				}
 				elseif ($Mode -eq "1") {
-					$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Number Objects", "All GB", 
-					"LOB GB", "Row Overflow GB", "Clustered Tables", 
-					"Clustered Tables GB", "NC Indexes", "NC Indexes GB", 
-					"ratio table: NC Indexes", "Heaps", "Heaps GB", "Partitioned Tables", 
-					"Partitioned NCs", "Partitioned GB", "Filtered Indexes", 
-					"Indexed Views", "Max Row Count", "Max Table GB", "Max NC Index GB", 
-					"Count Tables > 1GB", "Count Tables > 10GB", "Count Tables > 100GB", 
-					"Count NCs > 1GB", "Count NCs > 10GB", "Count NCs > 100GB", 
-					@{Name = "Oldest Create Date"; Expression = { if ($_."Oldest Create Date" -ne [System.DBNull]::Value) { ($_."Oldest Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Oldest Create Date" } } }, 
-					@{Name = "Most Recent Create Date"; Expression = { if ($_."Most Recent Create Date" -ne [System.DBNull]::Value) { ($_."Most Recent Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Most Recent Create Date" } } }, 
-					@{Name = "Most Recent Modify Date"; Expression = { if ($_."Most Recent Modify Date" -ne [System.DBNull]::Value) { ($_."Most Recent Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Most Recent Modify Date" } } } | Where-Object "Number Objects" -NotLike "sp_BlitzIndex*" | ConvertTo-Html -As Table -Fragment
-					$htmlTable = $htmlTable -replace '<table>', '<table id="IndexSummaryTable">'
+					#$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Number Objects", "All GB", 
+					#"LOB GB", "Row Overflow GB", "Clustered Tables", 
+					#"Clustered Tables GB", "NC Indexes", "NC Indexes GB", 
+					#"ratio table: NC Indexes", "Heaps", "Heaps GB", "Partitioned Tables", 
+					#"Partitioned NCs", "Partitioned GB", "Filtered Indexes", 
+					#"Indexed Views", "Max Row Count", "Max Table GB", "Max NC Index GB", 
+					#"Count Tables > 1GB", "Count Tables > 10GB", "Count Tables > 100GB", 
+					#"Count NCs > 1GB", "Count NCs > 10GB", "Count NCs > 100GB", 
+					#@{Name = "Oldest Create Date"; Expression = { if ($_."Oldest Create Date" -ne [System.DBNull]::Value) { ($_."Oldest Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Oldest Create Date" } } }, 
+					#@{Name = "Most Recent Create Date"; Expression = { if ($_."Most Recent Create Date" -ne [System.DBNull]::Value) { ($_."Most Recent Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Most Recent Create Date" } } }, 
+					#@{Name = "Most Recent Modify Date"; Expression = { if ($_."Most Recent Modify Date" -ne [System.DBNull]::Value) { ($_."Most Recent Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Most Recent Modify Date" } } } | Where-Object "Number Objects" -NotLike "sp_BlitzIndex*" | ConvertTo-Html -As Table -Fragment
+					#$htmlTable = $htmlTable -replace '<table>', '<table id="IndexSummaryTable">'
+					$htmlTable = Convert-TableToHtml $BlitzIxTbl -NoCaseChange -TblID "IndexSummaryTable" -ExclCols "Display Order"
 				}
 				elseif ($Mode -eq "2") {
-					$BlitzIxTbl.Columns["Definition: [Property] ColumnName {datatype maxbytes}"].ColumnName = "Definition"
-					if (([string]::IsNullOrEmpty($CheckDB)) -and ($RecordsReturned -gt 30000)) {
-						Write-Host "  ->More than 30k records returned `n  ->limiting output to first 30k records based on databases found in the plan cache results."
-						Add-LogRow "->sp_BlitzIndex mode $Mode" "More than 30k records" "Output limited to first 30k records based on databases found in the plan cache results"
-						$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Schema Name", "Object Name", 
-						"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
-						"Object Type", "Definition", 
-						"Key Column Names With Sort", "Count Key Columns", "Include Column Names", 
-						"Count Included Columns", "Secret Column Names", "Count Secret Columns", 
-						"Partition Key Column Name", "Filter Definition", "Is Indexed View", 
-						"Is Primary Key", "Is XML", "Is Spatial", "Is NC Columnstore", 
-						"Is CX Columnstore", "Is Disabled", "Is Hypothetical", "Is Padded", 
-						"Fill Factor", "Is Reference by Foreign Key", 
-						@{Name = "Last User Seek"; Expression = { if ($_."Last User Seek" -ne [System.DBNull]::Value) { ($_."Last User Seek").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Seek" } } }, 
-						@{Name = "Last User Scan"; Expression = { if ($_."Last User Scan" -ne [System.DBNull]::Value) { ($_."Last User Scan").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Scan" } } }, 
-						@{Name = "Last User Lookup"; Expression = { if ($_."Last User Lookup" -ne [System.DBNull]::Value) { ($_."Last User Lookup").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Lookup" } } }, 
-						@{Name = "Last User Update"; Expression = { if ($_."Last User Update" -ne [System.DBNull]::Value) { ($_."Last User Update").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Update" } } }, 
-						"Total Reads", 
-						"User Updates", "Reads Per Write", "Index Usage", "Partition Count", 
-						"Rows", "Reserved MB", "Reserved LOB MB", "Reserved Row Overflow MB", 
-						"Index Size", "Row Lock Count", "Row Lock Wait Count", "Row Lock Wait ms", 
-						"Avg Row Lock Wait ms", "Page Lock Count", "Page Lock Wait Count", 
-						"Page Lock Wait ms", "Avg Page Lock Wait ms", "Lock Escalation Attempts", 
-						"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
-						"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
-						@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
-						@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } } | 
-						Where-Object -FilterScript { $DBArray -contains $_."Database Name" } | Select-Object -First 30000 | ConvertTo-Html -As Table -Fragment
-     }
-					else {
-						$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Schema Name", "Object Name", 
-						"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
-						"Object Type", "Definition", 
-						"Key Column Names With Sort", "Count Key Columns", "Include Column Names", 
-						"Count Included Columns", "Secret Column Names", "Count Secret Columns", 
-						"Partition Key Column Name", "Filter Definition", "Is Indexed View", 
-						"Is Primary Key", "Is XML", "Is Spatial", "Is NC Columnstore", 
-						"Is CX Columnstore", "Is Disabled", "Is Hypothetical", "Is Padded", 
-						"Fill Factor", "Is Reference by Foreign Key", 
-						@{Name = "Last User Seek"; Expression = { if ($_."Last User Seek" -ne [System.DBNull]::Value) { ($_."Last User Seek").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Seek" } } }, 
-						@{Name = "Last User Scan"; Expression = { if ($_."Last User Scan" -ne [System.DBNull]::Value) { ($_."Last User Scan").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Scan" } } }, 
-						@{Name = "Last User Lookup"; Expression = { if ($_."Last User Lookup" -ne [System.DBNull]::Value) { ($_."Last User Lookup").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Lookup" } } }, 
-						@{Name = "Last User Update"; Expression = { if ($_."Last User Update" -ne [System.DBNull]::Value) { ($_."Last User Update").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Update" } } }, 
-						"Total Reads", 
-						"User Updates", "Reads Per Write", "Index Usage", "Partition Count", 
-						"Rows", "Reserved MB", "Reserved LOB MB", "Reserved Row Overflow MB", 
-						"Index Size", "Row Lock Count", "Row Lock Wait Count", "Row Lock Wait ms", 
-						"Avg Row Lock Wait ms", "Page Lock Count", "Page Lock Wait Count", 
-						"Page Lock Wait ms", "Avg Page Lock Wait ms", "Lock Escalation Attempts", 
-						"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
-						"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
-						@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
-						@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } } | 
-						ConvertTo-Html -As Table -Fragment
-					}
-					#add table specify style
-					$htmlTable = $htmlTable -replace '<table>', '<table id="IndexUsgTable" class="IndexUsageTable sortable">'
+					#$BlitzIxTbl.Columns["Definition: [Property] ColumnName {datatype maxbytes}"].ColumnName = "Definition"
+					#if (([string]::IsNullOrEmpty($CheckDB)) -and ($RecordsReturned -gt 30000)) {
+					#	Write-Host "  ->More than 30k records returned `n  ->limiting output to first 30k records based on databases found in the plan cache results."
+					#	Add-LogRow "->sp_BlitzIndex mode $Mode" "More than 30k records" "Output limited to first 30k records based on databases found in the plan cache results"
+					#	$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Schema Name", "Object Name", 
+					#	"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
+					#	"Object Type", "Definition", 
+					#	"Key Column Names With Sort", "Count Key Columns", "Include Column Names", 
+					#	"Count Included Columns", "Secret Column Names", "Count Secret Columns", 
+					#	"Partition Key Column Name", "Filter Definition", "Is Indexed View", 
+					#	"Is Primary Key", "Is XML", "Is Spatial", "Is NC Columnstore", 
+					#	"Is CX Columnstore", "Is Disabled", "Is Hypothetical", "Is Padded", 
+					#	"Fill Factor", "Is Reference by Foreign Key", 
+					#	@{Name = "Last User Seek"; Expression = { if ($_."Last User Seek" -ne [System.DBNull]::Value) { ($_."Last User Seek").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Seek" } } }, 
+					#	@{Name = "Last User Scan"; Expression = { if ($_."Last User Scan" -ne [System.DBNull]::Value) { ($_."Last User Scan").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Scan" } } }, 
+					#	@{Name = "Last User Lookup"; Expression = { if ($_."Last User Lookup" -ne [System.DBNull]::Value) { ($_."Last User Lookup").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Lookup" } } }, 
+					#	@{Name = "Last User Update"; Expression = { if ($_."Last User Update" -ne [System.DBNull]::Value) { ($_."Last User Update").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Update" } } }, 
+					#	"Total Reads", 
+					#	"User Updates", "Reads Per Write", "Index Usage", "Partition Count", 
+					#	"Rows", "Reserved MB", "Reserved LOB MB", "Reserved Row Overflow MB", 
+					#	"Index Size", "Row Lock Count", "Row Lock Wait Count", "Row Lock Wait ms", 
+					#	"Avg Row Lock Wait ms", "Page Lock Count", "Page Lock Wait Count", 
+					#	"Page Lock Wait ms", "Avg Page Lock Wait ms", "Lock Escalation Attempts", 
+					#	"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
+					#	"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
+					#	@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
+					#	@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } } | 
+					#	Where-Object -FilterScript { $DBArray -contains $_."Database Name" } | Select-Object -First 30000 | ConvertTo-Html -As Table -Fragment
+                    #}
+					#else {
+					#	$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Schema Name", "Object Name", 
+					#	"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
+					#	"Object Type", "Definition", 
+					#	"Key Column Names With Sort", "Count Key Columns", "Include Column Names", 
+					#	"Count Included Columns", "Secret Column Names", "Count Secret Columns", 
+					#	"Partition Key Column Name", "Filter Definition", "Is Indexed View", 
+					#	"Is Primary Key", "Is XML", "Is Spatial", "Is NC Columnstore", 
+					#	"Is CX Columnstore", "Is Disabled", "Is Hypothetical", "Is Padded", 
+					#	"Fill Factor", "Is Reference by Foreign Key", 
+					#	@{Name = "Last User Seek"; Expression = { if ($_."Last User Seek" -ne [System.DBNull]::Value) { ($_."Last User Seek").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Seek" } } }, 
+					#	@{Name = "Last User Scan"; Expression = { if ($_."Last User Scan" -ne [System.DBNull]::Value) { ($_."Last User Scan").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Scan" } } }, 
+					#	@{Name = "Last User Lookup"; Expression = { if ($_."Last User Lookup" -ne [System.DBNull]::Value) { ($_."Last User Lookup").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Lookup" } } }, 
+					#	@{Name = "Last User Update"; Expression = { if ($_."Last User Update" -ne [System.DBNull]::Value) { ($_."Last User Update").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Update" } } }, 
+					#	"Total Reads", 
+					#	"User Updates", "Reads Per Write", "Index Usage", "Partition Count", 
+					#	"Rows", "Reserved MB", "Reserved LOB MB", "Reserved Row Overflow MB", 
+					#	"Index Size", "Row Lock Count", "Row Lock Wait Count", "Row Lock Wait ms", 
+					#	"Avg Row Lock Wait ms", "Page Lock Count", "Page Lock Wait Count", 
+					#	"Page Lock Wait ms", "Avg Page Lock Wait ms", "Lock Escalation Attempts", 
+					#	"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
+					#	"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
+					#	@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
+					#	@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } } | 
+					#	ConvertTo-Html -As Table -Fragment
+					#}
+					##add table specify style
+					#$htmlTable = $htmlTable -replace '<table>', '<table id="IndexUsgTable" class="IndexUsageTable sortable">'
+					$htmlTable = Convert-TableToHtml $BlitzIxTbl -TblID "IndexUsgTable" -CSSClass "IndexUsageTable sortable" -NoCaseChange
 				}
 		
 				$html = $HTMLPre + @"
@@ -4837,8 +4860,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
 				if ("0", "4" -Contains $Mode) {
 					$DataSetCols = @("Priority", "Finding", "Database Name", 
-						"Details: schema.table.index(indexid)",   
-						"Definition: [Property] ColumnName {datatype maxbytes}", 
+						"Details",   
+						"Definition", 
 						"Secret Columns", "Usage", "Size", "Create TSQL", "Sample Plan File", "URL")
 				}
 				elseif ($Mode -eq "1") {
@@ -4856,7 +4879,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				elseif ($Mode -eq "2") {
 					$DataSetCols = @("Database Name", "Schema Name", "Object Name", 
 						"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
-						"Object Type", "Definition: [Property] ColumnName {datatype maxbytes}", 
+						"Object Type", "Definition", 
 						"Key Column Names With Sort", "Count Key Columns", "Include Column Names", 
 						"Count Included Columns", "Secret Column Names", "Count Secret Columns", 
 						"Partition Key Column Name", "Filter Definition", "Is Indexed View", 
@@ -4898,12 +4921,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 									$BlitzIxTbl.Rows[$RowNum]["Finding"]) | Out-Null
 							}
 						}
-						elseif (("Oldest Create Date", "Most Recent Create Date", "Most Recent Modify Date", "Last User Seek", 
-								"Last User Scan", "Last User Lookup", "Last User Update", "Create Date", "Modify Date" -contains $col) -and ($BlitzIxTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							$DateForExcel = $BlitzIxTbl.Rows[$RowNum][$col] | Get-Date
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+						#elseif (("Oldest Create Date", "Most Recent Create Date", "Most Recent Modify Date", "Last User Seek", 
+						#		"Last User Scan", "Last User Lookup", "Last User Update", "Create Date", "Modify Date" -contains $col) -and ($BlitzIxTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+						#	$DateForExcel = $BlitzIxTbl.Rows[$RowNum][$col] | Get-Date
+						#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 
-						}
+						#}
 						else {
 							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzIxTbl.Rows[$RowNum][$col]
 						}
