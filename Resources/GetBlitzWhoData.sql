@@ -17,29 +17,33 @@ DECLARE @DatabaseName NVARCHAR(128);
 SET @DatabaseName = N'';
 
 /*Standard output*/
-SELECT CONVERT(VARCHAR(25),[CheckDate],120) AS [check_date],
+SELECT CONVERT(VARCHAR(25),CAST([CheckDate] AS DATETIME),120) AS [CheckDate],
        CONVERT(VARCHAR(25),[start_time],120) AS [start_time],
        [elapsed_time],
-       [session_id],
+       
        [database_name],
+	   [session_id],
+	   [blocking_session_id],
        [query_text],
        [query_cost],
        [status],
-       [cached_parameter_info],
+       /*[cached_parameter_info],*/
        [wait_info],
        [top_session_waits],
-       [blocking_session_id],
+       
        [open_transaction_count],
        [is_implicit_transaction],
-       [nt_domain],
+       /*[nt_domain],
        [host_name],
        [login_name],
        [nt_user_name],
        [program_name],
        [fix_parameter_sniffing],
+	   
        [client_interface_name],
-       [login_time],
-       [request_time],
+	   
+       CONVERT(VARCHAR(25),[login_time],120) AS [login_time],
+       [request_time],*/
        [request_cpu_time],
        [request_logical_reads],
        [request_writes],
@@ -53,8 +57,6 @@ SELECT CONVERT(VARCHAR(25),[CheckDate],120) AS [check_date],
        [estimated_completion_time],
        [percent_complete],
        [deadlock_priority],
-       [transaction_isolation_level],
-       [degree_of_parallelism],
        [grant_time],
        [requested_memory_kb],
        [grant_memory_kb],
@@ -77,10 +79,7 @@ SELECT CONVERT(VARCHAR(25),[CheckDate],120) AS [check_date],
        [grantee_count],
        [waiter_count],
        [timeout_error_count],
-       [forced_grant_count],
-       [workload_group_name],
-       [resource_pool_name],
-	   CONVERT(VARCHAR(256),[query_hash],1) AS [query_hash]
+       [forced_grant_count]
 FROM   [tempdb].[dbo].[BlitzWho_..BlitzWhoOut..]
 WHERE  [database_name] = CASE
                            WHEN @DatabaseName = N'' THEN [database_name]
@@ -106,8 +105,10 @@ AND [program_name] NOT LIKE N'PSBlitz%';
                    [start_time])
 SELECT CONVERT(VARCHAR(25),[agg].[start_time],120) AS [start_time],
        [who].[elapsed_time],
+	   [who].[database_name],
        [agg].[session_id],
-       [who].[database_name],
+	   [who].[blocking_session_id],
+
        [who].[query_text],
 	   CAST('' AS VARCHAR(30)) AS [query],
        [who].[outer_command],
@@ -118,7 +119,7 @@ SELECT CONVERT(VARCHAR(25),[agg].[start_time],120) AS [start_time],
        [who].[cached_parameter_info],
        [who].[wait_info],
        [who].[top_session_waits],
-       [who].[blocking_session_id],
+       
        [who].[open_transaction_count],
        [who].[is_implicit_transaction],
        [who].[nt_domain],
@@ -126,7 +127,6 @@ SELECT CONVERT(VARCHAR(25),[agg].[start_time],120) AS [start_time],
        [who].[login_name],
        [who].[nt_user_name],
        [who].[program_name],
-       [who].[fix_parameter_sniffing],
        [who].[client_interface_name],
        CONVERT(VARCHAR(25),[who].[login_time],120) AS [login_time],
        CONVERT(VARCHAR(25),[who].[request_time],120) AS [request_time],
@@ -145,7 +145,7 @@ SELECT CONVERT(VARCHAR(25),[agg].[start_time],120) AS [start_time],
        [who].[deadlock_priority],
        [who].[transaction_isolation_level],
        [who].[degree_of_parallelism],
-       [who].[grant_time],
+       CONVERT(VARCHAR(25),[who].[grant_time],120) AS [grant_time],
        [who].[requested_memory_kb],
        [who].[grant_memory_kb],
        [who].[is_request_granted],
@@ -171,7 +171,8 @@ SELECT CONVERT(VARCHAR(25),[agg].[start_time],120) AS [start_time],
        [who].[workload_group_name],
        [who].[resource_pool_name],
        CONVERT(VARCHAR(256),[agg].[query_hash],1) AS [query_hash],
-       CONVERT(VARCHAR(256),[who].[query_plan_hash],1) AS [query_plan_hash]
+       CONVERT(VARCHAR(256),[who].[query_plan_hash],1) AS [query_plan_hash],
+	   [who].[fix_parameter_sniffing]
 FROM   [tempdb].[dbo].[BlitzWho_..BlitzWhoOut..] [who]
        INNER JOIN [agg]
                ON [who].[ID] = [agg].ID

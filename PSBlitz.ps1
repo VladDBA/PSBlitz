@@ -689,6 +689,9 @@ function Convert-TableToHtml {
 	)
 
 	try {
+		if($DebugInfo) {
+			Write-Host " ->Converting data to HTML..." -ForegroundColor Yellow
+		}
 		$properties = @()
 		$cultureInfo = [System.Globalization.CultureInfo]::CurrentCulture
         
@@ -707,6 +710,10 @@ function Convert-TableToHtml {
 			}
 			else {
 				$cultureInfo.TextInfo.ToTitleCase($currentColumn)
+			}
+			#handle lower case KB, MB, GB
+			if ($formattedName -like "*kb*" -or $formattedName -like "*mb*" -or $formattedName -like "*gb*") {
+				$formattedName = $formattedName -replace "([KMG])b", '$1B'
 			}
 
 			$property = if ($DateTimeCols -contains $currentColumn) {
@@ -806,6 +813,97 @@ function Convert-QueryTableToHtml {
 		return $htmlTableOut
 	} catch {
 		Write-Host " Error converting query table to HTML: $_" -ForegroundColor Red
+	}
+
+}
+
+function Convert-TableToExcel {
+    param (
+        [Parameter(Position = 0, Mandatory = $true)]
+        [System.Data.DataTable]$DataTable,
+        [Parameter(Position = 1, Mandatory = $true)]
+        $ExcelSheet,
+        [Parameter(Mandatory = $false)]
+        [int]$StartRow = 1,
+        [Parameter(Mandatory = $false)]
+        [int]$StartCol = 1,
+        [Parameter(Mandatory = $false)]
+        [string[]]$ColumnOrder,
+        [Parameter(Mandatory = $false)]
+        [string[]]$ExclCols,
+        [Parameter(Mandatory = $false)]
+        [string[]]$URLCols,
+        [Parameter(Mandatory = $false)]
+        [switch]$DebugInfo,
+		[Parameter(Mandatory = $false)]
+		[int]$MapURLToColNum,
+		[Parameter(Mandatory = $false)]
+		[string]$URLTextCol
+    )
+
+    try {
+        $ExcelStartRow = $StartRow
+        $ExcelColNum = $StartCol
+        $RowNum = 0
+
+        # Determine columns to process
+        $DataSetCols = if ($ColumnOrder) {
+            $ColumnOrder
+        } else {
+            $DataTable.Columns.ColumnName | Where-Object { $ExclCols -notcontains $_ }
+        }
+
+        if ($DebugInfo) {
+            Write-Host " ->Writing data to Excel worksheet" -ForegroundColor Yellow
+        }
+
+        foreach ($row in $DataTable) {
+            foreach ($col in $DataSetCols) {
+                if ($URLCols -contains $col) {
+                    if ($DataTable.Rows[$RowNum][$col] -like "http*") {
+                        $ExcelSheet.Hyperlinks.Add(
+                            $ExcelSheet.Cells.Item($ExcelStartRow, $MapURLToColNum),
+                            $DataTable.Rows[$RowNum][$col],
+                            "",
+                            "Click for more info",
+                            $DataTable.Rows[$RowNum][$URLTextCol]
+                        ) | Out-Null
+                    }
+                } else {
+                    $ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DataTable.Rows[$RowNum][$col]
+                }
+                $ExcelColNum += 1
+            }
+
+            $ExcelStartRow += 1
+            $RowNum += 1
+            $ExcelColNum = $StartCol
+        }
+
+        if ($DebugInfo) {
+            Write-Host " ->Data written successfully" -ForegroundColor Yellow
+        }
+
+    } catch {
+        Write-Host "Error converting table to Excel: $_" -ForegroundColor Red
+    }
+}
+
+function Save-ExcelFile {
+	param (
+	[Parameter(Position = 0, Mandatory = $true)]
+	$ExcelFile,
+	[Parameter(Position = 1, Mandatory = $false)]
+	[switch]$DebugInfo
+	)
+	try {
+		$ExcelFile.Save()
+		if ($DebugInfo) {
+			Write-Host " ->Excel file saved successfully" -ForegroundColor Yellow
+		}
+	}
+	catch {
+		Write-Host "Error saving Excel file: $_" -ForegroundColor Red
 	}
 
 }
@@ -1767,80 +1865,21 @@ try {
 			if ($DebugInfo) {
 				Write-Host " ->Converting instance info to HTML" -fore yellow
 			}
-			#$InstanceInfoTbl.Columns.Add("Estimated Response Latency (Sec)", [decimal]) | Out-Null
+
 			$InstanceInfoTbl.Rows[0]["estimated_response_latency(Sec)"] = $ConnTest
 
-			#$htmlTable1 = $InstanceInfoTbl | Select-Object  @{Name = "Machine Name"; Expression = { $_."machine_name" } },
-			#@{Name = "Instance Name"; Expression = { $_."instance_name" } }, 
-			#@{Name = "Version"; Expression = { $_."product_version" } }, 
-			#@{Name = "Product Level"; Expression = { $_."product_level" } },
-			#@{Name = "Patch Level"; Expression = { $_."patch_level" } },
-			#@{Name = "Edition"; Expression = { $_."edition" } }, 
-			#@{Name = "Is Clustered?"; Expression = { $_."is_clustered" } }, 
-			#@{Name = "Is AlwaysOnAG?"; Expression = { $_."always_on_enabled" } },
-			#@{Name = "FILESTREAM Access Level"; Expression = { $_."filestream_access_level" } },
-			#@{Name = "Tempdb Metadata Memory Optimized"; Expression = { $_."mem_optimized_tempdb_metadata" } },
-			#@{Name = "Fulltext Instaled"; Expression = { $_."fulltext_installed" } },
-			#@{Name = "Instance Collation"; Expression = { $_."instance_collation" } },
-			#@{Name = "User Databases"; Expression = { $_."user_db_count" } },
-			#@{Name = "Process ID"; Expression = { $_."process_id" } },
-			#@{Name = "Last Startup"; Expression = { ($_."instance_last_startup").ToString("yyyy-MM-dd HH:mm:ss") } },
-			#@{Name = "Uptime (days)"; Expression = { $_."uptime_days" } },
-			#@{Name = "Client Connections"; Expression = { $_."client_connections" } },
-			#"Estimated Response Latency (Sec)", 
-			#@{Name = "Server Time"; Expression = { ($_."server_time").ToString("yyyy-MM-dd HH:mm:ss") } } | ConvertTo-Html -As Table -Fragment
-			#$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="InstanceInfoTbl">'
 			$htmlTable1 = Convert-TableToHtml $InstanceInfoTbl -CSSClass InstanceInfoTbl -DebugInfo:$DebugInfo
 
-			if (($DebugInfo) -and ($IsAzureSQLDB -eq $false)) {
-				Write-Host " ->Converting resource info to HTML" -fore yellow
-			}
-			elseif (($DebugInfo) -and ($IsAzureSQLDB)) {
-				Write-Host " ->Skipping resource instance resource info for Azure SQL DB" -fore yellow
-			} 
 			if ($IsAzureSQLDB) {
 				$htmlTable2 = '<p>Instance resource information is not available for Azure SQL DB.</p>'
 			}
 			else {
-				#$htmlTable2 = $ResourceInfoTbl | Select-Object  @{Name = "Logical Cores"; Expression = { $_."logical_cpu_cores" } }, 
-				#@{Name = "Physical Cores"; Expression = { $_."physical_cpu_cores" } }, 
-				#@{Name = "Physical memory GB"; Expression = { $_."physical_memory_GB" } }, 
-				#@{Name = "Max Server Memory GB"; Expression = { $_."max_server_memory_GB" } }, 
-				#@{Name = "Target Server Memory GB"; Expression = { $_."target_server_memory_GB" } },
-				#@{Name = "Total Memory Used GB"; Expression = { $_."total_memory_used_GB" } },
-				#@{Name = "Buffer Pool Usage GB"; Expression = { $_."buffer_pool_usage_GB" } },
-				#@{Name = "Process physical memory low"; Expression = { $_."proc_physical_memory_low" } },
-				#@{Name = "Process virtual memory low"; Expression = { $_."proc_virtual_memory_low" } },
-				#@{Name = "Available Physical Memory GB"; Expression = { $_."available_physical_memory_GB" } },
-				#@{Name = "OS Memory State"; Expression = { $_."os_memory_state" } },
-				#"CTP",	"MAXDOP" | ConvertTo-Html -As Table -Fragment
-				#$htmlTable2 = $htmlTable2 -replace '<table>', '<table class="RsrcInfoTbl">'
+
 				$htmlTable2 = Convert-TableToHtml $ResourceInfoTbl -CSSClass RsrcInfoTbl -DebugInfo:$DebugInfo
 			}
 
-			if ($DebugInfo) {
-				Write-Host " ->Converting connections info to HTML" -fore yellow
-			}    
-			#$htmlTable3 = $ConnectionsInfoTbl | Select-Object  "Database", 
-			#@{Name = "Connections Count"; Expression = { $_."ConnectionsCount" } }, 
-			#@{Name = "Login Name"; Expression = { $_."LoginName" } }, 
-			#@{Name = "Client Hostname"; Expression = { $_."ClientHostName" } }, 
-			#@{Name = "Client IP"; Expression = { $_."ClientIP" } },
-			#@{Name = "Protocol"; Expression = { $_."ProtocolUsed" } },
-			#@{Name = "Oldest Connection Time"; Expression = { ($_."OldestConnectionTime").ToString("yyyy-MM-dd HH:mm:ss") } },
-			#@{Name = "Program"; Expression = { $_."Program" } }  | ConvertTo-Html -As Table -Fragment
-			#$htmlTable3 = $htmlTable3 -replace '<table>', '<table class="Top10ClientConnTbl">'
 			$htmlTable3 = Convert-TableToHtml $ConnectionsInfoTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
-
-			if ($DebugInfo) {
-				Write-Host " ->Converting session level options info to HTML" -fore yellow
-			}
-
-			#$htmlTable4 = $SessOptTbl | Select-Object "Option", "SessionSetting", "InstanceSetting", "Description", "URL" | ConvertTo-Html -As Table -Fragment
-			#$htmlTable4 = $htmlTable4 -replace '<table>', '<table class="SessOptTbl sortable">'
-			#$htmlTable4 = $htmlTable4 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
 			$htmlTable4 = Convert-TableToHtml $SessOptTbl -CSSClass 'SessOptTbl sortable' -HasURLs -DebugInfo:$DebugInfo
-
 
 			$HtmlTabName = "Instance Overview"
 			$html = $HTMLPre + @"
@@ -1874,175 +1913,25 @@ $htmlTable4
 			##Instance Info section
 			#Specify at which row in the sheet to start adding the data
 			$ExcelStartRow = 3
-			#Specify with which column in the sheet to start
-			$ExcelColNum = 1
-			#Set counter used for row retrieval
-			$RowNum = 0
-
-			#List of columns that should be returned from the data set
-			$DataSetCols = @("machine_name", "instance_name", "product_version", "product_level",
-				"patch_level", "edition", "is_clustered", "always_on_enabled", "filestream_access_level",
-				"tempdb_metadata_memory_optimized", "fulltext_installed", "instance_collation", "user_db_count", "process_id",
-				"instance_last_startup", "uptime_days", "client_connections", "net_latency", "server_time")
-
-			if ($DebugInfo) {
-				Write-Host " ->Writing instance info to Excel" -fore yellow
-			}
-			#Loop through each Excel row
-			foreach ($row in $InstanceInfoTbl) {
-				<#
-				Loop through each data set column of current row and fill the corresponding 
-				Excel cell
-				#>
-				foreach ($col in $DataSetCols) {			
-					#Fill Excel cell with value from the data set
-					[string]$DebugCol = $col
-					[string]$DebugValue = $InstanceInfoTbl.Rows[$RowNum][$col]
-					if ($col -eq "net_latency") {
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnTest
-					}
-					#elseif (("instance_last_startup", "server_time" -contains $col) -and ($InstanceInfoTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-					#	
-					#	$DateForExcel = $InstanceInfoTbl.Rows[$RowNum][$col] | Get-Date
-					#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-					#	
-					#}
-					else {
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $InstanceInfoTbl.Rows[$RowNum][$col]
-					}
-					$ExcelColNum += 1
-				}
-
-				#move to the next row in the spreadsheet
-				$ExcelStartRow += 1
-				#move to the next row in the data set
-				$RowNum += 1
-				# reset Excel column number so that next row population begins with column 1
-				$ExcelColNum = 1
-			}
+			Convert-TableToExcel $InstanceInfoTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo
 
 			##Resource Info section
 			#Specify at which row in the sheet to start adding the data
 			$ExcelStartRow = 8
-			#Specify with which column in the sheet to start
-			$ExcelColNum = 1
-			#Set counter used for row retrieval
-			$RowNum = 0
-
-			#List of columns that should be returned from the data set
-			$DataSetCols = @("logical_cpu_cores", "physical_cpu_cores", "physical_memory_GB", "max_server_memory_GB", "target_server_memory_GB",
-				"total_memory_used_GB", "buffer_pool_usage_GB", "process_physical_memory_low", "process_virtual_memory_low", "available_physical_memory_GB", "os_memory_state" , "CTP", "MAXDOP")
-
-			if ($DebugInfo) {
-				Write-Host " ->Writing resource info to Excel" -fore yellow
-			}
-			#Loop through each Excel row
-			foreach ($row in $ResourceInfoTbl) {
-				<#
-				Loop through each data set column of current row and fill the corresponding 
-				Excel cell
-				#>
-				foreach ($col in $DataSetCols) {
-					[string]$DebugCol = $col
-					[string]$DebugValue = $ResourceInfoTbl.Rows[$RowNum][$col]			
-					#Fill Excel cell with value from the data set
-					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ResourceInfoTbl.Rows[$RowNum][$col]
-					$ExcelColNum += 1
-				}
-
-				#move to the next row in the spreadsheet
-				$ExcelStartRow += 1
-				#move to the next row in the data set
-				$RowNum += 1
-				# reset Excel column number so that next row population begins with column 1
-				$ExcelColNum = 1
-			}
+			Convert-TableToExcel $ResourceInfoTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo
 
 			##Top 10 clients by connections section
 			#Specify at which row in the sheet to start adding the data
 			$ExcelStartRow = 14
-			#Specify with which column in the sheet to start
-			$ExcelColNum = 1
-			#Set counter used for row retrieval
-			$RowNum = 0
-
-			#List of columns that should be returned from the data set
-			$DataSetCols = @("Database", "connections_count", "login_name", "client_host_name", "client_IP", "Protocol", 
-				"oldest_connection_time", "Program")
-
-			if ($DebugInfo) {
-				Write-Host " ->Writing Top 10 clients by connections to Excel" -fore yellow
-			}
-			#Loop through each Excel row
-			foreach ($row in $ConnectionsInfoTbl) {
-				<#
-				Loop through each data set column of current row and fill the corresponding 
-				Excel cell
-				#>
-				foreach ($col in $DataSetCols) {
-					[string]$DebugCol = $col
-					[string]$DebugValue = $ConnectionsInfoTbl.Rows[$RowNum][$col]			
-					#Fill Excel cell with value from the data set
-					#if (($col -eq "OldestConnectionTime" -and ($ConnectionsInfoTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value))) {
-					#	$DateForExcel = $ConnectionsInfoTbl.Rows[$RowNum][$col] | Get-Date
-					#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-					#}
-					#else {
-					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $ConnectionsInfoTbl.Rows[$RowNum][$col]
-					#}
-					$ExcelColNum += 1
-				}
-
-				#move to the next row in the spreadsheet
-				$ExcelStartRow += 1
-				#move to the next row in the data set
-				$RowNum += 1
-				# reset Excel column number so that next row population begins with column 1
-				$ExcelColNum = 1
-			}
+			Convert-TableToExcel $ConnectionsInfoTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo
 
 			#Session level options
 			$ExcelStartRow = 14
 			$ExcelColNum = 10
-			$RowNum = 0
-
-			$DataSetCols = @("Option", "Session_Setting", "Instance_Setting", "Description", "URL")
-			if ($DebugInfo) {
-				Write-Host " ->Writing Session level options to Excel" -fore yellow
-			}
-			#Loop through each Excel row
-			foreach ($row in $SessOptTbl) {
-				<#
-				Loop through each data set column of current row and fill the corresponding 
-				Excel cell
-				#>
-				foreach ($col in $DataSetCols) {			
-					[string]$DebugCol = $col
-					[string]$DebugValue = $SessOptTbl.Rows[$RowNum][$col]
-					#Fill Excel cell with value from the data set
-					if ($col -eq "URL") {
-						if ($SessOptTbl.Rows[$RowNum][$col] -like "http*") {
-							$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 10),
-								$SessOptTbl.Rows[$RowNum][$col], "", "Click for more info",
-								$SessOptTbl.Rows[$RowNum]["Option"]) | Out-Null
-						}
-					}
-					else { 
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $SessOptTbl.Rows[$RowNum][$col]
-					}
-					$ExcelColNum += 1
-				}
-
-				#move to the next row in the spreadsheet
-				$ExcelStartRow += 1
-				#move to the next row in the data set
-				$RowNum += 1
-				# reset Excel column number so that next row population begins with column 1
-				$ExcelColNum = 10
-			}
+			Convert-TableToExcel $SessOptTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -StartCol $ExcelColNum -URLCols "URL" -MapURLToCol 10 -URLTextCol "Option"
 
 			##Saving file 
-			$ExcelFile.Save()
+			Save-ExcelFile $ExcelFile
 		}
 		##Cleaning up variables
 		Invoke-ClearVariables ResourceInfoTbl, InstanceInfoTbl, ConnectionsInfoTbl, SessOptTbl, PSBlitzSet
@@ -2073,36 +1962,14 @@ $htmlTable4
 		$TempDBSessTbl = $global:PSBlitzSet.Tables[2]
 
 		if ($ToHTML -eq "Y") {
-			if ($DebugInfo) {
-				Write-Host " ->Converting TempDB info to HTML" -fore yellow
-			}
-			#$htmlTable1 = $TempDBTbl | Select-Object @{Name = "Data Files"; Expression = { $_."data_files" } },
-			#@{Name = "Total Size MB"; Expression = { $_."total_size_MB" } },
-			#@{Name = "Free Space MB"; Expression = { $_."free_space_MB" } },
-			#@{Name = "% Free"; Expression = { $_."percent_free" } },
-			#@{Name = "Internal Objects MB"; Expression = { $_."internal_objects_MB" } },
-			#@{Name = "User Objects MB"; Expression = { $_."user_objects_MB" } },
-			#@{Name = "Version Store MB"; Expression = { $_."version_store_MB" } } | ConvertTo-Html -As Table -Fragment
-			#$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="TempdbInfoTbl">'
-			$htmlTable1 = Convert-TableToHtml $TempDBTbl -CSSClass "TempdbInfoTbl"
 
-			if ($DebugInfo) {
-				Write-Host " ->Converting TempDB table info to HTML" -fore yellow
-			}
-			#$htmlTable2 = $TempTabTbl | Select-Object @{Name = "Table Name"; Expression = { $_."table_name" } }, 
-			#@{Name = "Rows"; Expression = { $_."rows" } },
-			#@{Name = "Used Space MB"; Expression = { $_."used_space_MB" } }, 
-			#@{Name = "Reserved Space MB"; Expression = { $_."reserved_space_MB" } } | ConvertTo-Html -As Table -Fragment
-			$htmlTable2 = Convert-TableToHtml $TempTabTbl
-			if ($DebugInfo) {
-				Write-Host " ->Converting TempDB session usage info to HTML" -fore yellow
-			}
+			$htmlTable1 = Convert-TableToHtml $TempDBTbl -CSSClass "TempdbInfoTbl" -DebugInfo:$DebugInfo
+
+			$htmlTable2 = Convert-TableToHtml $TempTabTbl -DebugInfo:$DebugInfo
+
 			#Add query name column
-			#adding query name
-			#$TempDBSessTbl.Columns.Add("Query", [string]) | Out-Null
 			$RowNum = 0
-			$i = 0
-		
+			$i = 0		
 			foreach ($row in $TempDBSessTbl) {
 				if ($TempDBSessTbl.Rows[$RowNum]["query_text"] -ne [System.DBNull]::Value) {
 					$i += 1
@@ -2113,26 +1980,14 @@ $htmlTable4
 				$TempDBSessTbl.Rows[$RowNum]["query"] = $QueryName
 				$RowNum += 1
 			}
-			#$htmlTable3 = $TempDBSessTbl | Select-Object @{Name = "Session ID"; Expression = { $_."session_id" } },
-			#@{Name = "Request ID"; Expression = { $_."request_id" } },
-			#"Query",
-			#@{Name = "Database Name"; Expression = { $_."database" } },
-			#@{Name = "Total Allocation User Objects MB"; Expression = { $_."total_allocation_user_objects_MB" } },
-			#@{Name = "Net Allocation User Objects MB"; Expression = { $_."net_allocation_user_objects_MB" } },
-			#@{Name = "Total Allocation Internal Objects MB"; Expression = { $_."total_allocation_internal_objects_MB" } },
-			#@{Name = "Net Allocation Internal Objects MB"; Expression = { $_."net_allocation_internal_objects_MB" } },
-			#@{Name = "Total Allocation MB"; Expression = { $_."total_allocation_MB" } },
-			#@{Name = "Net Allocation MB"; Expression = { $_."net_allocation_MB" } },
-			##@{Name = "Query Text"; Expression = { $_."query_text" } },
-			#@{Name = "Query Hash"; Expression = { Get-HexString -HexInput $_."query_hash" } },
-			#@{Name = "Query Plan Hash"; Expression = { Get-HexString -HexInput $_."query_plan_hash" } } | ConvertTo-Html -As Table -Fragment
-			$htmlTable3 = Convert-TableToHtml $TempDBSessTbl -ExclCols "query_text"
 			
-			$QExt = '.query'
-			$FileSOrder = "TempDB"
-			$AnchorRegex = "$FileSOrder(_\d+)$QExt"
-			$AnchorURL = '<a href="#$&">$&</a>'
-			$htmlTable3 = $htmlTable3 -replace $AnchorRegex, $AnchorURL
+			$htmlTable3 = Convert-TableToHtml $TempDBSessTbl -ExclCols "query_text" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorID "TempDB"
+			
+			#$QExt = '.query'
+			#$FileSOrder = "TempDB"
+			#$AnchorRegex = "$FileSOrder(_\d+)$QExt"
+			#$AnchorURL = '<a href="#$&">$&</a>'
+			#$htmlTable3 = $htmlTable3 -replace $AnchorRegex, $AnchorURL
 
 			$htmlTable4 = $TempDBSessTbl | Select-Object "Query", 
 			@{Name = "Query Text"; Expression = { $_."query_text" } } | Where-Object -FilterScript { $_."Query Text" -ne [System.DBNull]::Value }  | ConvertTo-Html -As Table -Fragment
@@ -5909,32 +5764,33 @@ finally {
 				elseif ($IsAzureSQLDB) {
 					$HtmlTabName += " for $ASDBName"
 				}
-				$htmlTable = $BlitzWhoTbl | Select-Object @{Name = "CheckDate"; Expression = { if ($_."CheckDate" -ne [System.DBNull]::Value) { ($_."CheckDate").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."CheckDate" } } }, 
-				@{Name = "start_time"; Expression = { if ($_."start_time" -ne [System.DBNull]::Value) { ($_."start_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."start_time" } } },
-				"elapsed_time", "database_name", "session_id", "blocking_session_id",
-				#"query_text", 
-				"query_cost", @{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } }, "status", 
-				"cached_parameter_info", "wait_info", "top_session_waits",
-				"open_transaction_count", "is_implicit_transaction",
-				"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
-				"fix_parameter_sniffing", "client_interface_name", 
-				@{Name = "login_time"; Expression = { if ($_."login_time" -ne [System.DBNull]::Value) { ($_."login_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."login_time" } } }, 
-				@{Name = "request_time"; Expression = { if ($_."request_time" -ne [System.DBNull]::Value) { ($_."request_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_time" } } }, 
-				"request_cpu_time", "request_logical_reads", "request_writes",
-				"request_physical_reads", "session_cpu", "session_logical_reads",
-				"session_physical_reads", "session_writes", "tempdb_allocations_mb", 
-				"memory_usage", "estimated_completion_time", "percent_complete", 
-				"deadlock_priority", "transaction_isolation_level", "degree_of_parallelism",
-				"grant_time", 
-				"requested_memory_kb", "grant_memory_kb", "is_request_granted",
-				"required_memory_kb", "query_memory_grant_used_memory_kb", "ideal_memory_kb",
-				"is_small", "timeout_sec", "resource_semaphore_id", "wait_order", "wait_time_ms",
-				"next_candidate_for_memory_grant", "target_memory_kb", "max_target_memory_kb",
-				"total_memory_kb", "available_memory_kb", "granted_memory_kb",
-				"query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
-				"timeout_error_count", "forced_grant_count", "workload_group_name",
-				"resource_pool_name" | ConvertTo-Html -As Table -Fragment
-				$htmlTable = $htmlTable -replace '<table>', '<table class="sortable">'
+				#$htmlTable = $BlitzWhoTbl | Select-Object @{Name = "CheckDate"; Expression = { if ($_."CheckDate" -ne [System.DBNull]::Value) { ($_."CheckDate").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."CheckDate" } } }, 
+				#@{Name = "start_time"; Expression = { if ($_."start_time" -ne [System.DBNull]::Value) { ($_."start_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."start_time" } } },
+				#"elapsed_time", "database_name", "session_id", "blocking_session_id",
+				##"query_text", 
+				#"query_cost", @{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } }, "status", 
+				#"cached_parameter_info", "wait_info", "top_session_waits",
+				#"open_transaction_count", "is_implicit_transaction",
+				#"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
+				#"fix_parameter_sniffing", "client_interface_name", 
+				#@{Name = "login_time"; Expression = { if ($_."login_time" -ne [System.DBNull]::Value) { ($_."login_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."login_time" } } }, 
+				#@{Name = "request_time"; Expression = { if ($_."request_time" -ne [System.DBNull]::Value) { ($_."request_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_time" } } }, 
+				#"request_cpu_time", "request_logical_reads", "request_writes",
+				#"request_physical_reads", "session_cpu", "session_logical_reads",
+				#"session_physical_reads", "session_writes", "tempdb_allocations_mb", 
+				#"memory_usage", "estimated_completion_time", "percent_complete", 
+				#"deadlock_priority", "transaction_isolation_level", "degree_of_parallelism",
+				#"grant_time", 
+				#"requested_memory_kb", "grant_memory_kb", "is_request_granted",
+				#"required_memory_kb", "query_memory_grant_used_memory_kb", "ideal_memory_kb",
+				#"is_small", "timeout_sec", "resource_semaphore_id", "wait_order", "wait_time_ms",
+				#"next_candidate_for_memory_grant", "target_memory_kb", "max_target_memory_kb",
+				#"total_memory_kb", "available_memory_kb", "granted_memory_kb",
+				#"query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
+				#"timeout_error_count", "forced_grant_count", "workload_group_name",
+				#"resource_pool_name" | ConvertTo-Html -As Table -Fragment
+				#$htmlTable = $htmlTable -replace '<table>', '<table class="sortable">'
+				$htmlTable = Convert-TableToHtml $BlitzWhoTbl -CSSClass "sortable" 
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
 				</head>
@@ -5958,7 +5814,7 @@ finally {
 					Write-Host " ->Converting sp_BlitzWho aggregate output to HTML" -fore yellow
 				}
 
-				$BlitzWhoAggTbl.Columns.Add("Query", [string]) | Out-Null
+				#$BlitzWhoAggTbl.Columns.Add("Query", [string]) | Out-Null
 				$RowNum = 0
 				$i = 0
 			
@@ -5981,55 +5837,57 @@ finally {
 					$HtmlTabName += " for $ASDBName"
 				}
 				#Aggregate session table
-				$htmlTable = $BlitzWhoAggTbl | Select-Object @{Name = "start_time"; Expression = { if ($_."start_time" -ne [System.DBNull]::Value) { ($_."start_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."start_time" } } }, 
-				"elapsed_time", "database_name", "session_id", "blocking_session_id",  
-				#"query_text", 
-				"Query",
-				"outer_command", "query_cost", "sqlplan_file", "status", 
-				"cached_parameter_info", "wait_info", "top_session_waits",
-				"open_transaction_count", "is_implicit_transaction",
-				"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
-				"fix_parameter_sniffing", "client_interface_name", 
-				@{Name = "login_time"; Expression = { if ($_."login_time" -ne [System.DBNull]::Value) { ($_."login_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."login_time" } } }, 
-				@{ Name = "request_time"; Expression = { if ($_."request_time" -ne [System.DBNull]::Value) { ($_."request_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_time" } } }, 
-				"request_cpu_time", "request_logical_reads", "request_writes",
-				"request_physical_reads", "session_cpu", "session_logical_reads",
-				"session_physical_reads", "session_writes", "tempdb_allocations_mb", 
-				"memory_usage", 
-				"estimated_completion_time", 
-				"percent_complete", 
-				"deadlock_priority", "transaction_isolation_level", "degree_of_parallelism", 
-				"grant_time",
-				"requested_memory_kb", "grant_memory_kb", "is_request_granted",
-				"required_memory_kb", "query_memory_grant_used_memory_kb", "ideal_memory_kb",
-				"is_small", "timeout_sec", "resource_semaphore_id", "wait_order", "wait_time_ms",
-				"next_candidate_for_memory_grant", "target_memory_kb", "max_target_memory_kb",
-				"total_memory_kb", "available_memory_kb", "granted_memory_kb",
-				"query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
-				"timeout_error_count", "forced_grant_count", "workload_group_name",
-				"resource_pool_name", 
-				@{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } },
-				@{Name = "query_plan_hash"; Expression = { Get-HexString -HexInput $_."query_plan_hash" } } | ConvertTo-Html -As Table -Fragment
-				$htmlTable = $htmlTable -replace '<table>', '<table class="ActiveSessionsTab sortable">'
-				$QExt = '.query'
-				$FileSOrder = "RunningNow"
-				$AnchorRegex = "$FileSOrder(_\d+)$QExt"
-				$AnchorURL = '<a href="#$&">$&</a>'
-				$htmlTable = $htmlTable -replace $AnchorRegex, $AnchorURL
+				#$htmlTable = $BlitzWhoAggTbl | Select-Object @{Name = "start_time"; Expression = { if ($_."start_time" -ne [System.DBNull]::Value) { ($_."start_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."start_time" } } }, 
+				#"elapsed_time", "database_name", "session_id", "blocking_session_id",  
+				##"query_text", 
+				#"Query",
+				#"outer_command", "query_cost", "sqlplan_file", "status", 
+				#"cached_parameter_info", "wait_info", "top_session_waits",
+				#"open_transaction_count", "is_implicit_transaction",
+				#"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
+				#"fix_parameter_sniffing", "client_interface_name", 
+				#@{Name = "login_time"; Expression = { if ($_."login_time" -ne [System.DBNull]::Value) { ($_."login_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."login_time" } } }, 
+				#@{ Name = "request_time"; Expression = { if ($_."request_time" -ne [System.DBNull]::Value) { ($_."request_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."request_time" } } }, 
+				#"request_cpu_time", "request_logical_reads", "request_writes",
+				#"request_physical_reads", "session_cpu", "session_logical_reads",
+				#"session_physical_reads", "session_writes", "tempdb_allocations_mb", 
+				#"memory_usage", 
+				#"estimated_completion_time", 
+				#"percent_complete", 
+				#"deadlock_priority", "transaction_isolation_level", "degree_of_parallelism", 
+				#"grant_time",
+				#"requested_memory_kb", "grant_memory_kb", "is_request_granted",
+				#"required_memory_kb", "query_memory_grant_used_memory_kb", "ideal_memory_kb",
+				#"is_small", "timeout_sec", "resource_semaphore_id", "wait_order", "wait_time_ms",
+				#"next_candidate_for_memory_grant", "target_memory_kb", "max_target_memory_kb",
+				#"total_memory_kb", "available_memory_kb", "granted_memory_kb",
+				#"query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
+				#"timeout_error_count", "forced_grant_count", "workload_group_name",
+				#"resource_pool_name", 
+				#@{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } },
+				#@{Name = "query_plan_hash"; Expression = { Get-HexString -HexInput $_."query_plan_hash" } } | ConvertTo-Html -As Table -Fragment
+				#$htmlTable = $htmlTable -replace '<table>', '<table class="ActiveSessionsTab sortable">'
+				#$QExt = '.query'
+				#$FileSOrder = "RunningNow"
+				#$AnchorRegex = "$FileSOrder(_\d+)$QExt"
+				#$AnchorURL = '<a href="#$&">$&</a>'
+				#$htmlTable = $htmlTable -replace $AnchorRegex, $AnchorURL
+				$htmlTable = Convert-TableToHtml $BlitzWhoAggTbl -CSSClass "ActiveSessionsTab sortable" -AnchorFromHere -AnchorID "RunningNow" -ExclCols "query_text","query_plan"
 
 				#Query table
-				$htmlTable1 = $BlitzWhoAggTbl | Select-Object "Query", @{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } },
-				"query_text" | Where-Object -FilterScript { $_."query_text" -ne [System.DBNull]::Value } | ConvertTo-Html -As Table -Fragment
-				$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
-				$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
-				$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
+				#$htmlTable1 = $BlitzWhoAggTbl | Select-Object "Query", @{Name = "query_hash"; Expression = { Get-HexString -HexInput $_."query_hash" } },
+				#"query_text" | Where-Object -FilterScript { $_."query_text" -ne [System.DBNull]::Value } | ConvertTo-Html -As Table -Fragment
+				#$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
+				#$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
+				#$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
+				$htmlTable1 = Convert-QueryTableToHtml $BlitzWhoAggTbl -Cols "query","query_text" -AnchorToHere -AnchorID "RunningNow"
 
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
 				</head>
 				<body>
 				<h1 id="top">$HtmlTabName</h1>
-				<h3>Based on session activity captured between $($BtilzWhoStartTime.ToString("yyyy-MM-dd HH:mm:ss")) and $($BtilzWhoEndTime.ToString("yyyy-MM-dd HH:mm:ss")) server time.</h3>
+				<h3>Based on session activity captured between $BtilzWhoStartTime and $BtilzWhoEndTime server time.</h3>
 				<p><a href="#Queries">Jump to query text</a></p>
 				<br>
 				$SortableTable
@@ -6054,144 +5912,146 @@ finally {
 			}
 			else {
 
-				##Populating the "sp_BlitzWho" sheet
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Session Activity - Raw")
-				#Specify at which row in the sheet to start adding the data
-				$ExcelStartRow = $DefaultStartRow
-				#Specify with which column in the sheet to start
-				$ExcelColNum = 1
-				#Set counter used for row retrieval
-				$RowNum = 0
-
-				#List of columns that should be returned from the data set
-				$DataSetCols = @("CheckDate", "start_time", "elapsed_time", "database_name", "session_id",  
-					"blocking_session_id", "query_text", "query_cost", "query_hash", "status", 
-					"cached_parameter_info", "wait_info", "top_session_waits",
-					"open_transaction_count", "is_implicit_transaction",
-					"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
-					"fix_parameter_sniffing", "client_interface_name", "login_time",
-					"request_time", "request_cpu_time", "request_logical_reads", "request_writes",
-					"request_physical_reads", "session_cpu", "session_logical_reads",
-					"session_physical_reads", "session_writes", "tempdb_allocations_mb", 
-					"memory_usage", "estimated_completion_time", "percent_complete", 
-					"deadlock_priority", "transaction_isolation_level", "degree_of_parallelism",
-					"grant_time", "requested_memory_kb", "grant_memory_kb", "is_request_granted",
-					"required_memory_kb", "query_memory_grant_used_memory_kb", "ideal_memory_kb",
-					"is_small", "timeout_sec", "resource_semaphore_id", "wait_order", "wait_time_ms",
-					"next_candidate_for_memory_grant", "target_memory_kb", "max_target_memory_kb",
-					"total_memory_kb", "available_memory_kb", "granted_memory_kb",
-					"query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
-					"timeout_error_count", "forced_grant_count", "workload_group_name",
-					"resource_pool_name")
-
-				if ($DebugInfo) {
-					Write-Host " ->Writing sp_BlitzWho results to Excel" -fore yellow
-				}
-				#Loop through each Excel row
-				foreach ($row in $BlitzWhoTbl) {
+				###Populating the "sp_BlitzWho" sheet
+				#$ExcelSheet = $ExcelFile.Worksheets.Item("Session Activity - Raw")
+				##Specify at which row in the sheet to start adding the data
+				#$ExcelStartRow = $DefaultStartRow
+				##Specify with which column in the sheet to start
+				#$ExcelColNum = 1
+				##Set counter used for row retrieval
+				#$RowNum = 0
+#
+				##List of columns that should be returned from the data set
+				#$DataSetCols = @("CheckDate", "start_time", "elapsed_time", "database_name", "session_id",  
+				#	"blocking_session_id", "query_text", "query_cost", "query_hash", "status", 
+				#	"cached_parameter_info", "wait_info", "top_session_waits",
+				#	"open_transaction_count", "is_implicit_transaction",
+				#	"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
+				#	"fix_parameter_sniffing", "client_interface_name", "login_time",
+				#	"request_time", "request_cpu_time", "request_logical_reads", "request_writes",
+				#	"request_physical_reads", "session_cpu", "session_logical_reads",
+				#	"session_physical_reads", "session_writes", "tempdb_allocations_mb", 
+				#	"memory_usage", "estimated_completion_time", "percent_complete", 
+				#	"deadlock_priority", "transaction_isolation_level", "degree_of_parallelism",
+				#	"grant_time", "requested_memory_kb", "grant_memory_kb", "is_request_granted",
+				#	"required_memory_kb", "query_memory_grant_used_memory_kb", "ideal_memory_kb",
+				#	"is_small", "timeout_sec", "resource_semaphore_id", "wait_order", "wait_time_ms",
+				#	"next_candidate_for_memory_grant", "target_memory_kb", "max_target_memory_kb",
+				#	"total_memory_kb", "available_memory_kb", "granted_memory_kb",
+				#	"query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
+				#	"timeout_error_count", "forced_grant_count")
+#
+				#if ($DebugInfo) {
+				#	Write-Host " ->Writing sp_BlitzWho results to Excel" -fore yellow
+				#}
+				##Loop through each Excel row
+				#foreach ($row in $BlitzWhoTbl) {
 					<#
-			Loop through each data set column of current row and fill the corresponding 
-			Excel cell
-			#>
-					foreach ($col in $DataSetCols) {
-						#Fill Excel cell with value from the data set
-						[string]$DebugCol = $col
-						[string]$DebugValue = $BlitzWhoTbl.Rows[$RowNum][$col]
-						if ("query_hash", "query_plan_hash" -Contains $col) {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $BlitzWhoTbl.Rows[$RowNum][$col]
-						}
-						elseif (("CheckDate", "start_time", "login_time", "request_time" -contains $col) -and ($BlitzWhoTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							
-							$DateForExcel = $BlitzWhoTbl.Rows[$RowNum][$col] | Get-Date
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoTbl.Rows[$RowNum][$col]
-						}
-						$ExcelColNum += 1
-					}
-					#move to the next row in the spreadsheet
-					$ExcelStartRow += 1
-					#move to the next row in the data set
-					$RowNum += 1
-					# reset Excel column number so that next row population begins with column 1
-					$ExcelColNum = 1
-				}
+			Loop# through each data set column of current row and fill the corresponding 
+			Exce#l cell
+			#>#
+				#	foreach ($col in $DataSetCols) {
+				#		#Fill Excel cell with value from the data set
+				#		[string]$DebugCol = $col
+				#		[string]$DebugValue = $BlitzWhoTbl.Rows[$RowNum][$col]
+				#		if ("query_hash", "query_plan_hash" -Contains $col) {
+				#			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $BlitzWhoTbl.Rows[$RowNum][$col]
+				#		}
+				#		elseif (("CheckDate", "start_time", "login_time", "request_time" -contains $col) -and ($BlitzWhoTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+				#			
+				#			$DateForExcel = $BlitzWhoTbl.Rows[$RowNum][$col] | Get-Date
+				#			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+				#		}
+				#		else {
+				#			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoTbl.Rows[$RowNum][$col]
+				#		}
+				#		$ExcelColNum += 1
+				#	}
+				#	#move to the next row in the spreadsheet
+				#	$ExcelStartRow += 1
+				#	#move to the next row in the data set
+				#	$RowNum += 1
+				#	# reset Excel column number so that next row population begins with column 1
+				#	$ExcelColNum = 1
+				#}
 				##Saving file 
+				Convert-TableToExcel $BlitzWhoTbl $ExcelFile.Worksheets.Item("Session Activity - Raw") -StartRow $DefaultStartRow
 				$ExcelFile.Save()
 
-				##Populating the "sp_BlitzWho Aggregate" sheet
+				###Populating the "sp_BlitzWho Aggregate" sheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Session Activity - Aggregated")
-				#Add session capture interval
-				$ExcelSheet.Cells.Item(1, 6) = $BtilzWhoStartTime.ToString("yyyy-MM-dd HH:mm:ss")
-				$ExcelSheet.Cells.Item(1, 8) = $BtilzWhoEndTime.ToString("yyyy-MM-dd HH:mm:ss")
+				##Add session capture interval
+				$ExcelSheet.Cells.Item(1, 6) = $BtilzWhoStartTime
+				$ExcelSheet.Cells.Item(1, 8) = $BtilzWhoEndTime
+#
+				##Specify at which row in the sheet to start adding the data
+				#$ExcelStartRow = 3
+				##Specify with which column in the sheet to start
+				#$ExcelColNum = 1
+				##Set counter used for row retrieval
+				#$RowNum = 0
+#
+				##List of columns that should be returned from the data set
+				#$DataSetCols = @("start_time", "elapsed_time", "database_name", "session_id",
+				#	"blocking_session_id",  
+				#	"query_text", "outer_command", "query_cost", "sqlplan_file", "status", 
+				#	"cached_parameter_info", "wait_info", "top_session_waits",
+				#	"open_transaction_count", "is_implicit_transaction",
+				#	"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
+				#	"fix_parameter_sniffing", "client_interface_name", "login_time", 
+				#	"request_time", "request_cpu_time", "request_logical_reads", "request_writes",
+				#	"request_physical_reads", "session_cpu", "session_logical_reads",
+				#	"session_physical_reads", "session_writes", "tempdb_allocations_mb", 
+				#	"memory_usage", "estimated_completion_time", "percent_complete", 
+				#	"deadlock_priority", "transaction_isolation_level", "degree_of_parallelism",
+				#	"grant_time", "requested_memory_kb", "grant_memory_kb", "is_request_granted",
+				#	"required_memory_kb", "query_memory_grant_used_memory_kb", "ideal_memory_kb",
+				#	"is_small", "timeout_sec", "resource_semaphore_id", "wait_order", "wait_time_ms",
+				#	"next_candidate_for_memory_grant", "target_memory_kb", "max_target_memory_kb",
+				#	"total_memory_kb", "available_memory_kb", "granted_memory_kb",
+				#	"query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
+				#	"timeout_error_count", "forced_grant_count", "workload_group_name",
+				#	"resource_pool_name", "query_hash", "query_plan_hash")
 
-				#Specify at which row in the sheet to start adding the data
-				$ExcelStartRow = 3
-				#Specify with which column in the sheet to start
-				$ExcelColNum = 1
-				#Set counter used for row retrieval
-				$RowNum = 0
+				#if ($DebugInfo) {
+				#	Write-Host " ->Writing sp_BlitzWho aggregate results to Excel" -fore yellow
+				#}
+				##Loop through each Excel row
+				#foreach ($row in $BlitzWhoAggTbl) {
+				#	<#
+			    #     Loop through each data set column of current row and fill the corresponding 
+			    #     Excel cell
+			    #     #>
+				#	foreach ($col in $DataSetCols) {
+				#		[string]$DebugCol = $col
+				#		[string]$DebugValue = $BlitzWhoAggTbl.Rows[$RowNum][$col]
+				#		#Fill Excel cell with value from the data set
+				#		#Properly handling Query Hash and Plan Hash hex values 
+				#		if ("query_hash", "query_plan_hash" -Contains $col) {
+				#			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $BlitzWhoAggTbl.Rows[$RowNum][$col]
+				#			
+				#		}
+				#		elseif (("start_time", "login_time", "request_time" -contains $col) -and ($BlitzWhoAggTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+				#			#$DateTemp is a dumb workaround for a dumb problem that caused the hour to always be 00:00:00
+				#			$DateForExcel = $BlitzWhoAggTbl.Rows[$RowNum][$col] | Get-Date
+				#			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+				#		}
+				#		else {
+				#			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoAggTbl.Rows[$RowNum][$col]
+				#		}
+				#		$ExcelColNum += 1
+				#	}
+				#	#move to the next row in the spreadsheet
+				#	$ExcelStartRow += 1
+				#	#move to the next row in the data set
+				#	$RowNum += 1
+				#	# reset Excel column number so that next row population begins with column 1
+				#	$ExcelColNum = 1
+				#}
+				Convert-TableToExcel $BlitzWhoAggTbl $ExcelSheet -ExclCols "query", "query_plan" -StartRow 3
 
-				#List of columns that should be returned from the data set
-				$DataSetCols = @("start_time", "elapsed_time", "database_name", "session_id",
-					"blocking_session_id",  
-					"query_text", "outer_command", "query_cost", "sqlplan_file", "status", 
-					"cached_parameter_info", "wait_info", "top_session_waits",
-					"open_transaction_count", "is_implicit_transaction",
-					"nt_domain", "host_name", "login_name", "nt_user_name", "program_name",
-					"fix_parameter_sniffing", "client_interface_name", "login_time", 
-					"request_time", "request_cpu_time", "request_logical_reads", "request_writes",
-					"request_physical_reads", "session_cpu", "session_logical_reads",
-					"session_physical_reads", "session_writes", "tempdb_allocations_mb", 
-					"memory_usage", "estimated_completion_time", "percent_complete", 
-					"deadlock_priority", "transaction_isolation_level", "degree_of_parallelism",
-					"grant_time", "requested_memory_kb", "grant_memory_kb", "is_request_granted",
-					"required_memory_kb", "query_memory_grant_used_memory_kb", "ideal_memory_kb",
-					"is_small", "timeout_sec", "resource_semaphore_id", "wait_order", "wait_time_ms",
-					"next_candidate_for_memory_grant", "target_memory_kb", "max_target_memory_kb",
-					"total_memory_kb", "available_memory_kb", "granted_memory_kb",
-					"query_resource_semaphore_used_memory_kb", "grantee_count", "waiter_count",
-					"timeout_error_count", "forced_grant_count", "workload_group_name",
-					"resource_pool_name", "query_hash", "query_plan_hash")
-
-				if ($DebugInfo) {
-					Write-Host " ->Writing sp_BlitzWho aggregate results to Excel" -fore yellow
-				}
-				#Loop through each Excel row
-				foreach ($row in $BlitzWhoAggTbl) {
-					<#
-			Loop through each data set column of current row and fill the corresponding 
-			Excel cell
-			#>
-					foreach ($col in $DataSetCols) {
-						[string]$DebugCol = $col
-						[string]$DebugValue = $BlitzWhoAggTbl.Rows[$RowNum][$col]
-						#Fill Excel cell with value from the data set
-						#Properly handling Query Hash and Plan Hash hex values 
-						if ("query_hash", "query_plan_hash" -Contains $col) {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $BlitzWhoAggTbl.Rows[$RowNum][$col]
-							
-						}
-						elseif (("start_time", "login_time", "request_time" -contains $col) -and ($BlitzWhoAggTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							#$DateTemp is a dumb workaround for a dumb problem that caused the hour to always be 00:00:00
-							$DateForExcel = $BlitzWhoAggTbl.Rows[$RowNum][$col] | Get-Date
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-						}
-						else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzWhoAggTbl.Rows[$RowNum][$col]
-						}
-						$ExcelColNum += 1
-					}
-					#move to the next row in the spreadsheet
-					$ExcelStartRow += 1
-					#move to the next row in the data set
-					$RowNum += 1
-					# reset Excel column number so that next row population begins with column 1
-					$ExcelColNum = 1
-				}
 				##Saving file 
-				$ExcelFile.Save()
+				Save-ExcelFile $ExcelFile
 			}
 		}
 		##Cleaning up variables
@@ -6325,7 +6185,7 @@ finally {
 			$ExcelColNum = 1
 		}
 		##Saving file 
-		$ExcelFile.Save()
+		Save-ExcelFile $ExcelFile
 	}
 
 	#####################################################################################
@@ -6727,7 +6587,7 @@ finally {
 	}
 	
 	if ($ToHTML -ne "Y") {
-		$ExcelFile.Save()
+		Save-ExcelFile $ExcelFile
 		Start-Sleep -Seconds 1
 		$ExcelFile.Close()
 		Start-Sleep -Seconds 1
