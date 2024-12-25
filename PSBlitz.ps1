@@ -789,7 +789,7 @@ function Convert-QueryTableToHtml {
 			$formattedName = if ("current_query", "most_recent_query" -contains $currentColumn) {
 				"Query"
 			} 
-			elseif ("current_sql", "most_recent_sql" -contains $currentColumn) {
+			elseif ("current_sql", "most_recent_sql","query_sql_text" -contains $currentColumn) {
 				"Query Text"
 			}
 			elseif ($currentColumn -like "*_*") {
@@ -2870,11 +2870,11 @@ $JumpToTop
 				}
 				elseif ($SortOrder -like '*Memory*') {
 					$SheetName = $SheetName + "Mem & Recent Comp"
-					$HighlightCol = 52
+					$HighlightCol = 40
 				}
 				elseif ($SortOrder -eq "'Recent compilations'") {
 					$SheetName = $SheetName + "Mem & Recent Comp"
-					$HighlightCol = 38
+					$HighlightCol = 47
 				}
 
 				if ($ToHTML -eq "Y") {
@@ -2895,16 +2895,8 @@ $JumpToTop
 					
 					$htmlTable1 = Convert-TableToHtml $BlitzCacheTbl -NoCaseChange -ExclCols "Query Text", "Query Plan" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs $FileSOrder
 				
-		
-					#$htmlTable2 = $BlitzCacheWarnTbl | Select-Object "Priority", "FindingsGroup", "Finding", "Details", "URL" | Where-Object { $_."Priority" -ne 255 } | ConvertTo-Html -As Table -Fragment
-					#$htmlTable2 = $htmlTable2 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
-					$htmlTable2 = Convert-TableToHtml $BlitzCacheWarnTbl -NoCaseChange -HasURLs
+					$htmlTable2 = Convert-TableToHtml $BlitzCacheWarnTbl -NoCaseChange -HasURLs -DebugInfo:$DebugInfo
 
-					#$htmlTable3 = $BlitzCacheTbl | Select-Object "Query", 
-					#"Query Text" | ConvertTo-Html -As Table -Fragment
-					#$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
-					#$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
-					#$htmlTable3 = $htmlTable3 -replace $AnchorRegex, $AnchorURL
 					$htmlTable3 = Convert-QueryTableToHtml $BlitzCacheTbl -DebugInfo:$DebugInfo -Cols "Query", "Query Text" -AnchorToHere -AnchorID $FileSOrder
 		
 					#pairing up related tables in the same HTML file
@@ -3038,71 +3030,8 @@ $JumpToTop
 					if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'") -or ($SortOrder -eq "'Query Hash'")) {
 						$ExcelStartRow = 17
 					}
-					#Set counter used for row retrieval
-					$RowNum = 0
-					#Set counter for sqlplan file names
-					$SQLPlanNum = 1
-
-					$ExcelColNum = 1
-
-					#define column list to only get the sp_BlitzCache columns that are relevant in this case
-					$DataSetCols = @("Database", "Cost", "Query Text", "SQLPlan File", "Query Type", "Warnings", "Missing Indexes",	"Implicit Conversion Info", "Cached Execution Parameters",
-						"# Executions", "Executions / Minute", "Execution Weight",
-						"% Executions (Type)", "Serial Desired Memory",
-						"Serial Required Memory", "Total CPU (ms)", "Avg CPU (ms)", "CPU Weight", "% CPU (Type)",
-						"Total Duration (ms)", "Avg Duration (ms)", "Duration Weight", "% Duration (Type)",
-						"Total Reads", "Average Reads", "Read Weight", "% Reads (Type)", "Total Writes",
-						"Average Writes", "Write Weight", "% Writes (Type)", "Total Rows", "Avg Rows", "Min Rows", "Max Rows",
-						"Minimum Memory Grant KB", "Maximum Memory Grant KB", "Minimum Used Grant KB", "Maximum Used Grant KB",
-						"Average Max Memory Grant", "Min Spills", "Max Spills", "Total Spills", "Avg Spills",
-						"# Plans", "# Distinct Plans", "Created At", "Last Execution", "Last Completion",
-						"Query Hash", "Query Plan Hash",
-						"SET Options", "Cached Plan Size (KB)", "Compile Time (ms)", "Compile CPU (ms)",
-						"Compile memory (KB)""Minimum Memory Grant KB",
-					
-						"Remove Plan Handle From Cache", "Remove SQL Handle From Cache")
-					if ($DebugInfo) {
-						Write-Host " ->Writing sp_BlitzCache results to sheet $SheetName" -fore yellow
-					}
-					foreach ($row in $BlitzCacheTbl) {
-						#Loop through each column from $DataSetCols for curent row and retrieve data from 
-						foreach ($col in $DataSetCols) {
-							[string]$DebugCol = $col
-							[string]$DebugValue = $BlitzCacheTbl.Rows[$RowNum][$col]
-							#Properly handling Query Hash, Plan Hash, Plan, and SQL Handle hex values 
-							#if ("Query Hash", "Query Plan Hash", "Plan Handle", "SQL Handle" -Contains $col) {
-							#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = Get-HexString -HexInput $BlitzCacheTbl.Rows[$RowNum][$col]
-							#	#move to the next column
-							#	#$ExcelColNum += 1
-							#	#move to the top of the loop
-							#	Continue
-							#}elseif
-							if ($BlitzCacheTbl.Rows[$RowNum][$col] -eq "<?NoNeedToClickMe -- N/A --?>") {
-								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = "   -- N/A --   "
-								#move to the next column
-								#$ExcelColNum += 1
-								#move to the top of the loop
-								#Continue
-							}
-							#elseif (("Created At", "Last Execution" -contains $col) -and ($BlitzCacheTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							#	$DateForExcel = $BlitzCacheTbl.Rows[$RowNum][$col] | Get-Date
-							#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-							#}
-							else {			
-								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzCacheTbl.Rows[$RowNum][$col]
-							}
-							#move to the next column
-							$ExcelColNum += 1			
-						
-						}
-
-						#move to the next row in the spreadsheet
-						$ExcelStartRow += 1
-						#move to the next row in the data set
-						$RowNum += 1
-						# reset Excel column number so that next row population begins with column 1
-						$ExcelColNum = 1
-					}
+	
+					Convert-TableToExcel $BlitzCacheTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -ExclCols "Query", "Query Plan"
 
 					####Plan Cache warning
 					$SheetName = "Plan Cache Warnings"
@@ -3116,11 +3045,6 @@ $JumpToTop
 					if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'")) {
 						$ExcelStartRow = 36
 					}
-					#Set counter used for row retrieval
-					$RowNum = 0
-					#Set counter for sqlplan file names
-					$SQLPlanNum = 1
-
 
 					if ($SortOrder -like '*CPU*') {
 						$ExcelWarnInitCol = 1
@@ -3153,40 +3077,9 @@ $JumpToTop
 					$ExcelURLCol = $ExcelWarnInitCol + 2
 					$ExcelColNum = $ExcelWarnInitCol
 
-					#define column list to only get the sp_BlitzCache columns that are relevant in this case
-					$DataSetCols = @("Priority", "FindingsGroup", "Finding", "Details", "URL")
-					if ($DebugInfo) {
-						Write-Host " ->Writing sp_BlitzCache results to sheet $SheetName" -fore yellow
-					}
-					foreach ($row in $BlitzCacheWarnTbl) {
-						#Loop through each column from $DataSetCols for curent row and retrieve data from 
-						foreach ($col in $DataSetCols) {
-							if ($col -eq "URL") {
-								if ($BlitzCacheWarnTbl.Rows[$RowNum][$col] -like "http*") {
-									$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, $ExcelURLCol),
-										$BlitzCacheWarnTbl.Rows[$RowNum][$col], "", "Click for more info",
-										$BlitzCacheWarnTbl.Rows[$RowNum]["Finding"]) | Out-Null
-								}
-							}
-							else {
-								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzCacheWarnTbl.Rows[$RowNum][$col] 
-							} 
-							#move to the next column
-							$ExcelColNum += 1			
-						}
-
-						#move to the next row in the spreadsheet
-						$ExcelStartRow += 1
-						#move to the next row in the data set
-						$RowNum += 1
-						# reset Excel column number so that next row population begins with column 1
-						$ExcelColNum = $ExcelWarnInitCol
-						if ($RowNum -eq 31) {
-							Continue
-						}
-					}
+					Convert-TableToExcel $BlitzCacheWarnTbl $ExcelSheet -StartRow $ExcelStartRow -StartCol $ExcelWarnInitCol -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum $ExcelURLCol -URLTextCol "Finding"
 					##Saving file 
-					$ExcelFile.Save()
+					Save-ExcelFile $ExcelFile
 				}	
 				##Cleaning up variables 
 				Invoke-ClearVariables BlitzCacheWarnTbl, BlitzCacheTbl, PSBlitzSet
@@ -3372,13 +3265,11 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					if ($DebugInfo) {
 						Write-Host " ->Exporting execution plans" -fore yellow
 					}
-					#Add column to table 
-					#$BlitzQSTbl.Columns.Add("SQLPlan File", [string]) | Out-Null
+
 					#Set counter used for row retrieval
 					$RowNum = 0
 					#Setting $i to 0
-					$i = 0
-				
+					$i = 0				
 					foreach ($row in $BlitzQSTbl) {
 						#Increment file name counter	
 						$i += 1
@@ -3395,11 +3286,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				
 					if ($ToHTML -eq "Y") {
 					
-						#adding query name
-						#$BlitzQSTbl.Columns.Add("Query", [string]) | Out-Null
 						$RowNum = 0
-						$i = 0
-			
+						$i = 0			
 						foreach ($row in $BlitzQSTbl) {
 							if ($BlitzQSTbl.Rows[$RowNum]["query_sql_text"] -ne [System.DBNull]::Value) {
 								$i += 1
@@ -3409,70 +3297,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 							$BlitzQSTbl.Rows[$RowNum]["Query"] = $QueryName
 							$RowNum += 1
 						}
-						if ($DebugInfo) {
-							Write-Host " ->Converting sp_BlitzQueryStore output to HTML" -fore yellow
-						}
-						#$htmlTable1 = $BlitzQSTbl | Select-Object @{Name = "Database"; Expression = { ($_."database_name") } },
-						#@{Name = "Query Cost"; Expression = { ($_."query_cost") } },
-						#@{Name = "PlanID"; Expression = { ($_."plan_id") } },
-						#@{Name = "QueryID"; Expression = { ($_."query_id") } },
-						#@{Name = "QueryID all PlanIDs"; Expression = { ($_."query_id_all_plan_ids") } },
-						#"Query",
-						#@{Name = "Proc or Function"; Expression = { ($_."proc_or_function_name") } },
-						#"SQLPlan File",
-						#@{Name = "Warnings"; Expression = { ($_."warnings") } },
-						#@{Name = "Pattern"; Expression = { ($_."pattern") } },
-						#@{Name = "Parameter Sniffing Symptoms"; Expression = { ($_."parameter_sniffing_symptoms") } },
-						#@{Name = "Top Three Waits"; Expression = { ($_."top_three_waits") } },
-						#@{Name = "Missing Indexes"; Expression = { ($_."missing_indexes").Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
-						#@{Name = "Implicit Conversion Info"; Expression = { ($_."implicit_conversion_info").Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
-						#@{Name = "Cached Exec Parameters"; Expression = { ($_."cached_execution_parameters").Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
-						#@{Name = "Executions"; Expression = { ($_."count_executions") } },
-						#@{Name = "Compiles"; Expression = { ($_."count_compiles") } },
-						#@{Name = "Total CPU Time(ms)"; Expression = { ($_."total_cpu_time") } },
-						#@{Name = "Avg CPU Time(ms)"; Expression = { ($_."avg_cpu_time") } },
-						#@{Name = "Total Duration(ms)"; Expression = { ($_."total_duration") } },
-						#@{Name = "Avg Duration(ms)"; Expression = { ($_."avg_duration") } },
-						#@{Name = "Total Logical IO Reads MB"; Expression = { ($_."total_logical_io_reads") } },
-						#@{Name = "Avg Logical IO Reads MB"; Expression = { ($_."avg_logical_io_reads") } },
-						#@{Name = "Total Physical IO Reads MB"; Expression = { ($_."total_physical_io_reads") } },
-						#@{Name = "Avg Physical IO Reads MB"; Expression = { ($_."avg_physical_io_reads") } },
-						#@{Name = "Total Logical IO Writes MB"; Expression = { ($_."total_logical_io_writes") } },
-						#@{Name = "Avg Logical IO Writes MB"; Expression = { ($_."avg_logical_io_writes") } },
-						#@{Name = "Total Rows"; Expression = { ($_."total_rowcount") } },
-						#@{Name = "Avg Rows"; Expression = { ($_."avg_rowcount") } },
-						#@{Name = "Total Query Max Used Memory MB"; Expression = { ($_."total_query_max_used_memory") } },
-						#@{Name = "Avg Query Max Used Memory MB"; Expression = { ($_."avg_query_max_used_memory") } },
-						#@{Name = "Total TempDB Used MB"; Expression = { ($_."total_tempdb_space_used") } },
-						#@{Name = "Avg TempDB Used MB"; Expression = { ($_."avg_tempdb_space_used") } },
-						#@{Name = "Total log bytes used"; Expression = { ($_."total_log_bytes_used") } },
-						#@{Name = "Avg log bytes used"; Expression = { ($_."avg_log_bytes_used") } },
-						#@{Name = "Total Num Physical IO Reads"; Expression = { ($_."total_num_physical_io_reads") } },
-						#@{Name = "Avg Num Physical IO Reads"; Expression = { ($_."avg_num_physical_io_reads") } },
-						#@{Name = "First Exec Time"; Expression = { if ($_."first_execution_time" -ne [System.DBNull]::Value) { ($_."first_execution_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."first_execution_time" } } },
-						#@{Name = "Last Exec Time"; Expression = { if ($_."last_execution_time" -ne [System.DBNull]::Value) { ($_."last_execution_time").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."last_execution_time" } } },
-						#@{Name = "Last Force Failure Reasson"; Expression = { ($_."last_force_failure_reason_desc") } },
-						#@{Name = "Context Settings"; Expression = { ($_."context_settings") } } | ConvertTo-Html -As Table -Fragment
-						$QExt = '.query'
-						$FileSOrder = "QueryStore"
-						$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan_xml" -CSSClass "QueryStoreTab sortable" -AnchorFromHere -AnchorIDs $FileSOrder -AnchorExt $QExt
 
+						$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan_xml" -CSSClass "QueryStoreTab sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
 
-						#$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="QueryStoreTab sortable">'
-					
-						#$AnchorRegex = "$FileSOrder(_\d+)$QExt"
-						#$AnchorURL = '<a href="#$&">$&</a>'
-						#$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
+						$htmlTable2 = Convert-TableToHtml $BlitzQSSumTbl -HasURLs -DebugInfo:$DebugInfo
 
-						#$htmlTable2 = $BlitzQSSumTbl | Select-Object "Priority", "FindingsGroup", "Finding", "Details", "URL" | ConvertTo-Html -As Table -Fragment
-						#$htmlTable2 = $htmlTable2 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
-						$htmlTable2 = Convert-TableToHtml $BlitzQSSumTbl -HasURLs
-
-						$htmlTable3 = $BlitzQSTbl | Select-Object "Query", 
-						@{Name = "Query Text"; Expression = { ($_."query_sql_text") } } | ConvertTo-Html -As Table -Fragment
-						$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
-						$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
-						$htmlTable3 = $htmlTable3 -replace $AnchorRegex, $AnchorURL
+						$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
 
 						if ($IsAzureSQLDB) {
 							$HtmlTabName = "sp_BlitzQueryStore results for $ASDBName"
@@ -3510,98 +3340,14 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						$ExcelSheet = $ExcelFile.Worksheets.Item("Query Store Info")
 						#Specify at which row in the sheet to start adding the data
 						$ExcelStartRow = $DefaultStartRow
-						#Specify with which column in the sheet to start
-						$ExcelColNum = 1
-						#Set counter used for row retrieval
-						$RowNum = 0
-
-						$DataSetCols = @("Priority", "FindingsGroup", "Finding", "Details", "URL")
-
-						if ($DebugInfo) {
-							Write-Host " ->Writing sp_BlitzQueryStore summary to Excel" -fore yellow
-						}
-						#Loop through each Excel row
-						foreach ($row in $BlitzQSSumTbl) {
-							foreach ($col in $DataSetCols) {
-								if ($col -eq "URL") {
-									#Make URLs clickable
-									if ($BlitzQSSumTbl.Rows[$RowNum][$col] -like "http*") {
-										$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 3),
-											$BlitzQSSumTbl.Rows[$RowNum][$col], "", "Click for more info",
-											$BlitzQSSumTbl.Rows[$RowNum]["Finding"]) | Out-Null
-									}
-								}
-								else {
-									$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzQSSumTbl.Rows[$RowNum][$col]
-								}
-								#move to the next column
-								$ExcelColNum += 1
-							}
-				
-							#move to the next row in the spreadsheet
-							$ExcelStartRow += 1
-							#move to the next row in the data set
-							$RowNum += 1
-							# reset Excel column number so that next row population begins with column 1
-							$ExcelColNum = 1
-						}
+						
+						Convert-TableToExcel $BlitzQSSumTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
 				
 						##Saving file 
-						$ExcelFile.Save()
+						Save-ExcelFile $ExcelFile
 
-						if ($DebugInfo) {
-							Write-Host " ->Writing sp_BlitzQueryStore info to Excel" -fore yellow
-						}
-
-
-						$DataSetCols = @("database_name", "query_cost", "plan_id", "query_id", "query_id_all_plan_ids", "query_sql_text",
-							"proc_or_function_name", "SQLPlan File", "warnings", "pattern", "parameter_sniffing_symptoms",
-							"top_three_waits", "missing_indexes", "implicit_conversion_info", "cached_execution_parameters",
-							"count_executions", "count_compiles", "total_cpu_time", "avg_cpu_time", "total_duration", "avg_duration",
-							"total_logical_io_reads", "avg_logical_io_reads", "total_physical_io_reads", "avg_physical_io_reads",
-							"total_logical_io_writes", "avg_logical_io_writes", "total_rowcount", "avg_rowcount", "total_query_max_used_memory",
-							"avg_query_max_used_memory", "total_tempdb_space_used", "avg_tempdb_space_used", "total_log_bytes_used", "avg_log_bytes_used",
-							"total_num_physical_io_reads", "avg_num_physical_io_reads", "first_execution_time", "last_execution_time",
-							"last_force_failure_reason_desc", "context_settings")
-						
-						## QS info
-						#Specify at which row in the sheet to start adding the data
-						$ExcelStartRow = $DefaultStartRow
-						#Specify with which column in the sheet to start
-						$ExcelColNum = 7
-						#Set counter used for row retrieval
-						$RowNum = 0
-						foreach ($row in $BlitzQSTbl) {
-							foreach ($col in $DataSetCols) {
-								[string]$DebugCol = $col
-								[string]$DebugValue = $BlitzQSTbl.Rows[$RowNum][$col]
-								#if ($BlitzQSTbl.Rows[$RowNum][$col] -eq "<?NoNeedToClickMe -- N/A --?>") {
-								#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = "   -- N/A --   "
-								#	#move to the next column
-								#	#$ExcelColNum += 1
-								#	#move to the top of the loop
-								#	#Continue
-								#}
-								#elseif (("first_execution_time", "last_execution_time" -Contains $col ) -and ($BlitzQSTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-								#	$DateForExcel = $BlitzQSTbl.Rows[$RowNum][$col] | Get-Date
-								#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-								#}
-								#else {
-								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzQSTbl.Rows[$RowNum][$col]
-								#}
-								#move to the next column
-								$ExcelColNum += 1
-							}
-
-							#move to the next row in the spreadsheet
-							$ExcelStartRow += 1
-							#move to the next row in the data set
-							$RowNum += 1
-							#Move to the next sqlplan file
-							$SQLPlanNum += 1
-							# reset Excel column number so that next row population begins with column 1
-							$ExcelColNum = 7
-						}
+						Convert-TableToExcel $BlitzQSTbl $ExcelSheet -StartRow $DefaultStartRow -StartCol 7 -DebugInfo:$DebugInfo -ExclCols "query_plan_xml","query"
+						Save-ExcelFile $ExcelFile
 					
 					}
 					Invoke-ClearVariables BlitzQSTbl, BlitzQSSumTbl, PSBlitzSet
@@ -3690,7 +3436,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					if ($DebugInfo) {
 						Write-Host " ->Exporting missing index sample execution plans (if any)" -fore yellow
 					}
-					#$BlitzIxTbl.Columns.Add("Sample Plan File", [string]) | Out-Null
+					
 					$RowNum = 0
 					$i = 0
 					foreach ($row in $BlitzIxTbl) {
@@ -3732,100 +3478,16 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		
 					if ("0", "4" -Contains $Mode) {					
 
-						#if (([string]::IsNullOrEmpty($CheckDB)) -and ($RecordsReturned -gt 30000)) {
-						#	Write-Host "  ->More than 30k records returned `n  ->limiting output to databases found in the plan cache results and excluding priority 250."
-						#	Add-LogRow "->sp_BlitzIndex mode $Mode" "More than 30k records" "Output limited to databases found in the plan cache results and excluded priority 250"
-						#	$htmlTable = $BlitzIxTbl | Select-Object "Priority", "Finding", "Database Name", 
-						#	"Details: schema.table.index(indexid)",   
-						#	"Definition", 
-						#	"Secret Columns", "Usage", "Size", "Create TSQL", "Sample Plan File", "URL" |  Where-Object -FilterScript { ($DBArray -contains $_."Database Name") -and ($_."Priority" -ne 250) -and ($_."Finding" -NotLike "sp_BlitzIndex*") } | ConvertTo-Html -As Table -Fragment
-						#
-						#}
-						#else {
-						#	$htmlTable = $BlitzIxTbl | Select-Object "Priority", "Finding", "Database Name", 
-						#	"Details: schema.table.index(indexid)",   
-						#	"Definition", 
-						#	"Secret Columns", "Usage", "Size", "Create TSQL", "Sample Plan File", "URL" | Where-Object "Finding" -NotLike "sp_BlitzIndex*" | ConvertTo-Html -As Table -Fragment
-						#}
-						$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols "Sample Query Plan" -NoCaseChange -HasURLs -TblID "IndexUsgTable"
-						#don't pay attention to that table id, it lies because it's late and I'm lazy
-						#$htmlTable = $htmlTable -replace '<table>', '<table id="IndexUsgTable">'		
-						#$htmlTable = $htmlTable -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
+						$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols "Sample Query Plan" -NoCaseChange -HasURLs -TblID "IndexUsgTable" -DebugInfo:$DebugInfo
+			
 					}
 					elseif ($Mode -eq "1") {
-						#$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Number Objects", "All GB", 
-						#"LOB GB", "Row Overflow GB", "Clustered Tables", 
-						#"Clustered Tables GB", "NC Indexes", "NC Indexes GB", 
-						#"ratio table: NC Indexes", "Heaps", "Heaps GB", "Partitioned Tables", 
-						#"Partitioned NCs", "Partitioned GB", "Filtered Indexes", 
-						#"Indexed Views", "Max Row Count", "Max Table GB", "Max NC Index GB", 
-						#"Count Tables > 1GB", "Count Tables > 10GB", "Count Tables > 100GB", 
-						#"Count NCs > 1GB", "Count NCs > 10GB", "Count NCs > 100GB", 
-						#@{Name = "Oldest Create Date"; Expression = { if ($_."Oldest Create Date" -ne [System.DBNull]::Value) { ($_."Oldest Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Oldest Create Date" } } }, 
-						#@{Name = "Most Recent Create Date"; Expression = { if ($_."Most Recent Create Date" -ne [System.DBNull]::Value) { ($_."Most Recent Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Most Recent Create Date" } } }, 
-						#@{Name = "Most Recent Modify Date"; Expression = { if ($_."Most Recent Modify Date" -ne [System.DBNull]::Value) { ($_."Most Recent Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Most Recent Modify Date" } } } | Where-Object "Number Objects" -NotLike "sp_BlitzIndex*" | ConvertTo-Html -As Table -Fragment
-						#$htmlTable = $htmlTable -replace '<table>', '<table id="IndexSummaryTable">'
-						$htmlTable = Convert-TableToHtml $BlitzIxTbl -NoCaseChange -TblID "IndexSummaryTable" -ExclCols "Display Order"
+
+						$htmlTable = Convert-TableToHtml $BlitzIxTbl -NoCaseChange -TblID "IndexSummaryTable" -ExclCols "Display Order" -DebugInfo:$DebugInfo
 					}
 					elseif ($Mode -eq "2") {
-						#$BlitzIxTbl.Columns["Definition: [Property] ColumnName {datatype maxbytes}"].ColumnName = "Definition"
-						#if (([string]::IsNullOrEmpty($CheckDB)) -and ($RecordsReturned -gt 30000)) {
-						#	Write-Host "  ->More than 30k records returned `n  ->limiting output to first 30k records based on databases found in the plan cache results."
-						#	Add-LogRow "->sp_BlitzIndex mode $Mode" "More than 30k records" "Output limited to first 30k records based on databases found in the plan cache results"
-						#	$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Schema Name", "Object Name", 
-						#	"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
-						#	"Object Type", "Definition", 
-						#	"Key Column Names With Sort", "Count Key Columns", "Include Column Names", 
-						#	"Count Included Columns", "Secret Column Names", "Count Secret Columns", 
-						#	"Partition Key Column Name", "Filter Definition", "Is Indexed View", 
-						#	"Is Primary Key", "Is XML", "Is Spatial", "Is NC Columnstore", 
-						#	"Is CX Columnstore", "Is Disabled", "Is Hypothetical", "Is Padded", 
-						#	"Fill Factor", "Is Reference by Foreign Key", 
-						#	@{Name = "Last User Seek"; Expression = { if ($_."Last User Seek" -ne [System.DBNull]::Value) { ($_."Last User Seek").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Seek" } } }, 
-						#	@{Name = "Last User Scan"; Expression = { if ($_."Last User Scan" -ne [System.DBNull]::Value) { ($_."Last User Scan").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Scan" } } }, 
-						#	@{Name = "Last User Lookup"; Expression = { if ($_."Last User Lookup" -ne [System.DBNull]::Value) { ($_."Last User Lookup").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Lookup" } } }, 
-						#	@{Name = "Last User Update"; Expression = { if ($_."Last User Update" -ne [System.DBNull]::Value) { ($_."Last User Update").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Update" } } }, 
-						#	"Total Reads", 
-						#	"User Updates", "Reads Per Write", "Index Usage", "Partition Count", 
-						#	"Rows", "Reserved MB", "Reserved LOB MB", "Reserved Row Overflow MB", 
-						#	"Index Size", "Row Lock Count", "Row Lock Wait Count", "Row Lock Wait ms", 
-						#	"Avg Row Lock Wait ms", "Page Lock Count", "Page Lock Wait Count", 
-						#	"Page Lock Wait ms", "Avg Page Lock Wait ms", "Lock Escalation Attempts", 
-						#	"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
-						#	"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
-						#	@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
-						#	@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } } | 
-						#	Where-Object -FilterScript { $DBArray -contains $_."Database Name" } | Select-Object -First 30000 | ConvertTo-Html -As Table -Fragment
-						#}
-						#else {
-						#	$htmlTable = $BlitzIxTbl | Select-Object "Database Name", "Schema Name", "Object Name", 
-						#	"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
-						#	"Object Type", "Definition", 
-						#	"Key Column Names With Sort", "Count Key Columns", "Include Column Names", 
-						#	"Count Included Columns", "Secret Column Names", "Count Secret Columns", 
-						#	"Partition Key Column Name", "Filter Definition", "Is Indexed View", 
-						#	"Is Primary Key", "Is XML", "Is Spatial", "Is NC Columnstore", 
-						#	"Is CX Columnstore", "Is Disabled", "Is Hypothetical", "Is Padded", 
-						#	"Fill Factor", "Is Reference by Foreign Key", 
-						#	@{Name = "Last User Seek"; Expression = { if ($_."Last User Seek" -ne [System.DBNull]::Value) { ($_."Last User Seek").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Seek" } } }, 
-						#	@{Name = "Last User Scan"; Expression = { if ($_."Last User Scan" -ne [System.DBNull]::Value) { ($_."Last User Scan").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Scan" } } }, 
-						#	@{Name = "Last User Lookup"; Expression = { if ($_."Last User Lookup" -ne [System.DBNull]::Value) { ($_."Last User Lookup").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Lookup" } } }, 
-						#	@{Name = "Last User Update"; Expression = { if ($_."Last User Update" -ne [System.DBNull]::Value) { ($_."Last User Update").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last User Update" } } }, 
-						#	"Total Reads", 
-						#	"User Updates", "Reads Per Write", "Index Usage", "Partition Count", 
-						#	"Rows", "Reserved MB", "Reserved LOB MB", "Reserved Row Overflow MB", 
-						#	"Index Size", "Row Lock Count", "Row Lock Wait Count", "Row Lock Wait ms", 
-						#	"Avg Row Lock Wait ms", "Page Lock Count", "Page Lock Wait Count", 
-						#	"Page Lock Wait ms", "Avg Page Lock Wait ms", "Lock Escalation Attempts", 
-						#	"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
-						#	"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
-						#	@{Name = "Create Date"; Expression = { if ($_."Create Date" -ne [System.DBNull]::Value) { ($_."Create Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Create Date" } } }, 
-						#	@{Name = "Modify Date"; Expression = { if ($_."Modify Date" -ne [System.DBNull]::Value) { ($_."Modify Date").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Modify Date" } } } | 
-						#	ConvertTo-Html -As Table -Fragment
-						#}
-						##add table specify style
-						#$htmlTable = $htmlTable -replace '<table>', '<table id="IndexUsgTable" class="IndexUsageTable sortable">'
-						$htmlTable = Convert-TableToHtml $BlitzIxTbl -TblID "IndexUsgTable" -CSSClass "IndexUsageTable sortable" -NoCaseChange
+
+						$htmlTable = Convert-TableToHtml $BlitzIxTbl -TblID "IndexUsgTable" -CSSClass "IndexUsageTable sortable" -NoCaseChange -DebugInfo:$DebugInfo
 					}
 		
 					$html = $HTMLPre + @"
@@ -3874,96 +3536,101 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					#Specify worksheet
 					$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
 					if ("0", "4" -Contains $Mode) {
-						$DataSetCols = @("Priority", "Finding", "Database Name", 
-							"Details",   
-							"Definition", 
-							"Secret Columns", "Usage", "Size", "Create TSQL", "Sample Plan File", "URL")
-					}
-					elseif ($Mode -eq "1") {
-						$DataSetCols = @("Database Name", "Number Objects", "All GB", 
-							"LOB GB", "Row Overflow GB", "Clustered Tables", 
-							"Clustered Tables GB", "NC Indexes", "NC Indexes GB", 
-							"ratio table: NC Indexes", "Heaps", "Heaps GB", "Partitioned Tables", 
-							"Partitioned NCs", "Partitioned GB", "Filtered Indexes", 
-							"Indexed Views", "Max Row Count", "Max Table GB", "Max NC Index GB", 
-							"Count Tables > 1GB", "Count Tables > 10GB", "Count Tables > 100GB", 
-							"Count NCs > 1GB", "Count NCs > 10GB", "Count NCs > 100GB", 
-							"Oldest Create Date", "Most Recent Create Date", 
-							"Most Recent Modify Date")
-					}
-					elseif ($Mode -eq "2") {
-						$DataSetCols = @("Database Name", "Schema Name", "Object Name", 
-							"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
-							"Object Type", "Definition", 
-							"Key Column Names With Sort", "Count Key Columns", "Include Column Names", 
-							"Count Included Columns", "Secret Column Names", "Count Secret Columns", 
-							"Partition Key Column Name", "Filter Definition", "Is Indexed View", 
-							"Is Primary Key", "Is XML", "Is Spatial", "Is NC Columnstore", 
-							"Is CX Columnstore", "Is Disabled", "Is Hypothetical", "Is Padded", 
-							"Fill Factor", "Is Reference by Foreign Key", "Last User Seek", 
-							"Last User Scan", "Last User Lookup", "Last User Update", "Total Reads", 
-							"User Updates", "Reads Per Write", "Index Usage", "Partition Count", 
-							"Rows", "Reserved MB", "Reserved LOB MB", "Reserved Row Overflow MB", 
-							"Index Size", "Row Lock Count", "Row Lock Wait Count", "Row Lock Wait ms", 
-							"Avg Row Lock Wait ms", "Page Lock Count", "Page Lock Wait Count", 
-							"Page Lock Wait ms", "Avg Page Lock Wait ms", "Lock Escalation Attempts", 
-							"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
-							"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
-							"Create Date", "Modify Date")
-					}
-					#Specify at which row in the sheet to start adding the data
-					$ExcelStartRow = $DefaultStartRow
-					#Specify starting record from the data set
-					$RowNum = 0
-					#Specify at which column of the current $initRow of the sheet to start adding the data
-					$ExcelColNum = 1
+						#$DataSetCols = @("Priority", "Finding", "Database Name", 
+						#	"Details",   
+						#	"Definition", 
+						#	"Secret Columns", "Usage", "Size", "Create TSQL", "Sample Plan File", "URL")
+						Convert-TableToExcel $BlitzIxTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -ExclCols "Sample Query Plan" -URLCols "URL" -MapURLToColNum 2 -URLTextCol "Finding"
 
-					#Loop through each Excel row
-					if ($DebugInfo) {
-						Write-Host " ->Writing sp_BlitzIndex results to sheet $SheetName" -fore yellow
 					}
-					foreach ($row in $BlitzIxTbl) {
+					#elseif ($Mode -eq "1") {
+					#	$DataSetCols = @("Database Name", "Number Objects", "All GB", 
+					#		"LOB GB", "Row Overflow GB", "Clustered Tables", 
+					#		"Clustered Tables GB", "NC Indexes", "NC Indexes GB", 
+					#		"ratio table: NC Indexes", "Heaps", "Heaps GB", "Partitioned Tables", 
+					#		"Partitioned NCs", "Partitioned GB", "Filtered Indexes", 
+					#		"Indexed Views", "Max Row Count", "Max Table GB", "Max NC Index GB", 
+					#		"Count Tables > 1GB", "Count Tables > 10GB", "Count Tables > 100GB", 
+					#		"Count NCs > 1GB", "Count NCs > 10GB", "Count NCs > 100GB", 
+					#		"Oldest Create Date", "Most Recent Create Date", 
+					#		"Most Recent Modify Date")
+					#}
+					#elseif ($Mode -eq "2") {
+					#	$DataSetCols = @("Database Name", "Schema Name", "Object Name", 
+					#		"Index Name", "Index ID", "Details: schema.table.index(indexid)", 
+					#		"Object Type", "Definition", 
+					#		"Key Column Names With Sort", "Count Key Columns", "Include Column Names", 
+					#		"Count Included Columns", "Secret Column Names", "Count Secret Columns", 
+					#		"Partition Key Column Name", "Filter Definition", "Is Indexed View", 
+					#		"Is Primary Key", "Is XML", "Is Spatial", "Is NC Columnstore", 
+					#		"Is CX Columnstore", "Is Disabled", "Is Hypothetical", "Is Padded", 
+					#		"Fill Factor", "Is Reference by Foreign Key", "Last User Seek", 
+					#		"Last User Scan", "Last User Lookup", "Last User Update", "Total Reads", 
+					#		"User Updates", "Reads Per Write", "Index Usage", "Partition Count", 
+					#		"Rows", "Reserved MB", "Reserved LOB MB", "Reserved Row Overflow MB", 
+					#		"Index Size", "Row Lock Count", "Row Lock Wait Count", "Row Lock Wait ms", 
+					#		"Avg Row Lock Wait ms", "Page Lock Count", "Page Lock Wait Count", 
+					#		"Page Lock Wait ms", "Avg Page Lock Wait ms", "Lock Escalation Attempts", 
+					#		"Lock Escalations", "Page Latch Wait Count", "Page Latch Wait ms", 
+					#		"Page IO Latch Wait Count", "Page IO Latch Wait ms", "Data Compression", 
+					#		"Create Date", "Modify Date")
+					#}
+				else {
+					Convert-TableToExcel $BlitzIxTbl $ExcelSheet -StartRow $DefaultStartRow -ExclCols "Display Order" -DebugInfo:$DebugInfo
+				}
+				##Specify at which row in the sheet to start adding the data
+				#$ExcelStartRow = $DefaultStartRow
+				##Specify starting record from the data set
+				#$RowNum = 0
+				##Specify at which column of the current $initRow of the sheet to start adding the data
+				#$ExcelColNum = 1
 
-						#Loop through each data set column of current row and fill the corresponding 
-						# Excel cell
-						foreach ($col in $DataSetCols) {
-							[string]$DebugCol = $col
-							[string]$DebugValue = $BlitzIxTbl.Rows[$RowNum][$col]
-							if ($col -eq "URL") {
-								if ($BlitzIxTbl.Rows[$RowNum][$col] -like "http*") {
-									$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 2),
-										$BlitzIxTbl.Rows[$RowNum][$col], "", "Click for more info",
-										$BlitzIxTbl.Rows[$RowNum]["Finding"]) | Out-Null
-								}
-							}
-							#elseif (("Oldest Create Date", "Most Recent Create Date", "Most Recent Modify Date", "Last User Seek", 
-							#		"Last User Scan", "Last User Lookup", "Last User Update", "Create Date", "Modify Date" -contains $col) -and ($BlitzIxTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							#	$DateForExcel = $BlitzIxTbl.Rows[$RowNum][$col] | Get-Date
-							#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
+				##Loop through each Excel row
+				#if ($DebugInfo) {
+				#	Write-Host " ->Writing sp_BlitzIndex results to sheet $SheetName" -fore yellow
+				#}
+				#foreach ($row in $BlitzIxTbl) {
 
-							#}
-							else {
-								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzIxTbl.Rows[$RowNum][$col]
-							}
-							#move to the next column
-							$ExcelColNum += 1
-						}
+				#	#Loop through each data set column of current row and fill the corresponding 
+				#	# Excel cell
+				#	foreach ($col in $DataSetCols) {
+				#		[string]$DebugCol = $col
+				#		[string]$DebugValue = $BlitzIxTbl.Rows[$RowNum][$col]
+				#		if ($col -eq "URL") {
+				#			if ($BlitzIxTbl.Rows[$RowNum][$col] -like "http*") {
+				#				$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 2),
+				#					$BlitzIxTbl.Rows[$RowNum][$col], "", "Click for more info",
+				#					$BlitzIxTbl.Rows[$RowNum]["Finding"]) | Out-Null
+				#			}
+				#		}
+				#		#elseif (("Oldest Create Date", "Most Recent Create Date", "Most Recent Modify Date", "Last User Seek", 
+				#		#		"Last User Scan", "Last User Lookup", "Last User Update", "Create Date", "Modify Date" -contains $col) -and ($BlitzIxTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
+				#		#	$DateForExcel = $BlitzIxTbl.Rows[$RowNum][$col] | Get-Date
+				#		#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
 
-						#move to the next row in the spreadsheet
-						$ExcelStartRow += 1
-						#move to the next row in the data set
-						$RowNum += 1
-						# reset Excel column number so that next row population begins with column 1
-						$ExcelColNum = 1
-						#Exit this loop if $RowNum > 10000
-						if ($RowNum -eq 10001) {
-							Add-LogRow " ->sp_BlitzIndex mode $Mode" "Limited export to Excel" "10k record limit has been reached."
-							Break
-						}
-					}
+				#		#}
+				#		else {
+				#			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzIxTbl.Rows[$RowNum][$col]
+				#		}
+				#		#move to the next column
+				#		$ExcelColNum += 1
+				#	}
+
+				#	#move to the next row in the spreadsheet
+				#	$ExcelStartRow += 1
+				#	#move to the next row in the data set
+				#	$RowNum += 1
+				#	# reset Excel column number so that next row population begins with column 1
+				#	$ExcelColNum = 1
+				#	#Exit this loop if $RowNum > 10000
+				#	if ($RowNum -eq 10001) {
+				#		Add-LogRow " ->sp_BlitzIndex mode $Mode" "Limited export to Excel" "10k record limit has been reached."
+				#		Break
+				#	}
+				#}
 			
 					##Saving file 
-					$ExcelFile.Save()
+					Save-ExcelFile $ExcelFile
 				}
 				##Cleaning up variables
 				Invoke-ClearVariables BlitzIxTbl, PSBlitzSet
@@ -4120,7 +3787,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					#@{Name = "Tran Name"; Expression = { $_."transaction_name" } } | ConvertTo-Html -As Table -Fragment
 					#$htmlTable2 = $htmlTable2 -replace '<table>', '<table id="DeadlockDtlTable" class="DeadlockDetailsTable">'
 
-					$QExt = '.query'
+					
 					#$AnchorRegex = "DL(\d+)Q(\d+)V{0,}$QExt"
 					#$AnchorURL = '<a href="#$&">$&</a>'
 					#$htmlTable2 = $htmlTable2 -replace $AnchorRegex, $AnchorURL
@@ -4333,7 +4000,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					#Set counter used for row retrieval
 					$RowNum = 0
 					#Set counter for sqlplan file names
-					$SQLPlanNum = 1
+					#$SQLPlanNum = 1
 
 					#List of columns that should be returned from the data set
 					$DataSetCols = @("database_name", "query_text", "sqlplan_file", "creation_time",
