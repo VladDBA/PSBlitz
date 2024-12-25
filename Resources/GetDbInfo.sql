@@ -111,8 +111,6 @@ SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],CONVERT(VARCHAR(25),d.[cr
                   + N' WHEN f.[type] = 0 THEN ( CAST(f.size AS BIGINT) * 8 / 1024.00 / 1024.00 )'
                   + @LineFeed
                   + N' ELSE 0.00 END) AS NUMERIC(23, 3))  AS [DataFilesSizeGB],'
-				  + @LineFeed
-				  + N'bpi.[CachedSizeMB],bpi.[BufferPool%],'
                   + @LineFeed
                   + N'SUM(CASE WHEN f.[type] = 1 THEN 1 ELSE 0 END) AS [LogFiles],'
                   + @LineFeed
@@ -131,6 +129,8 @@ SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],CONVERT(VARCHAR(25),d.[cr
                   + N'CAST(SUM(CAST(f.size AS BIGINT) * 8 / 1024.00 / 1024.00) AS NUMERIC(23, 3))'
                   + @LineFeed
                   + N'+ ISNULL(fs.FSFilesSizeGB, 0.000) AS [DatabaseSizeGB],'
+				  + @LineFeed
+				  + N'bpi.[CachedSizeMB],bpi.[BufferPool%],'
                   + @LineFeed
                   + N'd.[log_reuse_wait_desc] AS [CurrentLogReuseWait],'
                   + @LineFeed

@@ -1997,7 +1997,7 @@ $htmlTable4
 			
 			$htmlTable3 = Convert-TableToHtml $TempDBSessTbl -ExclCols "query_text" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs "TempDB"
 			
-			$htmlTable4 = Convert-QueryTableToHtml $htmlTable4 -DebugInfo:$DebugInfo -Cols "query", "query_text" -AnchorToHere -AnchorID "TempDB"
+			$htmlTable4 = Convert-QueryTableToHtml $TempDBSessTbl -DebugInfo:$DebugInfo -Cols "query", "query_text" -AnchorToHere -AnchorID "TempDB"
 
 			$HtmlTabName = "TempDB Info"
 
@@ -2572,47 +2572,9 @@ $htmlTable
 
 				##Populating the "sp_BlitzFirst 30s" sheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Happening Now")
-				#Specify at which row in the sheet to start adding the data
-				$ExcelStartRow = $DefaultStartRow
-				#Specify with which column in the sheet to start
-				$ExcelColNum = 1
-				#Set counter used for row retrieval
-				$RowNum = 0
-
-				$DataSetCols = @("Priority", "FindingsGroup", "Finding", "Details", "URL")
-
-				if ($DebugInfo) {
-					Write-Host " ->Writing sp_BlitzFirst results to Excel" -fore yellow
-				}
-				#Loop through each Excel row
-				foreach ($row in $BlitzFirstTbl) {
-					#Loop through each data set column of current row and fill the corresponding 
-					# Excel cell
-					foreach ($col in $DataSetCols) {
-						#Fill Excel cell with value from the data set
-						if ($col -eq "URL") {
-							if ($BlitzFirstTbl.Rows[$RowNum][$col] -like "http*") {
-								$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 3),
-									$BlitzFirstTbl.Rows[$RowNum][$col], "", "Click for more info",
-									$BlitzFirstTbl.Rows[$RowNum]["Finding"]) | Out-Null
-							}
-						}
-						else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $BlitzFirstTbl.Rows[$RowNum][$col]
-						}
-						#move to the next column
-						$ExcelColNum += 1
-					}
-
-					#move to the next row in the spreadsheet
-					$ExcelStartRow += 1
-					#move to the next row in the data set
-					$RowNum += 1
-					# reset Excel column number so that next row population begins with column 1
-					$ExcelColNum = 1
-				}
+				Convert-TableToExcel $BlitzFirstTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
 				##Saving file 
-				$ExcelFile.Save()
+				Save-ExcelFile $ExcelFile
 			}
 			Invoke-ClearVariables BlitzFirstTbl, PSBlitzSet
 		}
@@ -2637,9 +2599,6 @@ $htmlTable
 
 				if ($ToHTML -eq "Y") {
 					#Waits
-					if ($DebugInfo) {
-						Write-Host " ->Converting wait stats info to HTML" -fore yellow
-					}
 					$HtmlTabName = "Wait Stats Since Last Startup"
 
 					$htmlTable = Convert-TableToHtml $WaitsTbl -NoCaseChange -HasURLs -CSSClass "WaitStats" -DebugInfo:$DebugInfo
@@ -2710,153 +2669,25 @@ $JumpToTop
 				}
 				else { 
 					##Populating the "Wait Stats" sheet
-					$ExcelSheet = $ExcelFile.Worksheets.Item("Wait Stats")
-					#Specify at which row in the sheet to start adding the data
-					$ExcelStartRow = $DefaultStartRow
-					#Specify with which column in the sheet to start
-					$ExcelColNum = 1
-					#Set counter used for row retrieval
-					$RowNum = 0
-
-					$DataSetCols = @("Sample Ended", "Hours Sample", "Thread Time (Hours)",
-						"wait_type", "wait_category", "Wait Time (Hours)", "Per Core Per Hour", 
-						"Signal Wait Time (Hours)", "Percent Signal Waits", "Number of Waits",
-						"Avg ms Per Wait", "URL")
-
-					if ($DebugInfo) {
-						Write-Host " ->Writing sp_BlitzFirst results to sheet Wait Stats" -fore yellow
-					}
-					#Loop through each Excel row
-					foreach ($row in $WaitsTbl) {
-						#Loop through each data set column of current row and fill the corresponding 
-						# Excel cell
-						foreach ($col in $DataSetCols) {
-							[string]$DebugCol = $col
-							[string]$DebugValue = $WaitsTbl.Rows[$RowNum][$col]
-							if ($col -eq "URL") {
-								#Make URLs clickable
-								if ($WaitsTbl.Rows[$RowNum][$col] -like "http*") {
-									$ExcelSheet.Hyperlinks.Add($ExcelSheet.Cells.Item($ExcelStartRow, 5),
-										$WaitsTbl.Rows[$RowNum][$col], "", "Click for more info",
-										$WaitsTbl.Rows[$RowNum]["wait_type"]) | Out-Null
-								}
-							}
-							#elseif (($col -eq "Sample Ended") -and ($WaitsTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							#	#$DateTemp is a dumb workaround for a dumb problem that caused the hour to always be 00:00:00
-							#	[string]$DateTemp = $WaitsTbl.Rows[$RowNum][$col]
-							#	$DateForExcel = $DateTemp | Get-Date
-							#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-							#}
-							else {
-								$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $WaitsTbl.Rows[$RowNum][$col]
-							}
-							#move to the next column
-							$ExcelColNum += 1
-						}
-
-						#move to the next row in the spreadsheet
-						$ExcelStartRow += 1
-						#move to the next row in the data set
-						$RowNum += 1
-						# reset Excel column number so that next row population begins with column 1
-						$ExcelColNum = 1
-					}
+					$ExcelSheet = $ExcelFile.Worksheets.Item("Wait Stats")					
+					Convert-TableToExcel $WaitsTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 5 -URLTextCol "wait_type"
 
 					##Saving file 
-					$ExcelFile.Save()
+					Save-ExcelFile $ExcelFile
+
 					## populating the "Storage" sheet
-					$ExcelSheet = $ExcelFile.Worksheets.Item("Storage Stats")
-					#Specify at which row in the sheet to start adding the data
-					$ExcelStartRow = $DefaultStartRow
-					#Specify with which column in the sheet to start
-					$ExcelColNum = 1
-					#Set counter used for row retrieval
-					$RowNum = 0
-
-					$DataSetCols = @("Pattern", "Sample Time", "Sample (seconds)", "File Name",
-						"Drive", "# Reads/Writes", "MB Read/Written", "Avg Stall (ms)", "file physical name",
-						"DatabaseName")
-					if ($DebugInfo) {
-						Write-Host " ->Writing sp_BlitzFirst results to sheet Storage Stats" -fore yellow
-					}
-					#Loop through each Excel row
-					foreach ($row in $StorageTbl) {
-						#Loop through each data set column of current row and fill the corresponding 
-						# Excel cell
-						foreach ($col in $DataSetCols) {
-							[string]$DebugCol = $col
-							[string]$DebugValue = $StorageTbl.Rows[$RowNum][$col]
-							#Fill Excel cell with value from the data set
-							#if (($col -eq "Sample Time") -and ($StorageTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-							#	[string]$DateTemp = $StorageTbl.Rows[$RowNum][$col]
-							#	$DateForExcel = $DateTemp | Get-Date
-							#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-							#}
-							#else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $StorageTbl.Rows[$RowNum][$col]
-							#}
-						
-							#move to the next column
-							$ExcelColNum += 1
-						}
-
-						#move to the next row in the spreadsheet
-						$ExcelStartRow += 1
-						#move to the next row in the data set
-						$RowNum += 1
-						# reset Excel column number so that next row population begins with column 1
-						$ExcelColNum = 1
-					}
+					$ExcelSheet = $ExcelFile.Worksheets.Item("Storage Stats")					
+					Convert-TableToExcel $StorageTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -ExclCols "StallRank"
 
 					##Saving file 
-					$ExcelFile.Save()
+					Save-ExcelFile $ExcelFile
+
 					## populating the "Perfmon" sheet
 					$ExcelSheet = $ExcelFile.Worksheets.Item("Perfmon Stats")
-					#Specify at which row in the sheet to start adding the data
-					$ExcelStartRow = $DefaultStartRow
-					#Specify with which column in the sheet to start
-					$ExcelColNum = 1
-					#Set counter used for row retrieval
-					$RowNum = 0
-
-					$DataSetCols = @("object_name", "counter_name", "instance_name", 
-						"FirstSampleTime", "FirstSampleValue", "LastSampleTime", "LastSampleValue",
-						"ValueDelta", "ValuePerSecond")
-
-					if ($DebugInfo) {
-						Write-Host " ->Writing sp_BlitzFirst results to sheet Perfmon Stats" -fore yellow
-					}
-					#Loop through each Excel row
-					foreach ($row in $PerfmonTbl) {
-						#Loop through each data set column of current row and fill the corresponding 
-						# Excel cell
-						foreach ($col in $DataSetCols) {
-							[string]$DebugCol = $col
-							[string]$DebugValue = $PerfmonTbl.Rows[$RowNum][$col]
-							#Fill Excel cell with value from the data set
-							#if (("FirstSampleTime", "LastSampleTime" -Contains $col) -and ($PerfmonTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value))	{
-							#	[string]$DateTemp = $PerfmonTbl.Rows[$RowNum][$col]
-							#	$DateForExcel = $DateTemp | Get-Date
-							#	$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-							#}
-							#else {
-							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $PerfmonTbl.Rows[$RowNum][$col]
-							#}
-						
-							#move to the next column
-							$ExcelColNum += 1
-						}
-
-						#move to the next row in the spreadsheet
-						$ExcelStartRow += 1
-						#move to the next row in the data set
-						$RowNum += 1
-						# reset Excel column number so that next row population begins with column 1
-						$ExcelColNum = 1
-					}
+					Convert-TableToExcel $PerfmonTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
 		
 					##Saving file 
-					$ExcelFile.Save()
+					Save-ExcelFile $ExcelFile
 				}
 
 				##Cleaning up variables
@@ -2866,8 +2697,7 @@ $JumpToTop
 				Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
 				$BlitzWhoPass += 1
 			}
-		}
-		
+		}		
 
 		#####################################################################################
 		#						sp_BlitzCache												#
@@ -2981,9 +2811,6 @@ $JumpToTop
 				$RowNum = 0
 				#Setting $i to 0
 				$i = 0
-
-				#$BlitzCacheTbl.Columns.Add("SQLPlan File", [string]) | Out-Null
-
 				foreach ($row in $BlitzCacheTbl) {
 					#Increment file name counter	
 					$i += 1
@@ -3035,7 +2862,7 @@ $JumpToTop
 				}
 				elseif ($SortOrder -like '*Spills*') {
 					$SheetName = $SheetName + "Spills"
-					$HighlightCol = 58
+					$HighlightCol = 43
 				}
 				elseif ("'Duplicate'", "'Query Hash'" -contains $SortOrder) {
 					$SheetName = $SheetName + "Dupl & Single Use"
@@ -3055,70 +2882,30 @@ $JumpToTop
 				
 					$RowNum = 0
 					$i = 0
-			
-					#adding query name
-					#$BlitzCacheTbl.Columns.Add("Query", [string]) | Out-Null
-					$RowNum = 0
-					$i = 0
-			
 					foreach ($row in $BlitzCacheTbl) {
 						if ($BlitzCacheTbl.Rows[$RowNum]["Query Text"] -ne [System.DBNull]::Value) {
 							$i += 1
-							$QueryName = $FileSOrder + "_" + $i + ".query"
-					
+							$QueryName = $FileSOrder + "_" + $i + ".query"					
 						}
 						else { $QueryName = "" }
 						$BlitzCacheTbl.Rows[$RowNum]["Query"] = $QueryName
 						$RowNum += 1
 					}
-					if ($DebugInfo) {
-						Write-Host " ->Converting sp_BlitzCache output to HTML" -fore yellow
-					}
 				
-					#$htmlTable1 = $BlitzCacheTbl | Select-Object "Database", "Cost", 
-					#"Query",
-					#"SQLPlan File", 
-					#"Query Type", "Warnings", 
-					#@{Name = "Missing Indexes"; Expression = { $_."Missing Indexes".Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },	
-					#@{Name = "Implicit Conversion Info"; Expression = { $_."Implicit Conversion Info".Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
-					#@{Name = "Cached Execution Parameters"; Expression = { $_."Cached Execution Parameters".Replace('ClickMe', '').Replace('<?NoNeedTo -- N/A --?>', '') } },
-					#"# Executions", "Executions / Minute", "Execution Weight",
-					#"% Executions (Type)", "Serial Desired Memory",
-					#"Serial Required Memory", "Total CPU (ms)", "Avg CPU (ms)", "CPU Weight", "% CPU (Type)",
-					#"Total Duration (ms)", "Avg Duration (ms)", "Duration Weight", "% Duration (Type)",
-					#"Total Reads", "Average Reads", "Read Weight", "% Reads (Type)", "Total Writes",
-					#"Average Writes", "Write Weight", "% Writes (Type)", "Total Rows", "Avg Rows", "Min Rows",
-					#"Max Rows", "# Plans", "# Distinct Plans", 
-					#@{Name = "Created At"; Expression = { if ($_."Created At" -ne [System.DBNull]::Value) { ($_."Created At").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Created At" } } }, 
-					#@{Name = "Last Execution"; Expression = { if ($_."Last Execution" -ne [System.DBNull]::Value) { ($_."Last Execution").ToString("yyyy-MM-dd HH:mm:ss") }else { $_."Last Execution" } } },
-					#"StatementStartOffset", "StatementEndOffset", 
-					#@{Name = "Query Hash"; Expression = { Get-HexString -HexInput $_."Query Hash" } }, 
-					#@{Name = "Query Plan Hash"; Expression = { Get-HexString -HexInput $_."Query Plan Hash" } },
-					#"SET Options", "Cached Plan Size (KB)", "Compile Time (ms)", "Compile CPU (ms)",
-					#"Compile memory (KB)", 
-					#@{Name = "Plan Handle"; Expression = { Get-HexString -HexInput $_."Plan Handle" } }, 
-					#@{Name = "SQL Handle"; Expression = { Get-HexString -HexInput $_."SQL Handle" } }, 
-					#"Minimum Memory Grant KB",
-					#"Maximum Memory Grant KB", "Minimum Used Grant KB", "Maximum Used Grant KB",
-					#"Average Max Memory Grant", "Min Spills", "Max Spills", "Total Spills", "Avg Spills" | ConvertTo-Html -As Table -Fragment
-					$htmlTable1 = Convert-TableToHtml $BlitzCacheTbl -NoCaseChange -ExclCols "Query Text", "Query Plan"
+					
+					$htmlTable1 = Convert-TableToHtml $BlitzCacheTbl -NoCaseChange -ExclCols "Query Text", "Query Plan" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs $FileSOrder
 				
-					#Handling URLs
-					$QExt = '.query'
-					$AnchorRegex = "$FileSOrder(_\d+)$QExt"
-					$AnchorURL = '<a href="#$&">$&</a>'
-					$htmlTable1 = $htmlTable1 -replace $AnchorRegex, $AnchorURL
 		
 					#$htmlTable2 = $BlitzCacheWarnTbl | Select-Object "Priority", "FindingsGroup", "Finding", "Details", "URL" | Where-Object { $_."Priority" -ne 255 } | ConvertTo-Html -As Table -Fragment
 					#$htmlTable2 = $htmlTable2 -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
 					$htmlTable2 = Convert-TableToHtml $BlitzCacheWarnTbl -NoCaseChange -HasURLs
 
-					$htmlTable3 = $BlitzCacheTbl | Select-Object "Query", 
-					"Query Text" | ConvertTo-Html -As Table -Fragment
-					$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
-					$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
-					$htmlTable3 = $htmlTable3 -replace $AnchorRegex, $AnchorURL
-
+					#$htmlTable3 = $BlitzCacheTbl | Select-Object "Query", 
+					#"Query Text" | ConvertTo-Html -As Table -Fragment
+					#$AnchorRegex = "<td>$FileSOrder(_\d+)$QExt"
+					#$AnchorURL = '<td id=' + "$FileSOrder" + '$1' + "$QExt>" + "$FileSOrder" + '$1' + "$QExt"
+					#$htmlTable3 = $htmlTable3 -replace $AnchorRegex, $AnchorURL
+					$htmlTable3 = Convert-QueryTableToHtml $BlitzCacheTbl -DebugInfo:$DebugInfo -Cols "Query", "Query Text" -AnchorToHere -AnchorID $FileSOrder
 		
 					#pairing up related tables in the same HTML file
 					if ("'CPU'", "'Reads'", "'Duration'", "'Executions'", "'Writes'",
