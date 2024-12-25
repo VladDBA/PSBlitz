@@ -106,6 +106,7 @@ SELECT CONVERT(VARCHAR(25),[qcte].[time_of_check],120) AS [time_of_check],
                                                     + '.query'
          ELSE ''
        END                         AS [current_query],
+	   [qcte].[current_sql],
 	   CASE
          WHEN [sqlplan_curr].[query_plan] IS NOT NULL THEN 'OpenTranCurrent_'
                                                            + CAST([qcte].[session_id] AS VARCHAR(10))
@@ -118,6 +119,7 @@ SELECT CONVERT(VARCHAR(25),[qcte].[time_of_check],120) AS [time_of_check],
                                                         + '.query'
          ELSE ''
        END                         AS [most_recent_query],
+	   [qcte].[most_recent_sql],
 	   CASE
          WHEN [sqlplan_rec].[query_plan] IS NOT NULL THEN 'OpenTranRecent_'
                                                           + CAST([qcte].[session_id] AS VARCHAR(10))
@@ -142,9 +144,7 @@ SELECT CONVERT(VARCHAR(25),[qcte].[time_of_check],120) AS [time_of_check],
        [qcte].[login_name],
        [qcte].[program_name],
        [qcte].[client_interface_name],
-       [qcte].[current_sql],
        [sqlplan_curr].[query_plan] AS [current_plan],
-       [qcte].[most_recent_sql],
        [sqlplan_rec].[query_plan]  AS [most_recent_plan]
 FROM   [qcte]
        OUTER APPLY sys.dm_exec_query_plan([qcte].[current_plan_handle]) AS [sqlplan_curr]

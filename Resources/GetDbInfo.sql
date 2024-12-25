@@ -98,7 +98,7 @@ SELECT
 FROM AggBPInfo
 
 /*Return database files and size info*/
-SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],d.[create_date] AS [Created],' AS NVARCHAR(MAX))
+SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],CONVERT(VARCHAR(25),d.[create_date],120) AS [Created],' AS NVARCHAR(MAX))
                   + @LineFeed
                   + N'd.[state_desc] AS [DatabaseState],'
                   + @LineFeed
