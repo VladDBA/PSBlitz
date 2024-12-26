@@ -5556,11 +5556,13 @@ BEGIN
 						br.index_sanity_id=sn.index_sanity_id
 					LEFT JOIN #IndexCreateTsql ts ON 
 						br.index_sanity_id=ts.index_sanity_id
+					WHERE Priority <> -1
 					ORDER BY br.Priority ASC, br.check_id ASC, br.blitz_result_id ASC, br.findings_group ASC
 					OPTION (RECOMPILE);
 					/*Vlad - column changes for PSBlitz - end*/
 					/*Vlad - additional result set to get total count for warning*/
 					SELECT COUNT(1) AS RecordCount FROM #BlitzIndexResults
+					WHERE Priority <> -1
 					OPTION (RECOMPILE);
 					/*Vlad - additional result set to get total count for warning - end*/
 				 END;
@@ -5806,15 +5808,15 @@ BEGIN
 				/*Vlad - date time conversion for PSBlitz*/
 				CONVERT(VARCHAR(25),MIN(create_date),120) AS [Oldest Create Date],
 				CONVERT(VARCHAR(25),MAX(create_date),120) AS [Most Recent Create Date],
-				CONVERT(VARCHAR(25),MAX(modify_date),120) AS [Most Recent Modify Date],
+				CONVERT(VARCHAR(25),MAX(modify_date),120) AS [Most Recent Modify Date]
 				/*Vlad - date time conversion for PSBlitz*/
-				1 AS [Display Order]
+				/*1 AS [Display Order]*/
 			FROM #IndexSanity AS i
 			--left join here so we don't lose disabled nc indexes
 			LEFT JOIN #IndexSanitySize AS sz 
 				ON i.index_sanity_id=sz.index_sanity_id
 			GROUP BY DB_NAME(i.database_id)	 
-			UNION ALL
+			/*UNION ALL
 			SELECT  CASE WHEN @GetAllDatabases = 1 THEN N'All Databases' ELSE N'Database ' + N' as of ' + CONVERT(NVARCHAR(16),GETDATE(),121) END,        
 					@ScriptVersionName,   
 					N'From Your Community Volunteers' ,   
@@ -5823,7 +5825,7 @@ BEGIN
 					NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,
 					NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,
 					NULL,NULL,0 AS display_order
-			ORDER BY [Display Order] ASC
+			ORDER BY [Display Order] ASC*/
 			OPTION (RECOMPILE);
   			END;
 		END;
@@ -6150,7 +6152,7 @@ BEGIN
 					i.[object_name] AS [Object Name], 
 					ISNULL(i.index_name, '') AS [Index Name],
 					CAST(i.index_id AS NVARCHAR(10))AS [Index ID],
-					db_schema_object_indexid AS [Details: schema.table.index(indexid)], 
+					/*db_schema_object_indexid AS [Details: schema.table.index(indexid)],*/
 					CASE    WHEN index_id IN ( 1, 0 ) THEN 'TABLE'
 						ELSE 'NonClustered'
 						END AS [Object Type], 
@@ -6184,11 +6186,11 @@ BEGIN
 					user_updates AS [User Updates], 
 					reads_per_write AS [Reads Per Write], 
 					index_usage_summary AS [Index Usage], 
-					sz.total_singleton_lookup_count AS [Singleton Lookups],
+					/*sz.total_singleton_lookup_count AS [Singleton Lookups],
 					sz.total_range_scan_count AS [Range Scans],
 					sz.total_leaf_delete_count AS [Leaf Deletes],
 					sz.total_leaf_update_count AS [Leaf Updates],
-					sz.index_op_stats AS [Index Op Stats],
+					sz.index_op_stats AS [Index Op Stats],*/
 					sz.partition_count AS [Partition Count],
 					sz.total_rows AS [Rows], 
 					sz.total_reserved_MB AS [Reserved MB], 

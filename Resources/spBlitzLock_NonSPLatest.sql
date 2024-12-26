@@ -3634,7 +3634,7 @@ BEGIN
                     @@SERVERNAME,*/
                 dr.deadlock_type,
                 CONVERT(VARCHAR(25),dr.event_date,120) AS event_date,
-				REPLACE(REPLACE(REPLACE(CONVERT(VARCHAR(25),dr.event_date,120),'':'',''''),'' '',''_''),''-'','''') AS graphfile_date,
+				/*REPLACE(REPLACE(REPLACE(CONVERT(VARCHAR(25),dr.event_date,120),'':'',''''),'' '',''_''),''-'','''') AS graphfile_date,*/
                 database_name =
                     COALESCE
                     (
@@ -3644,7 +3644,8 @@ BEGIN
                     ),
                 dr.spid,
                 dr.deadlock_group,
-                CAST('''' AS VARCHAR(30)) AS deadlock_graph_file,
+                CASE WHEN dr.deadlock_group LIKE ''% - VICTIM'' THEN REPLACE(LEFT(dr.deadlock_group, CHARINDEX('','', dr.deadlock_group) - 1),'' #'',''_'') + ''.xdl''
+				ELSE '''' END AS deadlock_graph_file,
 				REPLACE(REPLACE(REPLACE(dr.deadlock_group,''Deadlock #'',''DL''),'', Query #'',''Q''),'' - VICTIM'',''V'')+''.query'' AS query,
 				' + CASE @ExportToExcel
                          WHEN 1
@@ -3933,7 +3934,7 @@ BEGIN
                 );
              /*Vlad - column changes for PSBlitz*/  
                 SELECT
-                    ap.available_plans,
+                    /*ap.available_plans,*/
                     ap.database_name,
 					CAST('' AS VARCHAR(30)) AS query,
                     query_text = REPLACE(REPLACE(ap.query_xml, N'<?query '+CAST(CHAR(10) AS NVARCHAR(1)),N''),CAST(CHAR(10) AS NVARCHAR(1))+N'   ?>',N''),
@@ -3960,8 +3961,8 @@ BEGIN
                     ap.max_reserved_threads,
                     ap.min_used_threads,
                     ap.max_used_threads,
-                    ap.total_rows,
-                    CONVERT(VARCHAR(256),ap.[sql_handle],1) AS [sql_handle]/*,
+                    ap.total_rows/*,
+                    CONVERT(VARCHAR(256),ap.[sql_handle],1) AS [sql_handle],
                     ap.statement_start_offset,
                     ap.statement_end_offset*/
                 FROM

@@ -187,7 +187,7 @@ Output directory name `[HostName]_[Instance]_[TimeStamp]` for an instance-wide c
 
 Deadlocks will be saved in the Deadlocks directory under the output directory.
 
-Deadlock file naming convention - `[EventDate]_[EventTime]_[RecordNumberOfDistinctDeadlockGroupVictim].xdl`
+Deadlock file naming convention - `Deadlock_[DeadlockNumber].xdl`
 
 Execution plans will be saved in the Plans directory under the output directory.
 
@@ -196,7 +196,7 @@ Execution plans file naming convention:
  - for plans obtained through sp_BlitzIndex (only available in SQL Server 2019 and above) - `MissingIndex_[MissingIndexNumber].sqlplan`.
  - for plans obtained through the open transactions check - `OpenTranCurrent_[SPID].sqlplan` and/or `OpenTranRecent_[SPID].sqlplan`.
  - for plans obtained through sp_BlitzQueryStore - `QueryStore_[RowNumber].sqlplan`
- - for plans obtained through sp_BlitzWho - `RunningNow_[SPID]_[start_time]_[query_plan_hash].sqlplan`. If no query plan hash is returned by sp_BlitzWho, then 0x00 will be used.
+ - for plans obtained through sp_BlitzWho - `RunningNow_[RowNumber].sqlplan`. If no query plan hash is returned by sp_BlitzWho, then 0x00 will be used.
 
 [*Back to top*](#header1)
 
