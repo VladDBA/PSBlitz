@@ -2183,11 +2183,9 @@ $JumpToTop
 </html>
 "@
 
-				if ($DebugInfo) {
-					Write-Host " ->Writing HTML file." -fore yellow
-				}
-				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "OpenTransactions.html" 
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+				#Save HTML file
+				Save-HtmlFile $html "OpenTransactions.html" $HTMLOutDir $DebugInfo
+				Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3
 
 			}
 			else {
@@ -2288,14 +2286,10 @@ $JumpToTop
 </body>
 </html>
 "@
-				if ($DebugInfo) {
-					Write-Host " ->Writing HTML file." -fore yellow
-				}
-				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "AzureSQLDBInfo.html" 
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 
-
-
+				#Save HTML file
+				Save-HtmlFile $html "AzureSQLDBInfo.html" $HTMLOutDir $DebugInfo
+				Invoke-ClearVariables html, htmlTable, htmlTable1, htmlTable2, htmlTable3, htmlTable4, htmlTable5, htmlTable6
 			}
 			else {
 				#Populate the Azure SQL DB Resource Governance section
@@ -2363,7 +2357,7 @@ $JumpToTop
 				Convert-TableToExcel $DBConfigTbl $ExcelSheet -StartRow $ExcelStartRow -StartCol $ExcelColNum -DebugInfo:$DebugInfo
 
 				##Saving file 
-				$ExcelFile.Save()
+				Save-ExcelFile $ExcelFile
 			}
 			Invoke-ClearVariables DBInfoTbl, DBFileInfoTbl, RsrcGovTbl, RsrcUsageTbl, ObjImpUpgrTbl, DBConfigTbl, PSBlitzSet
 		}
@@ -2400,9 +2394,6 @@ $JumpToTop
 
 				$htmlTable = Convert-TableToHtml $DBInfoTbl -NoCaseChange -DebugInfo:$DebugInfo
 				
-				
-				#$htmlTable1 = $DBFileInfoTbl | Select-Object  "Database", "FileID", "FileLogicalName", "FilePhysicalName", "FileType", "State", "SizeGB",
-				#"AvailableSpaceGB", "MaxFileSizeGB", "GrowthIncrement" | ConvertTo-Html -As Table -Fragment
 				$htmlTable1 = Convert-TableToHtml $DBFileInfoTbl -NoCaseChange -TblID "DBFileInfoTable" -CSSClass "sortable" -DebugInfo:$DebugInfo
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable">'
@@ -2410,12 +2401,9 @@ $JumpToTop
 				else {
 					$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable sortable">'
 				}
-				#$htmlTable1 = $htmlTable1 -replace '<table>', '<table id="DBFileInfoTable" class="sortable">'
-				
 
 				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
-					#$htmlTable2 = $DBConfigTbl | Select-Object "Database", "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
-					#$htmlTable2 = $htmlTable2 -replace '<table>', '<table class="sortable">'
+
 					$htmlTable2 = Convert-TableToHtml $DBConfigTbl -NoCaseChange -CSSClass "sortable" -DebugInfo:$DebugInfo
 					$htmlBlock = "`n<br>`n <h2>Database Scoped Configuration for $CheckDB</h2>"
 					$htmlBlock += '<p><a href="https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-scoped-configuration-transact-sql?view=sql-server-ver16" target="_blank">More Info</a></p>'
@@ -2446,11 +2434,10 @@ $htmlBlock
 </body>
 </html>
 "@
-				if ($DebugInfo) {
-					Write-Host " ->Writing HTML file." -fore yellow
-				}
-				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "DatabaseInfo.html" 
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+
+				#Save HTML file
+				Save-HtmlFile $html "DatabaseInfo.html" $HTMLOutDir $DebugInfo
+				Invoke-ClearVariables html, htmlTable, htmlTable1, htmlBlock
 			}
 			else {
 				##Populating the "Database Info" sheet with the database files data first because 
@@ -2478,8 +2465,6 @@ $htmlBlock
 					$ExcelColNum = 2
 				
 					Convert-TableToExcel $DBConfigTbl $ExcelSheet -StartRow $ExcelStartRow -StartCol $ExcelColNum -DebugInfo:$DebugInfo
-
-					
 				}
 				##Saving file 
 				Save-ExcelFile $ExcelFile
@@ -2529,17 +2514,13 @@ $JumpToTop
 </html>
 "@
 
-				if ($DebugInfo) {
-					Write-Host " ->Writing HTML file." -fore yellow
-				} 
-				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "spBlitz.html"
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
-
+				#Save HTML file
+				Save-HtmlFile $html "spBlitz.html" $HTMLOutDir $DebugInfo
+				Invoke-ClearVariables html, htmlTable
 			}
 			else {
 				##Populating the "sp_Blitz" sheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Instance Health")
-				#Specify at which row in the sheet to start adding the data
 					
 				Convert-TableToExcel $BlitzTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
 
@@ -2581,14 +2562,11 @@ $htmlTable
 </html>
 "@
 
-			if ($DebugInfo) {
-				Write-Host " ->Writing HTML file." -fore yellow
-			} 
-			$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzFirst30s.html"
-			$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+			#Save HTML file
+			Save-HtmlFile $html "BlitzFirst30s.html" $HTMLOutDir $DebugInfo
+			Invoke-ClearVariables html, htmlTable
 		}
 		else {
-
 			##Populating the "sp_BlitzFirst 30s" sheet
 			$ExcelSheet = $ExcelFile.Worksheets.Item("Happening Now")
 			Convert-TableToExcel $BlitzFirstTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
@@ -2632,16 +2610,12 @@ $JumpToTop
 </body>
 </html>
 "@
-				if ($DebugInfo) {
-					Write-Host " ->Writing HTML file." -fore yellow
-				} 
-				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzFirst_Waits.html"
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+				#Save HTML file
+				Save-HtmlFile $html "BlitzFirst_Waits.html" $HTMLOutDir $DebugInfo
+				Invoke-ClearVariables html, htmlTable
 			 
 				#Storage
-
 				$HtmlTabName = "Storage Throughput Since Instance Startup"
-
 				$htmlTable = Convert-TableToHtml $StorageTbl -NoCaseChange -TblID "StorageStatsTable" -CSSClass "Storage sortable" -ExclCols "StallRank" -DebugInfo:$DebugInfo
 			 
 				$html = $HTMLPre + @"
@@ -2656,15 +2630,12 @@ $JumpToTop
 </body>
 </html>
 "@
-				if ($DebugInfo) {
-					Write-Host " ->Writing HTML file." -fore yellow
-				} 
-				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzFirst_Storage.html"
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+				#Save HTML file
+				Save-HtmlFile $html "BlitzFirst_Storage.html" $HTMLOutDir $DebugInfo
+				Invoke-ClearVariables html, htmlTable
 			 
 				#Perfmon
 				$HtmlTabName = "Perfmon Stats Since Instance Startup"
-
 				$htmlTable = Convert-TableToHtml $PerfmonTbl -NoCaseChange -TblID "PerfmonTable" -CSSClass "Perfmon sortable" -DebugInfo:$DebugInfo
 			 
 				$html = $HTMLPre + @"
@@ -2680,11 +2651,9 @@ $JumpToTop
 </html>
 "@
 
-				if ($DebugInfo) {
-					Write-Host " ->Writing HTML file." -fore yellow
-				} 
-				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzFirst_Perfmon.html"
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+				#Save HTML file
+				Save-HtmlFile $html "BlitzFirst_Perfmon.html" $HTMLOutDir $DebugInfo
+				Invoke-ClearVariables html, htmlTable
 			}
 			else { 
 				##Populating the "Wait Stats" sheet
