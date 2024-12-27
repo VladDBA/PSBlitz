@@ -357,29 +357,6 @@ else {
 }
 
 ###Functions
-#Function to properly output hex strings like Plan Handle and SQL Handle
-function Get-HexString {
-	param (
-		[System.Array]$HexInput
-	)
-	if ($HexInput -eq [System.DBNull]::Value) {
-		$HexString = ""
-	}
- else {
-		#Formatting value as hex and stripping extra stuff
-		$HexSplit = ($HexInput | Format-Hex -ErrorAction Ignore | Select-String "00000")
-		<#
-	Converting to string, prepending 0x, removing spaces 
-	and joining it in one single string
-	#>
-		$HexString = "0x"
-		for ($i = 0; $i -lt $HexSplit.Length; $i++) {
-			$HexString = $HexString + "$($HexSplit[$i].ToString().Substring(11,47).replace(' ','') )"
-		}
-	}
-	Write-Output $HexString
-}
-
 #Function to return a brief help menu
 function Get-PSBlitzHelp {
 	Write-Host "`n######	PSBlitz		######`n Version $Vers - $VersDate
