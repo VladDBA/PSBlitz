@@ -1690,7 +1690,9 @@ if ($ToHTML -ne "Y") {
 	}
 
 	try {
-		$ExcelApp = New-Object -comobject Excel.Application	-ErrorAction Stop	
+		$ExcelApp = New-Object -comobject Excel.Application	-ErrorAction Stop
+		Write-Host "PSBlitz is writing the report to Excel." -Fore Green
+		Write-Host " Warning: Do not open or close Excel during this execution of PSBlitz." -Fore Yellow	
 	}
 	catch {
 		Write-Host "Could not open Excel." -fore Red
