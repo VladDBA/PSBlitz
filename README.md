@@ -18,11 +18,12 @@
 - [Prerequisites](#Prerequisites)
 - [Installation](#Installation)
 - [What it does](#What-it-does)
-
 - [Default check VS in-depth check](#Default-check-VS-in-depth-check)
 - [Output files](#Output-files)
 - [Usage examples](#Usage-examples)
-- [Report a bug](#Report-a-Bug)
+- [Acknowledgments](#Acknowledgments)
+- [Contributing](#Contributing)
+- [Support](#Support)
 - [Screenshots](#Screenshots)
 - [License](/LICENSE)
 
@@ -71,7 +72,8 @@ Do not change the directory structure and file names.
 
 PSBlitz.ps1 uses slightly modified, non-stored procedure versions, of the following components 
 from [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit).
-<br>You can find the all the scripts in the repository's [Resources](/Resources) directory
+<br>You can find the all the scripts in the repository's [Resources](/Resources) directory.
+<br><br>_Note that I'm using the original stored procedure names puerly for example purposes, PSBlitz does not create or require the sp_Blitz* stored procedures to exist on the instance._
 
 #### Outputs the following to an Excel spreadsheet or to an HTML report:
 - Instance information
@@ -148,8 +150,6 @@ When running PSBlitz with the Excel output, if you (open and) close an Excel win
 
 ## Default check VS in-depth check
 
-_Note that I'm using the original stored procedure names puerly for example purposes, PSBlitz does not create or require the sp_Blitz* stored procedures to exist on the instance._
-
 ### The default check returns the following data:
 - Instance resource and conviguration overview 
 - Open transactions
@@ -201,6 +201,9 @@ If, the case of an instance-wide check, a database accounts for at least 3/2 of 
 - Worst queries recorded in the Query Store in the past 7 days
 - Statistics information
 - Index fragmentation information
+
+### Limiting data retrieved from the plan cache to the last x minutes
+By default, the query data retrieved from the plan cache will check the contents of the entire plan cache, but you can limit that timeframe by using the `-CacheMinutesBack` parameter.<br>For example, using `-CacheMinutesBack 20` will look in the plan cache for queries that have been executed in the past 20 minutes.<br>The paramter also accounts for PSBlitz execution until that point and is dynamically auto-adjusted so that the desired timeframe won't be missed due to PSBlitz's added execution time.
 
 #### Note
 I don't recommend going with values lower than 5 for -BlitzWhoDelay, especially in a production environment.
@@ -294,12 +297,34 @@ Otherwise you can navigate in PowerShell to the directory where the script is an
     ```PowerShell
     .\PSBlitz.ps1 yourserver.database.windows.net -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
     ```
+15. Run it against a default instance residing on Server02, with HTML output, in-depth checks via SQL login and password, while limmiting most checks to YourDatabase only, and also limiting the query information returned from the plan cache to the past 2 hours
+    ```PowerShell
+    .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -ToHTML Y -IsIndepth Y -CheckDB YourDatabase -CacheMinutesBack 120
+    ```
 Note that `-ServerName` is a positional parameter, so you don't necessarily have to specify the parameter's name as long as the first thing after the script's name is the instance 
 
 [*Back to top*](#header1)
 
-## Report a Bug
+## Acknowledgments
+[Brent Ozar](https://www.brentozar.com/) for the SQL Server First Responder Kit.<br>
+All contributors to this project. (at this point it's just me, lol)
+
+[*Back to top*](#header1)
+
+## Contributing
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
+
+## Support
+### Reporting Bugs
 If you've ran into an error while running PSBlitz, please read [this](https://github.com/VladDBA/PSBlitz/issues/216) before opening an issue.
+### Feature requests
+For feature requests, open an issue with the enhancement label
+
+[*Back to top*](#header1)
 
 ## Screenshots
 ![GIF](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/GIF_000.gif)
