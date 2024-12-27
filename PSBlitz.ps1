@@ -273,7 +273,7 @@ param(
 ###Internal params
 #Version
 $Vers = "5.0.0"
-$VersDate = "2024-12-26"
+$VersDate = "2024-12-27"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -758,6 +758,9 @@ function Convert-QueryTableToHtml {
 		[string] $AnchorExt = '.query'
 	)
 	try {
+		if ($DebugInfo) {
+			Write-Host " ->Converting query data to HTML..." -ForegroundColor Yellow
+		}
 
 		$properties = @()
 		$cultureInfo = [System.Globalization.CultureInfo]::CurrentCulture
@@ -901,7 +904,7 @@ function Save-ExcelFile {
 		}
 	}
 	catch {
-		Write-Host "Error saving Excel file: $_" -ForegroundColor Red
+		Write-Host " Error saving Excel file: $_" -ForegroundColor Red
 	}
 
 }
@@ -1774,24 +1777,6 @@ if ($ToHTML -ne "Y") {
 	$ExcelFile = $ExcelApp.Workbooks.Open("$OutExcelF")
 	$ExcelApp.DisplayAlerts = $False
 }
-###Check instance uptime
-$UptimeQuery = new-object System.Data.SqlClient.SqlCommand
-$Query = "SELECT CAST(DATEDIFF(HH, [sqlserver_start_time], GETDATE()) / 24.00 AS NUMERIC(23, 2)) AS [uptime_days]	"
-$Query = $Query + "`nFROM [sys].[dm_os_sys_info];"
-$UptimeQuery.CommandText = $Query
-$UptimeQuery.Connection = $SqlConnection
-$UptimeQuery.CommandTimeout = 100
-$UptimeAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-$UptimeAdapter.SelectCommand = $UptimeQuery
-$UptimeSet = new-object System.Data.DataSet
-$UptimeAdapter.Fill($UptimeSet) | Out-Null
-$SqlConnection.Close()
-if ($UptimeSet.Tables[0].Rows[0]["uptime_days"] -lt 7.00) {
-	[string]$DaysUp = $UptimeSet.Tables[0].Rows[0]["uptime_days"]
-	Write-Host "Warning: Instance uptime is less than 7 days - $DaysUp" -Fore Red
-	Write-Host "->Diagnostics data might not be reliable with less than 7 days of uptime." -Fore Red
-}
-
 ###Create log table
 $LogTbl = New-Object System.Data.DataTable
 $LogTbl.Columns.Add("Step", [string]) | Out-Null
@@ -1800,6 +1785,21 @@ $LogTbl.Columns.Add("EndDate", [string]) | Out-Null
 $LogTbl.Columns.Add("Duration", [string]) | Out-Null
 $LogTbl.Columns.Add("Outcome", [string]) | Out-Null
 $LogTbl.Columns.Add("ErrorMsg", [string]) | Out-Null
+
+###Check instance uptime
+Write-Host "Checking instance uptime..." -NoNewline
+#$UptimeQuery = new-object System.Data.SqlClient.SqlCommand
+$Query = "SELECT CAST(DATEDIFF(HH, [sqlserver_start_time], GETDATE()) / 24.00 AS NUMERIC(23, 2)) AS [uptime_days]	"
+$Query = $Query + "`nFROM [sys].[dm_os_sys_info];"
+Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Uptime check" -ConnStringIn $ConnString -CmdTimeoutIn 100
+if ($global:StepOutcome -eq "Success") {
+	if($global:PSBlitzSet.Tables[0].Rows[0]["uptime_days"] -lt 7.00){
+		[string]$DaysUp = $global:PSBlitzSet.Tables[0].Rows[0]["uptime_days"]
+	Write-Host "Warning: Instance uptime is less than 7 days - $DaysUp" -Fore Red
+	Write-Host "->Diagnostics data might not be reliable with less than 7 days of uptime." -Fore Red
+	}
+	Invoke-ClearVariables PSBlitzSet
+}
 
 #####################################################################################
 #						Check start													#
