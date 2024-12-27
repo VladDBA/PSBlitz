@@ -925,6 +925,32 @@ function Save-ExcelFile {
 
 }
 
+function Save-HtmlFile {
+	param (
+		[Parameter(Position = 0, Mandatory = $true)]
+		$HtmlData,
+		[Parameter(Position = 1, Mandatory = $true)]
+		[string]$HtmlFileName,
+		[Parameter(Position = 2, Mandatory = $true)]
+		[string]$HtmlOutputDir,
+		[Parameter(Position = 3, Mandatory = $false)]
+		[switch]$DebugInfo
+	)
+	if($HtmlFileName -notlike "*.html") {
+		$HtmlFileName = $HtmlFileName + ".html"
+	}
+	try {
+		$HTMLFilePath = Join-Path -Path $HtmlOutputDir -ChildPath $HtmlFileName
+		$HtmlData | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+		if ($DebugInfo) {
+			Write-Host " ->HTML file saved successfully" -ForegroundColor Yellow
+		}
+	}
+	catch {
+		Write-Host "Error saving HTML file: $_" -ForegroundColor Red
+	}
+}
+
 function Invoke-ClearVariables {
 	[Parameter(Position = 0, Mandatory = $true)]
 	[string[]]$VarNames
