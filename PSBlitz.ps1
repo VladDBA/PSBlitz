@@ -936,7 +936,7 @@ function Save-HtmlFile {
 		[Parameter(Position = 3, Mandatory = $false)]
 		[switch]$DebugInfo
 	)
-	if($HtmlFileName -notlike "*.html") {
+	if ($HtmlFileName -notlike "*.html") {
 		$HtmlFileName = $HtmlFileName + ".html"
 	}
 	try {
@@ -2069,12 +2069,9 @@ $htmlTable2
 			</body>
 			</html>
 "@
-
-			if ($DebugInfo) {
-				Write-Host " ->Writing HTML file." -fore yellow
-			}
-			$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "TempDBInfo.html"
-			$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+			#Save HTML file
+			Save-HtmlFile $html "TempDBInfo.html" $HTMLOutDir $DebugInfo
+			Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3, htmlTable4
 
 		}
 		else {
@@ -4378,7 +4375,7 @@ finally {
 		#}
 		##Loop through each Excel row
 		#foreach ($row in $LogTbl) {
-#
+		#
 		#	foreach ($col in $DataSetCols) {
 		#		[string]$DebugCol = $col
 		#		[string]$DebugValue = $LogTbl.Rows[$RowNum][$col]
