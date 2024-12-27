@@ -874,6 +874,8 @@ function Convert-TableToExcel {
 
 		foreach ($row in $DataTable) {
 			foreach ($col in $DataSetCols) {
+				[string]$global:DebugCol = $col
+				[string]$global:DebugValue = $DataTable.Rows[$RowNum][$col]
 				if ($URLCols -contains $col) {
 					if ($DataTable.Rows[$RowNum][$col] -like "http*") {
 						$ExcelSheet.Hyperlinks.Add(
@@ -902,7 +904,9 @@ function Convert-TableToExcel {
 
 	}
  catch {
-		Write-Host "Error converting table to Excel: $_" -ForegroundColor Red
+		Write-Host " Error converting table to Excel: $_" -ForegroundColor Red
+		Write-Host "  Debug Column: $global:DebugCol"
+		Write-Host "  Debug Value: $global:DebugValue"
 	}
 }
 
@@ -934,7 +938,9 @@ function Save-HtmlFile {
 		[Parameter(Position = 2, Mandatory = $true)]
 		[string]$HtmlOutputDir,
 		[Parameter(Position = 3, Mandatory = $false)]
-		[switch]$DebugInfo
+		[switch]$DebugInfo,
+		[Parameter(Position = 4, Mandatory = $false)]
+		[string]$AdditionalInfo = ''
 	)
 	if ($HtmlFileName -notlike "*.html") {
 		$HtmlFileName = $HtmlFileName + ".html"
@@ -943,7 +949,7 @@ function Save-HtmlFile {
 		$HTMLFilePath = Join-Path -Path $HtmlOutputDir -ChildPath $HtmlFileName
 		$HtmlData | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 		if ($DebugInfo) {
-			Write-Host " ->HTML file saved successfully" -ForegroundColor Yellow
+			Write-Host " ->$($AdditionalInfo)HTML file saved successfully" -ForegroundColor Yellow
 		}
 	}
 	catch {
@@ -2989,13 +2995,12 @@ $JumpToTop
 					</body>
 					</html>
 "@
-					$SecondHalf = "Done"
-					$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "$HtmlFileName"
-					$html3 | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+					$SecondHalf = "Done"					
+					#Save the HTML file containing both pairs
+					Save-HtmlFile $html3 $HtmlFileName $HTMLOutDir $DebugInfo "Complete "
+				
 				}
-				if ($DebugInfo) {
-					Write-Host " ->Writing HTML file." -fore yellow
-				}
+
 				#Only writing the file here if this is the first half
 				if (($FirstHalf -eq "Done") -and ($SecondHalf -eq "NotDone")) {
 					$html3 = $CacheHTMLPre + $html + $html2 + @"
@@ -3003,9 +3008,10 @@ $JumpToTop
 					</body>
 					</html>
 "@
-					$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "$HtmlFileName"
-					$html3 | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+					#Save the partial HTML file
+					Save-HtmlFile $html3 $HtmlFileName $HTMLOutDir $DebugInfo "Partial "
 				}
+				
 
 			}
 			else {
@@ -3319,8 +3325,9 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					</body>
 					</html>
 "@
-					$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzQueryStore.html"
-					$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+
+					Save-HtmlFile $html "BlitzQueryStore.html" $HTMLOutDir $DebugInfo
+					Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3
 
 				}
 				else {
@@ -3330,13 +3337,11 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$ExcelStartRow = $DefaultStartRow
 						
 					Convert-TableToExcel $BlitzQSSumTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
-				
 					##Saving file 
 					Save-ExcelFile $ExcelFile
 
 					Convert-TableToExcel $BlitzQSTbl $ExcelSheet -StartRow $DefaultStartRow -StartCol 7 -DebugInfo:$DebugInfo -ExclCols "query_plan_xml", "query"
-					Save-ExcelFile $ExcelFile
-					
+					Save-ExcelFile $ExcelFile					
 				}
 				Invoke-ClearVariables BlitzQSTbl, BlitzQSSumTbl, PSBlitzSet
 			}
@@ -3441,9 +3446,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				}
 			}
 			if ($ToHTML -eq "Y") {
-				if ($DebugInfo) {
-					Write-Host " ->Converting sp_BlitzIndex output to HTML" -fore yellow
-				}
+
 				if ($Mode -eq "0") {
 					$HtmlTabName = "Index Diagnosis"
 				}
@@ -3500,11 +3503,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				</html>
 "@
 
-				if ($DebugInfo) {
-					Write-Host " ->Writing HTML file." -fore yellow
-				} 
-				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzIndex_$Mode.html"
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"        
+				Save-HtmlFile $html "BlitzIndex_$Mode.html" $HTMLOutDir $DebugInfo
+				Invoke-ClearVariables html, htmlTable
 			}
 			else {
 			
@@ -3634,12 +3634,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				#Increment row retrieval counter
 				$RowNum += 1
 			}
-			$DeadlockSpan = $TblLockOver.Rows[0]["object_name"]
 		
 			if ($ToHTML -eq "Y") {
-				if ($DebugInfo) {
-					Write-Host " ->Converting sp_BlitzLock output to HTML" -fore yellow
-				}
 
 				$HtmlTabName = "Deadlocks"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
@@ -3664,7 +3660,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		</head>
 		<body>
 		<h1 id="top">$HtmlTabName</h1>
-		<p>$DeadlockSpan</p>
 		<h2>Deadlock Overview</h2>
 		<p><a href="#Deadlocks1">Jump to deadlock details</a></p>
 "@
@@ -3712,13 +3707,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				</html>
 "@
 				}
-				if ($DebugInfo) {
-					Write-Host " - >Writing HTML file." -fore yellow
-				}
-				if ($TblLockDtl.Rows.Count -gt 0) {
-					$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzLock.html"
-					$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
-				}
+				
+				Save-HtmlFile $html "BlitzLock.html" $HTMLOutDir $DebugInfo
+				Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3, htmlTable4, htmlTable5
+				
 			}
 			else {
 				## populating the "sp_BlitzLock Details" sheet
@@ -3806,9 +3798,11 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$htmlTable = $htmlTable -replace '<th>Update ', '<th class="tooltip" title="The commented options are suggestions based on record counts.">Update '
 					if ($IsAzureSQLDB) {
 						$HtmlTabName = "Statistics info for $ASDBName"
+						$HtmlFileName = "StatsInfo_$ASDBName.html"
 					}
 					else {
 						$HtmlTabName = "Statistics info for $CheckDB"
+						$HtmlFileName = "StatsInfo_$CheckDB.html"
 					}
 					$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
@@ -3822,16 +3816,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				</body>
 				</html>
 "@
-					if ($DebugInfo) {
-						Write-Host " - >Writing HTML file." -fore yellow
-					}
-					if ($IsAzureSQLDB) {
-						$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "StatsInfo_$ASDBName.html"						
-					}
-					else {
-						$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "StatsInfo_$CheckDB.html"						
-					}
-					$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"				
+					Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
+					Invoke-ClearVariables html, htmlTable			
 				}
 				else {
 
@@ -3908,9 +3894,11 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$htmlTable = Convert-TableToHtml $IndexTbl -TblID "StatsOrIxFragTable" -CSSClass "sortable" -DebugInfo:$DebugInfo
 					if ($IsAzureSQLDB) {
 						$HtmlTabName = "Index fragmentation info for $ASDBName"
+						$HtmlFileName = "IndexFragInfo_$ASDBName.html"
 					}
 					else {
 						$HtmlTabName = "Index fragmentation info for $CheckDB"
+						$HtmlFileName = "IndexFragInfo_$CheckDB.html"
 					}
 			
 					$html = $HTMLPre + @"
@@ -3925,16 +3913,22 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				</body>
 				</html>
 "@
-					if ($DebugInfo) {
-						Write-Host " - >Writing HTML file." -fore yellow
-					} 
+
+					Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
+					Invoke-ClearVariables html, htmlTable
+				}
+				else {
 					if ($IsAzureSQLDB) {
-						$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "IndexFragInfo_$ASDBName.html"						
+						$SheetName = "Index Fragmentation for $ASDBName"
 					}
 					else {
-						$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "IndexFragInfo_$CheckDB.html"						
+						$SheetName = "Index Fragmentation for $CheckDB"
 					}
-					$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"		
+					$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
+					Convert-TableToExcel $IndexTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
+					##Saving file
+					Save-ExcelFile $ExcelFile
+
 				}
 				else {
 					$ExcelSheet = $ExcelFile.Worksheets.Item("Index Fragmentation")
@@ -3978,8 +3972,8 @@ finally {
 		else {
 			Write-Host " $TerminatingErrorMessage" -fore red
 			if ($ToHTML -ne "Y") {
-				Write-Host "  Debug Column: $DebugCol"
-				Write-Host "  Debug Value: $DebugValue"
+				Write-Host "  Debug Column: $global:DebugCol"
+				Write-Host "  Debug Value: $global:DebugValue"
 			}
 		}
 		#[string]$TerminatingErrorMessage = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty Message
@@ -4150,15 +4144,9 @@ finally {
 				</body>
 				</html>
 "@ 
-				if ($DebugInfo) {
-					Write-Host " - >Writing HTML file." -fore yellow
-				} 
-				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzWho.html"
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
 
-				if ($DebugInfo) {
-					Write-Host " ->Converting sp_BlitzWho aggregate output to HTML" -fore yellow
-				}
+				Save-HtmlFile $html "BlitzWho.html" $HTMLOutDir $DebugInfo
+				Invoke-ClearVariables html, htmlTable
 
 				#$BlitzWhoAggTbl.Columns.Add("Query", [string]) | Out-Null
 				$RowNum = 0
@@ -4206,11 +4194,8 @@ finally {
 				</body>
 				</html>
 "@ 
-				if ($DebugInfo) {
-					Write-Host " - >Writing HTML file." -fore yellow
-				}
-				$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "BlitzWho_Agg.html"
-				$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+				Save-HtmlFile $html "BlitzWho_Agg.html" $HTMLOutDir $DebugInfo
+				Invoke-ClearVariables html, htmlTable, htmlTable1
 
 			}
 			else {
@@ -4332,38 +4317,7 @@ finally {
 		##Insert log data in Excel
 		##Populating the "ExecutionLog" sheet
 		$ExcelSheet = $ExcelFile.Worksheets.Item("ExecutionLog")
-		##Specify at which row in the sheet to start adding the data
-		#$ExcelStartRow = 3
-		##Specify with which column in the sheet to start
-		#$ExcelColNum = 1
-		##Set counter used for row retrieval
-		#$RowNum = 0
-		#$DataSetCols = @("Step", "StartDate", "EndDate", "Duration", "Outcome", "ErrorMsg")
-		#if ($DebugInfo) {
-		#	Write-Host " ->Writing Execution Log to Excel" -fore yellow
-		#}
-		##Loop through each Excel row
-		#foreach ($row in $LogTbl) {
-		#
-		#	foreach ($col in $DataSetCols) {
-		#		[string]$DebugCol = $col
-		#		[string]$DebugValue = $LogTbl.Rows[$RowNum][$col]
-		#		if (( "StartDate", "EndDate" -contains $col) -and ( $LogTbl.Rows[$RowNum][$col] -ne [System.DBNull]::Value)) {
-		#			$DateForExcel = $LogTbl.Rows[$RowNum][$col] | Get-Date
-		#			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DateForExcel.ToString("yyyy-MM-dd HH:mm:ss")
-		#		}
-		#		else {
-		#			$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $LogTbl.Rows[$RowNum][$col]
-		#		}
-		#		$ExcelColNum += 1
-		#	}
-		#	#move to the next row in the spreadsheet
-		#	$ExcelStartRow += 1
-		#	#move to the next row in the data set
-		#	$RowNum += 1
-		#	# reset Excel column number so that next row population begins with column 1
-		#	$ExcelColNum = 1
-		#}
+
 		Convert-TableToExcel $LogTbl $ExcelSheet -StartRow 3 -DebugInfo:$DebugInfo
 		##Saving file 
 		Save-ExcelFile $ExcelFile
@@ -4425,8 +4379,11 @@ finally {
 						</body>
 						</html>
 "@ 
-		$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "ExecutionLog.html"		
-		$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+
+		Save-HtmlFile $html "ExecutionLog.html" $HTMLOutDir $DebugInfo
+		Invoke-ClearVariables html, htmlTable
+
+		### Index page intro portion
 		$AzureEnv = ""
 		if ($IsAzureSQLMI) {
 			$AzureEnv = "- Azure SQL MI"
@@ -4484,7 +4441,6 @@ finally {
 			# Get the file name without the extension and replace any underscores with spaces for the description.
 			$Description = $File.BaseName.Replace("_", " ")
 			# Create a row in the table with a link to the file and its description.
-			#$RelativePath = $File.Name
 			$RelativePath = Join-Path -Path . -ChildPath "HTMLFiles" 
 			$RelativePath = Join-Path -Path $RelativePath -ChildPath $File.Name
 			if ($File.Name -eq "spBlitz.html") {
@@ -4752,16 +4708,14 @@ finally {
 				</html>
 "@
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
-			$IndexFile = "PSBlitzOutput_$InstName_$CheckDB.html"
+			$IndexFileName = "PSBlitzOutput_$InstName_$CheckDB.html"
 		}
 		else {
-			$IndexFile = "PSBlitzOutput_$InstName.html"
+			$IndexFileName = "PSBlitzOutput_$InstName.html"
 		}
-		if ($DebugInfo) {
-			Write-Host " ->Writing HTML file." -fore yellow
-		} 
-		$HTMLFilePath = Join-Path -Path $OutDir -ChildPath "$IndexFile"
-		$IndexContent | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+		#Save index page
+		Save-HtmlFile $IndexContent $IndexFileName $OutDir $DebugInfo
+		Invoke-ClearVariables IndexContent
 
 		#copy js resources
 		foreach ($htmlResource in $HtmlResources) {
