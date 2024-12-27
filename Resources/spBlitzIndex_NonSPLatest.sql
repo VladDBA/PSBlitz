@@ -76,7 +76,7 @@ SELECT
 
 /*
 Everything beyond this point is straight from sp_BlitzIndex except for the commented block 
-between lines 6507 and 6514 and without the GO at the end
+between lines 6507 and 6514, the result sets changes (column orders, date time to varchar conversion, etc.) for PSBlitz, and without the GO at the end
 */
 
 SET NOCOUNT ON;
@@ -5536,26 +5536,35 @@ BEGIN
 			BEGIN
 				IF(@OutputType <> 'NONE')
 				BEGIN
-					SELECT Priority, ISNULL(br.findings_group,N'') + 
+				/*Vlad - column changes and record count limit for PSBlitz*/
+					SELECT TOP(10000) Priority, ISNULL(br.findings_group,N'') + 
 							CASE WHEN ISNULL(br.finding,N'') <> N'' THEN N': ' ELSE N'' END
 							+ br.finding AS [Finding], 
 						br.[database_name] AS [Database Name],
-						br.details AS [Details: schema.table.index(indexid)], 
-						br.index_definition AS [Definition: [Property]] ColumnName {datatype maxbytes}], 
+						br.details AS [Details], 
+						br.index_definition AS [Definition], 
 						ISNULL(br.secret_columns,'') AS [Secret Columns],          
 						br.index_usage_summary AS [Usage], 
 						br.index_size_summary AS [Size],
-						COALESCE(br.more_info,sn.more_info,'') AS [More Info],
-						br.URL, 
+						/*COALESCE(br.more_info,sn.more_info,'') AS [More Info],*/						 
 						COALESCE(br.create_tsql,ts.create_tsql,'') AS [Create TSQL],
+						CAST('' AS VARCHAR(30)) AS [Sample Plan File],
+						br.URL,
 						br.sample_query_plan AS [Sample Query Plan]
 					FROM #BlitzIndexResults br
 					LEFT JOIN #IndexSanity sn ON 
 						br.index_sanity_id=sn.index_sanity_id
 					LEFT JOIN #IndexCreateTsql ts ON 
 						br.index_sanity_id=ts.index_sanity_id
+					WHERE Priority <> -1
 					ORDER BY br.Priority ASC, br.check_id ASC, br.blitz_result_id ASC, br.findings_group ASC
 					OPTION (RECOMPILE);
+					/*Vlad - column changes for PSBlitz - end*/
+					/*Vlad - additional result set to get total count for warning*/
+					SELECT COUNT(1) AS RecordCount FROM #BlitzIndexResults
+					WHERE Priority <> -1
+					OPTION (RECOMPILE);
+					/*Vlad - additional result set to get total count for warning - end*/
 				 END;
 
 			END;
@@ -5796,16 +5805,18 @@ BEGIN
 				SUM(CASE WHEN index_id NOT IN (0,1) AND sz.total_reserved_MB > 1024 THEN 1 ELSE 0 END) AS [Count NCs > 1GB],
 				SUM(CASE WHEN index_id NOT IN (0,1) AND sz.total_reserved_MB > 10240 THEN 1 ELSE 0 END) AS [Count NCs > 10GB],
 				SUM(CASE WHEN index_id NOT IN (0,1) AND sz.total_reserved_MB > 102400 THEN 1 ELSE 0 END) AS [Count NCs > 100GB],
-				MIN(create_date) AS [Oldest Create Date],
-				MAX(create_date) AS [Most Recent Create Date],
-				MAX(modify_date) AS [Most Recent Modify Date],
-				1 AS [Display Order]
+				/*Vlad - date time conversion for PSBlitz*/
+				CONVERT(VARCHAR(25),MIN(create_date),120) AS [Oldest Create Date],
+				CONVERT(VARCHAR(25),MAX(create_date),120) AS [Most Recent Create Date],
+				CONVERT(VARCHAR(25),MAX(modify_date),120) AS [Most Recent Modify Date]
+				/*Vlad - date time conversion for PSBlitz*/
+				/*1 AS [Display Order]*/
 			FROM #IndexSanity AS i
 			--left join here so we don't lose disabled nc indexes
 			LEFT JOIN #IndexSanitySize AS sz 
 				ON i.index_sanity_id=sz.index_sanity_id
 			GROUP BY DB_NAME(i.database_id)	 
-			UNION ALL
+			/*UNION ALL
 			SELECT  CASE WHEN @GetAllDatabases = 1 THEN N'All Databases' ELSE N'Database ' + N' as of ' + CONVERT(NVARCHAR(16),GETDATE(),121) END,        
 					@ScriptVersionName,   
 					N'From Your Community Volunteers' ,   
@@ -5814,7 +5825,7 @@ BEGIN
 					NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,
 					NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,NULL,
 					NULL,NULL,0 AS display_order
-			ORDER BY [Display Order] ASC
+			ORDER BY [Display Order] ASC*/
 			OPTION (RECOMPILE);
   			END;
 		END;
@@ -6135,16 +6146,17 @@ BEGIN
 	
 		IF(@OutputType <> 'NONE')
 		BEGIN
+		/*Vlad - changes made for PSBlitz*/
 			SELECT  i.[database_name] AS [Database Name], 
 					i.[schema_name] AS [Schema Name], 
 					i.[object_name] AS [Object Name], 
 					ISNULL(i.index_name, '') AS [Index Name],
 					CAST(i.index_id AS NVARCHAR(10))AS [Index ID],
-					db_schema_object_indexid AS [Details: schema.table.index(indexid)], 
+					/*db_schema_object_indexid AS [Details: schema.table.index(indexid)],*/
 					CASE    WHEN index_id IN ( 1, 0 ) THEN 'TABLE'
 						ELSE 'NonClustered'
 						END AS [Object Type], 
-					index_definition AS [Definition: [Property]] ColumnName {datatype maxbytes}],
+					index_definition AS [Definition],
 					ISNULL(LTRIM(key_column_names_with_sort_order), '') AS [Key Column Names With Sort],
 					ISNULL(count_key_columns, 0) AS [Count Key Columns],
 					ISNULL(include_column_names, '') AS [Include Column Names], 
@@ -6166,19 +6178,19 @@ BEGIN
 					is_padded AS [Is Padded], 
 					fill_factor AS [Fill Factor], 
 					is_referenced_by_foreign_key AS [Is Reference by Foreign Key], 
-					last_user_seek AS [Last User Seek], 
-					last_user_scan AS [Last User Scan], 
-					last_user_lookup AS [Last User Lookup],
-					last_user_update AS [Last User Update], 
+					CONVERT(VARCHAR(25),last_user_seek,120) AS [Last User Seek], 
+					CONVERT(VARCHAR(25),last_user_scan,120) AS [Last User Scan], 
+					CONVERT(VARCHAR(25),last_user_lookup,120) AS [Last User Lookup],
+					CONVERT(VARCHAR(25),last_user_update,120) AS [Last User Update], 
 					total_reads AS [Total Reads], 
 					user_updates AS [User Updates], 
 					reads_per_write AS [Reads Per Write], 
 					index_usage_summary AS [Index Usage], 
-					sz.total_singleton_lookup_count AS [Singleton Lookups],
+					/*sz.total_singleton_lookup_count AS [Singleton Lookups],
 					sz.total_range_scan_count AS [Range Scans],
 					sz.total_leaf_delete_count AS [Leaf Deletes],
 					sz.total_leaf_update_count AS [Leaf Updates],
-					sz.index_op_stats AS [Index Op Stats],
+					sz.index_op_stats AS [Index Op Stats],*/
 					sz.partition_count AS [Partition Count],
 					sz.total_rows AS [Rows], 
 					sz.total_reserved_MB AS [Reserved MB], 
@@ -6201,10 +6213,10 @@ BEGIN
 					sz.page_io_latch_wait_in_ms as [Page IO Latch Wait ms],
                     sz.total_forwarded_fetch_count AS [Forwarded Fetches],
 					sz.data_compression_desc AS [Data Compression],
-					i.create_date AS [Create Date],
-					i.modify_date AS [Modify Date],
-					more_info AS [More Info],
-                    CASE 
+					CONVERT(VARCHAR(25),i.create_date,120) AS [Create Date],
+					CONVERT(VARCHAR(25),i.modify_date,120) AS [Modify Date]
+					/*more_info AS [More Info],*/
+                   /* CASE 
 						 WHEN i.is_primary_key = 1 AND i.index_definition <> '[HEAP]'
 							THEN N'--ALTER TABLE ' + QUOTENAME(i.[database_name]) + N'.' + QUOTENAME(i.[schema_name]) + N'.' + QUOTENAME(i.[object_name])
 							     + N' DROP CONSTRAINT ' + QUOTENAME(i.index_name) + N';'
@@ -6218,17 +6230,19 @@ BEGIN
 						 END AS [Drop TSQL],
 					CASE 
 						WHEN i.index_definition = '[HEAP]' THEN N''
-					    ELSE N'--' + ict.create_tsql END AS [Create TSQL], 
-					1 AS [Display Order]
+					    ELSE N'--' + ict.create_tsql END AS [Create TSQL] 
+						*/
+					/*,1 AS [Display Order]*/
             INTO #Mode2Temp
 			FROM    #IndexSanity AS i --left join here so we don't lose disabled nc indexes
 			LEFT JOIN #IndexSanitySize AS sz ON i.index_sanity_id = sz.index_sanity_id
             LEFT JOIN #IndexCreateTsql AS ict ON i.index_sanity_id = ict.index_sanity_id
 			OPTION(RECOMPILE);
+			/*Vlad - changes made for PSBlitz - end*/
 
 			IF @@ROWCOUNT > 0
             BEGIN
-			    SELECT
+			    SELECT TOP(10000) /*Vlad - hard 10k record limit for PSBlitz*/
 			        sz.*
 			    FROM #Mode2Temp AS sz
 			    ORDER BY    /* Shout out to DHutmacher */
@@ -6272,6 +6286,11 @@ BEGIN
 			    			CASE WHEN @SortOrder = N'modify_date' AND @SortDirection = N'asc' THEN CONVERT(DATETIME, sz.[Modify Date]) ELSE NULL END ASC,
 			    	sz.[Database Name], [Schema Name], [Object Name], [Index ID]
 			    OPTION (RECOMPILE);
+
+				/*Vlad - additional result set to get total count for warning*/
+					SELECT COUNT(1) AS RecordCount FROM #Mode2Temp
+					OPTION (RECOMPILE);
+				/*Vlad - additional result set to get total count for warning - end*/
 			END
 			ELSE
 			BEGIN

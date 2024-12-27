@@ -98,7 +98,7 @@ SELECT
 FROM AggBPInfo
 
 /*Return database files and size info*/
-SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],d.[create_date] AS [Created],' AS NVARCHAR(MAX))
+SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],CONVERT(VARCHAR(25),d.[create_date],120) AS [Created],' AS NVARCHAR(MAX))
                   + @LineFeed
                   + N'd.[state_desc] AS [DatabaseState],'
                   + @LineFeed
@@ -129,6 +129,8 @@ SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],d.[create_date] AS [Creat
                   + N'CAST(SUM(CAST(f.size AS BIGINT) * 8 / 1024.00 / 1024.00) AS NUMERIC(23, 3))'
                   + @LineFeed
                   + N'+ ISNULL(fs.FSFilesSizeGB, 0.000) AS [DatabaseSizeGB],'
+				  + @LineFeed
+				  + N'bpi.[CachedSizeMB],bpi.[BufferPool%],'
                   + @LineFeed
                   + N'd.[log_reuse_wait_desc] AS [CurrentLogReuseWait],'
                   + @LineFeed
@@ -167,8 +169,6 @@ SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],d.[create_date] AS [Creat
 					  + @LineFeed + N'WHEN ek.[encryption_state] = 6 THEN ''Protection change in progress'''
 					  + @LineFeed + N'END AS [EncryptionState]'
 					  END
-                  + @LineFeed
-				  + N',bpi.[CachedSizeMB],bpi.[BufferPool%]'
                   + @LineFeed + N'FROM   sys.master_files AS f'
                   + @LineFeed
                   + N'INNER JOIN sys.databases AS d  ON f.database_id = d.database_id'

@@ -36,7 +36,7 @@ SELECT ISNULL(SERVERPROPERTY('MachineName'),'N/A')                              
          WHEN SERVERPROPERTY('IsTempdbMetadataMemoryOptimized') = 1 THEN 'Yes'
          WHEN SERVERPROPERTY('IsTempdbMetadataMemoryOptimized') = 0 THEN 'No'
          ELSE 'N/A'
-       END                                                                                 AS [mem_optimized_tempdb_metadata],
+       END                                                                                 AS [tempdb_metadata_memory_optimized],
        CASE
          WHEN SERVERPROPERTY('IsFullTextInstalled') = 1 THEN 'Yes'
          WHEN SERVERPROPERTY('IsFullTextInstalled') = 0 THEN 'No'
@@ -44,12 +44,13 @@ SELECT ISNULL(SERVERPROPERTY('MachineName'),'N/A')                              
        END                                                                                 AS [fulltext_installed],
        SERVERPROPERTY('Collation')                                                         AS [instance_collation],
 	   (SELECT COUNT([database_id]) FROM [sys].[databases] WHERE [database_id] > 4)        AS [user_db_count],
-       [sqlserver_start_time]                                                              AS [instance_last_startup],
+       CONVERT(VARCHAR(22),[sqlserver_start_time],120)                                     AS [instance_last_startup],
        SERVERPROPERTY('ProcessID')                                                         AS [process_id],
        CAST(DATEDIFF(HH, [sqlserver_start_time], GETDATE()) / 24.00 AS NUMERIC(23, 2))     AS [uptime_days],
        (SELECT COUNT(*)
         FROM   [sys].[dm_exec_connections])                                                AS [client_connections],
-		GETDATE()                                                                          AS [server_time]
+		CAST(0 AS DECIMAL(6,3))                                                            AS [estimated_response_latency(sec)],
+		CONVERT(VARCHAR(30),SYSDATETIMEOFFSET(),120)                                       AS [server_time]
 FROM   [sys].[dm_os_sys_info]
 OPTION(RECOMPILE); 
 
@@ -63,7 +64,7 @@ SET @LineFeed = CHAR(13) + CHAR(10);
 SELECT @SQL = CASE
               /*Skipping this query on Azure SQL DB*/
                 WHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure'
-                     AND SERVERPROPERTY('EngineEdition') IN ( 5, 6 ) THEN CAST(N'SELECT ''Not available'' AS [logical_cpu_cores], '' in Azure '' AS [physical_cpu_cores], ''SQL DB'' ' AS NVARCHAR(MAX))
+                     AND SERVERPROPERTY('EngineEdition') IN ( 5, 6 ) THEN CAST(N'SELECT ''Not available'' AS [logical_cpu_cores], '' in Azure '' AS [physical_CPU_cores], ''SQL DB'' ' AS NVARCHAR(MAX))
                                                                           + N'[AS physical_memory_GB], NULL AS [max_server_memory_GB], NULL AS [target_server_memory_GB], '
                                                                           + N'NULL AS [total_memory_used_GB], NULL AS [proc_physical_memory_low], NULL AS [proc_virtual_memory_low], '
                                                                           + N'NULL AS [available_physical_memory_GB], NULL AS [os_memory_state], NULL AS [CTP], NULL AS [MAXDOP]'
@@ -108,17 +109,17 @@ SELECT @SQL = CASE
 					 + @LineFeed
                      + N'(SELECT CASE WHEN [process_physical_memory_low] = 1 THEN ''Yes'''
                      + @LineFeed
-                     + N'ELSE ''No'' END FROM sys.dm_os_process_memory) AS [proc_physical_memory_low],'
+                     + N'ELSE ''No'' END FROM sys.dm_os_process_memory) AS [process_physical_memory_low],'
                      + @LineFeed
                      + N'(SELECT CASE WHEN [process_virtual_memory_low] = 1 THEN ''Yes'''
                      + @LineFeed
-                     + N'ELSE ''No'' END FROM sys.dm_os_process_memory) AS [proc_virtual_memory_low],'
+                     + N'ELSE ''No'' END FROM sys.dm_os_process_memory) AS [process_virtual_memory_low],'
                      + @LineFeed
                      + N'(SELECT CAST(([available_physical_memory_kb]/1024.00/1024.00) AS DECIMAL(15, 2))'
                      + @LineFeed
                      + N' FROM [sys].[dm_os_sys_memory]) AS [available_physical_memory_GB],'
                      + @LineFeed
-                     + N'(SELECT [system_memory_state_desc] FROM [sys].[dm_os_sys_memory]) AS [os_memory_state],'
+                     + N'(SELECT [system_memory_state_desc] FROM [sys].[dm_os_sys_memory]) AS [OS_memory_state],'
                      + @LineFeed
                      + N'(SELECT [value] FROM [sys].[configurations]'
                      + @LineFeed
@@ -136,14 +137,14 @@ BEGIN
 END;
 
 /*Get connection info*/
-SELECT TOP 10 [d].[name]                                                       AS [Database],
-              COUNT([s].[status])                                              AS [ConnectionsCount],
-              RTRIM(LTRIM([s].[login_name]))                                   AS [LoginName],
-              ISNULL([s].[host_name], N'N/A')                                  AS [ClientHostName],
-              REPLACE(REPLACE([c].[client_net_address], N'<', N''), N'>', N'') AS [ClientIP],
-              [c].[net_transport]                                              AS [ProtocolUsed],
-			  MAX([c].[connect_time])                                          AS [OldestConnectionTime],
-              [s].[program_name]                                               AS [Program]              
+SELECT TOP 10 [d].[name]                                                       AS [database],
+              COUNT([s].[status])                                              AS [connections_count],
+              RTRIM(LTRIM([s].[login_name]))                                   AS [login_name],
+              ISNULL([s].[host_name], N'N/A')                                  AS [client_host_name],
+              REPLACE(REPLACE([c].[client_net_address], N'<', N''), N'>', N'') AS [client_IP],
+              [c].[net_transport]                                              AS [Protocol],
+			  CONVERT(VARCHAR(25),MAX([c].[connect_time]),121)                 AS [oldest_connection_time],
+              [s].[program_name]                                               AS [program]              
 FROM   sys.dm_exec_sessions AS [s]
        LEFT JOIN sys.databases AS [d]
               ON [d].[database_id] = [s].[database_id]
@@ -157,7 +158,7 @@ GROUP  BY [d].[database_id],
           [c].[client_net_address],
           [c].[net_transport],
           [s].[program_name]
-ORDER  BY [ConnectionsCount] DESC
+ORDER  BY [connections_count] DESC
 OPTION(RECOMPILE);
 
 /*Get SET options from both session and instance*/
@@ -224,11 +225,11 @@ SELECT [Option],
        CASE
          WHEN ( @@OPTIONS & id ) = id THEN 'ON'
          ELSE 'OFF'
-       END AS [SessionSetting],
+       END AS [Session_Setting],
        CASE
          WHEN ( @InstanceLevelOption & id ) = id THEN 'ON'
          ELSE 'OFF'
-       END AS [InstanceSetting],
+       END AS [Instance_Setting],
        [Description],
        CASE
          WHEN [Description] LIKE '%obsolete%' THEN ''
@@ -237,4 +238,5 @@ SELECT [Option],
               + '-transact-sql'
        END AS [URL]
 FROM   OPTCTE
+ORDER BY [Option]
 OPTION(RECOMPILE);

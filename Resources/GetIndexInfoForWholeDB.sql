@@ -22,7 +22,7 @@ GROUP  BY [l].[resource_database_id],
           [l].[resource_associated_entity_id]; 
 
 
-SELECT DB_NAME()                                                                              AS [database],
+SELECT TOP(20000) DB_NAME()                                                                   AS [database],
        SCHEMA_NAME([obj].[schema_id]) + '.'
        + [obj].[name]                                                                         AS [object_name],
        [obj].[type_desc]                                                                      AS [object_type],
@@ -60,7 +60,7 @@ GROUP  BY SCHEMA_NAME([obj].[schema_id]) + '.'
           [ips].[avg_fragmentation_in_percent],
           [ips].[page_count],
           [ips].[forwarded_record_count]
-ORDER  BY [ips].[avg_fragmentation_in_percent] DESC;
+ORDER  BY [ips].[avg_fragmentation_in_percent] DESC, [size_in_GB] DESC;
 
 SELECT 'Exclusive Lock'                           AS [xlocked],
        OBJECT_NAME([resource_associated_entity_id]) AS [object_name]

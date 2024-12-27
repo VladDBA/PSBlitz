@@ -15,7 +15,7 @@ SET @DatabaseName = N'';
 		- can't do SELECT DISTINCT when XML data is involved, so I'll split this up using a CTE
 */
 WITH qcte
-     AS (SELECT DISTINCT GETDATE()                                                 AS [time_of_check],
+     AS (SELECT DISTINCT CONVERT(VARCHAR(25),GETDATE(),120)                        AS [time_of_check],
                          DB_NAME([es].[database_id])                               AS [database_name],
                          [s].[session_id],
                          [re].[blocking_session_id],
@@ -96,10 +96,36 @@ WITH qcte
                                        WHEN @DatabaseName <> N'' THEN DB_ID(@DatabaseName)
                                        ELSE [es].[database_id]
                                      END)
-SELECT [qcte].[time_of_check],
+SELECT CONVERT(VARCHAR(25),[qcte].[time_of_check],120) AS [time_of_check],
        [qcte].[database_name],
        [qcte].[session_id],
        [qcte].[blocking_session_id],
+	   CASE
+         WHEN [qcte].[current_sql] IS NOT NULL THEN 'Current_'
+                                                    + CAST([qcte].[session_id] AS VARCHAR(10))
+                                                    + '.query'
+         ELSE ''
+       END                         AS [current_query],
+	   [qcte].[current_sql],
+	   CASE
+         WHEN [sqlplan_curr].[query_plan] IS NOT NULL THEN 'OpenTranCurrent_'
+                                                           + CAST([qcte].[session_id] AS VARCHAR(10))
+                                                           + '.sqlplan'
+         ELSE '-- N/A --'
+       END                         AS [current_plan_file],
+	   CASE
+         WHEN [qcte].[most_recent_sql] IS NOT NULL THEN 'MostRecent_'
+                                                        + CAST([qcte].[session_id] AS VARCHAR(10))
+                                                        + '.query'
+         ELSE ''
+       END                         AS [most_recent_query],
+	   [qcte].[most_recent_sql],
+	   CASE
+         WHEN [sqlplan_rec].[query_plan] IS NOT NULL THEN 'OpenTranRecent_'
+                                                          + CAST([qcte].[session_id] AS VARCHAR(10))
+                                                          + '.sqlplan'
+         ELSE '-- N/A --'
+       END                         AS [most_recent_plan_file],
        [qcte].[wait_type],
        [qcte].[wait_time_seconds],
        [qcte].[wait_resource],
@@ -108,44 +134,18 @@ SELECT [qcte].[time_of_check],
        [qcte].[current_reuqest_status],
        [qcte].[transaction_name],
        [qcte].[open_transaction_count],
-       [qcte].[transaction_begin_time],
+       CONVERT(VARCHAR(25),[qcte].[transaction_begin_time],120) AS [transaction_begin_time],
        [qcte].[transaction_type],
        [qcte].[transaction_state],
-       [qcte].[request_start_time],
-       [qcte].[request_end_time],
+       CONVERT(VARCHAR(25),[qcte].[request_start_time],120) AS [request_start_time],
+       CONVERT(VARCHAR(25),[qcte].[request_end_time],120) AS [request_end_time],
        [qcte].[active_request_elapsed_seconds],
        [qcte].[host_name],
        [qcte].[login_name],
        [qcte].[program_name],
        [qcte].[client_interface_name],
-       [qcte].[current_sql],
-       CASE
-         WHEN [qcte].[current_sql] IS NOT NULL THEN 'Current_'
-                                                    + CAST([qcte].[session_id] AS VARCHAR(10))
-                                                    + '.query'
-         ELSE ''
-       END                         AS [current_query],
        [sqlplan_curr].[query_plan] AS [current_plan],
-       CASE
-         WHEN [sqlplan_curr].[query_plan] IS NOT NULL THEN 'OpenTranCurrent_'
-                                                           + CAST([qcte].[session_id] AS VARCHAR(10))
-                                                           + '.sqlplan'
-         ELSE '-- N/A --'
-       END                         AS [current_plan_file],
-       [qcte].[most_recent_sql],
-       CASE
-         WHEN [qcte].[most_recent_sql] IS NOT NULL THEN 'MostRecent_'
-                                                        + CAST([qcte].[session_id] AS VARCHAR(10))
-                                                        + '.query'
-         ELSE ''
-       END                         AS [most_recent_query],
-       [sqlplan_rec].[query_plan]  AS [most_recent_plan],
-       CASE
-         WHEN [sqlplan_rec].[query_plan] IS NOT NULL THEN 'OpenTranRecent_'
-                                                          + CAST([qcte].[session_id] AS VARCHAR(10))
-                                                          + '.sqlplan'
-         ELSE '-- N/A --'
-       END                         AS [most_recent_plan_file]
+       [sqlplan_rec].[query_plan]  AS [most_recent_plan]
 FROM   [qcte]
        OUTER APPLY sys.dm_exec_query_plan([qcte].[current_plan_handle]) AS [sqlplan_curr]
        OUTER APPLY sys.dm_exec_query_plan([qcte].[most_recent_plan_handle]) AS [sqlplan_rec]

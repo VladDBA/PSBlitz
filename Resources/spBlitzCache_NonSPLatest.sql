@@ -95,6 +95,8 @@ IF OBJECT_ID('tempdb.dbo.#relop', 'U') IS NOT NULL
 
 /*
 Everything beyond this point is straight from sp_BlitzCache 
+except for column order and data type changes made for PSBlitz as well as replacing the 
+'<?NoNeedToClickMe -- N/A --?>' string with an empty string, and
 without the GO at the end
 */
 
@@ -4138,11 +4140,11 @@ RAISERROR(N'Filling in implicit conversion and cached plan parameter info', 0, 1
 UPDATE b
 SET b.implicit_conversion_info = CASE WHEN b.implicit_conversion_info IS NULL 
 									  OR CONVERT(NVARCHAR(MAX), b.implicit_conversion_info) = N''
-									  THEN '<?NoNeedToClickMe -- N/A --?>' 
+									  THEN '' 
 							     ELSE b.implicit_conversion_info END,
 	b.cached_execution_parameters = CASE WHEN b.cached_execution_parameters IS NULL 
 										 OR CONVERT(NVARCHAR(MAX), b.cached_execution_parameters) = N''
-										 THEN '<?NoNeedToClickMe -- N/A --?>' 
+										 THEN '' 
 									ELSE b.cached_execution_parameters END
 FROM ##BlitzCacheProcs AS b
 WHERE b.SPID = @@SPID
@@ -4362,7 +4364,7 @@ IF EXISTS ( SELECT 1/0
 	UPDATE b
 	SET b.missing_indexes = 
 		CASE WHEN b.missing_indexes IS NULL 
-			 THEN '<?NoNeedToClickMe -- N/A --?>' 
+			 THEN '' 
 			 ELSE b.missing_indexes 
 		END
 	FROM ##BlitzCacheProcs AS b
@@ -4912,15 +4914,19 @@ BEGIN
 END;
 ELSE
 BEGIN
+ /*Vlad - column list changes for PSBlitz -- added Query and "SQLPlan File" columns*/
     SET @columns = N' DatabaseName AS [Database],
 		QueryPlanCost AS [Cost],
-        QueryText AS [Query Text],
+		CAST('''' AS VARCHAR(30)) AS [Query],
+		QueryText AS [Query Text],
+		CAST('''' AS VARCHAR(30)) AS [SQLPlan File],        
         QueryType AS [Query Type],
         Warnings AS [Warnings], 
 		QueryPlan AS [Query Plan], 
 		missing_indexes AS [Missing Indexes],
 		implicit_conversion_info AS [Implicit Conversion Info],
 		cached_execution_parameters AS [Cached Execution Parameters], ' + @nl;
+		/*Vlad - column list changes for PSBlitz END*/
 
     IF @ExpertMode = 2 /* Opserver */
     BEGIN
@@ -4994,34 +5000,35 @@ BEGIN
 				  CASE WHEN select_with_writes > 0 THEN '', 66'' ELSE '''' END
 				  , 3, 200000) AS opserver_warning , ' + @nl ;
     END;
-    
+    /*Vlad - column list changes, datetime and varbinary to varchar conversions for PSBlitz*/
     SET @columns += N'        
         CONVERT(NVARCHAR(30), CAST((ExecutionCount) AS BIGINT), 1) AS [# Executions],
         CONVERT(NVARCHAR(30), CAST((ExecutionsPerMinute) AS BIGINT), 1) AS [Executions / Minute],
         CONVERT(NVARCHAR(30), CAST((PercentExecutions) AS BIGINT), 1) AS [Execution Weight],
+		CONVERT(NVARCHAR(30), CAST((PercentExecutionsByType) AS BIGINT), 1) AS [% Executions (Type)],
         CONVERT(NVARCHAR(30), CAST((SerialDesiredMemory) AS BIGINT), 1) AS [Serial Desired Memory],
         CONVERT(NVARCHAR(30), CAST((SerialRequiredMemory) AS BIGINT), 1) AS [Serial Required Memory],
         CONVERT(NVARCHAR(30), CAST((TotalCPU) AS BIGINT), 1) AS [Total CPU (ms)],
         CONVERT(NVARCHAR(30), CAST((AverageCPU) AS BIGINT), 1) AS [Avg CPU (ms)],
         CONVERT(NVARCHAR(30), CAST((PercentCPU) AS BIGINT), 1) AS [CPU Weight],
+		CONVERT(NVARCHAR(30), CAST((PercentCPUByType) AS BIGINT), 1) AS [% CPU (Type)],
         CONVERT(NVARCHAR(30), CAST((TotalDuration) AS BIGINT), 1) AS [Total Duration (ms)],
         CONVERT(NVARCHAR(30), CAST((AverageDuration) AS BIGINT), 1) AS [Avg Duration (ms)],
         CONVERT(NVARCHAR(30), CAST((PercentDuration) AS BIGINT), 1) AS [Duration Weight],
+		CONVERT(NVARCHAR(30), CAST((PercentDurationByType) AS BIGINT), 1) AS [% Duration (Type)],
         CONVERT(NVARCHAR(30), CAST((TotalReads) AS BIGINT), 1) AS [Total Reads],
         CONVERT(NVARCHAR(30), CAST((AverageReads) AS BIGINT), 1) AS [Average Reads],
         CONVERT(NVARCHAR(30), CAST((PercentReads) AS BIGINT), 1) AS [Read Weight],
+		CONVERT(NVARCHAR(30), CAST((PercentReadsByType) AS BIGINT), 1) AS [% Reads (Type)],
         CONVERT(NVARCHAR(30), CAST((TotalWrites) AS BIGINT), 1) AS [Total Writes],
         CONVERT(NVARCHAR(30), CAST((AverageWrites) AS BIGINT), 1) AS [Average Writes],
         CONVERT(NVARCHAR(30), CAST((PercentWrites) AS BIGINT), 1) AS [Write Weight],
-        CONVERT(NVARCHAR(30), CAST((PercentExecutionsByType) AS BIGINT), 1) AS [% Executions (Type)],
-        CONVERT(NVARCHAR(30), CAST((PercentCPUByType) AS BIGINT), 1) AS [% CPU (Type)],
-        CONVERT(NVARCHAR(30), CAST((PercentDurationByType) AS BIGINT), 1) AS [% Duration (Type)],
-        CONVERT(NVARCHAR(30), CAST((PercentReadsByType) AS BIGINT), 1) AS [% Reads (Type)],
         CONVERT(NVARCHAR(30), CAST((PercentWritesByType) AS BIGINT), 1) AS [% Writes (Type)],
         CONVERT(NVARCHAR(30), CAST((TotalReturnedRows) AS BIGINT), 1) AS [Total Rows],
         CONVERT(NVARCHAR(30), CAST((AverageReturnedRows) AS BIGINT), 1) AS [Avg Rows],
         CONVERT(NVARCHAR(30), CAST((MinReturnedRows) AS BIGINT), 1) AS [Min Rows],
         CONVERT(NVARCHAR(30), CAST((MaxReturnedRows) AS BIGINT), 1) AS [Max Rows],
+		
 		CONVERT(NVARCHAR(30), CAST((MinGrantKB) AS BIGINT), 1) AS [Minimum Memory Grant KB],
 		CONVERT(NVARCHAR(30), CAST((MaxGrantKB) AS BIGINT), 1) AS [Maximum Memory Grant KB],
 		CONVERT(NVARCHAR(30), CAST((MinUsedGrantKB) AS BIGINT), 1) AS [Minimum Used Grant KB], 
@@ -5030,28 +5037,33 @@ BEGIN
 		CONVERT(NVARCHAR(30), CAST((MinSpills) AS BIGINT), 1) AS [Min Spills],
 		CONVERT(NVARCHAR(30), CAST((MaxSpills) AS BIGINT), 1) AS [Max Spills],
 		CONVERT(NVARCHAR(30), CAST((TotalSpills) AS BIGINT), 1) AS [Total Spills],
-		CONVERT(NVARCHAR(30), CAST((AvgSpills) AS MONEY), 1) AS [Avg Spills],
-        CONVERT(NVARCHAR(30), CAST((NumberOfPlans) AS BIGINT), 1) AS [# Plans],
-        CONVERT(NVARCHAR(30), CAST((NumberOfDistinctPlans) AS BIGINT), 1) AS [# Distinct Plans],
-        PlanCreationTime AS [Created At],
-        LastExecutionTime AS [Last Execution],
-		LastCompletionTime AS [Last Completion],
+		CONVERT(NVARCHAR(30), CAST((AvgSpills) AS MONEY), 1) AS [Avg Spills], 
+		CONVERT(NVARCHAR(30), CAST((NumberOfPlans) AS BIGINT), 1) AS [# Plans],
+		CONVERT(NVARCHAR(30), CAST((NumberOfDistinctPlans) AS BIGINT), 1) AS [# Distinct Plans],
+		CONVERT(VARCHAR(25),PlanCreationTime,120) AS [Created At],
+        CONVERT(VARCHAR(25),LastExecutionTime,120) AS [Last Execution],
+		CONVERT(VARCHAR(25),LastCompletionTime,120) AS [Last Completion],
+		CONVERT(VARCHAR(256),QueryHash,1) AS [Query Hash],
+		CONVERT(VARCHAR(256),QueryPlanHash,1) AS [Query Plan Hash],
+		COALESCE(SetOptions, '''') AS [SET Options],
+
         CONVERT(NVARCHAR(30), CAST((CachedPlanSize) AS BIGINT), 1) AS [Cached Plan Size (KB)],
         CONVERT(NVARCHAR(30), CAST((CompileTime) AS BIGINT), 1) AS [Compile Time (ms)],
         CONVERT(NVARCHAR(30), CAST((CompileCPU) AS BIGINT), 1) AS [Compile CPU (ms)],
         CONVERT(NVARCHAR(30), CAST((CompileMemory) AS BIGINT), 1) AS [Compile memory (KB)],
-        COALESCE(SetOptions, '''') AS [SET Options],
-		PlanHandle AS [Plan Handle], 
-		SqlHandle AS [SQL Handle], 
-		[SQL Handle More Info],
-        QueryHash AS [Query Hash],
-		[Query Hash More Info],
-        QueryPlanHash AS [Query Plan Hash],
-        StatementStartOffset,
-        StatementEndOffset,
-		PlanGenerationNum,
+        
+		/*CONVERT(VARCHAR(256),PlanHandle,1) AS [Plan Handle],*/ 
+		/*CONVERT(VARCHAR(256),SqlHandle,1) AS [SQL Handle],  */
+		/*[SQL Handle More Info],*/
+        
+		/*[Query Hash More Info],*/
+        
+        /*StatementStartOffset,*/
+        /*StatementEndOffset,  */
+		/*PlanGenerationNum,   */
 		[Remove Plan Handle From Cache],
 		[Remove SQL Handle From Cache]';
+		/*Vlad - column list changes for PSBlitz end here*/
 END;
 
 SET @sql = N'
@@ -6226,15 +6238,16 @@ BEGIN
 	
 		END;            
     
-	
-    SELECT  Priority,
+	/*Vlad - column changes fpr PSBlitz*/
+    SELECT  [Priority],
             FindingsGroup,
             Finding,
-            URL,
-            Details,
-            CheckID
+			Details,
+            URL/*,            
+            CheckID*/
     FROM    ##BlitzCacheResults
     WHERE   SPID = @@SPID
+	AND [Priority] <> 255
     GROUP BY Priority,
             FindingsGroup,
             Finding,

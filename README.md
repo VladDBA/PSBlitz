@@ -1,24 +1,47 @@
 # PSBlitz
+
+[![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-blue.svg)](https://github.com/PowerShell/PowerShell)
+[![Windows PowerShell](https://img.shields.io/badge/Windows-PowerShell%207.x-5E5E5E.svg)](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows)
+[![Linux](https://img.shields.io/badge/Linux-PowerShell%207.x-orange.svg)](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-linux)
+[![SQL Server](https://img.shields.io/badge/SQL%20Server-2014%2B-0078D4.svg)](https://learn.microsoft.com/en-us/sql/sql-server)
+[![Azure SQL DB](https://img.shields.io/badge/Azure%20SQL-Database-0078D4.svg)](https://learn.microsoft.com/en-us/azure/azure-sql/database/sql-database-paas-overview)
+[![Azure SQL MI](https://img.shields.io/badge/Azure%20SQL-Managed%20Instance-0078D4.svg)](https://learn.microsoft.com/en-us/azure/azure-sql/managed-instance/sql-managed-instance-paas-overview)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+> A PowerShell-based SQL Server performance diagnostics and health check tool.
+
 <a name="header1"></a>
 ## Navigation
 - [Intro](#Intro)
-- [What it does](#What-it-does)
+- [Features overview](#Features-overview)
+- [Compatibility](#Compatibility)
 - [Prerequisites](#Prerequisites)
 - [Installation](#Installation)
-- [What it runs](#What-it-runs)
+- [What it does](#What-it-does)
 - [Default check VS in-depth check](#Default-check-VS-in-depth-check)
 - [Output files](#Output-files)
 - [Usage examples](#Usage-examples)
-- [Report a bug](#Report-a-Bug)
+- [Acknowledgments](#Acknowledgments)
+- [Contributing](#Contributing)
+- [Support](#Support)
 - [Screenshots](#Screenshots)
 - [License](/LICENSE)
 
 ## Intro
 
-Since I'm a big fan of [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) and I've found myself in many situations where I would have liked a quick way to easily export the output of sp_Blitz, sp_BlitzCache, sp_BlitzFirst, sp_BlitzIndex, sp_BlitzLock, and sp_BlitzWho to Excel, as well as saving to disk the execution plans identified by sp_BlitzCache and deadlock graphs from sp_BlitzLock, I've decided to put together a PowerShell script that does just that.<br>
+Since I'm a big fan of [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) and I've found myself in many situations where I would have liked a quick way to easily export the output of sp_Blitz, sp_BlitzCache, sp_BlitzFirst, sp_BlitzIndex, sp_BlitzLock, and sp_BlitzWho to Excel, as well as saving to disk the execution plans identified by sp_BlitzCache and deadlock graphs from sp_BlitzLock, I've decided to put together a PowerShell script that does just that.<br><br>
 As of version 3.0.0, PSBlitz is also capable of exporting the report to HTML making Excel/Office no longer a hard requirement for running PSBlitz.<br>
 As of version 4.0.1, PSBlitz is also compatible with Azure SQL DB and Azure SQL Managed Instance. <br>
 As of version 4.3.4, PSBlitz can be executed using PowerShell on Linux, the output will default to HTML regardless of the option used.
+
+## Features overview
+
+- SQL Server health checks
+- Performance diagnostics
+- Query analysis
+- Deadlock investigation
+- Azure SQL DB support
+- Cross-platform compatibility
 
 ## Compatibility 
 
@@ -27,9 +50,32 @@ PSBlitz can be executed with:
 - PowerShell 7.x
 - PowerShell 7.x on Linux
 
+## Prerequisites
+1. In order to be able to run the PSBlitz.ps1 script, you'll need to unblock it:
+    ```PowerShell
+    Unblock-File .\PSBlitz.ps1
+    ```
+2. If you want the report to be in Excel format, then the MS Office suite needs to be installed on the machine where you're executing PSBlitz, otherwise use the HTML format.
+3. Sufficient permissions to query DMVs, server state, and get database objects' definitions.
+
+You __don't need__ to have any of the sp_Blitz stored procedures present on the instance that you're executing PSBlitz.ps1 for, all the scripts are contained in the `PSBlitz\Resources` directory in non-stored procedure format.
+
+## Installation
+
+Download the latest zip file from the [Releases](https://github.com/VladDBA/PSBlitz/releases) section of the repository and extract its contents. 
+
+Do not change the directory structure and file names.
+
+[*Back to top*](#header1)
+
 ## What it does
 
-Outputs the following to an Excel spreadsheet or to an HTML report:
+PSBlitz.ps1 uses slightly modified, non-stored procedure versions, of the following components 
+from [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit).
+<br>You can find the all the scripts in the repository's [Resources](/Resources) directory.
+<br><br>_Note that I'm using the original stored procedure names puerly for example purposes, PSBlitz does not create or require the sp_Blitz* stored procedures to exist on the instance._
+
+#### Outputs the following to an Excel spreadsheet or to an HTML report:
 - Instance information
 - Currently opened transactions (if any)
 - Wait stats - from sp_BlitzFirst
@@ -61,55 +107,23 @@ Exports the following files:
    - Index Usage Details
    - (Detailed) Index Diagnosis
 
-  The behavior can be controlled via the `-MaxUsrDBs` parameter, but only change the value if most of those databases don't have too many tables, or you've opted to output to HTML and have enough RAM for PS to handle the data (PSBlitz will limit the output to 30k records if more rows are returned)
+  The behavior can be controlled via the `-MaxUsrDBs` parameter, but only change the value if most of those databases don't have too many tables, or you've opted to output to HTML and have enough RAM for PS to handle the data (PSBlitz will limit the output to 10k records if more rows are returned)
 
+- If the database targeted by the "stats info" and "index fragmentation info" steps have lots of tables/indexes/partitions/statistics, the following limits will be applied:
+    - Stats Info - Limited to 10k records ordered by modified percent descending.
+    - Index Fragmentation Info - Limited to 20k records ordered by avg fragmentation percent descending, size descending.
 
-## Prerequisites
-1. In order to be able to run the PSBlitz.ps1 script, you'll need to unblock it:
-    ```PowerShell
-    Unblock-File .\PSBlitz.ps1
-    ```
-2. If you want the report to be in Excel format, then the MS Office suite needs to be installed on the machine where you're executing PSBlitz, otherwise use the HTML format.
-3. Sufficient permissions to query DMVs, server state, and get database objects' definitions.
+## Limitations
 
-You don't need to have any of the sp_Blitz stored procedures present on the instance that you're executing PSBlitz.ps1 for, all the scripts are contained in the `PSBlitz\Resources` directory in non-stored procedure format.
-
-Limitations:
+### Check targets
 - For the time being PSBlitz.ps1 can only run against SQL Server instances, Azure SQL DB, and Azure SQL Managed Instance, but not against Amazon RDS.
 
-[*Back to top*](#header1)
+### Excel
+- If you're using a 32bit installation of Excel and opt for the xlsx output, you might run into "out of memory" errors. <br>That's not an issue with PSBlitz, it's the direct result of opting to still use 32bit software in `SELECT DATEPART(YEAR,GETDATE())`.
 
-## Installation
+## Known issues:
+When running PSBlitz with the Excel output, if you (open and) close an Excel window in parallel with PSBlitz's execution you'll also cause the Excel session used by PSBlitz to close, leading to the following error message:<br>`You cannot call a method on a null-valued expression.`
 
-Download the latest zip file from the [Releases](https://github.com/VladDBA/PSBlitz/releases) section of the repository and extract its contents. 
-
-Do not change the directory structure and file names.
-
-[*Back to top*](#header1)
-
-## What it runs
-PSBlitz.ps1 uses slightly modified, non-stored procedure versions, of the following components 
-from [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit):
-- sp_Blitz
-- sp_BlitzCache
-- sp_BlitzFirst
-- sp_BlitzIndex
-- sp_BlitzLock
-- sp_BlitzWho
-- sp_BlitzQueryStore
-
-Aside from the above scripts, PSBlitz also runs the following scripts to return sp_BlitzWho data, instance and resource information, TempDB usage,
-opened transactions, statistics and index fragmentation info:
-- GetDbInfo.sql
-- GetBlitzWhoData.sql
-- GetInstanceInfo.sql
-- GetAzureSQLDBInfo.sql
-- GetTempDBUsageInfo.sql
-- GetOpenTransactions.sql
-- GetIndexInfoForWholeDB.sql
-- GetStatsInfoForWholeDB.sql
-
-You can find the all the scripts in the repository's [Resources](/Resources) directory
 
 [*Back to top*](#header1)
 
@@ -126,7 +140,7 @@ You can find the all the scripts in the repository's [Resources](/Resources) dir
 |`-OutputDir`| Used to provide a path where the output directory should be saved to. <br>Defaults to PSBlitz.ps1's directory if not specified or a non-existent path is provided.|
 |`-ToHTML`| Providing Y as a value will tell PSBlitz.ps1 to output the report as HTML instead of an Excel file. This is perfect when running PSBlitz from a machine that doesn't have Office installed.|
 |`-ZipOutput`| Providing Y as a value will tell PSBlitz.ps1 to also create a zip archive of the output files.<br>Defaults to N.|
-|`-BlitzWhoDelay` | Used to sepcify the number of seconds between each sp_BlitzWho execution. <br>Defaults to 10 if not specified.|
+|`-BlitzWhoDelay` | Used to sepcify the number of seconds between each active session data capture. <br>Defaults to 10 if not specified, meaning that active session data will be captured every 10 seconds.|
 |`-ConnTimeout`| Can be used to increased the timeout limit in seconds for connecting to SQL Server. <br>Defaults to 15 seconds if not specified.|
 |`-MaxTimeout`| Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. <br>Defaults to 1000 (16.6 minutes).|
 |`-MaxUsrDBs`| Can be used to tell PSBlitz to raise the limit of user databases based on which index-related info is limited to only the "loudest" database in the cache results. <br>Defaults to 50. <br>Only change it if you're using using HTML output and have enough RAM to handle the increased data that PS will have to process.|
@@ -136,47 +150,64 @@ You can find the all the scripts in the repository's [Resources](/Resources) dir
 
 ## Default check VS in-depth check
 
-- The default check will run the following:
-```SQL
-sp_Blitz @CheckServerInfo = 1
-sp_BlitzFirst @ExpertMode = 1, @Seconds = 30
-sp_BlitzIndex @GetAllDatabases = 1, @Mode = 0
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'CPU'/'avg cpu'	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'duration'/'avg duration'
-sp_BlitzWho @ExpertMode = 1
-sp_BlitzLock @StartDate = DATEADD(DAY,-15, GETDATE()), @EndDate = GETDATE()
-```
+### The default check returns the following data:
+- Instance resource and conviguration overview 
+- Open transactions
+- Tempdb confiuguration and usage
+- Database(s) configuration and size overview
+    - also outputs database scoped configuration in case of a database-specific check
+- Instance health information (skipped on Azure SQL DB)
+- What's going on during a 30 second interval in terms of waits and resource usage
+- Top 10 (the number can be modified via the `-CacheTop` parameter) queries found in the plan cache by CPU and duration
+- Index diagnostics for all databases
+- Deadlock information for the past 15 days (automatically reduced to 7 days if PSBlitz ran for over 15 minutes already)
+- Session activity collected during the execution of PSBlitz, polled every 10 seconds (the number of seconds can be controlled via the `-BlitzWhoDelay` parameter)
 
-- The in-depth check will run the following:
-```SQL
-sp_Blitz @CheckServerInfo = 1, @CheckUserDatabaseObjects = 1	
-sp_BlitzFirst @ExpertMode = 1, @Seconds = 30	
-sp_BlitzFirst @SinceStartup = 1	
-sp_BlitzIndex @GetAllDatabases = 1, @Mode = 1	
-sp_BlitzIndex @GetAllDatabases = 1, @Mode = 2	
-sp_BlitzIndex @GetAllDatabases = 1, @Mode = 4	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'CPU'/'avg cpu'	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'reads'/'avg reads'	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'writes'/'avg writes'
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'duration'/'avg duration'	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'executions'/'xpm'	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'memory grant'	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'recent compilations', @Top = 50	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'spills'/'avg spills'	
-sp_BlitzWho @ExpertMode = 1	
-sp_BlitzLock @StartDate = DATEADD(DAY,-15, GETDATE()), @EndDate = GETDATE()
-```
+### The in-depth check returns the following data:
+- Instance resource and conviguration overview 
+- Open transactions
+- Tempdb confiuguration and usage
+- Database(s) configuration and size overview
+    - also outputs database scoped configuration in case of a database-specific check
+- Instance health and database objects information (skipped on Azure SQL DB)
+- What's going on during a 30 second interval in terms of waits and resource usage
+- Waits stats info since last instance restart
+- Storage stats since last instance restart
+- Perfmon stats since last instance restart
+- Top 10 (the number can be modified via the `-CacheTop` parameter) queries found in the plan cache by:
+    - CPU
+    - Duration
+    - Reads
+    - Writes
+    - Executions
+    - Memory Grant
+    - Spills to tempdb
+    - Duplicate Plans
+- Top 50 queries by recent plan compilations
+- Database index summary
+- Index usage information
+- Detailed index diagnostics
+- Deadlock information for the past 15 days (automatically reduced to 7 days if PSBlitz ran for over 15 minutes already)
+- Session activity collected during the execution of PSBlitz, polled every 10 seconds (the number of seconds can be controlled via the `-BlitzWhoDelay` parameter)
 
-- sp_BlitzWho will be executed as part of a background process at every 10 seconds. The frequency can be changed using the `-BlitzWhoDelay` parameter. Note that I don't recommend going with values lower than 5 for -BlitzWhoDelay, especially in a production environment.
+### Database-specific checks
+Using `-CheckDB SomeDB` will limit most of the data to the specified database, it also gets the following additional information:
+- Worst queries recorded in the Query Store in the past 7 days
+- Statistics information
+- Index fragmentation information
 
-- Using `-CheckDB SomeDB` will modify the executions of sp_Blitz, sp_BlitzCache, sp_BlitzIndex, and sp_BlitzLock as follows:
-```SQL
-sp_Blitz @CheckServerInfo = 1, @CheckUserDatabaseObjects = 0
-sp_BlitzIndex @GetAllDatabases = 0, @DatabaseName = 'SomeDB', @Mode = ...
-sp_BlitzCache @ExpertMode = 1, @DatabaseName = 'SomeDB', @SortOrder = ...
-sp_BlitzLock @StartDate = DATEADD(DAY,-15, GETDATE()), @EndDate = GETDATE(), @DatabaseName = 'SomeDB'
-```
-- Using `-CheckDB SomeDB` will also retrieve current statistics data and index fragmentation data for said database.
+### Behavior changes based on plan cache data
+If, the case of an instance-wide check, a database accounts for at least 3/2 of the data returned from the plan cache, the following information will also be returned for that database:
+- Worst queries recorded in the Query Store in the past 7 days
+- Statistics information
+- Index fragmentation information
+
+### Limiting data retrieved from the plan cache to the last x minutes
+By default, the query data retrieved from the plan cache will check the contents of the entire plan cache, but you can limit that timeframe by using the `-CacheMinutesBack` parameter.<br>For example, using `-CacheMinutesBack 20` will look in the plan cache for queries that have been executed in the past 20 minutes.<br>The paramter also accounts for PSBlitz execution until that point and is dynamically auto-adjusted so that the desired timeframe won't be missed due to PSBlitz's added execution time.
+
+#### Note
+I don't recommend going with values lower than 5 for -BlitzWhoDelay, especially in a production environment.
+
 [*Back to top*](#header1)
 
 ## Output files
@@ -187,7 +218,7 @@ Output directory name `[HostName]_[Instance]_[TimeStamp]` for an instance-wide c
 
 Deadlocks will be saved in the Deadlocks directory under the output directory.
 
-Deadlock file naming convention - `[EventDate]_[EventTime]_[RecordNumberOfDistinctDeadlockGroupVictim].xdl`
+Deadlock file naming convention - `Deadlock_[DeadlockNumber].xdl`
 
 Execution plans will be saved in the Plans directory under the output directory.
 
@@ -196,7 +227,7 @@ Execution plans file naming convention:
  - for plans obtained through sp_BlitzIndex (only available in SQL Server 2019 and above) - `MissingIndex_[MissingIndexNumber].sqlplan`.
  - for plans obtained through the open transactions check - `OpenTranCurrent_[SPID].sqlplan` and/or `OpenTranRecent_[SPID].sqlplan`.
  - for plans obtained through sp_BlitzQueryStore - `QueryStore_[RowNumber].sqlplan`
- - for plans obtained through sp_BlitzWho - `RunningNow_[SPID]_[start_time]_[query_plan_hash].sqlplan`. If no query plan hash is returned by sp_BlitzWho, then 0x00 will be used.
+ - for plans obtained through sp_BlitzWho - `RunningNow_[RowNumber].sqlplan`. If no query plan hash is returned by sp_BlitzWho, then 0x00 will be used.
 
 [*Back to top*](#header1)
 
@@ -266,12 +297,34 @@ Otherwise you can navigate in PowerShell to the directory where the script is an
     ```PowerShell
     .\PSBlitz.ps1 yourserver.database.windows.net -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
     ```
+15. Run it against a default instance residing on Server02, with HTML output, in-depth checks via SQL login and password, while limmiting most checks to YourDatabase only, and also limiting the query information returned from the plan cache to the past 2 hours
+    ```PowerShell
+    .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -ToHTML Y -IsIndepth Y -CheckDB YourDatabase -CacheMinutesBack 120
+    ```
 Note that `-ServerName` is a positional parameter, so you don't necessarily have to specify the parameter's name as long as the first thing after the script's name is the instance 
 
 [*Back to top*](#header1)
 
-## Report a Bug
+## Acknowledgments
+[Brent Ozar](https://www.brentozar.com/) for the SQL Server First Responder Kit.<br>
+All contributors to this project. (at this point it's just me, lol)
+
+[*Back to top*](#header1)
+
+## Contributing
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Open a Pull Request
+
+## Support
+### Reporting Bugs
 If you've ran into an error while running PSBlitz, please read [this](https://github.com/VladDBA/PSBlitz/issues/216) before opening an issue.
+### Feature requests
+For feature requests, open an issue with the enhancement label
+
+[*Back to top*](#header1)
 
 ## Screenshots
 ![GIF](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/GIF_000.gif)

@@ -3627,13 +3627,14 @@ BEGIN
             BEGIN
                 SET @ExportToExcel = 0;
             END;
-
+			/*Vlad - result set changes for PSBlitz*/
             SET @deadlock_result += N'
             SELECT
-                server_name =
-                    @@SERVERNAME,
+                /*server_name =
+                    @@SERVERNAME,*/
                 dr.deadlock_type,
-                dr.event_date,
+                CONVERT(VARCHAR(25),dr.event_date,120) AS event_date,
+				/*REPLACE(REPLACE(REPLACE(CONVERT(VARCHAR(25),dr.event_date,120),'':'',''''),'' '',''_''),''-'','''') AS graphfile_date,*/
                 database_name =
                     COALESCE
                     (
@@ -3643,10 +3644,13 @@ BEGIN
                     ),
                 dr.spid,
                 dr.deadlock_group,
-                ' + CASE @ExportToExcel
+                CASE WHEN dr.deadlock_group LIKE ''% - VICTIM'' THEN REPLACE(LEFT(dr.deadlock_group, CHARINDEX('','', dr.deadlock_group) - 1),'' #'',''_'') + ''.xdl''
+				ELSE '''' END AS deadlock_graph_file,
+				REPLACE(REPLACE(REPLACE(dr.deadlock_group,''Deadlock #'',''DL''),'', Query #'',''Q''),'' - VICTIM'',''V'')+''.query'' AS query,
+				' + CASE @ExportToExcel
                          WHEN 1
                          THEN N'
-                query = dr.query_string,
+                query_text = dr.query_string,
                 object_names =
                     REPLACE(
                     REPLACE(
@@ -3665,8 +3669,8 @@ BEGIN
                 dr.waiter_mode,
                 dr.lock_mode,
                 dr.transaction_count,
-                dr.client_option_1,
-                dr.client_option_2,
+                /*dr.client_option_1,
+                dr.client_option_2,*/
                 dr.login_name,
                 dr.host_name,
                 dr.client_app,
@@ -3674,11 +3678,11 @@ BEGIN
                 dr.wait_resource,
                 dr.priority,
                 dr.log_used,
-                dr.last_tran_started,
-                dr.last_batch_started,
-                dr.last_batch_completed,
+                CONVERT(VARCHAR(25),dr.last_tran_started,120) AS last_tran_started,
+                CONVERT(VARCHAR(25),dr.last_batch_started,120) AS last_batch_started,
+                CONVERT(VARCHAR(25),dr.last_batch_completed,120) AS last_batch_completed,
                 dr.transaction_name,
-                dr.status,' +
+                /*dr.status,' +
                     CASE
                         WHEN (@ExportToExcel = 1
                               OR @OutputDatabaseCheck = 0)
@@ -3694,7 +3698,7 @@ BEGIN
                 dr.waiter_waiter_activity,
                 dr.waiter_merging,
                 dr.waiter_spilling,
-                dr.waiter_waiting_to_close,'
+                dr.waiter_waiting_to_close,*/'
                         ELSE N'
                 dr.parallel_deadlock_details,'
                         END +
@@ -3712,6 +3716,7 @@ BEGIN
                 dr.is_victim DESC
             OPTION(RECOMPILE, LOOP JOIN, HASH JOIN);
             ';
+			/*Vlad - result set changes for PSBlitz - end*/
 
         IF (@OutputDatabaseCheck = 0)
         BEGIN
@@ -3927,15 +3932,16 @@ BEGIN
                     sql_handle,
                     plan_handle
                 );
-               
+             /*Vlad - column changes for PSBlitz*/  
                 SELECT
-                    ap.available_plans,
+                    /*ap.available_plans,*/
                     ap.database_name,
-                    query_text =
-                        TRY_CAST(ap.query_xml AS xml),
+					CAST('' AS VARCHAR(30)) AS query,
+                    query_text = REPLACE(REPLACE(ap.query_xml, N'<?query '+CAST(CHAR(10) AS NVARCHAR(1)),N''),CAST(CHAR(10) AS NVARCHAR(1))+N'   ?>',N''),
+					CAST('' AS VARCHAR(30)) AS sqlplan_file,
                     ap.query_plan,
-                    ap.creation_time,
-                    ap.last_execution_time,
+                    CONVERT(VARCHAR(25),ap.creation_time,120) AS creation_time,
+                    CONVERT(VARCHAR(25),ap.last_execution_time,120) AS last_execution_time,
                     ap.execution_count,
                     ap.executions_per_second,
                     ap.total_worker_time_ms,
@@ -3955,10 +3961,10 @@ BEGIN
                     ap.max_reserved_threads,
                     ap.min_used_threads,
                     ap.max_used_threads,
-                    ap.total_rows,
-                    ap.sql_handle,
+                    ap.total_rows/*,
+                    CONVERT(VARCHAR(256),ap.[sql_handle],1) AS [sql_handle],
                     ap.statement_start_offset,
-                    ap.statement_end_offset
+                    ap.statement_end_offset*/
                 FROM
                 (
               
@@ -4011,24 +4017,26 @@ BEGIN
                 ORDER BY
                     ap.avg_worker_time_ms DESC
                 OPTION(RECOMPILE, LOOP JOIN, HASH JOIN);
+				/*Vlad - column changes for PSBlitz - end*/  
 
                 RAISERROR('Finished at %s', 0, 1, @d) WITH NOWAIT;
             
                 SET @d = CONVERT(varchar(40), GETDATE(), 109);
                 RAISERROR('Returning findings %s', 0, 1, @d) WITH NOWAIT;
-            
+            /*Vlad - changes for PSBlitz*/
                 SELECT
-                    df.check_id,
+                    /*df.check_id,*/
                     df.database_name,
                     df.object_name,
                     df.finding_group,
                     df.finding
                 FROM #deadlock_findings AS df
+				WHERE df.check_id <> -1
                 ORDER BY
                     df.check_id,
                     df.sort_order
                 OPTION(RECOMPILE);
-            
+            /*Vlad - changes for PSBlitz - end*/
                 SET @d = CONVERT(varchar(40), GETDATE(), 109);
                 RAISERROR('Finished at %s', 0, 1, @d) WITH NOWAIT;
             END; /*done with output to client app.*/
