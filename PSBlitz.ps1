@@ -947,7 +947,7 @@ function Save-HtmlFile {
 		}
 	}
 	catch {
-		Write-Host "Error saving HTML file: $_" -ForegroundColor Red
+		Write-Host " Error saving HTML file: $_" -ForegroundColor Red
 	}
 }
 
@@ -1941,11 +1941,9 @@ $htmlTable4
 </body>
 </html>
 "@
-			if ($DebugInfo) {
-				Write-Host " ->Writing HTML file." -fore yellow
-			}
-			$HTMLFilePath = Join-Path -Path $HTMLOutDir -ChildPath "InstanceInfo.html"
-			$html | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
+			#Save HTML file
+			Save-HtmlFile $html "InstanceInfo.html" $HTMLOutDir $DebugInfo
+			Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3, htmlTable4
 		}
 		else {
 			###Populating the "Instance Info" sheet
@@ -2007,7 +2005,7 @@ $htmlTable4
 
 			$htmlTable2 = Convert-TableToHtml $TempTabTbl -DebugInfo:$DebugInfo
 
-			#Add query name column
+			#Add query name
 			$RowNum = 0
 			$i = 0		
 			foreach ($row in $TempDBSessTbl) {
