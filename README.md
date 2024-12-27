@@ -1,11 +1,24 @@
 # PSBlitz
+
+[![PowerShell](https://img.shields.io/badge/PowerShell-5.1%2B-blue.svg)](https://github.com/PowerShell/PowerShell)
+[![Windows PowerShell](https://img.shields.io/badge/Windows-PowerShell%207.x-5E5E5E.svg)](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows)
+[![Linux](https://img.shields.io/badge/Linux-PowerShell%207.x-orange.svg)](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-linux)
+[![SQL Server](https://img.shields.io/badge/SQL%20Server-2014%2B-0078D4.svg)](https://learn.microsoft.com/en-us/sql/sql-server)
+[![Azure SQL DB](https://img.shields.io/badge/Azure%20SQL-Database-0078D4.svg)](https://learn.microsoft.com/en-us/azure/azure-sql/database/sql-database-paas-overview)
+[![Azure SQL MI](https://img.shields.io/badge/Azure%20SQL-Managed%20Instance-0078D4.svg)](https://learn.microsoft.com/en-us/azure/azure-sql/managed-instance/sql-managed-instance-paas-overview)
+[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+
+> A PowerShell-based SQL Server performance diagnostics and health check tool.
+
 <a name="header1"></a>
 ## Navigation
 - [Intro](#Intro)
-- [What it does](#What-it-does)
+- [Features overview](#Features-overview)
+- [Compatibility](#Compatibility)
 - [Prerequisites](#Prerequisites)
 - [Installation](#Installation)
-- [What it runs](#What-it-runs)
+- [What it does](#What-it-does)
+
 - [Default check VS in-depth check](#Default-check-VS-in-depth-check)
 - [Output files](#Output-files)
 - [Usage examples](#Usage-examples)
@@ -15,10 +28,19 @@
 
 ## Intro
 
-Since I'm a big fan of [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) and I've found myself in many situations where I would have liked a quick way to easily export the output of sp_Blitz, sp_BlitzCache, sp_BlitzFirst, sp_BlitzIndex, sp_BlitzLock, and sp_BlitzWho to Excel, as well as saving to disk the execution plans identified by sp_BlitzCache and deadlock graphs from sp_BlitzLock, I've decided to put together a PowerShell script that does just that.<br>
+Since I'm a big fan of [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) and I've found myself in many situations where I would have liked a quick way to easily export the output of sp_Blitz, sp_BlitzCache, sp_BlitzFirst, sp_BlitzIndex, sp_BlitzLock, and sp_BlitzWho to Excel, as well as saving to disk the execution plans identified by sp_BlitzCache and deadlock graphs from sp_BlitzLock, I've decided to put together a PowerShell script that does just that.<br><br>
 As of version 3.0.0, PSBlitz is also capable of exporting the report to HTML making Excel/Office no longer a hard requirement for running PSBlitz.<br>
 As of version 4.0.1, PSBlitz is also compatible with Azure SQL DB and Azure SQL Managed Instance. <br>
 As of version 4.3.4, PSBlitz can be executed using PowerShell on Linux, the output will default to HTML regardless of the option used.
+
+## Features overview
+
+- SQL Server health checks
+- Performance diagnostics
+- Query analysis
+- Deadlock investigation
+- Azure SQL DB support
+- Cross-platform compatibility
 
 ## Compatibility 
 
@@ -27,9 +49,31 @@ PSBlitz can be executed with:
 - PowerShell 7.x
 - PowerShell 7.x on Linux
 
+## Prerequisites
+1. In order to be able to run the PSBlitz.ps1 script, you'll need to unblock it:
+    ```PowerShell
+    Unblock-File .\PSBlitz.ps1
+    ```
+2. If you want the report to be in Excel format, then the MS Office suite needs to be installed on the machine where you're executing PSBlitz, otherwise use the HTML format.
+3. Sufficient permissions to query DMVs, server state, and get database objects' definitions.
+
+You __don't need__ to have any of the sp_Blitz stored procedures present on the instance that you're executing PSBlitz.ps1 for, all the scripts are contained in the `PSBlitz\Resources` directory in non-stored procedure format.
+
+## Installation
+
+Download the latest zip file from the [Releases](https://github.com/VladDBA/PSBlitz/releases) section of the repository and extract its contents. 
+
+Do not change the directory structure and file names.
+
+[*Back to top*](#header1)
+
 ## What it does
 
-Outputs the following to an Excel spreadsheet or to an HTML report:
+PSBlitz.ps1 uses slightly modified, non-stored procedure versions, of the following components 
+from [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit).
+<br>You can find the all the scripts in the repository's [Resources](/Resources) directory
+
+#### Outputs the following to an Excel spreadsheet or to an HTML report:
 - Instance information
 - Currently opened transactions (if any)
 - Wait stats - from sp_BlitzFirst
@@ -61,55 +105,24 @@ Exports the following files:
    - Index Usage Details
    - (Detailed) Index Diagnosis
 
-  The behavior can be controlled via the `-MaxUsrDBs` parameter, but only change the value if most of those databases don't have too many tables, or you've opted to output to HTML and have enough RAM for PS to handle the data (PSBlitz will limit the output to 30k records if more rows are returned)
+  The behavior can be controlled via the `-MaxUsrDBs` parameter, but only change the value if most of those databases don't have too many tables, or you've opted to output to HTML and have enough RAM for PS to handle the data (PSBlitz will limit the output to 10k records if more rows are returned)
 
+- If the database targeted by the "stats info" and "index fragmentation info" steps have lots of tables/indexes/partitions/statistics, the following limits will be applied:
+    - Stats Info - Limited to 10k records ordered by modified percent descending.
+    - Index Fragmentation Info - Limited to 20k records ordered by avg fragmentation percent descending, size descending.
 
-## Prerequisites
-1. In order to be able to run the PSBlitz.ps1 script, you'll need to unblock it:
-    ```PowerShell
-    Unblock-File .\PSBlitz.ps1
-    ```
-2. If you want the report to be in Excel format, then the MS Office suite needs to be installed on the machine where you're executing PSBlitz, otherwise use the HTML format.
-3. Sufficient permissions to query DMVs, server state, and get database objects' definitions.
+## Limitations
 
-You don't need to have any of the sp_Blitz stored procedures present on the instance that you're executing PSBlitz.ps1 for, all the scripts are contained in the `PSBlitz\Resources` directory in non-stored procedure format.
-
-Limitations:
+### Check targets
 - For the time being PSBlitz.ps1 can only run against SQL Server instances, Azure SQL DB, and Azure SQL Managed Instance, but not against Amazon RDS.
 
-[*Back to top*](#header1)
+### Excel
+- If you're using a 32bit installation of Excel and opt for the xlsx output, you might run into "out of memory" errors. <br>That's not an issue with PSBlitz, it's the direct result of opting to still use 32bit software in `SELECT DATEPART(YEAR,GETDATE())`.
 
-## Installation
+## Known issues:
+When running PSBlitz with the Excel output, if you (open and) close an Excel window in parallel with PSBlitz's execution you'll also cause the Excel session used by PSBlitz to close, leading to the following error message:
+- `You cannot call a method on a null-valued expression.`
 
-Download the latest zip file from the [Releases](https://github.com/VladDBA/PSBlitz/releases) section of the repository and extract its contents. 
-
-Do not change the directory structure and file names.
-
-[*Back to top*](#header1)
-
-## What it runs
-PSBlitz.ps1 uses slightly modified, non-stored procedure versions, of the following components 
-from [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit):
-- sp_Blitz
-- sp_BlitzCache
-- sp_BlitzFirst
-- sp_BlitzIndex
-- sp_BlitzLock
-- sp_BlitzWho
-- sp_BlitzQueryStore
-
-Aside from the above scripts, PSBlitz also runs the following scripts to return sp_BlitzWho data, instance and resource information, TempDB usage,
-opened transactions, statistics and index fragmentation info:
-- GetDbInfo.sql
-- GetBlitzWhoData.sql
-- GetInstanceInfo.sql
-- GetAzureSQLDBInfo.sql
-- GetTempDBUsageInfo.sql
-- GetOpenTransactions.sql
-- GetIndexInfoForWholeDB.sql
-- GetStatsInfoForWholeDB.sql
-
-You can find the all the scripts in the repository's [Resources](/Resources) directory
 
 [*Back to top*](#header1)
 
@@ -135,6 +148,8 @@ You can find the all the scripts in the repository's [Resources](/Resources) dir
 [*Back to top*](#header1)
 
 ## Default check VS in-depth check
+
+_Note that I'm using the original stored procedure names puerly for example purposes, PSBlitz does not create or require the sp_Blitz* stored procedures to exist on the instance._
 
 - The default check will run the following:
 ```SQL
