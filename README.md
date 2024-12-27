@@ -120,8 +120,7 @@ Exports the following files:
 - If you're using a 32bit installation of Excel and opt for the xlsx output, you might run into "out of memory" errors. <br>That's not an issue with PSBlitz, it's the direct result of opting to still use 32bit software in `SELECT DATEPART(YEAR,GETDATE())`.
 
 ## Known issues:
-When running PSBlitz with the Excel output, if you (open and) close an Excel window in parallel with PSBlitz's execution you'll also cause the Excel session used by PSBlitz to close, leading to the following error message:
-- `You cannot call a method on a null-valued expression.`
+When running PSBlitz with the Excel output, if you (open and) close an Excel window in parallel with PSBlitz's execution you'll also cause the Excel session used by PSBlitz to close, leading to the following error message:<br>`You cannot call a method on a null-valued expression.`
 
 
 [*Back to top*](#header1)
@@ -139,7 +138,7 @@ When running PSBlitz with the Excel output, if you (open and) close an Excel win
 |`-OutputDir`| Used to provide a path where the output directory should be saved to. <br>Defaults to PSBlitz.ps1's directory if not specified or a non-existent path is provided.|
 |`-ToHTML`| Providing Y as a value will tell PSBlitz.ps1 to output the report as HTML instead of an Excel file. This is perfect when running PSBlitz from a machine that doesn't have Office installed.|
 |`-ZipOutput`| Providing Y as a value will tell PSBlitz.ps1 to also create a zip archive of the output files.<br>Defaults to N.|
-|`-BlitzWhoDelay` | Used to sepcify the number of seconds between each sp_BlitzWho execution. <br>Defaults to 10 if not specified.|
+|`-BlitzWhoDelay` | Used to sepcify the number of seconds between each active session data capture. <br>Defaults to 10 if not specified, meaning that active session data will be captured every 10 seconds.|
 |`-ConnTimeout`| Can be used to increased the timeout limit in seconds for connecting to SQL Server. <br>Defaults to 15 seconds if not specified.|
 |`-MaxTimeout`| Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. <br>Defaults to 1000 (16.6 minutes).|
 |`-MaxUsrDBs`| Can be used to tell PSBlitz to raise the limit of user databases based on which index-related info is limited to only the "loudest" database in the cache results. <br>Defaults to 50. <br>Only change it if you're using using HTML output and have enough RAM to handle the increased data that PS will have to process.|
@@ -151,47 +150,61 @@ When running PSBlitz with the Excel output, if you (open and) close an Excel win
 
 _Note that I'm using the original stored procedure names puerly for example purposes, PSBlitz does not create or require the sp_Blitz* stored procedures to exist on the instance._
 
-- The default check will run the following:
-```SQL
-sp_Blitz @CheckServerInfo = 1
-sp_BlitzFirst @ExpertMode = 1, @Seconds = 30
-sp_BlitzIndex @GetAllDatabases = 1, @Mode = 0
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'CPU'/'avg cpu'	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'duration'/'avg duration'
-sp_BlitzWho @ExpertMode = 1
-sp_BlitzLock @StartDate = DATEADD(DAY,-15, GETDATE()), @EndDate = GETDATE()
-```
+### The default check returns the following data:
+- Instance resource and conviguration overview 
+- Open transactions
+- Tempdb confiuguration and usage
+- Database(s) configuration and size overview
+    - also outputs database scoped configuration in case of a database-specific check
+- Instance health information (skipped on Azure SQL DB)
+- What's going on during a 30 second interval in terms of waits and resource usage
+- Top 10 (the number can be modified via the `-CacheTop` parameter) queries found in the plan cache by CPU and duration
+- Index diagnostics for all databases
+- Deadlock information for the past 15 days (automatically reduced to 7 days if PSBlitz ran for over 15 minutes already)
+- Session activity collected during the execution of PSBlitz, polled every 10 seconds (the number of seconds can be controlled via the `-BlitzWhoDelay` parameter)
 
-- The in-depth check will run the following:
-```SQL
-sp_Blitz @CheckServerInfo = 1, @CheckUserDatabaseObjects = 1	
-sp_BlitzFirst @ExpertMode = 1, @Seconds = 30	
-sp_BlitzFirst @SinceStartup = 1	
-sp_BlitzIndex @GetAllDatabases = 1, @Mode = 1	
-sp_BlitzIndex @GetAllDatabases = 1, @Mode = 2	
-sp_BlitzIndex @GetAllDatabases = 1, @Mode = 4	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'CPU'/'avg cpu'	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'reads'/'avg reads'	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'writes'/'avg writes'
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'duration'/'avg duration'	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'executions'/'xpm'	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'memory grant'	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'recent compilations', @Top = 50	
-sp_BlitzCache @ExpertMode = 1, @SortOrder = 'spills'/'avg spills'	
-sp_BlitzWho @ExpertMode = 1	
-sp_BlitzLock @StartDate = DATEADD(DAY,-15, GETDATE()), @EndDate = GETDATE()
-```
+### The in-depth check returns the following data:
+- Instance resource and conviguration overview 
+- Open transactions
+- Tempdb confiuguration and usage
+- Database(s) configuration and size overview
+    - also outputs database scoped configuration in case of a database-specific check
+- Instance health and database objects information (skipped on Azure SQL DB)
+- What's going on during a 30 second interval in terms of waits and resource usage
+- Waits stats info since last instance restart
+- Storage stats since last instance restart
+- Perfmon stats since last instance restart
+- Top 10 (the number can be modified via the `-CacheTop` parameter) queries found in the plan cache by:
+    - CPU
+    - Duration
+    - Reads
+    - Writes
+    - Executions
+    - Memory Grant
+    - Spills to tempdb
+    - Duplicate Plans
+- Top 50 queries by recent plan compilations
+- Database index summary
+- Index usage information
+- Detailed index diagnostics
+- Deadlock information for the past 15 days (automatically reduced to 7 days if PSBlitz ran for over 15 minutes already)
+- Session activity collected during the execution of PSBlitz, polled every 10 seconds (the number of seconds can be controlled via the `-BlitzWhoDelay` parameter)
 
-- sp_BlitzWho will be executed as part of a background process at every 10 seconds. The frequency can be changed using the `-BlitzWhoDelay` parameter. Note that I don't recommend going with values lower than 5 for -BlitzWhoDelay, especially in a production environment.
+### Database-specific checks
+Using `-CheckDB SomeDB` will limit most of the data to the specified database, it also gets the following additional information:
+- Worst queries recorded in the Query Store in the past 7 days
+- Statistics information
+- Index fragmentation information
 
-- Using `-CheckDB SomeDB` will modify the executions of sp_Blitz, sp_BlitzCache, sp_BlitzIndex, and sp_BlitzLock as follows:
-```SQL
-sp_Blitz @CheckServerInfo = 1, @CheckUserDatabaseObjects = 0
-sp_BlitzIndex @GetAllDatabases = 0, @DatabaseName = 'SomeDB', @Mode = ...
-sp_BlitzCache @ExpertMode = 1, @DatabaseName = 'SomeDB', @SortOrder = ...
-sp_BlitzLock @StartDate = DATEADD(DAY,-15, GETDATE()), @EndDate = GETDATE(), @DatabaseName = 'SomeDB'
-```
-- Using `-CheckDB SomeDB` will also retrieve current statistics data and index fragmentation data for said database.
+### Behavior changes based on plan cache data
+If, the case of an instance-wide check, a database accounts for at least 3/2 of the data returned from the plan cache, the following information will also be returned for that database:
+- Worst queries recorded in the Query Store in the past 7 days
+- Statistics information
+- Index fragmentation information
+
+#### Note
+I don't recommend going with values lower than 5 for -BlitzWhoDelay, especially in a production environment.
+
 [*Back to top*](#header1)
 
 ## Output files
