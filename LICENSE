@@ -1,11 +1,14 @@
 MIT License
 
 Copyright for sp_Blitz, sp_BlitzCache, sp_BlitzFirst, sp_BlitzIndex, 
-sp_BlitzLock, and sp_BlitzWho is held by Brent Ozar Unlimited under MIT licence:
-[SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit)
+sp_BlitzLock,sp_BlitzQueryStore, and sp_BlitzWho is held by Brent Ozar Unlimited under MIT licence:
+[SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit).
+
+Copyright for sorttable.js is held by [Stuart Langridge](http://www.kryogenix.org/code/browser/sorttable/)
+
+
 Copyright for PSBlitz.ps1, GetStatsInfoForWholeDB.sql, GetOpenTransactions.sql, 
-GetIndexInfoForWholeDB.sql, GetInstanceInfo.sql, and GetTempDBUsageInfo.sql 
-is held by Vlad Drumea, 2024 as described below.
+GetIndexInfoForWholeDB.sql, GetInstanceInfo.sql, GetAzureSQLDBInfo.sql, GetTempDBUsageInfo.sql GetBlitzWhoData.sql, and styles.css, is held by Vlad Drumea, 2024 as described below.
 
 Copyright (c) 2024 Vlad Drumea - https://vladdba.com/
 
