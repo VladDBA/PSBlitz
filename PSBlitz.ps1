@@ -84,9 +84,14 @@
  Copyright for sp_Blitz, sp_BlitzCache, sp_BlitzFirst, sp_BlitzIndex, 
  sp_BlitzLock, and sp_BlitzWho is held by Brent Ozar Unlimited under MIT licence:
  SQL Server First Responder Kit - https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit
+
+ Copyright for sorttable.js is held by Stuart Langridge - http://www.kryogenix.org/code/browser/sorttable/
+
  Copyright for PSBlitz.ps1, GetStatsInfoForWholeDB.sql, GetOpenTransactions.sql, 
  GetIndexInfoForWholeDB.sql, GetInstanceInfo.sql, and GetTempDBUsageInfo.sql 
- is held by Vlad Drumea, 2024 as described below.
+ is held by Vlad Drumea, 2025 as described below.
+
+ Copyright (c) 2025 Vlad Drumea - https://vladdba.com/
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -168,7 +173,7 @@
  Author: Vlad Drumea (VladDBA)
  Website: https://vladdba.com/
 
- Copyright: (c) 2024 by Vlad Drumea, licensed under MIT
+ Copyright: (c) 2025 by Vlad Drumea, licensed under MIT
  License: MIT https://opensource.org/licenses/MIT
 
 .LINK
@@ -272,8 +277,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.0.0"
-$VersDate = "2024-12-27"
+$Vers = "5.0.1"
+$VersDate = "2025-01-14"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -3897,23 +3902,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					Invoke-ClearVariables html, htmlTable
 				}
 				else {
-					if ($IsAzureSQLDB) {
-						$SheetName = "Index Fragmentation for $ASDBName"
-					}
-					else {
-						$SheetName = "Index Fragmentation for $CheckDB"
-					}
-					$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
-					Convert-TableToExcel $IndexTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
-					##Saving file
-					Save-ExcelFile $ExcelFile
-
-				}
-				else {
 					$ExcelSheet = $ExcelFile.Worksheets.Item("Index Fragmentation")
-					
 					Convert-TableToExcel $IndexTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
-
 					##Saving file
 					Save-ExcelFile $ExcelFile
 				}
