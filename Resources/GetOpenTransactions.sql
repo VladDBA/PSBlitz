@@ -141,10 +141,10 @@ SELECT CONVERT(VARCHAR(25),[qcte].[time_of_check],120) AS [time_of_check],
        CONVERT(VARCHAR(25),[qcte].[request_end_time],120) AS [request_end_time],
        [qcte].[active_request_elapsed_seconds],
 	   CASE 
-	     WHEN [qcte].[transaction_state] = 'The transaction is active' 
-		 THEN DATEDIFF(SECOND, [qcte].[transaction_begin_time],[qcte].[time_of_check] ) 
+	     WHEN [qcte].[request_end_time] IS NOT NULL 
+		 THEN DATEDIFF(SECOND, [qcte].[request_end_time],[qcte].[time_of_check] ) 
 		 ELSE NULL 
-	   END AS [active_transaction_elapsed_seconds],
+	   END AS [seconds_since_request_ended],
        [qcte].[host_name],
        [qcte].[login_name],
        [qcte].[program_name],
