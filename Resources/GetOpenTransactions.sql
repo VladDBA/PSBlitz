@@ -11,7 +11,7 @@ DECLARE @DatabaseName NVARCHAR(256);
 SET @DatabaseName = N'';
 
 /*
-		This is a fix for an edge case that causes the same record(s) to show up multiple times
+		This CTE is a fix for an edge case that causes the same record(s) to show up multiple times
 		- can't do SELECT DISTINCT when XML data is involved, so I'll split this up using a CTE
 */
 WITH qcte
@@ -140,6 +140,11 @@ SELECT CONVERT(VARCHAR(25),[qcte].[time_of_check],120) AS [time_of_check],
        CONVERT(VARCHAR(25),[qcte].[request_start_time],120) AS [request_start_time],
        CONVERT(VARCHAR(25),[qcte].[request_end_time],120) AS [request_end_time],
        [qcte].[active_request_elapsed_seconds],
+	   CASE 
+	     WHEN [qcte].[transaction_state] = 'The transaction is active' 
+		 THEN DATEDIFF(SECOND, [qcte].[transaction_begin_time],[qcte].[time_of_check] ) 
+		 ELSE NULL 
+	   END AS [active_transaction_elapsed_seconds],
        [qcte].[host_name],
        [qcte].[login_name],
        [qcte].[program_name],
