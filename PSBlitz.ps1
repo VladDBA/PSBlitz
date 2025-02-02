@@ -278,7 +278,7 @@ param(
 ###Internal params
 #Version
 $Vers = "5.1.0"
-$VersDate = "2025-02-02"
+$VersDate = "2025-02-03"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -812,7 +812,9 @@ function Export-PlansAndDeadlocks {
 		[Parameter(Position = 5, Mandatory = $false)]
 		[string] $FPrefix = '',
 		[Parameter(Position = 6, Mandatory = $false)]
-		[switch] $DebugInfo
+		[switch] $DebugInfo,
+		[Parameter(Position = 7, Mandatory = $false)]
+		[switch] $FileNameFromColumn
 	)
 	try {
 		#if ($DebugInfo) {
@@ -824,11 +826,20 @@ function Export-PlansAndDeadlocks {
 		foreach ($row in $DataTable) {
 			$i += 1
 			$FileName = "-- N/A --"
-			if($DataTable.Rows[$RowNum][$XMLColName] -ne [System.DBNull]::Value){
-				$FileName = $FPrefix +'_'+ $i + '.' + $OutputType
+			if (($DataTable.Rows[$RowNum][$XMLColName] -ne [System.DBNull]::Value) -and 
+			    (($DataTable.Rows[$RowNum][$FNameColName] -like "Deadlock*") -or
+			      ($XMLColName -ne "deadlock_graph")) ) {
+				if ($FileNameFromColumn) {
+					$FileName = $DataTable.Rows[$RowNum][$FNameColName]
+				}
+				else {
+					$FileName = $FPrefix + '_' + $i + '.' + $OutputType
+				}
 				$DataTable.Rows[$RowNum][$XMLColName] | Format-XML | Set-Content -Path "$FileDir\$FileName" -Force
 			}
-			$DataTable.Rows[$RowNum][$FNameColName] = $FileName
+			if ($FileNameFromColumn -eq $false) {
+				$DataTable.Rows[$RowNum][$FNameColName] = $FileName
+			}			
 			$RowNum += 1			
 		}
 
@@ -838,6 +849,35 @@ function Export-PlansAndDeadlocks {
 	}
 	catch {
 		Write-Host " Error exporting deadlock and plan data: $_" -ForegroundColor Red
+	}
+}
+
+function Add-QueryName {
+	param (
+		[Parameter(Position = 0, Mandatory = $true)]
+		[System.Data.DataTable] $DataTable,
+		[Parameter(Position = 1, Mandatory = $true)]
+		[string] $QueryNameColName,
+		[Parameter(Position = 2, Mandatory = $true)]
+		[string] $QueryTextColName,
+		[Parameter(Position = 3, Mandatory = $true)]
+		[string] $QPrefix
+	)
+	try {
+		$RowNum = 0
+		$i = 0
+		foreach ($row in $DataTable) {
+			if ($DataTable.Rows[$RowNum][$QueryTextColName] -ne [System.DBNull]::Value) {
+				$i += 1
+				$QueryName = $QPrefix + "_" + $i + ".query"					
+			}
+			else { $QueryName = "-- N/A --" }
+			$DataTable.Rows[$RowNum][$QueryNameColName] = $QueryName
+			$RowNum += 1
+		}
+	}
+	catch {
+		Write-Host " Error adding query names: $_" -ForegroundColor Red
 	}
 }
 
@@ -1298,7 +1338,7 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 	if (!([string]$AdvOptions = Read-Host -Prompt "Show advanced options?(empty defaults to N)[Y/N]")) {
 		$AdvOptions = "N"
 	}
-	if($AdvOptions -eq "Y"){
+	if ($AdvOptions -eq "Y") {
 		##Get top N queries from cache
 		[int]$CacheTop = Read-Host -Prompt "Number of top resource intensive queries to return?(empty defaults to 10)"
 
@@ -1837,10 +1877,10 @@ $Query = "SELECT CAST(DATEDIFF(HH, [sqlserver_start_time], GETDATE()) / 24.00 AS
 $Query = $Query + "`nFROM [sys].[dm_os_sys_info];"
 Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Uptime check" -ConnStringIn $ConnString -CmdTimeoutIn 100
 if ($global:StepOutcome -eq "Success") {
-	if($global:PSBlitzSet.Tables[0].Rows[0]["uptime_days"] -lt 7.00){
+	if ($global:PSBlitzSet.Tables[0].Rows[0]["uptime_days"] -lt 7.00) {
 		[string]$DaysUp = $global:PSBlitzSet.Tables[0].Rows[0]["uptime_days"]
-	Write-Host "Warning: Instance uptime is less than 7 days - $DaysUp" -Fore Red
-	Write-Host "->Diagnostics data might not be reliable with less than 7 days of uptime." -Fore Red
+		Write-Host "Warning: Instance uptime is less than 7 days - $DaysUp" -Fore Red
+		Write-Host "->Diagnostics data might not be reliable with less than 7 days of uptime." -Fore Red
 	}
 	Invoke-ClearVariables PSBlitzSet
 }
@@ -2034,20 +2074,8 @@ $htmlTable4
 
 			$htmlTable2 = Convert-TableToHtml $TempTabTbl -DebugInfo:$DebugInfo
 
-			#Add query name
-			$RowNum = 0
-			$i = 0		
-			foreach ($row in $TempDBSessTbl) {
-				if ($TempDBSessTbl.Rows[$RowNum]["query_text"] -ne [System.DBNull]::Value) {
-					$i += 1
-					$QueryName = "TempDB_" + $i + ".query"
-				
-				}
-				else { $QueryName = "" }
-				$TempDBSessTbl.Rows[$RowNum]["query"] = $QueryName
-				$RowNum += 1
-			}
-			
+			Add-QueryName $TempDBSessTbl "query" "query_text" "TempDB"
+
 			$htmlTable3 = Convert-TableToHtml $TempDBSessTbl -ExclCols "query_text" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs "TempDB"
 			
 			$htmlTable4 = Convert-QueryTableToHtml $TempDBSessTbl -DebugInfo:$DebugInfo -Cols "query", "query_text" -AnchorToHere -AnchorID "TempDB"
@@ -2160,26 +2188,9 @@ $htmlTable2
 			Write-Host " ->No open transactions found."
 		}
 		else {
-			##Exporting execution plans to file
-			#Set counter used for row retrieval
-			[int]$RowNum = 0
-			$i = 0
-			#loop through each row
-			if ($DebugInfo) {
-				Write-Host " ->Exporting execution plans" -fore yellow
-			}
-			foreach ($row in $AcTranTbl) {
-				$i += 1
-				if ($AcTranTbl.Rows[$RowNum]["current_plan"] -ne [System.DBNull]::Value) {
-					[string]$SQLPlanFile = $AcTranTbl.Rows[$RowNum]["current_plan_file"]
-					$AcTranTbl.Rows[$RowNum]["current_plan"] | Format-XML | Set-Content -Path $PlanOutDir\$($SQLPlanFile) -Force
-				}
-				if ($AcTranTbl.Rows[$RowNum]["most_recent_plan"] -ne [System.DBNull]::Value) {
-					[string]$SQLPlanFile = $AcTranTbl.Rows[$RowNum]["most_recent_plan_file"]
-					$AcTranTbl.Rows[$RowNum]["most_recent_plan"] | Format-XML | Set-Content -Path $PlanOutDir\$($SQLPlanFile) -Force
-				}
-				$RowNum += 1
-			}
+
+			Export-PlansAndDeadlocks $AcTranTbl $PlanOutDir "current_plan" "current_plan_file" -DebugInfo:$DebugInfo -FileNameFromColumn
+			Export-PlansAndDeadlocks $AcTranTbl $PlanOutDir "most_recent_plan" "most_recent_plan_file" -DebugInfo:$DebugInfo -FileNameFromColumn
 			if ($ToHTML -eq "Y") {
 
 				$tableName = "Open transaction info"
@@ -2825,25 +2836,8 @@ $JumpToTop
 			if ($DebugInfo) {
 				Write-Host " ->Exporting execution plans for $SortOrder" -fore yellow
 			}
-			<#Set counter used for row retrieval
-			$RowNum = 0
-			#Setting $i to 0
-			$i = 0
-			foreach ($row in $BlitzCacheTbl) {
-				#Increment file name counter	
-				$i += 1
-				$SQLPlanFile = "-- N/A --" 
-				#Get only the column storing the execution plan data that's not NULL and write it to a file
-				if ($BlitzCacheTbl.Rows[$RowNum]["Query Plan"] -ne [System.DBNull]::Value) {
-					$SQLPlanFile = $FileSOrder + "_" + $i + ".sqlplan"
-					$BlitzCacheTbl.Rows[$RowNum]["Query Plan"] | Format-XML | Set-Content -Path "$PlanOutDir\$SQLPlanFile" -Force
-				}
-				$BlitzCacheTbl.Rows[$RowNum]["SQLPlan File"] = $SQLPlanFile		
-				#Increment row retrieval counter
-				$RowNum += 1
-			}
-				#>
-				Export-PlansAndDeadlocks $BlitzCacheTbl $PlanOutDir "Query Plan" "SQLPlan File" -FPrefix $FileSOrder -DebugInfo:$DebugInfo
+
+			Export-PlansAndDeadlocks $BlitzCacheTbl $PlanOutDir "Query Plan" "SQLPlan File" -FPrefix $FileSOrder -DebugInfo:$DebugInfo
 
 			##Add database names to array
 			if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
@@ -2899,19 +2893,8 @@ $JumpToTop
 
 			if ($ToHTML -eq "Y") {
 				$SheetName = $SheetName -replace "Top Queries - ", ""
-				
-				$RowNum = 0
-				$i = 0
-				foreach ($row in $BlitzCacheTbl) {
-					if ($BlitzCacheTbl.Rows[$RowNum]["Query Text"] -ne [System.DBNull]::Value) {
-						$i += 1
-						$QueryName = $FileSOrder + "_" + $i + ".query"					
-					}
-					else { $QueryName = "" }
-					$BlitzCacheTbl.Rows[$RowNum]["Query"] = $QueryName
-					$RowNum += 1
-				}
-				
+
+				Add-QueryName $BlitzCacheTbl "Query" "Query Text" $FileSOrder				
 					
 				$htmlTable1 = Convert-TableToHtml $BlitzCacheTbl -NoCaseChange -ExclCols "Query Text", "Query Plan" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs $FileSOrder
 				
@@ -3286,39 +3269,11 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					Write-Host " ->Exporting execution plans" -fore yellow
 				}
 
-				#Set counter used for row retrieval
-				<#$RowNum = 0
-				#Setting $i to 0
-				$i = 0				
-				foreach ($row in $BlitzQSTbl) {
-					#Increment file name counter	
-					$i += 1
-					$SQLPlanFile = "-- N/A --"
-					#Get only the column storing the execution plan data that's not NULL and write it to a file
-					if ($BlitzQSTbl.Rows[$RowNum]["query_plan_xml"] -ne [System.DBNull]::Value) {
-						$SQLPlanFile = "QueryStore_" + $i + ".sqlplan"
-						$BlitzQSTbl.Rows[$RowNum]["query_plan_xml"] | Format-XML | Set-Content -Path "$PlanOutDir\$SQLPlanFile" -Force
-					}
-					$BlitzQSTbl.Rows[$RowNum]["SQLPlan File"] = $SQLPlanFile		
-					#Increment row retrieval counter
-					$RowNum += 1
-				}
-					#>
 				Export-PlansAndDeadlocks $BlitzQSTbl $PlanOutDir "query_plan_xml" "SQLPlan File" -FPrefix "QueryStore" -DebugInfo:$DebugInfo
 				
 				if ($ToHTML -eq "Y") {
 					
-					$RowNum = 0
-					$i = 0			
-					foreach ($row in $BlitzQSTbl) {
-						if ($BlitzQSTbl.Rows[$RowNum]["query_sql_text"] -ne [System.DBNull]::Value) {
-							$i += 1
-							$QueryName = "QueryStore_" + $i + ".query"
-						}
-						else { $QueryName = "" }
-						$BlitzQSTbl.Rows[$RowNum]["Query"] = $QueryName
-						$RowNum += 1
-					}
+					Add-QueryName $BlitzQSTbl "Query" "query_sql_text" "QueryStore"
 
 					$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan_xml" -CSSClass "QueryStoreTab sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
 
@@ -3452,28 +3407,11 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$BlitzIxTbl = $global:PSBlitzSet.Tables[0]
 			if ("0", "4" -Contains $Mode) {
 				#Export sample execution plans for missing indexes (SQL Server 2019 only)
-				#Since we're already looping through the result set here, might as well add and
-				#populate the plan file name column as well
 				if ($DebugInfo) {
 					Write-Host " ->Exporting missing index sample execution plans (if any)" -fore yellow
 				}
 					
-				<#$RowNum = 0
-				$i = 0
-				foreach ($row in $BlitzIxTbl) {
-					if ($BlitzIxTbl.Rows[$RowNum]["Finding"] -like "*Missing Index") {
-						$SQLPlanFile = "--N/A--"
-						$i += 1
-						if ($BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] -ne [System.DBNull]::Value) {
-							$SQLPlanFile = "MissingIndex_$i.sqlplan"
-							$BlitzIxTbl.Rows[$RowNum]["Sample Query Plan"] | Format-XML | Set-Content -Path "$PlanOutDir\$SQLPlanFile" -Force
-						}
-						$BlitzIxTbl.Rows[$RowNum]["Sample Plan File"] = $SQLPlanFile
-					}
-					$RowNum += 1
-				}
-					#>
-					Export-PlansAndDeadlocks $BlitzIxTbl $PlanOutDir "Sample Query Plan" "Sample Plan File" -FPrefix "MissingIndex" -DebugInfo:$DebugInfo
+				Export-PlansAndDeadlocks $BlitzIxTbl $PlanOutDir "Sample Query Plan" "Sample Plan File" -FPrefix "MissingIndex" -DebugInfo:$DebugInfo
 			}
 			if ($ToHTML -eq "Y") {
 
@@ -3615,55 +3553,18 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		}
 		else {
 			##Exporting deadlock graphs to file
-			#Set counter used for row retrieval
-			[int]$RowNum = 0
-			#Setting $i to 0
-			#$i = 1
 			if ($DebugInfo) {
 				Write-Host " ->Exporting deadlock graphs (if any)" -fore yellow
 			}
-			foreach ($row in $TblLockDtl) {
-				<#
-			Get only the column storing the deadlock graph data that's not NULL, limit to one export per event by filtering for VICTIM, and write it to a file
-			#>
-				if (($TblLockDtl.Rows[$RowNum]["deadlock_graph"] -ne [System.DBNull]::Value) -and ($TblLockDtl.Rows[$RowNum]["deadlock_group"] -like "*VICTIM*")) {
-					#format the event date to append to file name
-					#[string]$DLDate = 
-					[string]$DLFile = $TblLockDtl.Rows[$RowNum]["deadlock_graph_file"]
-					#write .xdl file
-					$TblLockDtl.Rows[$RowNum]["deadlock_graph"] | Format-XML | Set-Content -Path "$XDLOutDir\$DLFile" -Force
-					#$TblLockDtl.Rows[$RowNum]["deadlock_graph_file"] = $DLFile
-					$i += 1									
-				}
-				#Increment row retrieval counter
-				$RowNum += 1				
-			}
+
+			Export-PlansAndDeadlocks $TblLockDtl $XDLOutDir "deadlock_graph" "deadlock_graph_file" -DebugInfo:$DebugInfo -FileNameFromColumn
 
 			##Exporting execution plans to file
 			if ($DebugInfo) {
 				Write-Host " ->Exporting execution plans related to deadlocks." -fore yellow
 			}
-			#Set counter used for row retrieval
-			$RowNum = 0
-			#Setting $i to 0
-			$i = 0
 			
-			foreach ($row in $TblLockPlans) {
-				#Increment file name counter	
-				$i += 1
-				$SQLPlanFile = "-- N/A --"
-				$QueryName = "-- N/A --"
-				#Get only the column storing the execution plan data that's not NULL and write it to a file
-				if ($TblLockPlans.Rows[$RowNum]["query_plan"] -ne [System.DBNull]::Value) {
-					$SQLPlanFile = "Deadlock_" + $i + ".sqlplan"
-					$QueryName = "DeadlockPlan_" + $i + ".query"
-					$TblLockPlans.Rows[$RowNum]["query_plan"] | Format-XML | Set-Content -Path "$PlanOutDir\$SQLPlanFile" -Force
-				}
-				$TblLockPlans.Rows[$RowNum]["sqlplan_file"] = $SQLPlanFile
-				$TblLockPlans.Rows[$RowNum]["query"] = $QueryName		
-				#Increment row retrieval counter
-				$RowNum += 1
-			}
+			Export-PlansAndDeadlocks $TblLockPlans $PlanOutDir "query_plan" "sqlplan_file" -FPrefix "DeadlockPlan" -DebugInfo:$DebugInfo
 		
 			if ($ToHTML -eq "Y") {
 
@@ -3680,6 +3581,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$htmlTable2 = Convert-TableToHtml $TblLockDtl -TblID "DeadlockDtlTable" -CSSClass "DeadlockDetailsTable" -AnchorFromHere -AnchorIDs "DL" -ExclCols "query_text", "deadlock_graph" -DebugInfo:$DebugInfo
 
 				$htmlTable3 = Convert-QueryTableToHtml $TblLockDtl -Cols "query", "query_text" -AnchorToHere -AnchorID "DeadlockDtlTable" -DebugInfo:$DebugInfo
+
+				Add-QueryName $TblLockPlans "query" "query_text" "DeadlockPlan"
 
 				$htmlTable4 = Convert-TableToHtml $TblLockPlans -AnchorFromHere -ExclCols "query_text", "query_plan" -AnchorIDs "DeadlockPlan" -DebugInfo:$DebugInfo
 
@@ -4116,19 +4019,8 @@ finally {
 			if ($DebugInfo) {
 				Write-Host " ->Exporting execution plans" -fore yellow
 			}
-			$RowNum = 0
-			$i = 0			
-			foreach ($row in $BlitzWhoAggTbl) {
-				$i += 1
-				$SQLPlanFile = "-- N/A --"
-				if ($BlitzWhoAggTbl.Rows[$RowNum]["query_plan"] -ne [System.DBNull]::Value) {
-					
-					$SQLPlanFile = "RunningNow_" + $i + ".sqlplan"
-					$BlitzWhoAggTbl.Rows[$RowNum]["query_plan"] | Format-XML | Set-Content -Path "$PlanOutDir\$SQLPlanFile" -Force			
-				}
-				$BlitzWhoAggTbl.Rows[$RowNum]["sqlplan_file"] = $SQLPlanFile
-				$RowNum += 1
-			}
+
+			Export-PlansAndDeadlocks $BlitzWhoAggTbl $PlanOutDir "query_plan" "sqlplan_file" -FPrefix "RunningNow" -DebugInfo:$DebugInfo
 
 			#Get capture time-frame
 			$BtilzWhoStartTime = $BlitzWhoTbl | Sort-Object -Property "CheckDate" | Select-Object -ExpandProperty "CheckDate" -First 1
@@ -4161,19 +4053,6 @@ finally {
 				Save-HtmlFile $html "BlitzWho.html" $HTMLOutDir $DebugInfo
 				Invoke-ClearVariables html, htmlTable
 
-				#$BlitzWhoAggTbl.Columns.Add("Query", [string]) | Out-Null
-				$RowNum = 0
-				$i = 0
-			
-				foreach ($row in $BlitzWhoAggTbl) {
-					$i += 1
-					if ($BlitzWhoAggTbl.Rows[$RowNum]["query_text"] -ne [System.DBNull]::Value) {						
-						$QueryName = "RunningNow_" + $i + ".query"					
-					}
-					else { $QueryName = "-- N/A --" }
-					$BlitzWhoAggTbl.Rows[$RowNum]["Query"] = $QueryName
-					$RowNum += 1
-				}
 				$HtmlTabName = "Aggregated Session Activity"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$HtmlTabName += " for $CheckDB" 
@@ -4181,9 +4060,8 @@ finally {
 				elseif ($IsAzureSQLDB) {
 					$HtmlTabName += " for $ASDBName"
 				}
-				
+				Add-QueryName $BlitzWhoAggTbl "Query" "query_text" "RunningNow"
 				$htmlTable = Convert-TableToHtml $BlitzWhoAggTbl -CSSClass "ActiveSessionsTab sortable" -AnchorFromHere -AnchorIDs "RunningNow" -ExclCols "query_text", "query_plan" -DebugInfo:$DebugInfo
-
 				$htmlTable1 = Convert-QueryTableToHtml $BlitzWhoAggTbl -Cols "query", "query_text" -AnchorToHere -AnchorID "RunningNow" -DebugInfo:$DebugInfo
 
 				$html = $HTMLPre + @"
