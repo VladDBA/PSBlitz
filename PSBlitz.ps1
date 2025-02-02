@@ -277,8 +277,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.0.1"
-$VersDate = "2025-01-14"
+$Vers = "5.1.0"
+$VersDate = "2025-02-02"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -327,12 +327,6 @@ if ($DebugInfo) {
 		ForegroundColor = 'Red'
 		NoNewLine       = $true
 	}
-	#Connection Timeout
-	$RedXConnTimeout = @{
-		Object          = 'x (Connection timeout)'
-		ForegroundColor = 'Red'
-		NoNewLine       = $true
-	}
 }
 else {
 	#Success
@@ -350,12 +344,6 @@ else {
 	#Command Timeout
 	$RedXTimeout = @{
 		Object          = 'x (Command timeout)'
-		ForegroundColor = 'Red'
-		NoNewLine       = $false
-	}
-	#Connection Timeout
-	$RedXConnTimeout = @{
-		Object          = 'x (Connection timeout)'
 		ForegroundColor = 'Red'
 		NoNewLine       = $false
 	}
@@ -528,13 +516,6 @@ function Invoke-ErrMsg {
 		$OutErr = Format-ExceptionMsg
 		Write-Host "  $OutErr" -fore Red	
 	}
- <#elseif ($RunTime -ge $ConnTimeout) {
-		Write-Host @RedXConnTimeout
-		if ($DebugInfo) {
-			Write-Host " - $RunTime seconds" -Fore Yellow
-		}
-		
-	}#>
  else {
 		Write-Host @RedX
 		if ($DebugInfo) {
@@ -814,6 +795,50 @@ function Convert-QueryTableToHtml {
 		Write-Host " Error converting query table to HTML: $_" -ForegroundColor Red
 	}
 
+}
+
+function Export-PlansAndDeadlocks {
+	param (
+		[Parameter(Position = 0, Mandatory = $true)]
+		[System.Data.DataTable] $DataTable,
+		[Parameter(Position = 1, Mandatory = $true)]
+		[string] $FileDir,
+		[Parameter(Position = 2, Mandatory = $True)]
+		[string] $XMLColName,
+		[Parameter(Position = 3, Mandatory = $True)]
+		[string] $FNameColName,
+		[Parameter(Position = 4, Mandatory = $false)]
+		[string] $OutputType = 'sqlplan',
+		[Parameter(Position = 5, Mandatory = $false)]
+		[string] $FPrefix = '',
+		[Parameter(Position = 6, Mandatory = $false)]
+		[switch] $DebugInfo
+	)
+	try {
+		#if ($DebugInfo) {
+		#	Write-Host " ->Exporting $(if($OutputType -eq 'xdl'){"deadlock graphs"}
+		#	else{"execution plans"})..." -ForegroundColor Yellow
+		#}
+		$RowNum = 0
+		$i = 0
+		foreach ($row in $DataTable) {
+			$i += 1
+			$FileName = "-- N/A --"
+			if($DataTable.Rows[$RowNum][$XMLColName] -ne [System.DBNull]::Value){
+				$FileName = $FPrefix +'_'+ $i + '.' + $OutputType
+				$DataTable.Rows[$RowNum][$XMLColName] | Format-XML | Set-Content -Path "$FileDir\$FileName" -Force
+			}
+			$DataTable.Rows[$RowNum][$FNameColName] = $FileName
+			$RowNum += 1			
+		}
+
+		if ($DebugInfo) {
+			Write-Host " ->Deadlock or plan data exported successfully" -ForegroundColor Yellow
+		}
+	}
+	catch {
+		Write-Host " Error exporting deadlock and plan data: $_" -ForegroundColor Red
+	}
 }
 
 function Convert-TableToExcel {
@@ -1256,9 +1281,9 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 		$SecSQLPass = Read-Host -Prompt "Password" -AsSecureString
 	}
 	##Indepth check 
-	$IsIndepth = Read-Host -Prompt "Perform an in-depth check?[Y/N]"
+	$IsIndepth = Read-Host -Prompt "Perform an in-depth check?(empty defaults to N)[Y/N]"
 	##sp_BlitzWho delay
-	if (!([int]$BlitzWhoDelay = Read-Host "Seconds of delay between sp_BlizWho executions (empty defaults to 10)")) { 
+	if (!([int]$BlitzWhoDelay = Read-Host "Seconds of delay between session activity captures (empty defaults to 10)")) { 
 		$BlitzWhoDelay = 10 
 	}
 	##Output file type
@@ -1268,6 +1293,20 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 	##Zip output files
 	if (!([string]$ZipOutput = Read-Host -Prompt "Create a zip archive of the output files?(empty defaults to N)[Y/N]")) {
 		$ZipOutput = "N"
+	}
+	##Prompt for advanced options
+	if (!([string]$AdvOptions = Read-Host -Prompt "Show advanced options?(empty defaults to N)[Y/N]")) {
+		$AdvOptions = "N"
+	}
+	if($AdvOptions -eq "Y"){
+		##Get top N queries from cache
+		[int]$CacheTop = Read-Host -Prompt "Number of top resource intensive queries to return?(empty defaults to 10)"
+
+		##How many minutes back to check for cache
+		[int]$CacheMinutesBack = Read-Host -Prompt "How many minutes in the past to check the plan cache?(empty defaults to everything in the plan cache)"
+
+		##custom output dir
+		[string]$OutputDir = Read-Host -Prompt "Specify another existing directory path to save the output.(empty defaults to PSBlitz's path)"
 	}
 }
 else {
@@ -2102,11 +2141,12 @@ $htmlTable2
 	Write-Host " Retrieving open transaction info" -NoNewline
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetOpenTransactions.sql"
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		[string]$Query = $Query -replace "SET @DatabaseName = N'';", "SET @DatabaseName = N'$CheckDB';"
-		Write-Host " for $CheckDB" -NoNewline
-	}
-	elseif ($IsAzureSQLDB) {
+	#if (!([string]::IsNullOrEmpty($CheckDB))) {
+	#	[string]$Query = $Query -replace "SET @DatabaseName = N'';", "SET @DatabaseName = N'$CheckDB';"
+	#	Write-Host " for $CheckDB" -NoNewline
+	#}
+	#elseif
+	if ($IsAzureSQLDB) {
 		Write-Host " for $ASDBName" -NoNewline
 	}
 	Write-Host "... " -NoNewline
@@ -2785,7 +2825,7 @@ $JumpToTop
 			if ($DebugInfo) {
 				Write-Host " ->Exporting execution plans for $SortOrder" -fore yellow
 			}
-			#Set counter used for row retrieval
+			<#Set counter used for row retrieval
 			$RowNum = 0
 			#Setting $i to 0
 			$i = 0
@@ -2802,6 +2842,8 @@ $JumpToTop
 				#Increment row retrieval counter
 				$RowNum += 1
 			}
+				#>
+				Export-PlansAndDeadlocks $BlitzCacheTbl $PlanOutDir "Query Plan" "SQLPlan File" -FPrefix $FileSOrder -DebugInfo:$DebugInfo
 
 			##Add database names to array
 			if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
@@ -3245,7 +3287,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				}
 
 				#Set counter used for row retrieval
-				$RowNum = 0
+				<#$RowNum = 0
 				#Setting $i to 0
 				$i = 0				
 				foreach ($row in $BlitzQSTbl) {
@@ -3261,6 +3303,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					#Increment row retrieval counter
 					$RowNum += 1
 				}
+					#>
+				Export-PlansAndDeadlocks $BlitzQSTbl $PlanOutDir "query_plan_xml" "SQLPlan File" -FPrefix "QueryStore" -DebugInfo:$DebugInfo
 				
 				if ($ToHTML -eq "Y") {
 					
@@ -3414,7 +3458,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					Write-Host " ->Exporting missing index sample execution plans (if any)" -fore yellow
 				}
 					
-				$RowNum = 0
+				<#$RowNum = 0
 				$i = 0
 				foreach ($row in $BlitzIxTbl) {
 					if ($BlitzIxTbl.Rows[$RowNum]["Finding"] -like "*Missing Index") {
@@ -3428,6 +3472,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					}
 					$RowNum += 1
 				}
+					#>
+					Export-PlansAndDeadlocks $BlitzIxTbl $PlanOutDir "Sample Query Plan" "Sample Plan File" -FPrefix "MissingIndex" -DebugInfo:$DebugInfo
 			}
 			if ($ToHTML -eq "Y") {
 
@@ -4052,9 +4098,9 @@ finally {
 		[string]$Query = $Query.replace('[tempdb].[dbo].', '')
 		[string]$Query = $Query.replace('tempdb.dbo.', '')
 	}
-	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		[string]$Query = $Query -replace "SET @DatabaseName = N''; " , "SET @DatabaseName = N'$CheckDB'; "
-	}
+	#if (!([string]::IsNullOrEmpty($CheckDB))) {
+	#	[string]$Query = $Query -replace "SET @DatabaseName = N''; " , "SET @DatabaseName = N'$CheckDB'; "
+	#} commented for #307
 	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Return sp_BlitzWho" -ConnStringIn $ConnString -CmdTimeoutIn 800
 	
 	if ($global:StepOutcome -eq "Success") {
@@ -4066,8 +4112,6 @@ finally {
 		}
 		else {
 
-			##Add plan file column 
-			#$BlitzWhoAggTbl.Columns.Add("sqlplan_file", [string]) | Out-Null
 			##Exporting execution plans to file and setting plan file names
 			if ($DebugInfo) {
 				Write-Host " ->Exporting execution plans" -fore yellow
