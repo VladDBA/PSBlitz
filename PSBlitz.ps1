@@ -2164,16 +2164,12 @@ $htmlTable2
 	}
 
 	#####################################################################################
-	#						Open transaction info										#
+	#						Open transaction info - Pass 1								#
 	#####################################################################################
 	Write-Host " Retrieving open transaction info" -NoNewline
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetOpenTransactions.sql"
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-	#if (!([string]::IsNullOrEmpty($CheckDB))) {
-	#	[string]$Query = $Query -replace "SET @DatabaseName = N'';", "SET @DatabaseName = N'$CheckDB';"
-	#	Write-Host " for $CheckDB" -NoNewline
-	#}
-	#elseif
+	[string]$Query = $Query -replace "SET @CheckPass = '';", "SET @CheckPass = 'Pass1';"
 	if ($IsAzureSQLDB) {
 		Write-Host " for $ASDBName" -NoNewline
 	}
@@ -2223,22 +2219,17 @@ $JumpToTop
 </body>
 </html>
 "@
-
 				#Save HTML file
 				Save-HtmlFile $html "OpenTransactions.html" $HTMLOutDir $DebugInfo
 				Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3
-
 			}
 			else {
 				##Populating the "Open Transactions" sheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Open Transactions")
-				
 				Convert-TableToExcel $AcTranTbl $ExcelSheet -DebugInfo:$DebugInfo -StartRow $DefaultStartRow -ExclCols "current_query", "most_recent_query", "current_plan", "most_recent_plan"
-
 				##Saving file 
 				Save-ExcelFile $ExcelFile
 			}
-					
 		}
 		##Cleaning up variables 
 		Invoke-ClearVariables AcTranTbl, PSBlitzSet

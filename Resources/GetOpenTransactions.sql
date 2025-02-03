@@ -6,9 +6,13 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-DECLARE @DatabaseName NVARCHAR(256);
+DECLARE @DatabaseName NVARCHAR(256),
+        @CheckPass VARCHAR(5);
 
 SET @DatabaseName = N'';
+/*This is here to avoid overwriting sqlplan files 
+if they originate from the same SPID*/
+SET @CheckPass = '';
 
 /*
 		This CTE is a fix for an edge case that causes the same record(s) to show up multiple times
@@ -108,7 +112,7 @@ SELECT CONVERT(VARCHAR(25),[qcte].[time_of_check],120) AS [time_of_check],
        END                         AS [current_query],
 	   [qcte].[current_sql],
 	   CASE
-         WHEN [sqlplan_curr].[query_plan] IS NOT NULL THEN 'OpenTranCurrent_'
+         WHEN [sqlplan_curr].[query_plan] IS NOT NULL THEN 'OpenTranCurrent'+@CheckPass+'_'
                                                            + CAST([qcte].[session_id] AS VARCHAR(10))
                                                            + '.sqlplan'
          ELSE '-- N/A --'
@@ -121,7 +125,7 @@ SELECT CONVERT(VARCHAR(25),[qcte].[time_of_check],120) AS [time_of_check],
        END                         AS [most_recent_query],
 	   [qcte].[most_recent_sql],
 	   CASE
-         WHEN [sqlplan_rec].[query_plan] IS NOT NULL THEN 'OpenTranRecent_'
+         WHEN [sqlplan_rec].[query_plan] IS NOT NULL THEN 'OpenTranRecent'+@CheckPass+'_'
                                                           + CAST([qcte].[session_id] AS VARCHAR(10))
                                                           + '.sqlplan'
          ELSE '-- N/A --'
