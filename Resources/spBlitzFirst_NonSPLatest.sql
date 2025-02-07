@@ -2,6 +2,13 @@
 Part of https://github.com/VladDBA/PSBlitz
 */
 
+    SET ANSI_NULLS ON;
+    SET ANSI_PADDING ON;
+    SET ANSI_WARNINGS ON;
+    SET ARITHABORT ON;
+    SET CONCAT_NULL_YIELDS_NULL ON;
+    SET QUOTED_IDENTIFIER ON;
+
 DECLARE
     @LogMessage NVARCHAR(4000),
     @Help TINYINT ,
