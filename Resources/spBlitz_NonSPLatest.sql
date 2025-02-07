@@ -9,9 +9,7 @@ Part of https://github.com/VladDBA/PSBlitz
     SET ARITHABORT ON;
     SET CONCAT_NULL_YIELDS_NULL ON;
     SET QUOTED_IDENTIFIER ON;
-    SET NOCOUNT ON;
-    SET STATISTICS XML OFF;
-	SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+    
 
 DECLARE
 	@Help TINYINT ,
@@ -81,6 +79,10 @@ IF OBJECT_ID('tempdb.dbo.#dbcc_events_from_trace', 'U') IS NOT NULL
 Everything beyond this point is straight from sp_Blitz 
 without the GO at the end and with minor column order changes starting at line 10432
 */	
+
+    SET NOCOUNT ON;
+    SET STATISTICS XML OFF;
+	SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
 	SELECT @Version = '8.22', @VersionDate = '20241019';
 	SET @OutputType = UPPER(@OutputType);
