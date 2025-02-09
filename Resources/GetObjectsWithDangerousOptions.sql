@@ -14,10 +14,10 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
 USE [..PSBlitzReplace..];
 
-SELECT DB_NAME()                       AS [database_name],
+SELECT DB_NAME()                       AS [database],
        QUOTENAME(SCHEMA_NAME([ob].[schema_id]))
        + N'.' + QUOTENAME([ob].[name]) AS [object_name],
-       [ob].[type_desc]                AS [object_type],
+       [ob].[type_desc]                AS [type],
        CASE
          WHEN [md].[uses_ansi_nulls] = 0 THEN 'OFF'
          ELSE 'ON'
@@ -26,8 +26,8 @@ SELECT DB_NAME()                       AS [database_name],
          WHEN [md].[uses_quoted_identifier] = 0 THEN 'OFF'
          ELSE 'ON'
        END                             AS [QUOTED_IDENTIFIER],
-       [ob].[create_date],
-       [ob].[modify_date]
+       [ob].[create_date] AS [created],
+       [ob].[modify_date] AS [modified]
 FROM   sys.[sql_modules] AS [md]
        INNER JOIN sys.[objects] AS [ob]
                ON [md].[object_id] = [ob].[object_id]

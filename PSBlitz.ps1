@@ -299,8 +299,8 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"GetTempDBUsageInfo.sql", "GetOpenTransactions.sql",
 	"GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql",
 	"GetDbInfo.sql", "GetAzureSQLDBInfo.sql",
-	"spBlitzQueryStore_NonSPLatest.sql", "searchtable.js", "sorttable.js",
-	"styles.css")
+	"spBlitzQueryStore_NonSPLatest.sql","GetObjectsWithDangerousOptions.sql", 
+	"searchtable.js", "sorttable.js","styles.css")
 #Set path+name of the input Excel file
 $OrigExcelF = Join-Path -Path $ResourcesPath -ChildPath $OrigExcelFName
 #Set default start row for Excel output
@@ -818,10 +818,10 @@ function Export-PlansAndDeadlocks {
 		[switch] $FileNameFromColumn
 	)
 	try {
-		#if ($DebugInfo) {
-		#	Write-Host " ->Exporting $(if($OutputType -eq 'xdl'){"deadlock graphs"}
-		#	else{"execution plans"})..." -ForegroundColor Yellow
-		#}
+		if ($DebugInfo) {
+			Write-Host " ->Exporting $(if($XMLColName -eq 'deadlock_graph'){"deadlock graphs"}
+			else{"execution plans"})..." -ForegroundColor Yellow
+		}
 		$RowNum = 0
 		$i = 0
 		foreach ($row in $DataTable) {
@@ -845,7 +845,8 @@ function Export-PlansAndDeadlocks {
 		}
 
 		if ($DebugInfo) {
-			Write-Host " ->Deadlock or plan data exported successfully" -ForegroundColor Yellow
+			Write-Host " ->$(if($XMLColName -eq 'deadlock_graph'){"deadlock graphs"}
+			else{"execution plans"}) exported successfully" -ForegroundColor Yellow
 		}
 	}
 	catch {
@@ -2558,7 +2559,7 @@ $JumpToTop
 				Convert-TableToExcel $BlitzTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
 
 				##Saving file 
-				$ExcelFile.Save()
+				Save-ExcelFile $ExcelFile
 			}
 			##Cleaning up variables
 			Invoke-ClearVariables BlitzTbl, PSBlitzSet		
@@ -2587,7 +2588,7 @@ $JumpToTop
 		if ($global:StepOutcome -eq "Success") {
 			$DangerousSetTbl = $global:PSBlitzSet.Tables[0]
 			if ($ToHTML -eq "Y") {
-				$HtmlTabName = "Objects with dangerous SET options"
+				$HtmlTabName = "Database objects with dangerous SET options"
 				$htmlTable = Convert-TableToHtml $DangerousSetTbl -CSSClass "sortable" -DebugInfo:$DebugInfo
 				$html = $HTMLPre + @"
 	<title>$HtmlTabName</title>
@@ -2600,10 +2601,18 @@ $JumpToTop
 </body>
 </html>
 "@
-
 				Save-HtmlFile $html "DangerousSETOpt.html" $HTMLOutDir $DebugInfo
-			}
+				Invoke-ClearVariables html, htmlTable
+			} else {
 
+				$ExcelSheet = $ExcelFile.Worksheets.Item("Objects Dangerous SET")
+					
+				Convert-TableToExcel $DangerousSetTbl $ExcelSheet -StartRow 3 -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
+
+				##Saving file 
+				Save-ExcelFile $ExcelFile
+
+			}
 			##Cleaning up variables
 			Invoke-ClearVariables DangerousSetTbl, PSBlitzSet	
 		}
@@ -2865,11 +2874,6 @@ $JumpToTop
 		if ($global:StepOutcome -eq "Success") {
 			$BlitzCacheTbl = $global:PSBlitzSet.Tables[0]
 			$BlitzCacheWarnTbl = $global:PSBlitzSet.Tables[1]
-
-			##Exporting execution plans to file
-			if ($DebugInfo) {
-				Write-Host " ->Exporting execution plans for $SortOrder" -fore yellow
-			}
 
 			Export-PlansAndDeadlocks $BlitzCacheTbl $PlanOutDir "Query Plan" "SQLPlan File" -FPrefix $FileSOrder -DebugInfo:$DebugInfo
 
@@ -3298,10 +3302,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			
 				$BlitzQSTbl = $global:PSBlitzSet.Tables[0]
 				$BlitzQSSumTbl = $global:PSBlitzSet.Tables[1]
-				##Exporting execution plans to file
-				if ($DebugInfo) {
-					Write-Host " ->Exporting execution plans" -fore yellow
-				}
 
 				Export-PlansAndDeadlocks $BlitzQSTbl $PlanOutDir "query_plan_xml" "SQLPlan File" -FPrefix "QueryStore" -DebugInfo:$DebugInfo
 				
@@ -3441,9 +3441,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$BlitzIxTbl = $global:PSBlitzSet.Tables[0]
 			if ("0", "4" -Contains $Mode) {
 				#Export sample execution plans for missing indexes (SQL Server 2019 only)
-				if ($DebugInfo) {
-					Write-Host " ->Exporting missing index sample execution plans (if any)" -fore yellow
-				}
 					
 				Export-PlansAndDeadlocks $BlitzIxTbl $PlanOutDir "Sample Query Plan" "Sample Plan File" -FPrefix "MissingIndex" -DebugInfo:$DebugInfo
 			}
@@ -3587,21 +3584,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		}
 		else {
 			##Exporting deadlock graphs to file
-			if ($DebugInfo) {
-				Write-Host " ->Exporting deadlock graphs (if any)" -fore yellow
-			}
-
 			Export-PlansAndDeadlocks $TblLockDtl $XDLOutDir "deadlock_graph" "deadlock_graph_file" -DebugInfo:$DebugInfo -FileNameFromColumn
 
 			##Exporting execution plans to file
-			if ($DebugInfo) {
-				Write-Host " ->Exporting execution plans related to deadlocks." -fore yellow
-			}
-			
 			Export-PlansAndDeadlocks $TblLockPlans $PlanOutDir "query_plan" "sqlplan_file" -FPrefix "DeadlockPlan" -DebugInfo:$DebugInfo
 		
 			if ($ToHTML -eq "Y") {
-
 				$HtmlTabName = "Deadlocks"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$HtmlTabName += " for $CheckDB" 
@@ -4050,10 +4038,6 @@ finally {
 		else {
 
 			##Exporting execution plans to file and setting plan file names
-			if ($DebugInfo) {
-				Write-Host " ->Exporting execution plans" -fore yellow
-			}
-
 			Export-PlansAndDeadlocks $BlitzWhoAggTbl $PlanOutDir "query_plan" "sqlplan_file" -FPrefix "RunningNow" -DebugInfo:$DebugInfo
 
 			#Get capture time-frame
