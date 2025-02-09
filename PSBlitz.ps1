@@ -595,7 +595,8 @@ function Invoke-PSBlitzQuery {
 		$global:StepOutcome = "Success"
 		if (($StepNameIn -like "sp_BlitzCache*") -or ($StepNameIn -like "sp_BlitzQueryStore*") -or 
 		($StepNameIn -eq "sp_BlitzIndex mode 1") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info") -or 
-		($StepNameIn -eq "sp_BlitzLock") -or ($StepNameIn -eq "Return sp_BlitzWho") -or ($StepNameIn -eq "Open Transacion Info")) {
+		($StepNameIn -eq "sp_BlitzLock") -or ($StepNameIn -eq "Return sp_BlitzWho") -or ($StepNameIn -eq "Open Transacion Info") -or 
+		($StepNameIn -eq "Objects with dangerous SET options")) {
 			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
 			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
 		}
@@ -2569,6 +2570,48 @@ $JumpToTop
 		$BlitzWhoPass += 1
 	}
 
+	#####################################################################################
+	#						Objects with dangerous SET options							#
+	#####################################################################################
+	if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
+		Write-Host " Retrieving objects created with dangerous SET options... " -NoNewLine
+		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetObjectsWithDangerousOptions.sql"
+		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
+		if ($IsAzureSQLDB) {
+			[string]$Query = $Query -replace 'USE [..PSBlitzReplace..];', ''
+		}
+		else {
+			$Query = $Query -replace '..PSBlitzReplace..', "$CheckDB"
+		}
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Objects with dangerous SET options" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
+		if ($global:StepOutcome -eq "Success") {
+			$DangerousSetTbl = $global:PSBlitzSet.Tables[0]
+			if ($ToHTML -eq "Y") {
+				$HtmlTabName = "Objects with dangerous SET options"
+				$htmlTable = Convert-TableToHtml $DangerousSetTbl -CSSClass "sortable" -DebugInfo:$DebugInfo
+				$html = $HTMLPre + @"
+	<title>$HtmlTabName</title>
+</head>
+<body>
+<h1 id="top">$HtmlTabName</h1>
+$SortableTable
+$htmlTable
+$JumpToTop
+</body>
+</html>
+"@
+
+				Save-HtmlFile $html "DangerousSETOpt.html" $HTMLOutDir $DebugInfo
+			}
+
+			##Cleaning up variables
+			Invoke-ClearVariables DangerousSetTbl, PSBlitzSet	
+		}
+	}
+	if ($JobStatus -ne "Running") {
+		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
+		$BlitzWhoPass += 1
+	}
 
 	#####################################################################################
 	#						sp_BlitzFirst 30 seconds									#
@@ -4577,6 +4620,11 @@ finally {
 				}
 				$Description = "Data collected by the query store for the past 7 days"
 				$AdditionalInfo = "Outputs execution plans as .sqlplan files."
+			}
+			elseif ($File.Name -like "DangerousSETOpt*") {
+				$PageName = "Objects with dangerous SET options"
+				$Description = "A list of database objects created with dangerous SET options"
+				$QuerySource = "sys.sql_modules, sys.objects"
 			}
 			$IndexContent += "<tr><td><a href='$RelativePath' target='_blank'>$PageName</a></td><td>$Description</td><td>$QuerySource</td><td>$AdditionalInfo</td></tr>"
 		}
