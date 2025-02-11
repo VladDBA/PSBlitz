@@ -2526,6 +2526,7 @@ $htmlBlock
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		if (($IsIndepth -eq "Y") -and ([string]::IsNullOrEmpty($CheckDB))) {
 			[string]$Query = $Query -replace ";SET @CheckUserDatabaseObjects = 0;", ";SET @CheckUserDatabaseObjects = 1;"
+			$GetUsrDBObj = $true
 		}
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_Blitz" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		if ($global:StepOutcome -eq "Success") {
@@ -2560,6 +2561,11 @@ $JumpToTop
 
 				##Saving file 
 				Save-ExcelFile $ExcelFile
+			}
+			
+			if($GetUsrDBObj){
+				#get databses with dangerous object set options
+				$DangerousObjDBs = $BlitzTbl | Where-Object {$_."Finding" -eq "Objects created with dangerous SET Options"} | Select-Object "Database Name"
 			}
 			##Cleaning up variables
 			Invoke-ClearVariables BlitzTbl, PSBlitzSet		
