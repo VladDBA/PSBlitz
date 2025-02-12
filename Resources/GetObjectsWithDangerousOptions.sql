@@ -44,7 +44,7 @@ ELSE
 BEGIN
 INSERT INTO ##PSBlitzDBs ([database])
 VALUES 
-('PSBlitzReplace');
+(N'..PSBlitzReplace..');
 END
 
 IF (SELECT COUNT(*) FROM ##PSBlitzDBs) >0
@@ -60,7 +60,7 @@ BEGIN
     FETCH NEXT FROM DBs INTO @DB;
     WHILE @@FETCH_STATUS = 0
     BEGIN
-    IF (@DB <> N'PSBlitzReplace')
+    IF (@DB <> N'..PSBlitzReplace..')
     BEGIN
         SET @SQL = N'
         INSERT INTO ##PSBlitzDangerousOptions
@@ -103,3 +103,12 @@ SELECT [database],
        [created],
        [modified] 
 FROM   ##PSBlitzDangerousOptions;
+
+IF OBJECT_ID('tempdb..##PSBlitzDangerousOptions') IS NOT NULL
+BEGIN
+    DROP TABLE ##PSBlitzDangerousOptions;
+END;
+IF OBJECT_ID('tempdb..##PSBlitzDBs') IS NOT NULL
+BEGIN
+    DROP TABLE ##PSBlitzDBs;
+END;

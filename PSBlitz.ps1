@@ -278,7 +278,7 @@ param(
 ###Internal params
 #Version
 $Vers = "5.1.0"
-$VersDate = "2025-02-03"
+$VersDate = "2025-02-12"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -2562,10 +2562,12 @@ $JumpToTop
 				##Saving file 
 				Save-ExcelFile $ExcelFile
 			}
-			
+
 			if($GetUsrDBObj){
 				#get databses with dangerous object set options
-				$DangerousObjDBs = $BlitzTbl | Where-Object {$_."Finding" -eq "Objects created with dangerous SET Options"} | Select-Object "Database Name"
+				$DangerousObjDBs = $BlitzTbl | Where-Object {$_."Finding" -eq "Objects created with dangerous SET Options"} | Select-Object "DatabaseName"
+				$DangerousObjDBsCount = $DangerousObjDBs.Rows.Count
+				Write-Host " Found $DangerousObjDBsCount databases with dangerous object SET options."
 			}
 			##Cleaning up variables
 			Invoke-ClearVariables BlitzTbl, PSBlitzSet		
@@ -2580,15 +2582,23 @@ $JumpToTop
 	#####################################################################################
 	#						Objects with dangerous SET options							#
 	#####################################################################################
-	if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
+	if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB) -or (($GetUsrDBObj) -and ($DangerousObjDBsCount -gt 0))) {
 		Write-Host " Retrieving objects created with dangerous SET options... " -NoNewLine
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetObjectsWithDangerousOptions.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		if ($IsAzureSQLDB) {
-			[string]$Query = $Query -replace 'USE [..PSBlitzReplace..];', ''
+			[string]$Query = $Query -replace 'SET @IsAzureSQLDB = 0;', 'SET @IsAzureSQLDB = 1;'
 		}
-		else {
+		elseif(!([string]::IsNullOrEmpty($CheckDB))) {
 			$Query = $Query -replace '..PSBlitzReplace..', "$CheckDB"
+		}elseif($GetUsrDBObj){
+			$InsertString = ''
+			foreach ($DB in $DangerousObjDBs) {
+				$InsertString += "(N'$($DB.DatabaseName)'),"
+			}
+			$InsertString = $InsertString.TrimEnd(',')
+			$InsertString
+			$Query = $Query -replace "\(N'..PSBlitzReplace..'\)", "$InsertString"
 		}
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Objects with dangerous SET options" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		if ($global:StepOutcome -eq "Success") {
@@ -2610,14 +2620,11 @@ $JumpToTop
 				Save-HtmlFile $html "DangerousSETOpt.html" $HTMLOutDir $DebugInfo
 				Invoke-ClearVariables html, htmlTable
 			} else {
-
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Objects Dangerous SET")
 					
 				Convert-TableToExcel $DangerousSetTbl $ExcelSheet -StartRow 3 -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
-
 				##Saving file 
 				Save-ExcelFile $ExcelFile
-
 			}
 			##Cleaning up variables
 			Invoke-ClearVariables DangerousSetTbl, PSBlitzSet	
