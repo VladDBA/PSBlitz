@@ -6,6 +6,7 @@
 [![SQL Server](https://img.shields.io/badge/SQL%20Server-2014%2B-0078D4.svg)](https://learn.microsoft.com/en-us/sql/sql-server)
 [![Azure SQL DB](https://img.shields.io/badge/Azure%20SQL-Database-0078D4.svg)](https://learn.microsoft.com/en-us/azure/azure-sql/database/sql-database-paas-overview)
 [![Azure SQL MI](https://img.shields.io/badge/Azure%20SQL-Managed%20Instance-0078D4.svg)](https://learn.microsoft.com/en-us/azure/azure-sql/managed-instance/sql-managed-instance-paas-overview)
+[![Code Signing](https://img.shields.io/badge/Code%20Signing-Verified-brightgreen.svg)](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 > A PowerShell-based SQL Server performance diagnostics and health check tool.
@@ -64,7 +65,14 @@ You __don't need__ to have any of the sp_Blitz stored procedures present on the 
 
 Download the latest zip file from the [Releases](https://github.com/VladDBA/PSBlitz/releases) section of the repository and extract its contents. 
 
-Do not change the directory structure and file names.
+As of version 5.1.0, PSBlitz.ps1 from the PSBlitz.zip archive found in every release is signed with a code-signing certificate.
+
+For versions pre 5.1.0, if your PowerShell execution policy is RemoteSigned, you would need to run the following command (update the path to match yours):
+```PowerShell
+Unblock-File C:\PathToFolder\PSBlitz\PSBlitz.ps1
+```
+
+__Do not change the directory structure and file names.__
 
 [*Back to top*](#header1)
 
