@@ -170,6 +170,7 @@ When running PSBlitz with the Excel output, if you (open and) close an Excel win
 - Database(s) configuration and size overview
     - also outputs database scoped configuration in case of a database-specific check
 - Instance health and database objects information (skipped on Azure SQL DB)
+- Database objects created with dangerous SET options (if databases with such objects are identified in the instance health step)
 - What's going on during a 30 second interval in terms of waits and resource usage
 - Waits stats info since last instance restart
 - Storage stats since last instance restart
@@ -195,6 +196,7 @@ Using `-CheckDB SomeDB` will limit most of the data to the specified database, i
 - Worst queries recorded in the Query Store in the past 7 days
 - Statistics information
 - Index fragmentation information
+- Database objects created with dangerous SET options
 
 ### Behavior changes based on plan cache data
 If, the case of an instance-wide check, a database accounts for at least 3/2 of the data returned from the plan cache, the following information will also be returned for that database:
