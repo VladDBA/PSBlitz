@@ -278,7 +278,7 @@ param(
 ###Internal params
 #Version
 $Vers = "5.1.0"
-$VersDate = "2025-02-13"
+$VersDate = "2025-02-18"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -299,8 +299,8 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"GetTempDBUsageInfo.sql", "GetOpenTransactions.sql",
 	"GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql",
 	"GetDbInfo.sql", "GetAzureSQLDBInfo.sql",
-	"spBlitzQueryStore_NonSPLatest.sql","GetObjectsWithDangerousOptions.sql", 
-	"searchtable.js", "sorttable.js","styles.css")
+	"spBlitzQueryStore_NonSPLatest.sql", "GetObjectsWithDangerousOptions.sql", 
+	"searchtable.js", "sorttable.js", "styles.css")
 #Set path+name of the input Excel file
 $OrigExcelF = Join-Path -Path $ResourcesPath -ChildPath $OrigExcelFName
 #Set default start row for Excel output
@@ -1828,7 +1828,15 @@ if ($ToHTML -eq "Y") {
 	<p>Report generated with <a href='https://github.com/VladDBA/PSBlitz' target='_blank'>PSBlitz</a> - created by <a href='https://vladdba.com/?ref=PSBlitz' target='_blank'>Vlad Drumea</a></p>
 	</footer>
 	<br>
-
+"@
+	$HTMLBodyStart = @"
+			</head>
+			<body>
+"@
+	$HTMLBodyEnd = @"
+        <br>
+	  </body>
+	 </html>
 "@
 	$htmlResources = @("styles.css", "sorttable.js", "searchtable.js")
 }
@@ -1956,7 +1964,6 @@ try {
 		}
 		Add-LogRow "Start sp_BlitzWho background process" $JobStatus
 		Write-Host " ->Active session data will be captured every $BlitzWhoDelay seconds."
-
 	}
 
 
@@ -1995,8 +2002,7 @@ try {
 			$HtmlTabName = "Instance Overview"
 			$html = $HTMLPre + @"
     <title>$HtmlTabName</title>
-    </head>
-    <body>
+    $HTMLBodyStart
 <h1>$HtmlTabName</h1>
 <h2>Instance information</h2>
 $htmlTable1
@@ -2009,8 +2015,7 @@ $htmlTable3
 <br>
 <h2>Session level options</h2>
 $htmlTable4
-</body>
-</html>
+$HTMLBodyEnd
 "@
 			#Save HTML file
 			Save-HtmlFile $html "InstanceInfo.html" $HTMLOutDir $DebugInfo
@@ -2086,8 +2091,7 @@ $htmlTable4
 
 			$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
-</head>
-<body>
+$HTMLBodyStart
 <h1>$HtmlTabName</h1>
 <h2>TempDB space usage</h2>
 $htmlTable1
@@ -2125,8 +2129,7 @@ $htmlTable2
 "@
 			}
 			$html += @"
-			</body>
-			</html>
+			$HTMLBodyEnd
 "@
 			#Save HTML file
 			Save-HtmlFile $html "TempDBInfo.html" $HTMLOutDir $DebugInfo
@@ -2207,8 +2210,7 @@ $htmlTable2
 
 				$html = $HTMLPre + @"
 <title>$tableName</title>
-</head>
-<body>
+$HTMLBodyStart
 <h1 id="top">$tableName</h1>
 $htmlTable1
 <br>
@@ -2218,8 +2220,7 @@ $htmlTable2
 <h2>Most Recent Query Text</h2>
 $htmlTable3
 $JumpToTop
-</body>
-</html>
+$HTMLBodyEnd
 "@
 				#Save HTML file
 				Save-HtmlFile $html "OpenTransactions.html" $HTMLOutDir $DebugInfo
@@ -2285,8 +2286,7 @@ $JumpToTop
 
 				$html = $HTMLPre + @"
 <title>$tableName</title>
-</head>
-<body>
+$HTMLBodyStart
 <h1 id="top">$tableName</h1>
 <h2>Azure SQL DB Resource Governance</h1>
 $htmlTable
@@ -2317,8 +2317,7 @@ $JumpToTop
 $SortableTable
 $htmlTable6
 $JumpToTop
-</body>
-</html>
+$HTMLBodyEnd
 "@
 
 				#Save HTML file
@@ -2451,8 +2450,7 @@ $JumpToTop
 
 				$html = $HTMLPre + @"
 <title>$tableName</title>
-</head>
-<body>
+$HTMLBodyStart
 <h1 id="top">$tableName</h1>
 $(if($DBInfoTbl.Rows.Count -gt 10){$SearchDiv -replace 'ReplaceSearchFunction','SearchDBInfo' -replace 'object', 'database'})
 $(if ([string]::IsNullOrEmpty($CheckDB)){$SortableTable})
@@ -2465,8 +2463,7 @@ $SortableTable
 $htmlTable1
 $JumpToTop
 $htmlBlock
-</body>
-</html>
+$HTMLBodyEnd
 "@
 
 				#Save HTML file
@@ -2538,15 +2535,13 @@ $htmlBlock
 				$htmlTable = Convert-TableToHtml $BlitzTbl -NoCaseChange -TblID "InstanceHealthTable" -HasURLs -DebugInfo:$DebugInfo
 				$html = $HTMLPre + @"
 <title>$tableName</title>
-</head>
-<body>
+$HTMLBodyStart
 <h1 id="top">$tableName</h1>
 $($SearchDiv -replace 'ReplaceSearchFunction', 'SearchInstanceHealth' -replace 'object' , 'database')
 <br>
 $htmlTable
 $JumpToTop
-</body>
-</html>
+$HTMLBodyEnd
 "@
 
 				#Save HTML file
@@ -2563,9 +2558,9 @@ $JumpToTop
 				Save-ExcelFile $ExcelFile
 			}
 
-			if($GetUsrDBObj){
+			if ($GetUsrDBObj) {
 				#get databses with dangerous object set options
-				$DangerousObjDBs = $BlitzTbl | Where-Object {$_."Finding" -eq "Objects created with dangerous SET Options"} | Select-Object "DatabaseName"
+				$DangerousObjDBs = $BlitzTbl | Where-Object { $_."Finding" -eq "Objects created with dangerous SET Options" } | Select-Object "DatabaseName"
 				$DangerousObjDBsCount = $DangerousObjDBs.Rows.Count
 				Write-Host " Found $DangerousObjDBsCount databases with dangerous object SET options."
 			}
@@ -2589,15 +2584,15 @@ $JumpToTop
 		if ($IsAzureSQLDB) {
 			[string]$Query = $Query -replace 'SET @IsAzureSQLDB = 0;', 'SET @IsAzureSQLDB = 1;'
 		}
-		elseif(!([string]::IsNullOrEmpty($CheckDB))) {
+		elseif (!([string]::IsNullOrEmpty($CheckDB))) {
 			$Query = $Query -replace '..PSBlitzReplace..', "$CheckDB"
-		}elseif($GetUsrDBObj){
+		}
+		elseif ($GetUsrDBObj) {
 			$InsertString = ''
 			foreach ($DB in $DangerousObjDBs) {
 				$InsertString += "(N'$($DB.DatabaseName)'),"
 			}
 			$InsertString = $InsertString.TrimEnd(',')
-			$InsertString
 			$Query = $Query -replace "\(N'..PSBlitzReplace..'\)", "$InsertString"
 		}
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Objects with dangerous SET options" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
@@ -2608,18 +2603,17 @@ $JumpToTop
 				$htmlTable = Convert-TableToHtml $DangerousSetTbl -CSSClass "sortable" -DebugInfo:$DebugInfo
 				$html = $HTMLPre + @"
 	<title>$HtmlTabName</title>
-</head>
-<body>
+$HTMLBodyStart
 <h1 id="top">$HtmlTabName</h1>
 $SortableTable
 $htmlTable
 $JumpToTop
-</body>
-</html>
+$HTMLBodyEnd
 "@
 				Save-HtmlFile $html "DangerousSETOpt.html" $HTMLOutDir $DebugInfo
 				Invoke-ClearVariables html, htmlTable
-			} else {
+			}
+			else {
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Objects Dangerous SET")
 					
 				Convert-TableToExcel $DangerousSetTbl $ExcelSheet -StartRow 3 -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
@@ -2650,13 +2644,11 @@ $JumpToTop
 			$HtmlTabName = "What's happening on the instance now?"
 			$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
-</head>
-<body>
+$HTMLBodyStart
 <h1>$HtmlTabName</h1>
 <h2>30 seconds time-frame</h2>
 $htmlTable
-</body>
-</html>
+$HTMLBodyEnd
 "@
 
 			#Save HTML file
@@ -2699,13 +2691,11 @@ $htmlTable
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
-</head>
-<body>
+$HTMLBodyStart
 <h1>$HtmlTabName</h1>
 $htmlTable
 $JumpToTop
-</body>
-</html>
+$HTMLBodyEnd
 "@
 				#Save HTML file
 				Save-HtmlFile $html "BlitzFirst_Waits.html" $HTMLOutDir $DebugInfo
@@ -2717,15 +2707,13 @@ $JumpToTop
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
-</head>
-<body>
+$HTMLBodyStart
 <h1>$HtmlTabName</h1>
 $($SearchDiv -replace 'ReplaceSearchFunction', 'SearchStorageStats' -replace 'object', 'database')
 $SortableTable
 $htmlTable
 $JumpToTop
-</body>
-</html>
+$HTMLBodyEnd
 "@
 				#Save HTML file
 				Save-HtmlFile $html "BlitzFirst_Storage.html" $HTMLOutDir $DebugInfo
@@ -2737,15 +2725,13 @@ $JumpToTop
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
-</head>
-<body>
+$HTMLBodyStart
 <h1>$HtmlTabName</h1>
 $($SearchDiv -replace 'ReplaceSearchFunction','SearchPerfmon' -replace 'object', 'counter')
 $SortableTable
 $htmlTable
 $JumpToTop
-</body>
-</html>
+$HTMLBodyEnd
 "@
 
 				#Save HTML file
@@ -2899,11 +2885,8 @@ $JumpToTop
 					}
 				}
 			}
-
-			<#
-			 Set Excel sheet names based on $SortOrder
-			Since we're already checking for sort order, I'll also add the column number for CSS
-			#>
+			<#Set Excel sheet names based on $SortOrder
+			Since we're already checking for sort order, I'll also add the column number for CSS#>
 			$SheetName = "Top Queries - "
 			if ($SortOrder -like '*CPU*') {
 				$SheetName = $SheetName + "CPU"
@@ -2984,8 +2967,7 @@ $JumpToTop
 					
 					$html = @"
 					<title>$HtmlTabName</title>
-					</head>
-					<body>
+					$HTMLBodyStart
 					<h1 id="top">$HtmlTabName</h1>
 					<br>
 					<h2>Top $CacheTop Queries by $HtmlTabName2</h2>
@@ -3051,9 +3033,7 @@ $JumpToTop
 "@
 					#putting it all together
 					$html3 = $CacheHTMLPre + $html + $html2 + @"
-					<br>
-					</body>
-					</html>
+					$HTMLBodyEnd
 "@
 					$SecondHalf = "Done"					
 					#Save the HTML file containing both pairs
@@ -3064,9 +3044,7 @@ $JumpToTop
 				#Only writing the file here if this is the first half
 				if (($FirstHalf -eq "Done") -and ($SecondHalf -eq "NotDone")) {
 					$html3 = $CacheHTMLPre + $html + $html2 + @"
-					<br>
-					</body>
-					</html>
+					$HTMLBodyEnd
 "@
 					#Save the partial HTML file
 					Save-HtmlFile $html3 $HtmlFileName $HTMLOutDir $DebugInfo "Partial "
@@ -3157,7 +3135,6 @@ $JumpToTop
 			Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop Y
 			$BlitzWhoPass += 1
 		}
-
 	}
 	
 	#####################################################################################
@@ -3278,7 +3255,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$QSCheckResult = $CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] 
 				Write-Host " ->$ASDBName - is not eligible for Query Store check" -NoNewLine -ErrorAction Stop
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" $QSCheckResult
-
 			}
 		}
 		Catch {
@@ -3286,7 +3262,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			Invoke-ErrMsg
 			$StepEnd = Get-Date
 			Add-LogRow "sp_BlitzQueryStore precheck" "Failure"
-
 		}
 		if ($CheckQueryStore -eq 'Y') {
 			$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzQueryStore_NonSPLatest.sql"
@@ -3336,8 +3311,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					}
 					$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
-					</head>
-					<body>
+					$HTMLBodyStart
 					<h1 id="top">$HtmlTabName</h1>
 					<br>
 					<h2>Query Store results from past 7 days</h2>
@@ -3351,9 +3325,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					<h2 id="Queries">Query text</h2>
 					$htmlTable3
 					$JumpToTop
-					<br>
-					</body>
-					</html>
+					$HTMLBodyEnd
 "@
 
 					Save-HtmlFile $html "BlitzQueryStore.html" $HTMLOutDir $DebugInfo
@@ -3495,8 +3467,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
-				</head>
-				<body>
+				$HTMLBodyStart
 				<h1 id="top">$HtmlTabName</h1>
 				$(if($Mode -eq "2"){
 					$SearchDiv -replace 'ReplaceSearchFunction', 'SearchIndexUsage'
@@ -3511,8 +3482,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$htmlTable 
 				<br>
 				$(if ($Mode -ne "1") {$JumpToTop})
-				</body>
-				</html>
+				$HTMLBodyEnd
 "@
 
 				Save-HtmlFile $html "BlitzIndex_$Mode.html" $HTMLOutDir $DebugInfo
@@ -3625,8 +3595,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		
 				$html = $HTMLPre + @"
 		<title>$HtmlTabName</title>
-		</head>
-		<body>
+		$HTMLBodyStart
 		<h1 id="top">$HtmlTabName</h1>
 		<h2>Deadlock Overview</h2>
 		<p><a href="#Deadlocks1">Jump to deadlock details</a></p>
@@ -3643,9 +3612,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		<h2 id="Deadlocks1">Deadlock Details</h2>
 		$(if($TblLockDtl.Rows.Count -ge 10){
 			$SearchDiv -replace 'ReplaceSearchFunction', 'SearchDeadlockDetails'
-			'<br>'
-		
-		})
+			'<br>'})
 		$htmlTable2
 		$JumpToTop
 		<br>
@@ -3663,16 +3630,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		<h2>Query Text For Execution Plans Involved in Deadlocks</h2>
 		$htmlTable5
 		$JumpToTop
-		<br>
-		</body>
-		</html>
+		$HTMLBodyEnd
 "@
 				}
 				else {
 					$html += @"
-				<br>
-				</body>
-				</html>
+				$HTMLBodyEnd
 "@
 				}
 				
@@ -3774,15 +3737,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					}
 					$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
-				</head>
-				<body>
+				$HTMLBodyStart
 				<h1>$HtmlTabName</h1>
 				$($SearchDiv -replace 'ReplaceSearchFunction', 'SearchStatsAndIndexFrag')
 				$SortableTable
 				$htmlTable
 				$JumpToTop
-				</body>
-				</html>
+				$HTMLBodyEnd
 "@
 					Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
 					Invoke-ClearVariables html, htmlTable			
@@ -3871,15 +3832,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			
 					$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
-				</head>
-				<body>
+				$HTMLBodyStart
 				<h1>$HtmlTabName</h1>
 				$($SearchDiv -replace 'ReplaceSearchFunction', 'SearchStatsAndIndexFrag')
 				$SortableTable
 				$htmlTable
 				$JumpToTop
-				</body>
-				</html>
+				$HTMLBodyEnd
 "@
 
 					Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
@@ -4069,16 +4028,13 @@ finally {
 				$htmlTable = Convert-TableToHtml $BlitzWhoTbl -CSSClass "sortable" -DebugInfo:$DebugInfo
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
-				</head>
-				<body>
+				$HTMLBodyStart
 				<h1>$HtmlTabName</h1>
 				<br>
 				$SortableTable
 				$htmlTable
 				$JumpToTop
-				<br>
-				</body>
-				</html>
+				$HTMLBodyEnd
 "@ 
 
 				Save-HtmlFile $html "BlitzWho.html" $HTMLOutDir $DebugInfo
@@ -4097,8 +4053,7 @@ finally {
 
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
-				</head>
-				<body>
+				$HTMLBodyStart
 				<h1 id="top">$HtmlTabName</h1>
 				<h3>Based on session activity captured between $BtilzWhoStartTime and $BtilzWhoEndTime server time.</h3>
 				<p><a href="#Queries">Jump to query text</a></p>
@@ -4112,9 +4067,7 @@ finally {
 				$htmlTable1
 				<br>
 				$JumpToTop
-				<br>
-				</body>
-				</html>
+				$HTMLBodyEnd
 "@ 
 				Save-HtmlFile $html "BlitzWho_Agg.html" $HTMLOutDir $DebugInfo
 				Invoke-ClearVariables html, htmlTable, htmlTable1
@@ -4291,15 +4244,13 @@ finally {
 		@{Name = "Message"; Expression = { $_."ErrorMsg" } } | ConvertTo-Html -As Table -Fragment
 		$html = $HTMLPre + @"
 						<title>$HtmlTabName</title>
-						</head>
-						<body>
+						$HTMLBodyStart
 						<h1 id="top">$HtmlTabName</h1>
 						<p>To report an issue, plese use <a href='https://github.com/VladDBA/PSBlitz/issues' target='_blank'>GitHub</a>, but make sure to read <a href='https://github.com/VladDBA/PSBlitz/issues/216' target='_blank'>this</a> first.</p>
 						$htmlTable
 						$JumpToTop
 				 		$Footer 
-						</body>
-						</html>
+						$HTMLBodyEnd
 "@ 
 
 		Save-HtmlFile $html "ExecutionLog.html" $HTMLOutDir $DebugInfo
