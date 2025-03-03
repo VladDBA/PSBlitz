@@ -71,7 +71,7 @@
 	You don't need to have any of the sp_Blitz stored procedures present on the instance that you're executing PSBlitz.ps1 for, 
 	all the scripts are contained in the PSBlitz\Resources directory in non-stored procedure format.
 
- Eecution
+ Execution
 
     You can run PSBlitz.ps1 by simply right-clicking on the script and then clicking on "Run With PowerShell" which will execute 
     the script in interactive mode, prompting you for the required input.
@@ -278,7 +278,7 @@ param(
 ###Internal params
 #Version
 $Vers = "5.1.0"
-$VersDate = "2025-02-18"
+$VersDate = "2025-03-03"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -788,6 +788,8 @@ function Convert-QueryTableToHtml {
 
 			$htmlTableOut = $htmlTableOut -replace $AnchorRegex, $AnchorURL
 		}
+		#Ensure CRLF displays correctly in HTML
+		$htmlTableOut = $htmlTableOut -replace '<table>','<table style="white-space:pre-wrap; word-wrap:normal">'
 		#Lazy way to remove empty rows, will try to fix later 
 		$htmlTableOut = $htmlTableOut -replace "<tr><td></td><td></td></tr>", ""
 		return $htmlTableOut
@@ -908,6 +910,7 @@ function Convert-TableToExcel {
 	)
 
 	try {
+		$StepStart = get-date
 		$ExcelStartRow = $StartRow
 		$ExcelColNum = $StartCol
 		$RowNum = 0
@@ -949,11 +952,13 @@ function Convert-TableToExcel {
 			$RowNum += 1
 			$ExcelColNum = $StartCol
 		}
-
+		$StepEnd = get-date
+		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
+		$RunTime = [Math]::Round($StepRunTime, 2)
 		if ($DebugInfo) {
-			Write-Host " ->Data written successfully" -ForegroundColor Yellow
+			Write-Host " ->Data written successfully  - $RunTime seconds" -ForegroundColor Yellow
 		}
-
+		
 	}
  catch {
 		Write-Host " Error converting table to Excel: $_" -ForegroundColor Red
@@ -2013,7 +2018,7 @@ $htmlTable2
 <h2>Top 10 clients by connections</h2>
 $htmlTable3
 <br>
-<h2>Session level options</h2>
+<h2>Session level SET options</h2>
 $htmlTable4
 $HTMLBodyEnd
 "@
@@ -2605,6 +2610,7 @@ $HTMLBodyEnd
 	<title>$HtmlTabName</title>
 $HTMLBodyStart
 <h1 id="top">$HtmlTabName</h1>
+<p><a href='https://vladdba.com/2025/03/03/dangerous-set-options-stored-procedures/' target='_blank'>Explanation about SET option inheritance in stored procedures</a></p>
 $SortableTable
 $htmlTable
 $JumpToTop
@@ -4191,6 +4197,9 @@ finally {
 
 		##Insert log data in Excel
 		##Populating the "ExecutionLog" sheet
+		if($DebugInfo){
+		Write-Host " Saving execution log for this run of PSBlitz..."
+		}
 		$ExcelSheet = $ExcelFile.Worksheets.Item("ExecutionLog")
 
 		Convert-TableToExcel $LogTbl $ExcelSheet -StartRow 3 -DebugInfo:$DebugInfo
@@ -4381,7 +4390,7 @@ finally {
 				elseif ($File.Name -like "BlitzIndex_2*") {
 					$PageName = "Index Usage"
 					$Description = "Index usage details."
-					$AdditionalInfo += "Output limited to 10k records"
+					$AdditionalInfo += "Output limited to 10k records. If your browser struggles to load the page, you can load it into SQL Server using <a href='https://github.com/VladDBA/PSBlitzHTMLParser/blob/main/PSBlitzIndexUsage_HTML2SQL.sql' target='_blank'>this script</a>"
 				}
 			}
 			elseif ($File.Name -like "BlitzCache*") {
