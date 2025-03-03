@@ -127,10 +127,17 @@ Exports the following files:
 - For the time being PSBlitz.ps1 can only run against SQL Server instances, Azure SQL DB, and Azure SQL Managed Instance, but not against Amazon RDS.
 
 ### Excel
-- If you're using a 32bit installation of Excel and opt for the xlsx output, you might run into "out of memory" errors. <br>That's not an issue with PSBlitz, it's the direct result of opting to still use 32bit software in `SELECT DATEPART(YEAR,GETDATE())`.
+- If you're using a 32bit installation of Excel and opt for the xlsx output, you might run into "out of memory" errors. <br>That's not an issue with PSBlitz, it's the direct result of opting to still use 32bit software in `SELECT DATEPART(YEAR,GETDATE()) AS current_year`.
 
 ## Known issues:
 When running PSBlitz with the Excel output, if you (open and) close an Excel window in parallel with PSBlitz's execution you'll also cause the Excel session used by PSBlitz to close, leading to the following error message:<br>`You cannot call a method on a null-valued expression.`
+<br>
+__Solution:__
+Don't do that :)
+
+When running PSBlitz with the Excel output, if the Excel report template was saved with focus on one of the pages that actually has data written to it during PSBlitz's execution, then there is a very noticeable performance degradation for all steps that involve writing to Excel. <br>
+__Solution:__
+Open PSBlitzOutput.xlsx (found in PSBlitz's Resources folder) click on the first Intro sheet, select cell A1, save and close the file.
 
 
 [*Back to top*](#header1)

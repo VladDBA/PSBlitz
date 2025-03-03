@@ -547,16 +547,16 @@ function Add-LogRow {
 	$LogRow.Step = $StepName
 	$LogRow.StartDate = $StepStart.ToString("yyyy-MM-dd HH:mm:ss")
 	$LogRow.EndDate = $StepEnd.ToString("yyyy-MM-dd HH:mm:ss")
-	$LogRow.Duration = $ExecTime
+	$LogRow."Duration (Seconds)" = $ExecTime
 	$LogRow.Outcome = $StepStatus
 	if ("Interrupted", "Failure" -contains $StepStatus ) {
-		$LogRow.ErrorMsg = $ErrMsg
+		$LogRow.Message = $ErrMsg
 	}
  elseif ($StepStatus -eq "Success") {
-		$LogRow.ErrorMsg = $MoreInfo
+		$LogRow.Message = $MoreInfo
 	}
 	else {
-		$LogRow.ErrorMsg = $MoreInfo
+		$LogRow.Message = $MoreInfo
 	}
 	$LogTbl.Rows.Add($LogRow)
 }
@@ -654,7 +654,8 @@ function Convert-TableToHtml {
 
 	try {
 		if ($DebugInfo) {
-			Write-Host " ->Converting data to HTML..." -ForegroundColor Yellow
+			Write-Host " ->Converting data to HTML... " -ForegroundColor Yellow -NoNewline
+			$StepStart = get-date
 		}
 		$properties = @()
 		$cultureInfo = [System.Globalization.CultureInfo]::CurrentCulture
@@ -721,11 +722,22 @@ function Convert-TableToHtml {
 				$htmlTableOut = $htmlTableOut -replace $AnchorRegex, $AnchorURL
 			}
 		}
+		if ($DebugInfo) {
+			$StepEnd = get-date
+			Write-Host @GreenCheck
+			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
+			$RunTime = [Math]::Round($StepRunTime, 2)
+			Write-Host " - $RunTime seconds" -Fore Yellow
+			Add-LogRow "->Convert data to HTML" "Success"
+		}
         
 		return $htmlTableOut
 	}
 	catch {
-		Write-Host " Error converting table to HTML: $_" -ForegroundColor Red
+		Invoke-ErrMsg
+		if ($DebugInfo) {
+			Add-LogRow "->Convert data to HTML" "Failure"
+		}
 	}
 }
 
@@ -746,7 +758,8 @@ function Convert-QueryTableToHtml {
 	)
 	try {
 		if ($DebugInfo) {
-			Write-Host " ->Converting query data to HTML..." -ForegroundColor Yellow
+			Write-Host " ->Converting query data to HTML... " -ForegroundColor Yellow -NoNewline
+			$StepStart = get-date
 		}
 
 		$properties = @()
@@ -789,13 +802,25 @@ function Convert-QueryTableToHtml {
 			$htmlTableOut = $htmlTableOut -replace $AnchorRegex, $AnchorURL
 		}
 		#Ensure CRLF displays correctly in HTML
-		$htmlTableOut = $htmlTableOut -replace '<table>','<table style="white-space:pre-wrap; word-wrap:normal">'
+		$htmlTableOut = $htmlTableOut -replace '<table>', '<table style="white-space:pre-wrap; word-wrap:normal">'
 		#Lazy way to remove empty rows, will try to fix later 
 		$htmlTableOut = $htmlTableOut -replace "<tr><td></td><td></td></tr>", ""
+		if ($DebugInfo) {
+			$StepEnd = get-date
+			Write-Host @GreenCheck
+			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
+			$RunTime = [Math]::Round($StepRunTime, 2)
+			Write-Host " - $RunTime seconds" -Fore Yellow
+			Add-LogRow "->Convert query data to HTML" "Success"
+		}
 		return $htmlTableOut
 	}
  catch {
-		Write-Host " Error converting query table to HTML: $_" -ForegroundColor Red
+		#Write-Host " Error converting query table to HTML: $_" -ForegroundColor Red
+		Invoke-ErrMsg
+		if ($DebugInfo) {
+			Add-LogRow "->Convert query data to HTML" "Failure"
+		}
 	}
 
 }
@@ -822,7 +847,8 @@ function Export-PlansAndDeadlocks {
 	try {
 		if ($DebugInfo) {
 			Write-Host " ->Exporting $(if($XMLColName -eq 'deadlock_graph'){"deadlock graphs"}
-			else{"execution plans"})..." -ForegroundColor Yellow
+			else{"execution plans"})... " -ForegroundColor Yellow -NoNewline
+			$StepStart = get-date
 		}
 		$RowNum = 0
 		$i = 0
@@ -847,12 +873,16 @@ function Export-PlansAndDeadlocks {
 		}
 
 		if ($DebugInfo) {
-			Write-Host " ->$(if($XMLColName -eq 'deadlock_graph'){"deadlock graphs"}
-			else{"execution plans"}) exported successfully" -ForegroundColor Yellow
+			$StepEnd = get-date
+			Write-Host @GreenCheck
+			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
+			$RunTime = [Math]::Round($StepRunTime, 2)
+			Write-Host " - $RunTime seconds" -Fore Yellow
 		}
 	}
 	catch {
-		Write-Host " Error exporting deadlock and plan data: $_" -ForegroundColor Red
+		Invoke-ErrMsg
+		#Write-Host " Error exporting deadlock and plan data: $_" -ForegroundColor Red
 	}
 }
 
@@ -924,7 +954,8 @@ function Convert-TableToExcel {
 		}
 
 		if ($DebugInfo) {
-			Write-Host " ->Writing data to Excel worksheet" -ForegroundColor Yellow
+			Write-Host " ->Writing data to Excel worksheet... " -ForegroundColor Yellow -NoNewline
+			$StepStart = get-date
 		}
 
 		foreach ($row in $DataTable) {
@@ -952,18 +983,24 @@ function Convert-TableToExcel {
 			$RowNum += 1
 			$ExcelColNum = $StartCol
 		}
-		$StepEnd = get-date
-		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-		$RunTime = [Math]::Round($StepRunTime, 2)
 		if ($DebugInfo) {
-			Write-Host " ->Data written successfully  - $RunTime seconds" -ForegroundColor Yellow
+			$StepEnd = get-date
+			Write-Host @GreenCheck
+			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
+			$RunTime = [Math]::Round($StepRunTime, 2)
+			Write-Host " - $RunTime seconds" -Fore Yellow
+			Add-LogRow "->Write data to Excel worksheet" "Success"
 		}
 		
 	}
  catch {
-		Write-Host " Error converting table to Excel: $_" -ForegroundColor Red
+	Invoke-ErrMsg
+		#Write-Host " Error converting table to Excel: $_" -ForegroundColor Red
 		Write-Host "  Debug Column: $global:DebugCol"
 		Write-Host "  Debug Value: $global:DebugValue"
+		if ($DebugInfo) {
+			Add-LogRow "->Write data to Excel worksheet" "Failure"
+		}
 	}
 }
 
@@ -1727,7 +1764,7 @@ if ($ZipOutput -eq "Y") {
 	$ZipFile = $SubDir + ".zip"
 }
 if ($DebugInfo) {
-	Write-Host " Output directory: $OutDir" -Fore Yellow
+	Write-Host "`n Output directory: `n$OutDir" -Fore Yellow
 }
 
 
@@ -1881,9 +1918,11 @@ $LogTbl = New-Object System.Data.DataTable
 $LogTbl.Columns.Add("Step", [string]) | Out-Null
 $LogTbl.Columns.Add("StartDate", [string]) | Out-Null
 $LogTbl.Columns.Add("EndDate", [string]) | Out-Null
-$LogTbl.Columns.Add("Duration", [string]) | Out-Null
+#$LogTbl.Columns.Add("Duration", [string]) | Out-Null
+$LogTbl.Columns.Add("Duration (Seconds)", [string]) | Out-Null
 $LogTbl.Columns.Add("Outcome", [string]) | Out-Null
-$LogTbl.Columns.Add("ErrorMsg", [string]) | Out-Null
+#$LogTbl.Columns.Add("ErrorMsg", [string]) | Out-Null
+$LogTbl.Columns.Add("Message", [string]) | Out-Null
 
 ###Check instance uptime
 Write-Host "Checking instance uptime..." -NoNewline
@@ -2610,7 +2649,7 @@ $HTMLBodyEnd
 	<title>$HtmlTabName</title>
 $HTMLBodyStart
 <h1 id="top">$HtmlTabName</h1>
-<p><a href='https://vladdba.com/2025/03/03/dangerous-set-options-stored-procedures/' target='_blank'>Explanation about SET option inheritance in stored procedures</a></p>
+<p><a href='https://vladdba.com/2025/03/03/dangerous-set-options-stored-procedures/' target='_blank'>More information about SET options inheritance in stored procedures</a></p>
 $SortableTable
 $htmlTable
 $JumpToTop
@@ -2622,7 +2661,7 @@ $HTMLBodyEnd
 			else {
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Objects Dangerous SET")
 					
-				Convert-TableToExcel $DangerousSetTbl $ExcelSheet -StartRow 3 -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
+				Convert-TableToExcel $DangerousSetTbl $ExcelSheet -StartRow 4 -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
 				##Saving file 
 				Save-ExcelFile $ExcelFile
 			}
@@ -2861,9 +2900,6 @@ $HTMLBodyEnd
 			$NewCacheMinutesBackStr = ";SET @MinutesBack = " + $CacheMinutesBack + ";"
 			[string]$Query = $Query -replace $OldCacheMinutesBackStr, $NewCacheMinutesBackStr
 		}
-		if ($DebugInfo) {
-			Write-Host " ->Replacing $OldSortString with $NewSortString" -fore yellow
-		}		
 
 		[string]$Query = $Query -replace $OldSortString, $NewSortString
 		Write-Host " ->Top $(if($SortOrder -eq "'recent compilations'"){"50"}else{$CacheTop}) queries by $($SortOrder -replace "'",'')... " -NoNewLine
@@ -3125,9 +3161,6 @@ $HTMLBodyEnd
 		}
 
 		$OldSortOrder = $SortOrder
-		if (($DebugInfo) -and ($SortOrder -ne "'Recent Compilations'")) {
-			Write-Host " ->old sort order is now $OldSortOrder" -fore yellow
-		}
 
 		# Set @MinutesBack to NULL for the next sort order
 		if (($OrigCacheMinutesBack -gt 0) -and $SortOrder -ne "'Recent Compilations'") {
@@ -3909,10 +3942,10 @@ finally {
 		$JobStatus = Get-Job -Name $JobName | Select-Object -ExpandProperty State
 		if ($JobStatus -eq "Running") {
 			if ($TryCompleted -eq "N") {
-				Write-Host " Attempting to stop $JobName background process... " -NoNewline
+				Write-Host " Attempting to stop session activity collection background process... " -NoNewline
 			}
 			else {
-				Write-Host " Stopping $JobName background process... " -NoNewline
+				Write-Host " Stopping session activity collection background process... " -NoNewline
 			}
 			$CreatFlagTbl = "DECLARE @SQL NVARCHAR(400);`nSELECT @SQL = N'CREATE TABLE '+ CASE "
 			$CreatFlagTbl += "`nWHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure' "
@@ -3962,13 +3995,13 @@ finally {
 				$BlitzWhoDelay += 10
 				Start-Sleep -Seconds $BlitzWhoDelay
 				if ($DebugInfo) {
-					Write-Host " ->Waiting for $BlitzWhoDelay seconds before getting job output." -Fore Yellow
+					Write-Host " ->Waiting for $BlitzWhoDelay seconds before getting session activity output." -Fore Yellow
 				}
 			}
 			$JobStatus = Get-Job -Name $JobName | Select-Object -ExpandProperty State
 			if ($JobStatus -ne "Running") {
 				if ($DebugInfo) {
-					Write-Host " ->$JobName process no longer running " -NoNewline -Fore Yellow
+					Write-Host " ->Session activity collection process no longer running " -NoNewline -Fore Yellow
 				}
 				Write-Host @GreenCheck
 				if ($DebugInfo) {
@@ -4001,9 +4034,6 @@ finally {
 		[string]$Query = $Query.replace('[tempdb].[dbo].', '')
 		[string]$Query = $Query.replace('tempdb.dbo.', '')
 	}
-	#if (!([string]::IsNullOrEmpty($CheckDB))) {
-	#	[string]$Query = $Query -replace "SET @DatabaseName = N''; " , "SET @DatabaseName = N'$CheckDB'; "
-	#} commented for #307
 	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Return sp_BlitzWho" -ConnStringIn $ConnString -CmdTimeoutIn 800
 	
 	if ($global:StepOutcome -eq "Success") {
@@ -4197,8 +4227,8 @@ finally {
 
 		##Insert log data in Excel
 		##Populating the "ExecutionLog" sheet
-		if($DebugInfo){
-		Write-Host " Saving execution log for this run of PSBlitz..."
+		if ($DebugInfo) {
+			Write-Host " Saving execution log for this run of PSBlitz..."
 		}
 		$ExcelSheet = $ExcelFile.Worksheets.Item("ExecutionLog")
 
@@ -4248,9 +4278,7 @@ finally {
 			Write-Host " ->Generating index and execution log pages." -fore yellow
 		} 
 		$HtmlTabName = "PSBlitz Execution Log"
-		$htmlTable = $LogTbl | Select-Object "Step", "StartDate", "EndDate", 
-		@{Name = "Duration (Seconds)"; Expression = { $_."Duration" } }, "Outcome", 
-		@{Name = "Message"; Expression = { $_."ErrorMsg" } } | ConvertTo-Html -As Table -Fragment
+		$htmlTable = Convert-TableToHtml $LogTbl -NoCaseChange -DebugInfo:$DebugInfo
 		$html = $HTMLPre + @"
 						<title>$HtmlTabName</title>
 						$HTMLBodyStart
