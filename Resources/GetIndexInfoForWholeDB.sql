@@ -5,6 +5,12 @@
 /*Index Fragmentation Info*/
 USE [..PSBlitzReplace..];
 
+SET ANSI_NULLS ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET ARITHABORT ON;
+SET CONCAT_NULL_YIELDS_NULL ON;
+SET QUOTED_IDENTIFIER ON;
 SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
@@ -25,8 +31,10 @@ GROUP  BY [l].[resource_database_id],
 SELECT TOP(20000) DB_NAME()                                                                   AS [database],
        SCHEMA_NAME([obj].[schema_id]) + '.'
        + [obj].[name]                                                                         AS [object_name],
+	   [obj].[object_id],
        [obj].[type_desc]                                                                      AS [object_type],
        ISNULL([ix].[name], '')                                                                AS [index_name],
+	   [ix].[index_id],
        [ips].[index_type_desc]                                                                AS [index_type],
        [ips].[partition_number],
        CAST([ips].[avg_fragmentation_in_percent] AS DECIMAL(5, 2))                            AS [avg_frag_percent],
@@ -53,8 +61,10 @@ WHERE  [ix].[type] IN( 0, 1, 2, 3,
                                  FROM   #test)
 GROUP  BY SCHEMA_NAME([obj].[schema_id]) + '.'
           + [obj].[name],
+		  [obj].[object_id],
           [obj].[type_desc],
           [ix].[name],
+		  [ix].[index_id],
           [ips].[index_type_desc],
           [ips].[partition_number],
           [ips].[avg_fragmentation_in_percent],

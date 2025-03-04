@@ -3,6 +3,13 @@ sp_BlitzCache non-stored procedure
 Part of https://github.com/VladDBA/PSBlitz
 */
 
+    SET ANSI_NULLS ON;
+    SET ANSI_PADDING ON;
+    SET ANSI_WARNINGS ON;
+    SET ARITHABORT ON;
+    SET CONCAT_NULL_YIELDS_NULL ON;
+    SET QUOTED_IDENTIFIER ON;
+
 DECLARE
     @Help BIT,
     @UseTriggersAnyway BIT,
@@ -39,11 +46,16 @@ DECLARE
     @Version     VARCHAR(30),
     @VersionDate DATETIME,
     @VersionCheckMode BIT;
+	/*PSBlitz-specific parameters*/
+	DECLARE @KeepCRLF BIT = 0;
+
 
 /*Making it easier to replace the value of @SortOrder and @Top via PS*/
 ;SELECT @SortOrder = 'CPU', @Top = 10;
 ;SET @DatabaseName = NULL;
 ;SET @MinutesBack = NULL;
+;SET @KeepCRLF = 1;
+
 SELECT
     @Help = 0,
     @UseTriggersAnyway = NULL,
@@ -2584,7 +2596,11 @@ SET     PercentCPU = y.PercentCPU,
         /* Strip newlines and tabs. Tabs are replaced with multiple spaces
            so that the later whitespace trim will completely eliminate them
          */
-        QueryText = REPLACE(REPLACE(REPLACE(QueryText, @cr, ' '), @lf, ' '), @tab, '  ')
+		 /* Vlad - change for - https://github.com/VladDBA/PSBlitz/issues/314*/
+        QueryText = CASE WHEN @KeepCRLF = 1 
+                         THEN REPLACE(QueryText, @tab, '  ')
+                         ELSE REPLACE(REPLACE(REPLACE(QueryText, @cr, ' '), @lf, ' '), @tab, '  ')
+					END
 FROM (
     SELECT  PlanHandle,
             CASE @total_cpu WHEN 0 THEN 0
@@ -2640,7 +2656,11 @@ SET     PercentCPU = y.PercentCPU,
         /* Strip newlines and tabs. Tabs are replaced with multiple spaces
            so that the later whitespace trim will completely eliminate them
          */
-        QueryText = REPLACE(REPLACE(REPLACE(QueryText, @cr, ' '), @lf, ' '), @tab, '  ')
+        /* Vlad - change for - https://github.com/VladDBA/PSBlitz/issues/314*/
+        QueryText = CASE WHEN @KeepCRLF = 1 
+                         THEN REPLACE(QueryText, @tab, '  ')
+                         ELSE REPLACE(REPLACE(REPLACE(QueryText, @cr, ' '), @lf, ' '), @tab, '  ')
+					END
 FROM (
     SELECT  DatabaseName,
             SqlHandle,

@@ -2,7 +2,12 @@
 	Part of PSBlitz - https://github.com/VladDBA/PSBlitz
 	License - https://github.com/VladDBA/PSBlitz/blob/main/LICENSE
 */
-
+SET ANSI_NULLS ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET ARITHABORT ON;
+SET CONCAT_NULL_YIELDS_NULL ON;
+SET QUOTED_IDENTIFIER ON;
 SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 
@@ -16,34 +21,19 @@ DECLARE @DatabaseName NVARCHAR(128);
 
 SET @DatabaseName = N'';
 
-/*Standard output*/
+/*Standard RAW output*/
 SELECT CONVERT(VARCHAR(25),CAST([CheckDate] AS DATETIME),120) AS [CheckDate],
        CONVERT(VARCHAR(25),[start_time],120) AS [start_time],
        [elapsed_time],
-       
        [database_name],
 	   [session_id],
 	   [blocking_session_id],
-       [query_text],
        [query_cost],
        [status],
-       /*[cached_parameter_info],*/
        [wait_info],
        [top_session_waits],
-       
        [open_transaction_count],
        [is_implicit_transaction],
-       /*[nt_domain],
-       [host_name],
-       [login_name],
-       [nt_user_name],
-       [program_name],
-       [fix_parameter_sniffing],
-	   
-       [client_interface_name],
-	   
-       CONVERT(VARCHAR(25),[login_time],120) AS [login_time],
-       [request_time],*/
        [request_cpu_time],
        [request_logical_reads],
        [request_writes],
@@ -108,8 +98,7 @@ SELECT CONVERT(VARCHAR(25),[agg].[start_time],120) AS [start_time],
 	   [who].[database_name],
        [agg].[session_id],
 	   [who].[blocking_session_id],
-
-       [who].[query_text],
+	   [who].[query_text],
 	   CAST('' AS VARCHAR(30)) AS [query],
        [who].[outer_command],
        [who].[query_plan],
@@ -119,7 +108,6 @@ SELECT CONVERT(VARCHAR(25),[agg].[start_time],120) AS [start_time],
        [who].[cached_parameter_info],
        [who].[wait_info],
        [who].[top_session_waits],
-       
        [who].[open_transaction_count],
        [who].[is_implicit_transaction],
        [who].[nt_domain],

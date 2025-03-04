@@ -2,16 +2,26 @@
 	Part of PSBlitz - https://github.com/VladDBA/PSBlitz
 	License - https://github.com/VladDBA/PSBlitz/blob/main/LICENSE
 */
+SET ANSI_NULLS ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET ARITHABORT ON;
+SET CONCAT_NULL_YIELDS_NULL ON;
+SET QUOTED_IDENTIFIER ON;
 SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-DECLARE @DatabaseName NVARCHAR(256);
+DECLARE @DatabaseName NVARCHAR(256),
+        @CheckPass VARCHAR(5);
 
 SET @DatabaseName = N'';
+/*This is here to avoid overwriting sqlplan files 
+if they originate from the same SPID*/
+SET @CheckPass = '';
 
 /*
-		This is a fix for an edge case that causes the same record(s) to show up multiple times
+		This CTE is a fix for an edge case that causes the same record(s) to show up multiple times
 		- can't do SELECT DISTINCT when XML data is involved, so I'll split this up using a CTE
 */
 WITH qcte
@@ -108,7 +118,7 @@ SELECT CONVERT(VARCHAR(25),[qcte].[time_of_check],120) AS [time_of_check],
        END                         AS [current_query],
 	   [qcte].[current_sql],
 	   CASE
-         WHEN [sqlplan_curr].[query_plan] IS NOT NULL THEN 'OpenTranCurrent_'
+         WHEN [sqlplan_curr].[query_plan] IS NOT NULL THEN 'OpenTranCurrent'+@CheckPass+'_'
                                                            + CAST([qcte].[session_id] AS VARCHAR(10))
                                                            + '.sqlplan'
          ELSE '-- N/A --'
@@ -121,7 +131,7 @@ SELECT CONVERT(VARCHAR(25),[qcte].[time_of_check],120) AS [time_of_check],
        END                         AS [most_recent_query],
 	   [qcte].[most_recent_sql],
 	   CASE
-         WHEN [sqlplan_rec].[query_plan] IS NOT NULL THEN 'OpenTranRecent_'
+         WHEN [sqlplan_rec].[query_plan] IS NOT NULL THEN 'OpenTranRecent'+@CheckPass+'_'
                                                           + CAST([qcte].[session_id] AS VARCHAR(10))
                                                           + '.sqlplan'
          ELSE '-- N/A --'
@@ -140,6 +150,11 @@ SELECT CONVERT(VARCHAR(25),[qcte].[time_of_check],120) AS [time_of_check],
        CONVERT(VARCHAR(25),[qcte].[request_start_time],120) AS [request_start_time],
        CONVERT(VARCHAR(25),[qcte].[request_end_time],120) AS [request_end_time],
        [qcte].[active_request_elapsed_seconds],
+	   CASE 
+	     WHEN [qcte].[request_end_time] IS NOT NULL 
+		 THEN DATEDIFF(SECOND, [qcte].[request_end_time],[qcte].[time_of_check] ) 
+		 ELSE NULL 
+	   END AS [seconds_since_request_ended],
        [qcte].[host_name],
        [qcte].[login_name],
        [qcte].[program_name],
