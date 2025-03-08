@@ -316,7 +316,7 @@ IF OBJECT_ID('tempdb..#dm_db_index_operational_stats') IS NOT NULL
               [database_name] NVARCHAR(128) NULL,
               URL NVARCHAR(200) NOT NULL,
               details NVARCHAR(MAX) NOT NULL,
-              index_definition NVARCHAR(MAX) NOT NULL,
+              index_definition NVARCHAR(MAX) NULL, /*Vlad - made NULLable because of https://github.com/VladDBA/PSBlitz/issues/320 */
               secret_columns NVARCHAR(MAX) NULL,
               index_usage_summary NVARCHAR(MAX) NULL,
               index_size_summary NVARCHAR(MAX) NULL,

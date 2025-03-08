@@ -277,8 +277,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.1.0"
-$VersDate = "2025-03-04"
+$Vers = "5.1.1"
+$VersDate = "2025-03-09"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
