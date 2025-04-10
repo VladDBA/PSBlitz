@@ -2320,13 +2320,13 @@ $HTMLBodyEnd
 				$htmlTable4 = Convert-TableToHtml $DBFileInfoTbl -TblID "DBFileInfoTable" -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
 				if ($ObjImpUpgrTbl.Rows.Count -gt 0) {
-					$htmlTable5 = $ObjImpUpgrTbl | Select-Objects "Object Type", "Object Name", "Index Name", "Dependency" | ConvertTo-Html -As Table -Fragment
+					$htmlTable5 = Convert-TableToHtml $ObjImpUpgrTbl -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
 				}
 				else {
 					$htmlTable5 = '<p>No matching objects found.</p>'
 				}			
 
-				$htmlTable6 = $DBConfigTbl | Select-Object "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
+				$htmlTable6 = Convert-TableToHtml $DBConfigTbl -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
 				$html = $HTMLPre + @"
 <title>$tableName</title>
@@ -3654,10 +3654,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			'<br>'})
 		$htmlTable2
 		$JumpToTop
-		<br>
-		<h2>Query Text</h2>
-		$htmlTable3
-		$JumpToTop
+		
 "@
 				if ($TblLockPlans.Rows.Count -gt 0) {
 					$html += @"
@@ -3669,14 +3666,17 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		<h2>Query Text For Execution Plans Involved in Deadlocks</h2>
 		$htmlTable5
 		$JumpToTop
+"@
+				}
+
+		$html += @"
+		<br>
+		<h2>Query Text For Deadlock Details</h2>
+		$htmlTable3
+		$JumpToTop
 		$HTMLBodyEnd
 "@
-				}
-				else {
-					$html += @"
-				$HTMLBodyEnd
-"@
-				}
+				
 				
 				Save-HtmlFile $html "BlitzLock.html" $HTMLOutDir $DebugInfo
 				Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3, htmlTable4, htmlTable5
