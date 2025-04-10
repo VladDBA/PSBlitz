@@ -102,6 +102,7 @@ SELECT
         [CachedSizeMB],
         CAST([CachedSizeMB] / SUM([CachedSizeMB]) OVER() * 100.0 AS DECIMAL(5,2)) AS [BufferPool%]
 FROM AggBPInfo
+OPTION (MAXDOP 1, RECOMPILE);
 
 /*Return database files and size info*/
 SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],CONVERT(VARCHAR(25),d.[create_date],120) AS [Created],' AS NVARCHAR(MAX))
