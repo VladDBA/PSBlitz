@@ -278,7 +278,7 @@ param(
 ###Internal params
 #Version
 $Vers = "5.1.1"
-$VersDate = "2025-03-09"
+$VersDate = "2025-04-09"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -2311,13 +2311,13 @@ $HTMLBodyEnd
 
 				$htmlTable = Convert-TableToHtml $RsrcGovTbl -DebugInfo:$DebugInfo -NoCaseChange
 
-				$htmlTable1 = Convert-TableToHtml $DBInfoTbl -DebugInfo:$DebugInfo -NoCaseChange
+				$htmlTable1 = Convert-TableToHtml $DBInfoTbl -TblID "DBInfoTable" -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
-				$htmlTable2 = Convert-TableToHtml $RsrcUsageTbl -DebugInfo:$DebugInfo -NoCaseChange
+				$htmlTable2 = Convert-TableToHtml $RsrcUsageTbl -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
-				$htmlTable3 = Convert-TableToHtml $Top10WaitsTbl -DebugInfo:$DebugInfo -NoCaseChange -HasURLs
+				$htmlTable3 = Convert-TableToHtml $Top10WaitsTbl -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange -HasURLs
 
-				$htmlTable4 = Convert-TableToHtml $DBFileInfoTbl -DebugInfo:$DebugInfo -NoCaseChange
+				$htmlTable4 = Convert-TableToHtml $DBFileInfoTbl -TblID "DBFileInfoTable" -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
 				if ($ObjImpUpgrTbl.Rows.Count -gt 0) {
 					$htmlTable5 = $ObjImpUpgrTbl | Select-Objects "Object Type", "Object Name", "Index Name", "Dependency" | ConvertTo-Html -As Table -Fragment

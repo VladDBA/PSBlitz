@@ -156,7 +156,7 @@ Open PSBlitzOutput.xlsx (found in PSBlitz's Resources folder) click on the first
 |`-ToHTML`| Providing Y as a value will tell PSBlitz.ps1 to output the report as HTML instead of an Excel file. This is perfect when running PSBlitz from a machine that doesn't have Office installed.|
 |`-ZipOutput`| Providing Y as a value will tell PSBlitz.ps1 to also create a zip archive of the output files.<br>Defaults to N.|
 |`-BlitzWhoDelay` | Used to sepcify the number of seconds between each active session data capture. <br>Defaults to 10 if not specified, meaning that active session data will be captured every 10 seconds.|
-|`-ConnTimeout`| Can be used to increased the timeout limit in seconds for connecting to SQL Server. <br>Defaults to 15 seconds if not specified.|
+|`-ConnTimeout`| Can be used to increased the timeout limit in seconds for connecting to SQL Server. <br>Defaults to 45 seconds if not specified.|
 |`-MaxTimeout`| Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. <br>Defaults to 1000 (16.6 minutes).|
 |`-MaxUsrDBs`| Can be used to tell PSBlitz to raise the limit of user databases based on which index-related info is limited to only the "loudest" database in the cache results. <br>Defaults to 50. <br>Only change it if you're using using HTML output and have enough RAM to handle the increased data that PS will have to process.|
 |`-DebugInfo`| Switch used to get more information for debugging and troubleshooting purposes.|
