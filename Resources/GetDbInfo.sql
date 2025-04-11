@@ -14,8 +14,7 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 DECLARE @DatabaseName NVARCHAR(128),
         @DBName       NVARCHAR(128),
         @ExecSQL      NVARCHAR(MAX),
-		@ParamDef     NVARCHAR(200),
-		@SkipThis     BIT,
+        @SkipThis     BIT,
         @LineFeed     NVARCHAR(5); 
 
 
@@ -29,7 +28,8 @@ SELECT @SkipThis = CASE
                      CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) = 13
                      AND CAST(SERVERPROPERTY('ProductLevel') AS NVARCHAR(128)) IN ( N'RTM', N'SP1' )
                     )
-                    OR CAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'), 0) AS TINYINT) < 13 THEN 1
+                    OR (CAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'), 0) AS TINYINT) < 13 
+                     AND CAST(ISNULL(SERVERPROPERTY('EngineEdition'), 0) AS TINYINT) IN (2,3,4)) THEN 1
                      ELSE 0
                    END;
 
@@ -166,7 +166,7 @@ SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [Database],CONVERT(VARCHAR(25),d.[cr
 				  + N'CASE WHEN d.[is_encrypted] = 1 THEN ''Yes'' ELSE ''No'' END AS [IsEncrypted]'
 				  + @LineFeed
                   + CASE
-                      WHEN @SkipThis = 1 THEN ' ''n/a'' AS [EncryptionState]'
+                      WHEN @SkipThis = 1 THEN ', ''n/a'' AS [EncryptionState]'
 					  ELSE N', CASE WHEN ek.[encryption_state] = 0 OR ek.[encryption_state] IS NULL THEN ''No Encryption'''
 					  + @LineFeed + N'WHEN ek.[encryption_state] = 1 THEN ''Unencrypted'''
 					  + @LineFeed + N'WHEN ek.[encryption_state] = 2 THEN ''Encryption in progress'''
