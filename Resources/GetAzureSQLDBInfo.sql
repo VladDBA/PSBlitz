@@ -67,7 +67,7 @@ FROM   sys.[dm_user_db_resource_governance];
 ;WITH FSFiles([database_id], [FSFilesCount], [FSFilesSizeGB])
      AS (SELECT DB_ID() AS [database_id],
                 COUNT([type]),
-                CAST(SUM(CAST([size] AS BIGINT) * 8 / 1024.00 / 1024.00) AS NUMERIC(23, 3))
+                CAST(SUM(CAST([size] AS BIGINT) * 8 / 1024. / 1024.) AS NUMERIC(23, 3))
          FROM   sys.[database_files]
          WHERE  [type] = 2
          GROUP  BY [type])
@@ -80,7 +80,7 @@ SELECT DB_NAME()                                                                
              ELSE 0
            END)                                                                                                        AS [Data Files],
        CAST(SUM(CASE
-                  WHEN [f].[type] = 0 THEN ( CAST([f].[size] AS BIGINT) * 8 / 1024.00 / 1024.00 )
+                  WHEN [f].[type] = 0 THEN ( CAST([f].[size] AS BIGINT) * 8 / 1024. / 1024. )
                   ELSE 0.00
                 END) AS NUMERIC(23, 3))                                                                                AS [Data Files Size GB],
        SUM(CASE
@@ -88,7 +88,7 @@ SELECT DB_NAME()                                                                
              ELSE 0
            END)                                                                                                        AS [Log Files],
        CAST(SUM(CASE
-                  WHEN [f].[type] = 1 THEN ( CAST([f].[size] AS BIGINT) * 8 / 1024.00 / 1024.00 )
+                  WHEN [f].[type] = 1 THEN ( CAST([f].[size] AS BIGINT) * 8 / 1024. / 1024. )
                   ELSE 0.00
                 END) AS NUMERIC(23, 3))                                                                                AS [LogFilesSizeGB],
        [l].[VirtualLogFiles],
@@ -104,26 +104,26 @@ SELECT DB_NAME()                                                                
        [d].[collation_name]                                                                                            AS [Collation],
        [d].[snapshot_isolation_state_desc]                                                                             AS [Snapshot Isolation State],
        CASE
-         WHEN [d].[is_read_committed_snapshot_on] = 1 THEN 'Yes'
-         ELSE 'No'
-       END                                                                                                             AS [Read Committed Snapshot On],
+         WHEN [d].[is_read_committed_snapshot_on] = 1 THEN 'On'
+         ELSE 'Off'
+       END                                                                                                             AS [Read Committed Snapshot],
        [d].[recovery_model_desc]                                                                                       AS [Recovery Model],
        CASE
-         WHEN [d].[is_auto_close_on] = 1 THEN 'Yes'
-         ELSE 'No'
-       END                                                                                                             AS [AutoClose On],
+         WHEN [d].[is_auto_close_on] = 1 THEN 'On'
+         ELSE 'Off'
+       END                                                                                                             AS [Auto Close],
        CASE
-         WHEN [d].[is_auto_shrink_on] = 1 THEN 'Yes'
-         ELSE 'No'
-       END                                                                                                             AS [AutoShrink On],
+         WHEN [d].[is_auto_shrink_on] = 1 THEN 'On'
+         ELSE 'Off'
+       END                                                                                                             AS [Auto Shrink],
        CASE
-         WHEN [d].[is_query_store_on] = 1 THEN 'Yes'
-         ELSE 'No'
-       END                                                                                                             AS [QueryStore On],
+         WHEN [d].[is_query_store_on] = 1 THEN 'On'
+         ELSE 'Off'
+       END                                                                                                             AS [Query Store],
        CASE
-         WHEN [d].[is_trustworthy_on] = 1 THEN 'Yes'
-         ELSE 'No'
-       END                                                                                                             AS [Trustworthy On]
+         WHEN [d].[is_trustworthy_on] = 1 THEN 'On'
+         ELSE 'Off'
+       END                                                                                                             AS [Trustworthy]
 FROM   sys.[database_files] AS [f]
        INNER JOIN sys.[databases] AS [d]
                ON DB_ID() = [d].[database_id]
@@ -279,28 +279,55 @@ OPTION (RECOMPILE);
 
 
 /*database files details*/
-SELECT DB_NAME()                                                                                                                                  AS [Database],
-       [f].[file_id]                                                                                                                              AS [FileID],
-       [f].[name]                                                                                                                                 AS [File Logical Name],
-       [f].[physical_name]                                                                                                                        AS [File Physical Name],
-       [f].[type_desc]                                                                                                                            AS [File Type],
-       [state_desc]                                                                                                                               AS [State],
-       CAST(( CAST([f].[size] AS BIGINT) * 8 / 1024.00 / 1024.00 ) AS NUMERIC(23, 3))                                                             AS [SizeGB],
-       CAST(( ( CAST([f].[size] AS BIGINT) - CAST(FILEPROPERTY([f].[name], 'SpaceUsed') AS BIGINT) ) * 8 / 1024.00 / 1024.00 ) AS NUMERIC(23, 3)) AS [Available SpaceGB],
+SELECT DB_NAME()                                                                                                                                  AS [database],
+       [f].[file_id]                                                                                                                              AS [file_id],
+       [f].[name]                                                                                                                                 AS [file_logical_name],
+       [f].[physical_name]                                                                                                                        AS [file_physical_name],
+       CASE f.[type]
+         WHEN 0 THEN 'Data File'
+         WHEN 1 THEN 'Transaction Log'
+         WHEN 2 THEN 'Filestream'
+         WHEN 4 THEN 'Full-Text'
+         ELSE f.[type_desc]
+	   END                                                                                                                                        AS [file_type],
+       [state_desc]                                                                                                                               AS [state],
+       CAST(( CAST([f].[size] AS BIGINT) * 8 / 1024. / 1024. ) AS NUMERIC(23, 3))                                                                 AS [size_GB],
+       CAST(( ( CAST([f].[size] AS BIGINT) - CAST(FILEPROPERTY([f].[name], 'SpaceUsed') AS BIGINT) ) * 8 / 1024. / 1024. ) AS NUMERIC(23, 3))     AS [available_space_GB],
+	   CASE 
+	     WHEN ios.[num_of_bytes_read] > 0
+	     THEN CAST(ios.[num_of_bytes_read]/ 1024./ 1024./1024. AS NUMERIC(23,3))
+	     ELSE 0 
+	   END                                                         AS [total_read_GB],
+	   ios.[num_of_reads]                                          AS [total_reads],
+	   ios.[io_stall_read_ms]                                      AS [total_read_stall_time(ms)],
+	    CASE WHEN ios.num_of_reads = 0 THEN 0.000 ELSE
+	   CAST(ios.io_stall_read_ms /CAST(ios.num_of_reads  AS NUMERIC(38,3)) AS NUMERIC(23,3))
+	   END                                                         AS [avg_read_stall(ms)],	   
+	   CASE 
+	     WHEN ios.[num_of_bytes_written] > 0
+	     THEN CAST(ios.[num_of_bytes_written]/ 1024./ 1024./1024. AS NUMERIC(23,3))
+	     ELSE 0 
+	   END                                                        AS [total_written_GB],
+	   ios.[num_of_writes]                                        AS [total_writes],
+	   ios.[io_stall_write_ms]                                    AS [total_write_stall_time(ms)],
+	   CASE WHEN ios.num_of_writes = 0 THEN 0.000 ELSE
+	   CAST(ios.io_stall_write_ms /CAST(ios.num_of_writes  AS NUMERIC(38,3)) AS NUMERIC(23,3))
+	   END                                                        AS [avg_write_stall(ms)],
        CASE
          WHEN [max_size] = 0
                OR [growth] = 0 THEN 'File autogrowth is disabled'
          WHEN [max_size] = -1
               AND [growth] > 0 THEN 'Unlimited'
-         WHEN [max_size] > 0 THEN CAST(CAST (CAST([max_size] AS BIGINT) * 8 / 1024.00 / 1024.00 AS NUMERIC(23, 3)) AS VARCHAR(20))
-       END                                                                                                                                        AS [Max File SizeGB],
+         WHEN [max_size] > 0 THEN CAST(CAST (CAST([max_size] AS BIGINT) * 8 / 1024. / 1024. AS NUMERIC(23, 3)) AS VARCHAR(20))
+       END                                                                                                                                        AS [max_file_size_GB],
        CASE
-         WHEN [is_percent_growth] = 1 THEN CAST([growth] AS NVARCHAR(2)) + N' %'
-         WHEN [is_percent_growth] = 0 THEN CAST(CAST(CAST([growth] AS BIGINT)*8/1024.00/1024.00 AS NUMERIC(23, 3)) AS VARCHAR(20))
+         WHEN [is_percent_growth] = 1 THEN CAST([growth] AS VARCHAR(2)) + ' %'
+         WHEN [is_percent_growth] = 0 THEN CAST(CAST(CAST([growth] AS BIGINT)*8/1024./1024. AS NUMERIC(23, 3)) AS VARCHAR(20))
                                            + ' GB'
-       END                                                                                                                                        AS [Growth Increment]
+       END                                                                                                                                        AS [growth_increment]
 FROM   sys.[database_files] AS [f]
-OPTION(RECOMPILE);
+CROSS APPLY sys.[dm_io_virtual_file_stats](DB_ID(),[f].[file_id]) AS [ios]
+OPTION(MAXDOP 1,RECOMPILE);
 
 /* Objects that might be impacted by a version change
 

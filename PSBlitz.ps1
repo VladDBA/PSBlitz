@@ -2418,7 +2418,7 @@ $HTMLBodyEnd
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = 36
 				#Specify with which column in the sheet to start
-				$ExcelColNum = 12
+				$ExcelColNum = 20
 				
 				Convert-TableToExcel $ObjImpUpgrTbl $ExcelSheet -StartRow $ExcelStartRow -StartCol $ExcelColNum -DebugInfo:$DebugInfo
 
@@ -2430,7 +2430,7 @@ $HTMLBodyEnd
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = 36
 				#Specify with which column in the sheet to start
-				$ExcelColNum = 17
+				$ExcelColNum = 25
 				Convert-TableToExcel $DBConfigTbl $ExcelSheet -StartRow $ExcelStartRow -StartCol $ExcelColNum -DebugInfo:$DebugInfo
 
 				##Saving file 
@@ -2462,16 +2462,16 @@ $HTMLBodyEnd
 				#$DBConfigTbl = New-Object System.Data.DataTable
 				$DBConfigTbl = $global:PSBlitzSet.Tables[2]
 			}
-			elseif (($MajorVers -lt 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
+			elseif (($MajorVers -lt 13) -and (!([string]::IsNullOrEmpty($CheckDB))) -and ($IsAzureSQLMI -eq $false)) {
 				Add-LogRow "->Database Scoped Config" "Skipped" "Major Version is $MajorVers"
 			}
 
 			if ($ToHTML -eq "Y") {
 				$tableName = "Database Info"
 
-				$htmlTable = Convert-TableToHtml $DBInfoTbl -NoCaseChange -DebugInfo:$DebugInfo
+				$htmlTable = Convert-TableToHtml $DBInfoTbl -DebugInfo:$DebugInfo
 				
-				$htmlTable1 = Convert-TableToHtml $DBFileInfoTbl -NoCaseChange -TblID "DBFileInfoTable" -CSSClass "sortable" -DebugInfo:$DebugInfo
+				$htmlTable1 = Convert-TableToHtml $DBFileInfoTbl -TblID "DBFileInfoTable" -CSSClass "sortable" -DebugInfo:$DebugInfo
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable">'
 				}
@@ -2479,7 +2479,7 @@ $HTMLBodyEnd
 					$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable sortable">'
 				}
 
-				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
+				if ((($MajorVers -ge 13) -or ($IsAzureSQLMI)) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 
 					$htmlTable2 = Convert-TableToHtml $DBConfigTbl -NoCaseChange -CSSClass "sortable" -DebugInfo:$DebugInfo
 					$htmlBlock = "`n<br>`n <h2>Database Scoped Configuration for $CheckDB</h2>"
@@ -2527,11 +2527,11 @@ $HTMLBodyEnd
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = 3
 				#Specify with which column in the sheet to start
-				$ExcelColNum = 12
+				$ExcelColNum = 20
 				
 				Convert-TableToExcel $DBInfoTbl $ExcelSheet -StartRow $ExcelStartRow -StartCol $ExcelColNum -DebugInfo:$DebugInfo
 
-				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
+				if ((($MajorVers -ge 13) -or ($IsAzureSQLMI)) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 					##Populating the DB Scoped Config sheet
 					$ExcelSheet = $ExcelFile.Worksheets.Item("DB Scoped Config")
 					#Specify at which row in the sheet to start adding the data
