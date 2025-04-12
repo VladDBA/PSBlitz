@@ -92,7 +92,7 @@ I'm not filtering by database name here*/
 WITH AggBPInfo
 AS
 (SELECT [database_id],
-CAST(COUNT(*) * 8/1024.0 AS NUMERIC(23, 3))  AS [cached_size_MB]
+CAST(COUNT(*) * 8/1024. AS NUMERIC(38, 3))  AS [cached_size_MB]
 FROM sys.dm_os_buffer_descriptors
 WHERE [database_id] <> 32767 
 GROUP BY [database_id])
@@ -105,8 +105,10 @@ FROM AggBPInfo
 OPTION (MAXDOP 1, RECOMPILE);
 
 /*Return database files and size info*/
-SELECT @ExecSQL = CAST(N'SELECT d.[name] AS [database],CONVERT(VARCHAR(25),d.[create_date],120) AS [created],' AS NVARCHAR(MAX))
+SELECT @ExecSQL = CAST(N'SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;' AS NVARCHAR(MAX))
                   + @LineFeed
+				  + N'SELECT d.[name] AS [database],CONVERT(VARCHAR(25),d.[create_date],120) AS [created],'
+				  + @LineFeed
                   + N'd.[state_desc] AS [state],'
                   + @LineFeed
                   + N'd.[user_access_desc] AS [user_access],'
@@ -252,7 +254,7 @@ WHILE @@FETCH_STATUS = 0
                      + N'SELECT DB_ID() AS [database_id], [f].[file_id],'
                      + @LineFeed
                      + N'CAST(( ( CAST([f].[size] AS BIGINT) - CAST(FILEPROPERTY([f].[name], ''SpaceUsed'') '
-                     + N'AS BIGINT) ) * 8 / 1024.00 / 1024.00 ) AS NUMERIC(23, 3)) AS [Available SpaceGB]'
+                     + N'AS BIGINT) ) * 8 / 1024. / 1024. ) AS NUMERIC(23, 3)) AS [Available SpaceGB]'
                      + @LineFeed
                      + N'FROM   sys.[database_files] AS [f] WHERE [f].[type] <> 2'
 					 + @LineFeed + N'OPTION (RECOMPILE);';
@@ -268,14 +270,14 @@ SELECT DB_NAME(f.database_id)                                     AS [database],
        f.[name]                                                   AS [file_logical_name],
        f.[physical_name]                                          AS [file_physical_name],
 	   CASE f.[type]
-         WHEN 0 THEN 'Data File'
+         WHEN 0 THEN 'Data'
          WHEN 1 THEN 'Transaction Log'
          WHEN 2 THEN 'Filestream'
          WHEN 4 THEN 'Full-Text'
          ELSE f.[type_desc]
 	   END                                                        AS [file_type],
        state_desc                                                 AS [state],
-       CAST(( CAST(f.size AS BIGINT) * 8 / 1024.00 / 1024.00 ) AS NUMERIC(23, 3)) AS [size_GB],
+       CAST(( CAST(f.size AS BIGINT) * 8 / 1024. / 1024. ) AS NUMERIC(23, 3)) AS [size_GB],
 	   [as].[available_space_GB],
 	   CASE 
 	     WHEN ios.[num_of_bytes_read] > 0
@@ -302,11 +304,11 @@ SELECT DB_NAME(f.database_id)                                     AS [database],
                OR [growth] = 0 THEN 'File autogrowth is disabled'
          WHEN [max_size] = -1
               AND [growth] > 0 THEN 'Unlimited'
-         WHEN [max_size] > 0 THEN CAST(CAST (CAST([max_size] AS BIGINT) * 8 / 1024. / 1024. AS NUMERIC(23, 3)) AS VARCHAR(20))
+         WHEN [max_size] > 0 THEN CAST(CAST (CAST([max_size] AS BIGINT) * 8 / 1024. / 1024. AS NUMERIC(23, 3)) AS VARCHAR(24))
        END                                                        AS [max_file_size_GB],
        CASE
          WHEN [is_percent_growth] = 1 THEN CAST([growth] AS VARCHAR(2)) + ' %'
-         WHEN [is_percent_growth] = 0 THEN CAST(CAST(CAST([growth] AS BIGINT)*8/1024./1024. AS NUMERIC(23, 3)) AS VARCHAR(20))
+         WHEN [is_percent_growth] = 0 THEN CAST(CAST(CAST([growth] AS BIGINT)*8/1024./1024. AS NUMERIC(23, 3)) AS VARCHAR(24))
                                            + ' GB'
        END                                                        AS [growth_increment]
 FROM   sys.master_files AS f
