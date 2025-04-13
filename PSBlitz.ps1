@@ -680,6 +680,11 @@ function Convert-TableToHtml {
 			if ($formattedName -like "*kb*" -or $formattedName -like "*mb*" -or $formattedName -like "*gb*") {
 				$formattedName = $formattedName -replace "([KMG])b", '$1B'
 			}
+			#handle mixed case ms
+			if ($formattedName -like "*ms" -or $formattedName -like "*ms)") {
+				$pattern = "(?-i)Ms"
+				$formattedName = $formattedName -replace $pattern , "ms"
+			}
 
 			$property = if ($DateTimeCols -contains $currentColumn) {
 				@{
