@@ -277,8 +277,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.1.0"
-$VersDate = "2025-03-04"
+$Vers = "5.2.0"
+$VersDate = "2025-04-13"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -680,6 +680,11 @@ function Convert-TableToHtml {
 			if ($formattedName -like "*kb*" -or $formattedName -like "*mb*" -or $formattedName -like "*gb*") {
 				$formattedName = $formattedName -replace "([KMG])b", '$1B'
 			}
+			#handle mixed case ms
+			if ($formattedName -like "*ms" -or $formattedName -like "*ms)") {
+				$pattern = "(?-i)Ms"
+				$formattedName = $formattedName -replace $pattern , "ms"
+			}
 
 			$property = if ($DateTimeCols -contains $currentColumn) {
 				@{
@@ -706,6 +711,9 @@ function Convert-TableToHtml {
 		}
 		elseif ($TblID) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID'>"
+		}
+		if($CSSClass -eq "Top10ClientConnTbl"){
+			$htmlTableOut = $htmlTableOut -replace "; </td>", "</td>"
 		}
         
 		if ($HasURLs) {
@@ -2085,8 +2093,8 @@ $HTMLBodyEnd
 
 			#Session level options
 			$ExcelStartRow = 14
-			$ExcelColNum = 10
-			Convert-TableToExcel $SessOptTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -StartCol $ExcelColNum -URLCols "URL" -MapURLToColNum 10 -URLTextCol "Option"
+			$ExcelColNum = 12
+			Convert-TableToExcel $SessOptTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -StartCol $ExcelColNum -URLCols "URL" -MapURLToColNum 12 -URLTextCol "Option"
 
 			##Saving file 
 			Save-ExcelFile $ExcelFile
@@ -2311,22 +2319,22 @@ $HTMLBodyEnd
 
 				$htmlTable = Convert-TableToHtml $RsrcGovTbl -DebugInfo:$DebugInfo -NoCaseChange
 
-				$htmlTable1 = Convert-TableToHtml $DBInfoTbl -DebugInfo:$DebugInfo -NoCaseChange
+				$htmlTable1 = Convert-TableToHtml $DBInfoTbl -TblID "DBInfoTable" -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
-				$htmlTable2 = Convert-TableToHtml $RsrcUsageTbl -DebugInfo:$DebugInfo -NoCaseChange
+				$htmlTable2 = Convert-TableToHtml $RsrcUsageTbl -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
-				$htmlTable3 = Convert-TableToHtml $Top10WaitsTbl -DebugInfo:$DebugInfo -NoCaseChange -HasURLs
+				$htmlTable3 = Convert-TableToHtml $Top10WaitsTbl -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange -HasURLs
 
-				$htmlTable4 = Convert-TableToHtml $DBFileInfoTbl -DebugInfo:$DebugInfo -NoCaseChange
+				$htmlTable4 = Convert-TableToHtml $DBFileInfoTbl -TblID "DBFileInfoTable" -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
 				if ($ObjImpUpgrTbl.Rows.Count -gt 0) {
-					$htmlTable5 = $ObjImpUpgrTbl | Select-Objects "Object Type", "Object Name", "Index Name", "Dependency" | ConvertTo-Html -As Table -Fragment
+					$htmlTable5 = Convert-TableToHtml $ObjImpUpgrTbl -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
 				}
 				else {
 					$htmlTable5 = '<p>No matching objects found.</p>'
 				}			
 
-				$htmlTable6 = $DBConfigTbl | Select-Object "Config Name", "Value", "IsDefault" | ConvertTo-Html -As Table -Fragment
+				$htmlTable6 = Convert-TableToHtml $DBConfigTbl -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
 				$html = $HTMLPre + @"
 <title>$tableName</title>
@@ -2418,7 +2426,7 @@ $HTMLBodyEnd
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = 36
 				#Specify with which column in the sheet to start
-				$ExcelColNum = 12
+				$ExcelColNum = 20
 				
 				Convert-TableToExcel $ObjImpUpgrTbl $ExcelSheet -StartRow $ExcelStartRow -StartCol $ExcelColNum -DebugInfo:$DebugInfo
 
@@ -2430,7 +2438,7 @@ $HTMLBodyEnd
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = 36
 				#Specify with which column in the sheet to start
-				$ExcelColNum = 17
+				$ExcelColNum = 25
 				Convert-TableToExcel $DBConfigTbl $ExcelSheet -StartRow $ExcelStartRow -StartCol $ExcelColNum -DebugInfo:$DebugInfo
 
 				##Saving file 
@@ -2462,16 +2470,16 @@ $HTMLBodyEnd
 				#$DBConfigTbl = New-Object System.Data.DataTable
 				$DBConfigTbl = $global:PSBlitzSet.Tables[2]
 			}
-			elseif (($MajorVers -lt 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
+			elseif (($MajorVers -lt 13) -and (!([string]::IsNullOrEmpty($CheckDB))) -and ($IsAzureSQLMI -eq $false)) {
 				Add-LogRow "->Database Scoped Config" "Skipped" "Major Version is $MajorVers"
 			}
 
 			if ($ToHTML -eq "Y") {
 				$tableName = "Database Info"
 
-				$htmlTable = Convert-TableToHtml $DBInfoTbl -NoCaseChange -DebugInfo:$DebugInfo
+				$htmlTable = Convert-TableToHtml $DBInfoTbl -DebugInfo:$DebugInfo
 				
-				$htmlTable1 = Convert-TableToHtml $DBFileInfoTbl -NoCaseChange -TblID "DBFileInfoTable" -CSSClass "sortable" -DebugInfo:$DebugInfo
+				$htmlTable1 = Convert-TableToHtml $DBFileInfoTbl -TblID "DBFileInfoTable" -CSSClass "sortable" -DebugInfo:$DebugInfo
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable">'
 				}
@@ -2479,7 +2487,7 @@ $HTMLBodyEnd
 					$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable sortable">'
 				}
 
-				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
+				if ((($MajorVers -ge 13) -or ($IsAzureSQLMI)) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 
 					$htmlTable2 = Convert-TableToHtml $DBConfigTbl -NoCaseChange -CSSClass "sortable" -DebugInfo:$DebugInfo
 					$htmlBlock = "`n<br>`n <h2>Database Scoped Configuration for $CheckDB</h2>"
@@ -2527,11 +2535,11 @@ $HTMLBodyEnd
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = 3
 				#Specify with which column in the sheet to start
-				$ExcelColNum = 12
+				$ExcelColNum = 20
 				
 				Convert-TableToExcel $DBInfoTbl $ExcelSheet -StartRow $ExcelStartRow -StartCol $ExcelColNum -DebugInfo:$DebugInfo
 
-				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
+				if ((($MajorVers -ge 13) -or ($IsAzureSQLMI)) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 					##Populating the DB Scoped Config sheet
 					$ExcelSheet = $ExcelFile.Worksheets.Item("DB Scoped Config")
 					#Specify at which row in the sheet to start adding the data
@@ -3654,10 +3662,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			'<br>'})
 		$htmlTable2
 		$JumpToTop
-		<br>
-		<h2>Query Text</h2>
-		$htmlTable3
-		$JumpToTop
+		
 "@
 				if ($TblLockPlans.Rows.Count -gt 0) {
 					$html += @"
@@ -3669,14 +3674,17 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		<h2>Query Text For Execution Plans Involved in Deadlocks</h2>
 		$htmlTable5
 		$JumpToTop
+"@
+				}
+
+		$html += @"
+		<br>
+		<h2>Query Text For Deadlock Details</h2>
+		$htmlTable3
+		$JumpToTop
 		$HTMLBodyEnd
 "@
-				}
-				else {
-					$html += @"
-				$HTMLBodyEnd
-"@
-				}
+				
 				
 				Save-HtmlFile $html "BlitzLock.html" $HTMLOutDir $DebugInfo
 				Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3, htmlTable4, htmlTable5
