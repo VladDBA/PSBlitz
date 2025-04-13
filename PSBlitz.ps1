@@ -278,7 +278,7 @@ param(
 ###Internal params
 #Version
 $Vers = "5.2.0"
-$VersDate = "2025-04-12"
+$VersDate = "2025-04-13"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -706,6 +706,9 @@ function Convert-TableToHtml {
 		}
 		elseif ($TblID) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID'>"
+		}
+		if($CSSClass -eq "Top10ClientConnTbl"){
+			$htmlTableOut = $htmlTableOut -replace "; </td>", "</td>"
 		}
         
 		if ($HasURLs) {
@@ -2085,8 +2088,8 @@ $HTMLBodyEnd
 
 			#Session level options
 			$ExcelStartRow = 14
-			$ExcelColNum = 10
-			Convert-TableToExcel $SessOptTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -StartCol $ExcelColNum -URLCols "URL" -MapURLToColNum 10 -URLTextCol "Option"
+			$ExcelColNum = 12
+			Convert-TableToExcel $SessOptTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -StartCol $ExcelColNum -URLCols "URL" -MapURLToColNum 12 -URLTextCol "Option"
 
 			##Saving file 
 			Save-ExcelFile $ExcelFile
