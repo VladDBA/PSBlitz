@@ -277,8 +277,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.2.0"
-$VersDate = "2025-04-13"
+$Vers = "5.2.1"
+$VersDate = "2025-04-17"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -4310,7 +4310,7 @@ finally {
 			$AzureEnv = "- Azure SQL DB"
 			$DbPortion = "- $ASDBName"
 		}
-		if (!([string]::IsNullOrEmpty($CheckDB))) {
+		elseif (!([string]::IsNullOrEmpty($CheckDB))) {
 			$DbPortion = "- database-specific check: $CheckDB"
 		}
 		else {
