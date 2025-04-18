@@ -596,7 +596,8 @@ function Invoke-PSBlitzQuery {
 		if (($StepNameIn -like "sp_BlitzCache*") -or ($StepNameIn -like "sp_BlitzQueryStore*") -or 
 		($StepNameIn -eq "sp_BlitzIndex mode 1") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info") -or 
 		($StepNameIn -eq "sp_BlitzLock") -or ($StepNameIn -eq "Return sp_BlitzWho") -or ($StepNameIn -eq "Open Transacion Info") -or 
-		($StepNameIn -eq "Objects with dangerous SET options")) {
+		($StepNameIn -eq "Objects with dangerous SET options") -or ($StepNameIn -eq "sp_Blitz") -or 
+		($StepNameIn -eq "sp_BlitzFirst 30 seconds")) {
 			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
 			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
 		}
@@ -712,7 +713,7 @@ function Convert-TableToHtml {
 		elseif ($TblID) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID'>"
 		}
-		if($CSSClass -eq "Top10ClientConnTbl"){
+		if ($CSSClass -eq "Top10ClientConnTbl") {
 			$htmlTableOut = $htmlTableOut -replace "; </td>", "</td>"
 		}
         
@@ -1002,7 +1003,7 @@ function Convert-TableToExcel {
 		
 	}
  catch {
-	Invoke-ErrMsg
+		Invoke-ErrMsg
 		#Write-Host " Error converting table to Excel: $_" -ForegroundColor Red
 		Write-Host "  Debug Column: $global:DebugCol"
 		Write-Host "  Debug Value: $global:DebugValue"
@@ -2650,10 +2651,15 @@ $HTMLBodyEnd
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Objects with dangerous SET options" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		if ($global:StepOutcome -eq "Success") {
 			$DangerousSetTbl = $global:PSBlitzSet.Tables[0]
-			if ($ToHTML -eq "Y") {
-				$HtmlTabName = "Database objects with dangerous SET options"
-				$htmlTable = Convert-TableToHtml $DangerousSetTbl -CSSClass "sortable" -DebugInfo:$DebugInfo
-				$html = $HTMLPre + @"
+			[int]$RowsReturned = $DangerousSetTbl.Rows.Count
+			if ($RowsReturned -le 0) {
+				Write-Host " ->No rows returned."
+			}
+			else {
+				if ($ToHTML -eq "Y") {
+					$HtmlTabName = "Database objects with dangerous SET options"
+					$htmlTable = Convert-TableToHtml $DangerousSetTbl -CSSClass "sortable" -DebugInfo:$DebugInfo
+					$html = $HTMLPre + @"
 	<title>$HtmlTabName</title>
 $HTMLBodyStart
 <h1 id="top">$HtmlTabName</h1>
@@ -2663,18 +2669,20 @@ $htmlTable
 $JumpToTop
 $HTMLBodyEnd
 "@
-				Save-HtmlFile $html "DangerousSETOpt.html" $HTMLOutDir $DebugInfo
-				Invoke-ClearVariables html, htmlTable
-			}
-			else {
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Objects Dangerous SET")
+					Save-HtmlFile $html "DangerousSETOpt.html" $HTMLOutDir $DebugInfo
+					Invoke-ClearVariables html, htmlTable
+				}
+				else {
+					$ExcelSheet = $ExcelFile.Worksheets.Item("Objects Dangerous SET")
 					
-				Convert-TableToExcel $DangerousSetTbl $ExcelSheet -StartRow 4 -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
-				##Saving file 
-				Save-ExcelFile $ExcelFile
+					Convert-TableToExcel $DangerousSetTbl $ExcelSheet -StartRow 4 -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
+					##Saving file 
+					Save-ExcelFile $ExcelFile
+				}
 			}
 			##Cleaning up variables
-			Invoke-ClearVariables DangerousSetTbl, PSBlitzSet	
+			Invoke-ClearVariables DangerousSetTbl, PSBlitzSet
+		 	
 		}
 	}
 	if ($JobStatus -ne "Running") {
@@ -3351,10 +3359,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
 
 					if ($IsAzureSQLDB) {
-						$HtmlTabName = "sp_BlitzQueryStore results for $ASDBName"
+						$HtmlTabName = "Query Store results for $ASDBName"
 					}
 					else {
-						$HtmlTabName = "sp_BlitzQueryStore results for $CheckDB"
+						$HtmlTabName = "Query Store results for $CheckDB"
 					}
 					$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
@@ -3677,7 +3685,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 "@
 				}
 
-		$html += @"
+				$html += @"
 		<br>
 		<h2>Query Text For Deadlock Details</h2>
 		$htmlTable3
@@ -3766,7 +3774,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			[int]$RowsReturned = $StatsTbl.Rows.Count
 			if ($RowsReturned -le 0) {
 				Write-Host " ->No rows returned."
-				Add-LogRow "->Stats Info" "No rows returned"
 			}
 			else {
 				if ($ToHTML -eq "Y") {
@@ -3839,7 +3846,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$RecordsReturned = $IndexTbl.Rows.Count
 			if ($RecordsReturned -le 0) {
 				Write-Host " ->No rows returned."
-				Add-LogRow "->Index Frag Info" "No rows returned."
 			}
 			else {
 				if ($IndexLckTbl.Rows.Count -gt 0) {
