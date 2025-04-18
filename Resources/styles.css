@@ -243,3 +243,28 @@ input.SearchBox {
 	width: 220px;
 	border-radius: 10px;
 }
+
+#message {
+	position: absolute;
+	background-color: #333;
+	color: #fff;
+	padding: 10px 20px;
+	border-radius: 5px;
+	opacity: 0;
+	transition: opacity 0.5s;
+	z-index: 1000;
+	pointer-events: none; /* Ensure the message doesn't interfere with clicks */
+  }
+  
+  #message.show {
+	opacity: 1;
+  }
+  
+  .copyButton {
+	cursor: pointer;
+	background: none;
+	border: none;
+	color: blue;
+	text-decoration: underline;
+	margin-left: 8px;
+  }

@@ -709,12 +709,24 @@ function Convert-TableToHtml {
 		}
 		elseif ($CSSClass) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class='$CSSClass'>"
+			#clean up XML noise and extra charcters in specific tables
+			if ($CSSClass -eq "QueryStoreTab sortable" ) {
+				$htmlTableOut = $htmlTableOut -replace "<td>&#39;</td>", "<td></td>"
+				$htmlTableOut = $htmlTableOut -replace "<td>&lt;\?ClickMe ", "<td>"
+				$htmlTableOut = $htmlTableOut -replace "\?&gt;</td>", "</td>"
+			}
+			elseif ($CSSClass -eq "CacheTabx") {
+				$htmlTableOut = $htmlTableOut -replace "<td>&lt;\?ClickMe ", "<td>"
+				$htmlTableOut = $htmlTableOut -replace "\?&gt;</td>", "</td>"
+				$htmlTableOut = $htmlTableOut -replace "<td>&lt;MissingIndexes&gt;","<td>"
+				$htmlTableOut = $htmlTableOut -replace "&lt;/MissingIndexes&gt;</td>","</td>"
+			}
+			elseif ($CSSClass -eq "Top10ClientConnTbl") {
+				$htmlTableOut = $htmlTableOut -replace "; </td>", "</td>"
+			}
 		}
 		elseif ($TblID) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID'>"
-		}
-		if ($CSSClass -eq "Top10ClientConnTbl") {
-			$htmlTableOut = $htmlTableOut -replace "; </td>", "</td>"
 		}
         
 		if ($HasURLs) {
@@ -1863,6 +1875,7 @@ if ($ToHTML -eq "Y") {
 	</style>
 	<script src="sorttable.js"></script>
 	<script src="searchtable.js"></script>
+	<script src="copy.js"></script>
 	
 "@
 	$URLRegex = '(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\".,<>?«»“”]))'
@@ -1889,7 +1902,7 @@ if ($ToHTML -eq "Y") {
 	  </body>
 	 </html>
 "@
-	$htmlResources = @("styles.css", "sorttable.js", "searchtable.js")
+	$htmlResources = @("styles.css", "sorttable.js", "searchtable.js", "copy.js")
 }
 else {
 	###Set output Excel name and destination
@@ -2988,7 +3001,7 @@ $HTMLBodyEnd
 
 				Add-QueryName $BlitzCacheTbl "Query" "Query Text" $FileSOrder				
 					
-				$htmlTable1 = Convert-TableToHtml $BlitzCacheTbl -NoCaseChange -ExclCols "Query Text", "Query Plan" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs $FileSOrder
+				$htmlTable1 = Convert-TableToHtml $BlitzCacheTbl -NoCaseChange -ExclCols "Query Text", "Query Plan" -CSSClass "CacheTabx" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs $FileSOrder
 				
 				$htmlTable2 = Convert-TableToHtml $BlitzCacheWarnTbl -NoCaseChange -HasURLs -DebugInfo:$DebugInfo
 
@@ -3000,7 +3013,7 @@ $HTMLBodyEnd
 					#Handling CSS
 					$CacheHTMLPre = $HTMLPre
 					$CacheHTMLPre = $CacheHTMLPre -replace 'CacheTab1High', $HighlightCol
-					$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="CacheTable1">'
+					$htmlTable1 = $htmlTable1 -replace "<table class='CacheTabx'>", '<table class="CacheTable1">'
 					
 					if ($SheetName -eq "Mem & Recent Comp") {
 						$HtmlTabName = "Queries by Memory Grants & Recent Compilations"
@@ -3055,7 +3068,7 @@ $HTMLBodyEnd
 				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'") -or ($SortOrder -eq "'Query Hash'")) {
 					$HtmlTabName2 = $SortOrder -replace "'", ""
 					#Handling CSS
-					$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="CacheTable2">'
+					$htmlTable1 = $htmlTable1 -replace "<table class='CacheTabx'>", '<table class="CacheTable2">'
 					
 					#Add heading if first half of the table failed
 					if ($PreviousOutcome -eq "Failure") {
@@ -3352,7 +3365,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					
 					Add-QueryName $BlitzQSTbl "Query" "query_sql_text" "QueryStore"
 
-					$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan_xml" -CSSClass "QueryStoreTab sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
+					$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan_xml", "database_name" -CSSClass "QueryStoreTab sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
 
 					$htmlTable2 = Convert-TableToHtml $BlitzQSSumTbl -HasURLs -DebugInfo:$DebugInfo
 
@@ -3778,9 +3791,14 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			else {
 				if ($ToHTML -eq "Y") {
 
-					$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -CSSClass "sortable" -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -ExclCols "database" -DebugInfo:$DebugInfo
 					#add tooltips
 					$htmlTable = $htmlTable -replace '<th>Update ', '<th class="tooltip" title="The commented options are suggestions based on record counts.">Update '
+					#add buttons
+					$htmlTable = $htmlTable -replace '<th>Get Details', '<th>Get Details<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="20">Copy all commands</button>'
+					$htmlTable = $htmlTable -replace 'counts.">Update Table Stats', 'counts.">Update Table Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="21">Copy all commands</button>'
+					$htmlTable = $htmlTable -replace 'counts.">Update Individual Stats', 'counts.">Update Individual Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="22">Copy all commands</button>'
+					$htmlTable = $htmlTable -replace 'counts.">Update Partition Stats', 'counts.">Update Partition Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="23">Copy all commands</button>'
 					if ($IsAzureSQLDB) {
 						$HtmlTabName = "Statistics info for $ASDBName"
 						$HtmlFileName = "StatsInfo_$ASDBName.html"
@@ -3794,7 +3812,9 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$HTMLBodyStart
 				<h1>$HtmlTabName</h1>
 				$($SearchDiv -replace 'ReplaceSearchFunction', 'SearchStatsAndIndexFrag')
-				$SortableTable
+				<!-- Message container -->
+                <div id="message">Copied to clipboard!</div>
+				<br>
 				$htmlTable
 				$JumpToTop
 				$HTMLBodyEnd
@@ -3873,7 +3893,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						Write-Host " ->Converting index info to HTML" -fore yellow
 					}
 
-					$htmlTable = Convert-TableToHtml $IndexTbl -TblID "StatsOrIxFragTable" -CSSClass "sortable" -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $IndexTbl -TblID "StatsOrIxFragTable" -ExclCols "database" -CSSClass "sortable" -DebugInfo:$DebugInfo
 					if ($IsAzureSQLDB) {
 						$HtmlTabName = "Index fragmentation info for $ASDBName"
 						$HtmlFileName = "IndexFragInfo_$ASDBName.html"
