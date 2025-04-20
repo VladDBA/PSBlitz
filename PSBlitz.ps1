@@ -1881,12 +1881,7 @@ if ($ToHTML -eq "Y") {
 	$URLRegex = '(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\".,<>?«»“”]))'
 	$SortableTable = '<p>Click on the column headers to sort the results.</p>'
 	$JumpToTop = '<p><a href="#top">Jump to top</a></p>'
-	$SearchDiv = @" 
-	    <div>
-		<input type=`"text`" id=`"SearchBox`" class=`"SearchBox`" onkeyup=`"ReplaceSearchFunction()`" placeholder=`" Filter by object name...`">
-		</div>
-"@
-	#Adding new search div to make gradual replacement easier
+
 	$SearchTableDiv = @"
 	    <div>
 		<input type=`"text`" id=`"SearchBox`" class=`"SearchBox`" onkeyup=`"SearchTable('ReplaceTableID', ReplaceColIdx)`" placeholder=`" Filter by object name...`">
@@ -2525,13 +2520,13 @@ $HTMLBodyEnd
 <title>$tableName</title>
 $HTMLBodyStart
 <h1 id="top">$tableName</h1>
-$(if($DBInfoTbl.Rows.Count -gt 10){$SearchTableDiv -replace $STDivReplace,"'SearchDBInfo',0" -replace 'object', 'database'})
+$(if($DBInfoTbl.Rows.Count -gt 10){$SearchTableDiv -replace $STDivReplace,"'DBInfoTable', 0" -replace 'object', 'database'})
 $(if ([string]::IsNullOrEmpty($CheckDB)){$SortableTable})
 $htmlTable
 $JumpToTop
 <br>
 <h2>Database Files Info</h2>
-$($SearchTableDiv -replace $STDivReplace,"'SearchDBFileInfo',0" -replace 'object', 'database' -replace 'id="SearchBox"', 'id="SearchBox1"')
+$($SearchTableDiv -replace $STDivReplace,"'DBFileInfoTable', 0" -replace 'object', 'database' -replace 'id="SearchBox"', 'id="SearchBox1"')
 $SortableTable
 $htmlTable1
 $JumpToTop
@@ -2610,7 +2605,7 @@ $HTMLBodyEnd
 <title>$tableName</title>
 $HTMLBodyStart
 <h1 id="top">$tableName</h1>
-$($SearchDiv -replace 'ReplaceSearchFunction', 'SearchInstanceHealth' -replace 'object' , 'database')
+$($SearchTableDiv -replace $STDivReplace, "'InstanceHealthTable', 3" -replace 'object' , 'database')
 <br>
 $htmlTable
 $JumpToTop
@@ -2790,7 +2785,7 @@ $HTMLBodyEnd
 <title>$HtmlTabName</title>
 $HTMLBodyStart
 <h1>$HtmlTabName</h1>
-$($SearchDiv -replace 'ReplaceSearchFunction', 'SearchStorageStats' -replace 'object', 'database')
+$($SearchTableDiv -replace $STDivReplace, "'StorageStatsTable', 9" -replace 'object', 'database')
 $SortableTable
 $htmlTable
 $JumpToTop
@@ -2808,7 +2803,7 @@ $HTMLBodyEnd
 <title>$HtmlTabName</title>
 $HTMLBodyStart
 <h1>$HtmlTabName</h1>
-$($SearchDiv -replace 'ReplaceSearchFunction','SearchPerfmon' -replace 'object', 'counter')
+$($SearchTableDiv -replace $STDivReplace, "'PerfmonTable', 1" -replace 'object', 'counter')
 $SortableTable
 $htmlTable
 $JumpToTop
