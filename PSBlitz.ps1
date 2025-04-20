@@ -2525,13 +2525,13 @@ $HTMLBodyEnd
 <title>$tableName</title>
 $HTMLBodyStart
 <h1 id="top">$tableName</h1>
-$(if($DBInfoTbl.Rows.Count -gt 10){$SearchDiv -replace 'ReplaceSearchFunction','SearchDBInfo' -replace 'object', 'database'})
+$(if($DBInfoTbl.Rows.Count -gt 10){$SearchTableDiv -replace $STDivReplace,"'SearchDBInfo',0" -replace 'object', 'database'})
 $(if ([string]::IsNullOrEmpty($CheckDB)){$SortableTable})
 $htmlTable
 $JumpToTop
 <br>
 <h2>Database Files Info</h2>
-$($SearchDiv -replace 'ReplaceSearchFunction','SearchDBFileInfo' -replace 'object', 'database' -replace 'id="SearchBox"', 'id="SearchBox1"')
+$($SearchTableDiv -replace $STDivReplace,"'SearchDBFileInfo',0" -replace 'object', 'database' -replace 'id="SearchBox"', 'id="SearchBox1"')
 $SortableTable
 $htmlTable1
 $JumpToTop
