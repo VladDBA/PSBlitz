@@ -718,8 +718,8 @@ function Convert-TableToHtml {
 			elseif ($CSSClass -eq "CacheTabx") {
 				$htmlTableOut = $htmlTableOut -replace "<td>&lt;\?ClickMe ", "<td>"
 				$htmlTableOut = $htmlTableOut -replace "\?&gt;</td>", "</td>"
-				$htmlTableOut = $htmlTableOut -replace "<td>&lt;MissingIndexes&gt;","<td>"
-				$htmlTableOut = $htmlTableOut -replace "&lt;/MissingIndexes&gt;</td>","</td>"
+				$htmlTableOut = $htmlTableOut -replace "<td>&lt;MissingIndexes&gt;", "<td>"
+				$htmlTableOut = $htmlTableOut -replace "&lt;/MissingIndexes&gt;</td>", "</td>"
 			}
 			elseif ($CSSClass -eq "Top10ClientConnTbl") {
 				$htmlTableOut = $htmlTableOut -replace "; </td>", "</td>"
@@ -1886,6 +1886,13 @@ if ($ToHTML -eq "Y") {
 		<input type=`"text`" id=`"SearchBox`" class=`"SearchBox`" onkeyup=`"ReplaceSearchFunction()`" placeholder=`" Filter by object name...`">
 		</div>
 "@
+	#Adding new search div to make gradual replacement easier
+	$SearchTableDiv = @"
+	    <div>
+		<input type=`"text`" id=`"SearchBox`" class=`"SearchBox`" onkeyup=`"SearchTable('ReplaceTableID', ReplaceColIdx)`" placeholder=`" Filter by object name...`">
+		</div>
+"@
+	$STDivReplace = "'ReplaceTableID', ReplaceColIdx"
 	$Footer = @"
 	<br>
 	<footer>  
@@ -3498,55 +3505,55 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Export-PlansAndDeadlocks $BlitzIxTbl $PlanOutDir "Sample Query Plan" "Sample Plan File" -FPrefix "MissingIndex" -DebugInfo:$DebugInfo
 			}
 			if ($ToHTML -eq "Y") {
-
+				$htmlTabSearch = ""
 				if ($Mode -eq "0") {
 					$HtmlTabName = "Index Diagnosis"
 				}
 				elseif ($Mode -eq "1") {
 					$HtmlTabName = "Index Summary"
+					if($BlitzIxTbl.Rows.Count -ge 5){
+						$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexSummaryTable', 0" -replace 'object', 'database'
+						$htmlTabSearch +="<br>"
+					}
 				}
 				elseif ($Mode -eq "2") {
 					$HtmlTabName = "Index Usage Details"
+
 				}
 				elseif ($Mode -eq "4") {
 					$HtmlTabName = "Detailed Index Diagnosis"
 				}
-				if (!([string]::IsNullOrEmpty($CheckDB))) {
-					$HtmlTabName += " for $CheckDB" 
+				if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
+					$HtmlTabName += " for $ASDBName$CheckDB"
+					$ExclCols = @("Sample Query Plan","Display Order", "Database Name")
+					$Mode2SearchCol = 0
 				}
-				elseif ($IsAzureSQLDB) {
-					$HtmlTabName += " for $ASDBName"
-				}
+				else {
+					$ExclCols = @("Sample Query Plan","Display Order")
+					$Mode2SearchCol = 1
+				}						
 		
-		
-				if ("0", "4" -Contains $Mode) {					
-
-					$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols "Sample Query Plan" -NoCaseChange -HasURLs -TblID "IndexUsgTable" -DebugInfo:$DebugInfo
-			
+				if ("0", "4" -Contains $Mode) {	
+					if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
+						$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexUsgTable', 2" -replace 'object', 'database'
+						$htmlTabSearch +="<br>"
+					}							
+					$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols $ExclCols -NoCaseChange -HasURLs -TblID "IndexUsgTable" -DebugInfo:$DebugInfo
 				}
 				elseif ($Mode -eq "1") {
-
-					$htmlTable = Convert-TableToHtml $BlitzIxTbl -NoCaseChange -TblID "IndexSummaryTable" -ExclCols "Display Order" -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $BlitzIxTbl -NoCaseChange -TblID "IndexSummaryTable" -ExclCols $ExclCols -DebugInfo:$DebugInfo
 				}
 				elseif ($Mode -eq "2") {
-
-					$htmlTable = Convert-TableToHtml $BlitzIxTbl -TblID "IndexUsgTable" -CSSClass "IndexUsageTable sortable" -NoCaseChange -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $BlitzIxTbl -TblID "IndexUsgTable" -CSSClass "IndexUsageTable sortable" -ExclCols $ExclCols -NoCaseChange -DebugInfo:$DebugInfo
+					$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexUsgTable', $Mode2SearchCol"
+					$htmlTabSearch += "`n$SortableTable"
 				}
 		
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
 				$HTMLBodyStart
 				<h1 id="top">$HtmlTabName</h1>
-				$(if($Mode -eq "2"){
-					$SearchDiv -replace 'ReplaceSearchFunction', 'SearchIndexUsage'
-					$SortableTable				
-				}elseif(("0","4" -Contains $Mode) -and (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false))){
-					$SearchDiv -replace 'ReplaceSearchFunction', 'SearchIndexUsage' -replace 'object', 'database'
-					"<br>"
-				}elseif(($Mode -eq "1") -and ($BlitzIxTbl.Rows.Count -ge 5)){
-					$SearchDiv -replace 'ReplaceSearchFunction', 'SearchIndexSummary' -replace 'object', 'database'
-					"<br>"
-				})
+				$htmlTabSearch
 				$htmlTable 
 				<br>
 				$(if ($Mode -ne "1") {$JumpToTop})
@@ -3642,11 +3649,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		
 			if ($ToHTML -eq "Y") {
 				$HtmlTabName = "Deadlocks"
-				if (!([string]::IsNullOrEmpty($CheckDB))) {
-					$HtmlTabName += " for $CheckDB" 
-				}
-				elseif ($IsAzureSQLDB) {
-					$HtmlTabName += " for $ASDBName"
+				if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
+					$HtmlTabName += " for $ASDBName$CheckDB" 
 				}
 				
 				$htmlTable1 = Convert-TableToHtml $TblLockOver -DebugInfo:$DebugInfo
@@ -3679,7 +3683,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		<br>
 		<h2 id="Deadlocks1">Deadlock Details</h2>
 		$(if($TblLockDtl.Rows.Count -ge 10){
-			$SearchDiv -replace 'ReplaceSearchFunction', 'SearchDeadlockDetails'
+			$SearchTableDiv -replace $STDivReplace, "'DeadlockDtlTable',7"
 			'<br>'})
 		$htmlTable2
 		$JumpToTop
@@ -3811,7 +3815,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				<title>$HtmlTabName</title>
 				$HTMLBodyStart
 				<h1>$HtmlTabName</h1>
-				$($SearchDiv -replace 'ReplaceSearchFunction', 'SearchStatsAndIndexFrag')
+				$($SearchTableDiv -replace $STDivReplace, "'StatsOrIxFragTable', 0")
 				<!-- Message container -->
                 <div id="message">Copied to clipboard!</div>
 				<br>
@@ -3907,7 +3911,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				<title>$HtmlTabName</title>
 				$HTMLBodyStart
 				<h1>$HtmlTabName</h1>
-				$($SearchDiv -replace 'ReplaceSearchFunction', 'SearchStatsAndIndexFrag')
+				$($SearchTableDiv -replace $STDivReplace, "'StatsOrIxFragTable', 0")
 				$SortableTable
 				$htmlTable
 				$JumpToTop

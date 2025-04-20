@@ -6155,7 +6155,7 @@ BEGIN
 		BEGIN
 		/*Vlad - changes made for PSBlitz*/
 			SELECT  i.[database_name] AS [Database Name], 
-					i.[schema_name] AS [Schema Name], 
+					i.[schema_name] +N'.'+ 
 					i.[object_name] AS [Object Name], 
 					ISNULL(i.index_name, '') AS [Index Name],
 					CAST(i.index_id AS NVARCHAR(10))AS [Index ID],
@@ -6291,7 +6291,8 @@ BEGIN
 			    			CASE WHEN @SortOrder = N'fetches' AND @SortDirection = N'asc' THEN sz.[Forwarded Fetches] ELSE NULL END ASC,
 			    			CASE WHEN @SortOrder = N'create_date' AND @SortDirection = N'asc' THEN CONVERT(DATETIME, sz.[Create Date]) ELSE NULL END ASC,
 			    			CASE WHEN @SortOrder = N'modify_date' AND @SortDirection = N'asc' THEN CONVERT(DATETIME, sz.[Modify Date]) ELSE NULL END ASC,
-			    	sz.[Database Name], [Schema Name], [Object Name], [Index ID]
+			    	/*sz.[Database Name], [Schema Name], [Object Name], [Index ID] - Vlad - for PSBlitz #341*/
+                    sz.[Database Name], [Object Name], [Index ID]
 			    OPTION (RECOMPILE);
 
 				/*Vlad - additional result set to get total count for warning*/
