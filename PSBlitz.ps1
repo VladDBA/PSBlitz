@@ -156,7 +156,7 @@
  Used to sepcify the number of seconds between each sp_BlitzWho execution. Defaults to 10 if not specified.
 
 .PARAMETER ConnTimeout
- Can be used to increased the timeout limit in seconds for connecting to SQL Server. Defaults to 15 seconds if not specified.
+ Can be used to increased the timeout limit in seconds for connecting to SQL Server. Defaults to 45 seconds if not specified.
 
 .PARAMETER MaxTimeout
  Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. Defaults to 1000 (16.6 minutes)
@@ -278,7 +278,7 @@ param(
 ###Internal params
 #Version
 $Vers = "5.2.1"
-$VersDate = "2025-04-17"
+$VersDate = "2025-04-20"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -300,7 +300,7 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql",
 	"GetDbInfo.sql", "GetAzureSQLDBInfo.sql",
 	"spBlitzQueryStore_NonSPLatest.sql", "GetObjectsWithDangerousOptions.sql", 
-	"searchtable.js", "sorttable.js", "styles.css")
+	"searchtable.js", "sorttable.js", "styles.css", "copy.js")
 #Set path+name of the input Excel file
 $OrigExcelF = Join-Path -Path $ResourcesPath -ChildPath $OrigExcelFName
 #Set default start row for Excel output
