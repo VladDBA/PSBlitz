@@ -3522,10 +3522,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$HtmlTabName += " for $ASDBName$CheckDB"
 					$ExclCols = @("Sample Query Plan","Display Order", "Database Name")
 					$Mode2SearchCol = 0
+					$Mode2CSS = "IndexUsageTableDB sortable"
 				}
 				else {
 					$ExclCols = @("Sample Query Plan","Display Order")
 					$Mode2SearchCol = 1
+					$Mode2CSS = "IndexUsageTable sortable"
 				}						
 		
 				if ("0", "4" -Contains $Mode) {	
@@ -3539,7 +3541,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$htmlTable = Convert-TableToHtml $BlitzIxTbl -NoCaseChange -TblID "IndexSummaryTable" -ExclCols $ExclCols -DebugInfo:$DebugInfo
 				}
 				elseif ($Mode -eq "2") {
-					$htmlTable = Convert-TableToHtml $BlitzIxTbl -TblID "IndexUsgTable" -CSSClass "IndexUsageTable sortable" -ExclCols $ExclCols -NoCaseChange -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $BlitzIxTbl -TblID "IndexUsgTable" -CSSClass $Mode2CSS -ExclCols $ExclCols -NoCaseChange -DebugInfo:$DebugInfo
 					$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexUsgTable', $Mode2SearchCol"
 					$htmlTabSearch += "`n$SortableTable"
 				}
