@@ -4629,14 +4629,15 @@ finally {
 			}
 			elseif ($File.Name -like "BlitzQueryStore*") {
 				$PageName = "Query Store Info"
+				$QuerySource = "QuickieStore @top = 20"
 				if ($IsAzureSQLDB) {
-					$QuerySource = "sp_QuickieStore @top = 20;"
+					$QuerySource += ";"
 				}
 				elseif ($DBSwitched -eq "Y") {
-					$QuerySource = "sp_sp_QuickieStore @database_name = '$DBName', @top = 20;"
+					$QuerySource += ", @database_name = '$DBName';"
 				}
 				else {
-					$QuerySource = "sp_sp_QuickieStore @database_name = '$CheckDB', @top = 20;"
+					$QuerySource += ", @database_name = '$CheckDB';"
 				}
 				$Description = "Data collected by the query store for the past 7 days"
 				$AdditionalInfo = "Outputs execution plans as .sqlplan files."
