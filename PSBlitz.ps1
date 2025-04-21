@@ -713,12 +713,7 @@ function Convert-TableToHtml {
 		elseif ($CSSClass) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class='$CSSClass'>"
 			#clean up XML noise and extra charcters in specific tables
-			if ($CSSClass -eq "QueryStoreTab sortable" ) {
-				$htmlTableOut = $htmlTableOut -replace "<td>&#39;</td>", "<td></td>"
-				$htmlTableOut = $htmlTableOut -replace "<td>&lt;\?ClickMe ", "<td>"
-				$htmlTableOut = $htmlTableOut -replace "\?&gt;</td>", "</td>"
-			}
-			elseif ($CSSClass -eq "CacheTabx") {
+            if ($CSSClass -eq "CacheTabx") {
 				$htmlTableOut = $htmlTableOut -replace "<td>&lt;\?ClickMe ", "<td>"
 				$htmlTableOut = $htmlTableOut -replace "\?&gt;</td>", "</td>"
 				$htmlTableOut = $htmlTableOut -replace "<td>&lt;MissingIndexes&gt;", "<td>"
