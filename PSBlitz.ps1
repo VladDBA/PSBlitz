@@ -300,7 +300,7 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql",
 	"GetDbInfo.sql", "GetAzureSQLDBInfo.sql",
 	"spBlitzQueryStore_NonSPLatest.sql", "GetObjectsWithDangerousOptions.sql", 
-	"searchtable.js", "sorttable.js", "styles.css", "copy.js")
+	"searchtable.js", "sorttable.js", "styles.css", "copy.js", "spQuickieStore_NonSPLatest.sql")
 #Set path+name of the input Excel file
 $OrigExcelF = Join-Path -Path $ResourcesPath -ChildPath $OrigExcelFName
 #Set default start row for Excel output
@@ -3334,7 +3334,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			Add-LogRow "sp_BlitzQueryStore precheck" "Failure"
 		}
 		if ($CheckQueryStore -eq 'Y') {
-			$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzQueryStore_NonSPLatest.sql"
+			$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spQuickieStore_NonSPLatest.sql"
 			[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 
 			if ($IsAzureSQLDB) {
@@ -3342,8 +3342,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			}
 			else {
 				if ($DBSwitched -eq "Y") {
-					$OldCheckDBStr = ";SET @DatabaseName = NULL;"
-					$NewCheckDBStr = ";SET @DatabaseName = '" + $CheckDB + "';"
+					$OldCheckDBStr = ";SET @database_name = NULL;"
+					$NewCheckDBStr = ";SET @database_name = N'" + $CheckDB + "';"
 				}
 				Write-Host " Retrieving Query Store info for $CheckDB..." -NoNewline
 				[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
@@ -3359,17 +3359,17 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			if ($global:StepOutcome -eq "Success") {
 			
 				$BlitzQSTbl = $global:PSBlitzSet.Tables[0]
-				$BlitzQSSumTbl = $global:PSBlitzSet.Tables[1]
+				#$BlitzQSSumTbl = $global:PSBlitzSet.Tables[1]
 
-				Export-PlansAndDeadlocks $BlitzQSTbl $PlanOutDir "query_plan_xml" "SQLPlan File" -FPrefix "QueryStore" -DebugInfo:$DebugInfo
+				Export-PlansAndDeadlocks $BlitzQSTbl $PlanOutDir "query_plan" "sql_plan_file" -FPrefix "QueryStore" -DebugInfo:$DebugInfo
 				
 				if ($ToHTML -eq "Y") {
 					
-					Add-QueryName $BlitzQSTbl "Query" "query_sql_text" "QueryStore"
+					Add-QueryName $BlitzQSTbl "query" "query_sql_text" "QueryStore"
 
-					$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan_xml", "database_name" -CSSClass "QueryStoreTab sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
+					$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan", "database_name","n" -CSSClass "QueryStoreTab sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
 
-					$htmlTable2 = Convert-TableToHtml $BlitzQSSumTbl -HasURLs -DebugInfo:$DebugInfo
+					#$htmlTable2 = Convert-TableToHtml $BlitzQSSumTbl -HasURLs -DebugInfo:$DebugInfo
 
 					$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
 
@@ -3384,13 +3384,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$HTMLBodyStart
 					<h1 id="top">$HtmlTabName</h1>
 					<br>
-					<h2>Query Store results from past 7 days</h2>
 					<p><a href="#Queries">Jump to query text</a></p>
 					$htmlTable1
-					<br>
-					<h2>Summary</h2>
-					$htmlTable2
-					$JumpToTop
 					<br>
 					<h2 id="Queries">Query text</h2>
 					$htmlTable3
@@ -3408,11 +3403,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					#Specify at which row in the sheet to start adding the data
 					$ExcelStartRow = $DefaultStartRow
 						
-					Convert-TableToExcel $BlitzQSSumTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
-					##Saving file 
-					Save-ExcelFile $ExcelFile
-
-					Convert-TableToExcel $BlitzQSTbl $ExcelSheet -StartRow $DefaultStartRow -StartCol 7 -DebugInfo:$DebugInfo -ExclCols "query_plan_xml", "query"
+					Convert-TableToExcel $BlitzQSTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -ExclCols "query", "query_plan", "n"
 					Save-ExcelFile $ExcelFile					
 				}
 				Invoke-ClearVariables BlitzQSTbl, BlitzQSSumTbl, PSBlitzSet

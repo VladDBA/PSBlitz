@@ -19,7 +19,7 @@ SET STATISTICS TIME, IO OFF;
 DECLARE
     @database_name sysname = NULL, /*the name of the database you want to look at query store in*/
     @sort_order varchar(20) = 'cpu', /*the runtime metric you want to prioritize results by*/
-    @top bigint = 10, /*the number of queries you want to pull back*/
+    @top bigint = 20, /*the number of queries you want to pull back*/
     @start_date datetimeoffset(7) = NULL, /*the begin date of your search, will be converted to UTC internally*/
     @end_date datetimeoffset(7) = NULL, /*the end date of your search, will be converted to UTC internally*/
     @timezone sysname = NULL, /*user specified time zone to override dates displayed in results*/
@@ -51,7 +51,7 @@ DECLARE
     @query_type varchar(11) = NULL, /*filter for only ad hoc queries or only from queries from modules*/
     @expert_mode bit = 0, /*returns additional columns and results*/
     @hide_help_table bit = 0, /*hides the "bottom table" that shows help and support information*/
-    @format_output bit = 1, /*returns numbers formatted with commas*/
+    @format_output bit = 0, /*returns numbers formatted with commas*/
     @get_all_databases bit = 0, /*looks for query store enabled user databases and returns combined results from all of them*/
     @include_databases nvarchar(max) = NULL, /*comma-separated list of databases to include (only when @get_all_databases = 1)*/
     @exclude_databases nvarchar(max) = NULL, /*comma-separated list of databases to exclude (only when @get_all_databases = 1)*/
@@ -70,7 +70,7 @@ DECLARE
     @version_date datetime = NULL;  /*OUTPUT; for support*/
 
 /*PSBlitz specific parameters/options*/
-;SET @database_name = 'StackOverflow';
+;SET @database_name = NULL;
 
 /*Temp table cleanup*/
 IF OBJECT_ID('tempdb.dbo.#distinct_plans', 'U') IS NOT NULL
@@ -8428,7 +8428,9 @@ FROM
         END + N'
         qsrs.execution_type_desc,
         qsq.object_name,
+        query = CAST(NULL AS NVARCHAR(30)),
         REPLACE(LEFT(CAST(qsqt.query_sql_text AS NVARCHAR(MAX)),LEN(CAST(qsqt.query_sql_text AS NVARCHAR(MAX)))-2),N''<?query '','''') AS query_sql_text,
+        sql_plan_file = CAST(NULL AS NVARCHAR(30)),
         query_plan =
              CASE
                  WHEN TRY_CAST(qsp.query_plan AS xml) IS NOT NULL
@@ -8468,7 +8470,9 @@ FROM
                         N' = ' +
                         /*Vlad - added case to convert execution_time columns to varchar for PSBlitz*/
                               CASE WHEN cd.column_source LIKE N'%execution\_time%' ESCAPE(N'\')
-                              THEN N' CONVERT(VARCHAR(30),'+cd.column_source+N',120) ' 
+                              THEN N' CONVERT(VARCHAR(19),'+cd.column_source+N',120) ' 
+                              WHEN (cd.column_name LIKE N'total%' OR cd.column_name LIKE N'avg%') AND (cd.column_name NOT LIKE N'%rowcount%')
+                              THEN N'CAST('+cd.column_source+N' AS NUMERIC(23,3))'
                               ELSE cd.column_source END +
                               /*Vlad - end case*/
                         N','
@@ -8488,7 +8492,7 @@ FROM
                             ELSE 
                             /*Vlad - added case to convert execution_time columns to varchar for PSBlitz*/
                               CASE WHEN cd.column_source LIKE N'%execution\_time%' ESCAPE(N'\')
-                              THEN N' CONVERT(VARCHAR(30),'+cd.column_source+N',120) ' 
+                              THEN N' CONVERT(VARCHAR(19),'+cd.column_source+N',120) ' 
                               ELSE cd.column_source END                              
                         /*Vlad - end case*/
                         END +
