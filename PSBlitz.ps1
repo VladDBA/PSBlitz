@@ -85,6 +85,9 @@
  sp_BlitzLock, and sp_BlitzWho is held by Brent Ozar Unlimited under MIT licence:
  SQL Server First Responder Kit - https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit
 
+ Copyright for sp_QuickieStore is held by  Darling Data, LLC:
+ DarlingData - https://github.com/erikdarlingdata/DarlingData
+
  Copyright for sorttable.js is held by Stuart Langridge - http://www.kryogenix.org/code/browser/sorttable/
 
  Copyright for PSBlitz.ps1, GetStatsInfoForWholeDB.sql, GetOpenTransactions.sql, 
@@ -277,8 +280,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.2.1"
-$VersDate = "2025-04-20"
+$Vers = "5.3.0"
+$VersDate = "2025-04-22"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
