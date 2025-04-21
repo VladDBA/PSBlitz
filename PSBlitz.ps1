@@ -3350,10 +3350,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Write-Host " Retrieving Query Store info for $ASDBName..." -NoNewline
 			}
 			else {
-				if ($DBSwitched -eq "Y") {
+				#if ($DBSwitched -eq "Y") {
 					$OldCheckDBStr = ";SET @database_name = NULL;"
 					$NewCheckDBStr = ";SET @database_name = N'" + $CheckDB + "';"
-				}
+				#}
 				Write-Host " Retrieving Query Store info for $CheckDB..." -NoNewline
 				[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 			}
@@ -4630,13 +4630,13 @@ finally {
 			elseif ($File.Name -like "BlitzQueryStore*") {
 				$PageName = "Query Store Info"
 				if ($IsAzureSQLDB) {
-					$QuerySource = "sp_BlitzQueryStore;"
+					$QuerySource = "sp_QuickieStore @top = 20;"
 				}
 				elseif ($DBSwitched -eq "Y") {
-					$QuerySource = "sp_BlitzQueryStore @DatabaseName = '$DBName';"
+					$QuerySource = "sp_sp_QuickieStore @database_name = '$DBName', @top = 20;"
 				}
 				else {
-					$QuerySource = "sp_BlitzQueryStore @DatabaseName = '$CheckDB';"
+					$QuerySource = "sp_sp_QuickieStore @database_name = '$CheckDB', @top = 20;"
 				}
 				$Description = "Data collected by the query store for the past 7 days"
 				$AdditionalInfo = "Outputs execution plans as .sqlplan files."
