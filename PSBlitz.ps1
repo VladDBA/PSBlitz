@@ -2052,6 +2052,8 @@ try {
 		$ResourceInfoTbl = $global:PSBlitzSet.Tables[1]
 		$ConnectionsInfoTbl = $global:PSBlitzSet.Tables[2]
 		$SessOptTbl = $global:PSBlitzSet.Tables[3]
+		$PlanCacheTypeTbl = $global:PSBlitzSet.Tables[4]
+		$PlanCacheByDBTbl = $global:PSBlitzSet.Tables[5]
 		
 		if ($ToHTML -eq "Y") {
 
@@ -2070,6 +2072,9 @@ try {
 			$htmlTable3 = Convert-TableToHtml $ConnectionsInfoTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
 			$htmlTable4 = Convert-TableToHtml $SessOptTbl -CSSClass 'SessOptTbl sortable' -HasURLs -DebugInfo:$DebugInfo
 
+			$htmlTable5 = Convert-TableToHtml $PlanCacheTypeTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
+			$htmlTable6 = Convert-TableToHtml $PlanCacheByDBTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
+
 			$HtmlTabName = "Instance Overview"
 			$html = $HTMLPre + @"
     <title>$HtmlTabName</title>
@@ -2083,6 +2088,12 @@ $htmlTable2
 <br>
 <h2>Top 10 clients by connections</h2>
 $htmlTable3
+<br>
+<h2>Plan cache usage by type</h2>
+$htmlTable5
+<br>
+<h2>Top 10 databases by plan cache usage</h2>
+$htmlTable6
 <br>
 <h2>Session level SET options</h2>
 $htmlTable4
