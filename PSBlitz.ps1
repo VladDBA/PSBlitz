@@ -302,7 +302,7 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"GetTempDBUsageInfo.sql", "GetOpenTransactions.sql",
 	"GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql",
 	"GetDbInfo.sql", "GetAzureSQLDBInfo.sql",
-	"spBlitzQueryStore_NonSPLatest.sql", "GetObjectsWithDangerousOptions.sql", 
+	"GetObjectsWithDangerousOptions.sql", 
 	"searchtable.js", "sorttable.js", "styles.css", "copy.js", "spQuickieStore_NonSPLatest.sql")
 #Set path+name of the input Excel file
 $OrigExcelF = Join-Path -Path $ResourcesPath -ChildPath $OrigExcelFName
