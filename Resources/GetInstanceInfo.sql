@@ -264,3 +264,58 @@ SELECT [Option],
 FROM   OPTCTE
 ORDER BY [Option]
 OPTION(RECOMPILE);
+
+/*plan cache distribution by type*/
+SELECT '_Total_'                                                                    AS [cache_type],
+       COUNT_BIG(*)                                                                 AS [total_plans],
+       SUM(CAST(CAST([size_in_bytes] AS BIGINT) / 1024. / 1024. AS DECIMAL(23, 3))) AS [plan_cache_used_mb],
+       AVG([usecounts])                                                             AS [avg_use_count],
+       SUM(CAST(CAST(
+                (
+                  CASE
+                    WHEN [usecounts] = 1 THEN [size_in_bytes]
+                    ELSE 0
+                  END
+                )
+                AS BIGINT) / 1024. / 1024. AS DECIMAL(23, 3)))                      AS [single_use_plans_total_mb],
+       SUM(CASE
+             WHEN [usecounts] = 1 THEN 1
+             ELSE 0
+           END)                                                                     AS [total_single_use_plans]
+FROM   sys.[dm_exec_cached_plans]
+UNION
+SELECT [objtype]                                                                    AS [cache_type],
+       COUNT_BIG(*)                                                                 AS [total_plans],
+       SUM(CAST(CAST([size_in_bytes] AS BIGINT) / 1024. / 1024. AS DECIMAL(23, 3))) AS [plan_cache_used_mb],
+       AVG([usecounts])                                                             AS [avg_use_count],
+       SUM(CAST(CAST(
+                (
+                  CASE
+                    WHEN [usecounts] = 1 THEN [size_in_bytes]
+                    ELSE 0
+                  END
+                )
+                AS BIGINT) / 1024. / 1024. AS DECIMAL(23, 3)))                      AS [single_use_plans_total_mb],
+       SUM(CASE
+             WHEN [usecounts] = 1 THEN 1
+             ELSE 0
+           END)                                                                     AS [total_single_use_plans]
+FROM   sys.[dm_exec_cached_plans]
+GROUP  BY [objtype]
+ORDER  BY [single_use_plans_total_mb] DESC
+OPTION(RECOMPILE);
+
+/*plan cache usage by db*/
+SELECT TOP(10) [d].name                                                                          AS [database],
+               COUNT_BIG(*)                                                                      AS [total_plans],
+               SUM(CAST(CAST([cp].[size_in_bytes] AS BIGINT) / 1024. / 1024. AS DECIMAL(23, 3))) AS [plan_cache_used_mb]
+FROM   sys.[dm_exec_query_stats]
+       CROSS APPLY sys.dm_exec_sql_text([dm_exec_query_stats].[plan_handle]) AS [qt]
+       INNER JOIN sys.[databases] AS [d]
+               ON [qt].[dbid] = [d].[database_id]
+       INNER JOIN sys.[dm_exec_cached_plans] AS [cp]
+               ON [cp].[plan_handle] = [dm_exec_query_stats].[plan_handle]
+WHERE  [d].[database_id] <> 32767
+GROUP  BY [d].name
+ORDER  BY [total_plans] DESC
+OPTION(RECOMPILE); 

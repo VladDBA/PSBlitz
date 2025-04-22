@@ -85,6 +85,9 @@
  sp_BlitzLock, and sp_BlitzWho is held by Brent Ozar Unlimited under MIT licence:
  SQL Server First Responder Kit - https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit
 
+ Copyright for sp_QuickieStore is held by  Darling Data, LLC:
+ DarlingData - https://github.com/erikdarlingdata/DarlingData
+
  Copyright for sorttable.js is held by Stuart Langridge - http://www.kryogenix.org/code/browser/sorttable/
 
  Copyright for PSBlitz.ps1, GetStatsInfoForWholeDB.sql, GetOpenTransactions.sql, 
@@ -156,7 +159,7 @@
  Used to sepcify the number of seconds between each sp_BlitzWho execution. Defaults to 10 if not specified.
 
 .PARAMETER ConnTimeout
- Can be used to increased the timeout limit in seconds for connecting to SQL Server. Defaults to 15 seconds if not specified.
+ Can be used to increased the timeout limit in seconds for connecting to SQL Server. Defaults to 45 seconds if not specified.
 
 .PARAMETER MaxTimeout
  Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. Defaults to 1000 (16.6 minutes)
@@ -277,8 +280,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.2.0"
-$VersDate = "2025-04-13"
+$Vers = "5.3.0"
+$VersDate = "2025-04-22"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -299,8 +302,8 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"GetTempDBUsageInfo.sql", "GetOpenTransactions.sql",
 	"GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql",
 	"GetDbInfo.sql", "GetAzureSQLDBInfo.sql",
-	"spBlitzQueryStore_NonSPLatest.sql", "GetObjectsWithDangerousOptions.sql", 
-	"searchtable.js", "sorttable.js", "styles.css")
+	"GetObjectsWithDangerousOptions.sql", 
+	"searchtable.js", "sorttable.js", "styles.css", "copy.js", "spQuickieStore_NonSPLatest.sql")
 #Set path+name of the input Excel file
 $OrigExcelF = Join-Path -Path $ResourcesPath -ChildPath $OrigExcelFName
 #Set default start row for Excel output
@@ -596,7 +599,8 @@ function Invoke-PSBlitzQuery {
 		if (($StepNameIn -like "sp_BlitzCache*") -or ($StepNameIn -like "sp_BlitzQueryStore*") -or 
 		($StepNameIn -eq "sp_BlitzIndex mode 1") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info") -or 
 		($StepNameIn -eq "sp_BlitzLock") -or ($StepNameIn -eq "Return sp_BlitzWho") -or ($StepNameIn -eq "Open Transacion Info") -or 
-		($StepNameIn -eq "Objects with dangerous SET options")) {
+		($StepNameIn -eq "Objects with dangerous SET options") -or ($StepNameIn -eq "sp_Blitz") -or 
+		($StepNameIn -eq "sp_BlitzFirst 30 seconds")) {
 			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
 			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
 		}
@@ -708,12 +712,19 @@ function Convert-TableToHtml {
 		}
 		elseif ($CSSClass) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class='$CSSClass'>"
+			#clean up XML noise and extra charcters in specific tables
+            if ($CSSClass -eq "CacheTabx") {
+				$htmlTableOut = $htmlTableOut -replace "<td>&lt;\?ClickMe ", "<td>"
+				$htmlTableOut = $htmlTableOut -replace "\?&gt;</td>", "</td>"
+				$htmlTableOut = $htmlTableOut -replace "<td>&lt;MissingIndexes&gt;", "<td>"
+				$htmlTableOut = $htmlTableOut -replace "&lt;/MissingIndexes&gt;</td>", "</td>"
+			}
+			elseif ($CSSClass -eq "Top10ClientConnTbl") {
+				$htmlTableOut = $htmlTableOut -replace "; </td>", "</td>"
+			}
 		}
 		elseif ($TblID) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID'>"
-		}
-		if($CSSClass -eq "Top10ClientConnTbl"){
-			$htmlTableOut = $htmlTableOut -replace "; </td>", "</td>"
 		}
         
 		if ($HasURLs) {
@@ -1002,7 +1013,7 @@ function Convert-TableToExcel {
 		
 	}
  catch {
-	Invoke-ErrMsg
+		Invoke-ErrMsg
 		#Write-Host " Error converting table to Excel: $_" -ForegroundColor Red
 		Write-Host "  Debug Column: $global:DebugCol"
 		Write-Host "  Debug Value: $global:DebugValue"
@@ -1862,16 +1873,19 @@ if ($ToHTML -eq "Y") {
 	</style>
 	<script src="sorttable.js"></script>
 	<script src="searchtable.js"></script>
+	<script src="copy.js"></script>
 	
 "@
 	$URLRegex = '(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\".,<>?«»“”]))'
 	$SortableTable = '<p>Click on the column headers to sort the results.</p>'
 	$JumpToTop = '<p><a href="#top">Jump to top</a></p>'
-	$SearchDiv = @" 
+
+	$SearchTableDiv = @"
 	    <div>
-		<input type=`"text`" id=`"SearchBox`" class=`"SearchBox`" onkeyup=`"ReplaceSearchFunction()`" placeholder=`" Filter by object name...`">
+		<input type=`"text`" id=`"SearchBox`" class=`"SearchBox`" onkeyup=`"SearchTable('ReplaceTableID', ReplaceColIdx)`" placeholder=`" Filter by object name...`">
 		</div>
 "@
+	$STDivReplace = "'ReplaceTableID', ReplaceColIdx"
 	$Footer = @"
 	<br>
 	<footer>  
@@ -1888,7 +1902,7 @@ if ($ToHTML -eq "Y") {
 	  </body>
 	 </html>
 "@
-	$htmlResources = @("styles.css", "sorttable.js", "searchtable.js")
+	$htmlResources = @("styles.css", "sorttable.js", "searchtable.js", "copy.js")
 }
 else {
 	###Set output Excel name and destination
@@ -2033,6 +2047,8 @@ try {
 		$ResourceInfoTbl = $global:PSBlitzSet.Tables[1]
 		$ConnectionsInfoTbl = $global:PSBlitzSet.Tables[2]
 		$SessOptTbl = $global:PSBlitzSet.Tables[3]
+		$PlanCacheTypeTbl = $global:PSBlitzSet.Tables[4]
+		$PlanCacheByDBTbl = $global:PSBlitzSet.Tables[5]
 		
 		if ($ToHTML -eq "Y") {
 
@@ -2051,6 +2067,9 @@ try {
 			$htmlTable3 = Convert-TableToHtml $ConnectionsInfoTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
 			$htmlTable4 = Convert-TableToHtml $SessOptTbl -CSSClass 'SessOptTbl sortable' -HasURLs -DebugInfo:$DebugInfo
 
+			$htmlTable5 = Convert-TableToHtml $PlanCacheTypeTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
+			$htmlTable6 = Convert-TableToHtml $PlanCacheByDBTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
+
 			$HtmlTabName = "Instance Overview"
 			$html = $HTMLPre + @"
     <title>$HtmlTabName</title>
@@ -2064,6 +2083,12 @@ $htmlTable2
 <br>
 <h2>Top 10 clients by connections</h2>
 $htmlTable3
+<br>
+<h2>Plan cache usage by type</h2>
+$htmlTable5
+<br>
+<h2>Top 10 databases by plan cache usage</h2>
+$htmlTable6
 <br>
 <h2>Session level SET options</h2>
 $htmlTable4
@@ -2504,13 +2529,13 @@ $HTMLBodyEnd
 <title>$tableName</title>
 $HTMLBodyStart
 <h1 id="top">$tableName</h1>
-$(if($DBInfoTbl.Rows.Count -gt 10){$SearchDiv -replace 'ReplaceSearchFunction','SearchDBInfo' -replace 'object', 'database'})
+$(if($DBInfoTbl.Rows.Count -gt 10){$SearchTableDiv -replace $STDivReplace,"'DBInfoTable', 0" -replace 'object', 'database'})
 $(if ([string]::IsNullOrEmpty($CheckDB)){$SortableTable})
 $htmlTable
 $JumpToTop
 <br>
 <h2>Database Files Info</h2>
-$($SearchDiv -replace 'ReplaceSearchFunction','SearchDBFileInfo' -replace 'object', 'database' -replace 'id="SearchBox"', 'id="SearchBox1"')
+$($SearchTableDiv -replace $STDivReplace,"'DBFileInfoTable', 0" -replace 'object', 'database' -replace 'id="SearchBox"', 'id="SearchBox1"')
 $SortableTable
 $htmlTable1
 $JumpToTop
@@ -2589,7 +2614,7 @@ $HTMLBodyEnd
 <title>$tableName</title>
 $HTMLBodyStart
 <h1 id="top">$tableName</h1>
-$($SearchDiv -replace 'ReplaceSearchFunction', 'SearchInstanceHealth' -replace 'object' , 'database')
+$($SearchTableDiv -replace $STDivReplace, "'InstanceHealthTable', 3" -replace 'object' , 'database')
 <br>
 $htmlTable
 $JumpToTop
@@ -2650,10 +2675,15 @@ $HTMLBodyEnd
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Objects with dangerous SET options" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		if ($global:StepOutcome -eq "Success") {
 			$DangerousSetTbl = $global:PSBlitzSet.Tables[0]
-			if ($ToHTML -eq "Y") {
-				$HtmlTabName = "Database objects with dangerous SET options"
-				$htmlTable = Convert-TableToHtml $DangerousSetTbl -CSSClass "sortable" -DebugInfo:$DebugInfo
-				$html = $HTMLPre + @"
+			[int]$RowsReturned = $DangerousSetTbl.Rows.Count
+			if ($RowsReturned -le 0) {
+				Write-Host " ->No rows returned."
+			}
+			else {
+				if ($ToHTML -eq "Y") {
+					$HtmlTabName = "Database objects with dangerous SET options"
+					$htmlTable = Convert-TableToHtml $DangerousSetTbl -CSSClass "sortable" -DebugInfo:$DebugInfo
+					$html = $HTMLPre + @"
 	<title>$HtmlTabName</title>
 $HTMLBodyStart
 <h1 id="top">$HtmlTabName</h1>
@@ -2663,18 +2693,20 @@ $htmlTable
 $JumpToTop
 $HTMLBodyEnd
 "@
-				Save-HtmlFile $html "DangerousSETOpt.html" $HTMLOutDir $DebugInfo
-				Invoke-ClearVariables html, htmlTable
-			}
-			else {
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Objects Dangerous SET")
+					Save-HtmlFile $html "DangerousSETOpt.html" $HTMLOutDir $DebugInfo
+					Invoke-ClearVariables html, htmlTable
+				}
+				else {
+					$ExcelSheet = $ExcelFile.Worksheets.Item("Objects Dangerous SET")
 					
-				Convert-TableToExcel $DangerousSetTbl $ExcelSheet -StartRow 4 -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
-				##Saving file 
-				Save-ExcelFile $ExcelFile
+					Convert-TableToExcel $DangerousSetTbl $ExcelSheet -StartRow 4 -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
+					##Saving file 
+					Save-ExcelFile $ExcelFile
+				}
 			}
 			##Cleaning up variables
-			Invoke-ClearVariables DangerousSetTbl, PSBlitzSet	
+			Invoke-ClearVariables DangerousSetTbl, PSBlitzSet
+		 	
 		}
 	}
 	if ($JobStatus -ne "Running") {
@@ -2762,7 +2794,7 @@ $HTMLBodyEnd
 <title>$HtmlTabName</title>
 $HTMLBodyStart
 <h1>$HtmlTabName</h1>
-$($SearchDiv -replace 'ReplaceSearchFunction', 'SearchStorageStats' -replace 'object', 'database')
+$($SearchTableDiv -replace $STDivReplace, "'StorageStatsTable', 9" -replace 'object', 'database')
 $SortableTable
 $htmlTable
 $JumpToTop
@@ -2780,7 +2812,7 @@ $HTMLBodyEnd
 <title>$HtmlTabName</title>
 $HTMLBodyStart
 <h1>$HtmlTabName</h1>
-$($SearchDiv -replace 'ReplaceSearchFunction','SearchPerfmon' -replace 'object', 'counter')
+$($SearchTableDiv -replace $STDivReplace, "'PerfmonTable', 1" -replace 'object', 'counter')
 $SortableTable
 $htmlTable
 $JumpToTop
@@ -2980,7 +3012,7 @@ $HTMLBodyEnd
 
 				Add-QueryName $BlitzCacheTbl "Query" "Query Text" $FileSOrder				
 					
-				$htmlTable1 = Convert-TableToHtml $BlitzCacheTbl -NoCaseChange -ExclCols "Query Text", "Query Plan" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs $FileSOrder
+				$htmlTable1 = Convert-TableToHtml $BlitzCacheTbl -NoCaseChange -ExclCols "Query Text", "Query Plan" -CSSClass "CacheTabx" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs $FileSOrder
 				
 				$htmlTable2 = Convert-TableToHtml $BlitzCacheWarnTbl -NoCaseChange -HasURLs -DebugInfo:$DebugInfo
 
@@ -2992,7 +3024,7 @@ $HTMLBodyEnd
 					#Handling CSS
 					$CacheHTMLPre = $HTMLPre
 					$CacheHTMLPre = $CacheHTMLPre -replace 'CacheTab1High', $HighlightCol
-					$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="CacheTable1">'
+					$htmlTable1 = $htmlTable1 -replace "<table class='CacheTabx'>", '<table class="CacheTable1">'
 					
 					if ($SheetName -eq "Mem & Recent Comp") {
 						$HtmlTabName = "Queries by Memory Grants & Recent Compilations"
@@ -3047,7 +3079,7 @@ $HTMLBodyEnd
 				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'") -or ($SortOrder -eq "'Query Hash'")) {
 					$HtmlTabName2 = $SortOrder -replace "'", ""
 					#Handling CSS
-					$htmlTable1 = $htmlTable1 -replace '<table>', '<table class="CacheTable2">'
+					$htmlTable1 = $htmlTable1 -replace "<table class='CacheTabx'>", '<table class="CacheTable2">'
 					
 					#Add heading if first half of the table failed
 					if ($PreviousOutcome -eq "Failure") {
@@ -3311,17 +3343,17 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			Add-LogRow "sp_BlitzQueryStore precheck" "Failure"
 		}
 		if ($CheckQueryStore -eq 'Y') {
-			$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzQueryStore_NonSPLatest.sql"
+			$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spQuickieStore_NonSPLatest.sql"
 			[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 
 			if ($IsAzureSQLDB) {
 				Write-Host " Retrieving Query Store info for $ASDBName..." -NoNewline
 			}
 			else {
-				if ($DBSwitched -eq "Y") {
-					$OldCheckDBStr = ";SET @DatabaseName = NULL;"
-					$NewCheckDBStr = ";SET @DatabaseName = '" + $CheckDB + "';"
-				}
+				#if ($DBSwitched -eq "Y") {
+					$OldCheckDBStr = ";SET @database_name = NULL;"
+					$NewCheckDBStr = ";SET @database_name = N'" + $CheckDB + "';"
+				#}
 				Write-Host " Retrieving Query Store info for $CheckDB..." -NoNewline
 				[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 			}
@@ -3336,38 +3368,33 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			if ($global:StepOutcome -eq "Success") {
 			
 				$BlitzQSTbl = $global:PSBlitzSet.Tables[0]
-				$BlitzQSSumTbl = $global:PSBlitzSet.Tables[1]
+				#$BlitzQSSumTbl = $global:PSBlitzSet.Tables[1]
 
-				Export-PlansAndDeadlocks $BlitzQSTbl $PlanOutDir "query_plan_xml" "SQLPlan File" -FPrefix "QueryStore" -DebugInfo:$DebugInfo
+				Export-PlansAndDeadlocks $BlitzQSTbl $PlanOutDir "query_plan" "sql_plan_file" -FPrefix "QueryStore" -DebugInfo:$DebugInfo
 				
 				if ($ToHTML -eq "Y") {
 					
-					Add-QueryName $BlitzQSTbl "Query" "query_sql_text" "QueryStore"
+					Add-QueryName $BlitzQSTbl "query" "query_sql_text" "QueryStore"
 
-					$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan_xml" -CSSClass "QueryStoreTab sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
+					$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan", "database_name","n" -CSSClass "QueryStoreTab sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
 
-					$htmlTable2 = Convert-TableToHtml $BlitzQSSumTbl -HasURLs -DebugInfo:$DebugInfo
+					#$htmlTable2 = Convert-TableToHtml $BlitzQSSumTbl -HasURLs -DebugInfo:$DebugInfo
 
 					$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
 
 					if ($IsAzureSQLDB) {
-						$HtmlTabName = "sp_BlitzQueryStore results for $ASDBName"
+						$HtmlTabName = "Query Store results for $ASDBName"
 					}
 					else {
-						$HtmlTabName = "sp_BlitzQueryStore results for $CheckDB"
+						$HtmlTabName = "Query Store results for $CheckDB"
 					}
 					$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
 					$HTMLBodyStart
 					<h1 id="top">$HtmlTabName</h1>
 					<br>
-					<h2>Query Store results from past 7 days</h2>
 					<p><a href="#Queries">Jump to query text</a></p>
 					$htmlTable1
-					<br>
-					<h2>Summary</h2>
-					$htmlTable2
-					$JumpToTop
 					<br>
 					<h2 id="Queries">Query text</h2>
 					$htmlTable3
@@ -3385,11 +3412,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					#Specify at which row in the sheet to start adding the data
 					$ExcelStartRow = $DefaultStartRow
 						
-					Convert-TableToExcel $BlitzQSSumTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
-					##Saving file 
-					Save-ExcelFile $ExcelFile
-
-					Convert-TableToExcel $BlitzQSTbl $ExcelSheet -StartRow $DefaultStartRow -StartCol 7 -DebugInfo:$DebugInfo -ExclCols "query_plan_xml", "query"
+					Convert-TableToExcel $BlitzQSTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -ExclCols "query", "query_plan", "n"
 					Save-ExcelFile $ExcelFile					
 				}
 				Invoke-ClearVariables BlitzQSTbl, BlitzQSSumTbl, PSBlitzSet
@@ -3477,55 +3500,57 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Export-PlansAndDeadlocks $BlitzIxTbl $PlanOutDir "Sample Query Plan" "Sample Plan File" -FPrefix "MissingIndex" -DebugInfo:$DebugInfo
 			}
 			if ($ToHTML -eq "Y") {
-
+				$htmlTabSearch = ""
 				if ($Mode -eq "0") {
 					$HtmlTabName = "Index Diagnosis"
 				}
 				elseif ($Mode -eq "1") {
 					$HtmlTabName = "Index Summary"
+					if($BlitzIxTbl.Rows.Count -ge 5){
+						$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexSummaryTable', 0" -replace 'object', 'database'
+						$htmlTabSearch +="<br>"
+					}
 				}
 				elseif ($Mode -eq "2") {
 					$HtmlTabName = "Index Usage Details"
+
 				}
 				elseif ($Mode -eq "4") {
 					$HtmlTabName = "Detailed Index Diagnosis"
 				}
-				if (!([string]::IsNullOrEmpty($CheckDB))) {
-					$HtmlTabName += " for $CheckDB" 
+				if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
+					$HtmlTabName += " for $ASDBName$CheckDB"
+					$ExclCols = @("Sample Query Plan","Display Order", "Database Name")
+					$Mode2SearchCol = 0
+					$Mode2CSS = "IndexUsageTableDB sortable"
 				}
-				elseif ($IsAzureSQLDB) {
-					$HtmlTabName += " for $ASDBName"
-				}
+				else {
+					$ExclCols = @("Sample Query Plan","Display Order")
+					$Mode2SearchCol = 1
+					$Mode2CSS = "IndexUsageTable sortable"
+				}						
 		
-		
-				if ("0", "4" -Contains $Mode) {					
-
-					$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols "Sample Query Plan" -NoCaseChange -HasURLs -TblID "IndexUsgTable" -DebugInfo:$DebugInfo
-			
+				if ("0", "4" -Contains $Mode) {	
+					if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
+						$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexUsgTable', 2" -replace 'object', 'database'
+						$htmlTabSearch +="<br>"
+					}							
+					$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols $ExclCols -NoCaseChange -HasURLs -TblID "IndexUsgTable" -DebugInfo:$DebugInfo
 				}
 				elseif ($Mode -eq "1") {
-
-					$htmlTable = Convert-TableToHtml $BlitzIxTbl -NoCaseChange -TblID "IndexSummaryTable" -ExclCols "Display Order" -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $BlitzIxTbl -NoCaseChange -TblID "IndexSummaryTable" -ExclCols $ExclCols -DebugInfo:$DebugInfo
 				}
 				elseif ($Mode -eq "2") {
-
-					$htmlTable = Convert-TableToHtml $BlitzIxTbl -TblID "IndexUsgTable" -CSSClass "IndexUsageTable sortable" -NoCaseChange -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $BlitzIxTbl -TblID "IndexUsgTable" -CSSClass $Mode2CSS -ExclCols $ExclCols -NoCaseChange -DebugInfo:$DebugInfo
+					$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexUsgTable', $Mode2SearchCol"
+					$htmlTabSearch += "`n$SortableTable"
 				}
 		
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
 				$HTMLBodyStart
 				<h1 id="top">$HtmlTabName</h1>
-				$(if($Mode -eq "2"){
-					$SearchDiv -replace 'ReplaceSearchFunction', 'SearchIndexUsage'
-					$SortableTable				
-				}elseif(("0","4" -Contains $Mode) -and (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false))){
-					$SearchDiv -replace 'ReplaceSearchFunction', 'SearchIndexUsage' -replace 'object', 'database'
-					"<br>"
-				}elseif(($Mode -eq "1") -and ($BlitzIxTbl.Rows.Count -ge 5)){
-					$SearchDiv -replace 'ReplaceSearchFunction', 'SearchIndexSummary' -replace 'object', 'database'
-					"<br>"
-				})
+				$htmlTabSearch
 				$htmlTable 
 				<br>
 				$(if ($Mode -ne "1") {$JumpToTop})
@@ -3621,11 +3646,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		
 			if ($ToHTML -eq "Y") {
 				$HtmlTabName = "Deadlocks"
-				if (!([string]::IsNullOrEmpty($CheckDB))) {
-					$HtmlTabName += " for $CheckDB" 
-				}
-				elseif ($IsAzureSQLDB) {
-					$HtmlTabName += " for $ASDBName"
+				if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
+					$HtmlTabName += " for $ASDBName$CheckDB" 
 				}
 				
 				$htmlTable1 = Convert-TableToHtml $TblLockOver -DebugInfo:$DebugInfo
@@ -3658,7 +3680,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		<br>
 		<h2 id="Deadlocks1">Deadlock Details</h2>
 		$(if($TblLockDtl.Rows.Count -ge 10){
-			$SearchDiv -replace 'ReplaceSearchFunction', 'SearchDeadlockDetails'
+			$SearchTableDiv -replace $STDivReplace, "'DeadlockDtlTable',7"
 			'<br>'})
 		$htmlTable2
 		$JumpToTop
@@ -3677,7 +3699,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 "@
 				}
 
-		$html += @"
+				$html += @"
 		<br>
 		<h2>Query Text For Deadlock Details</h2>
 		$htmlTable3
@@ -3766,14 +3788,18 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			[int]$RowsReturned = $StatsTbl.Rows.Count
 			if ($RowsReturned -le 0) {
 				Write-Host " ->No rows returned."
-				Add-LogRow "->Stats Info" "No rows returned"
 			}
 			else {
 				if ($ToHTML -eq "Y") {
 
-					$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -CSSClass "sortable" -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -ExclCols "database" -DebugInfo:$DebugInfo
 					#add tooltips
 					$htmlTable = $htmlTable -replace '<th>Update ', '<th class="tooltip" title="The commented options are suggestions based on record counts.">Update '
+					#add buttons
+					$htmlTable = $htmlTable -replace '<th>Get Details', '<th>Get Details<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="20">Copy all commands</button>'
+					$htmlTable = $htmlTable -replace 'counts.">Update Table Stats', 'counts.">Update Table Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="21">Copy all commands</button>'
+					$htmlTable = $htmlTable -replace 'counts.">Update Individual Stats', 'counts.">Update Individual Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="22">Copy all commands</button>'
+					$htmlTable = $htmlTable -replace 'counts.">Update Partition Stats', 'counts.">Update Partition Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="23">Copy all commands</button>'
 					if ($IsAzureSQLDB) {
 						$HtmlTabName = "Statistics info for $ASDBName"
 						$HtmlFileName = "StatsInfo_$ASDBName.html"
@@ -3786,8 +3812,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				<title>$HtmlTabName</title>
 				$HTMLBodyStart
 				<h1>$HtmlTabName</h1>
-				$($SearchDiv -replace 'ReplaceSearchFunction', 'SearchStatsAndIndexFrag')
-				$SortableTable
+				$($SearchTableDiv -replace $STDivReplace, "'StatsOrIxFragTable', 0")
+				<!-- Message container -->
+                <div id="message">Copied to clipboard!</div>
+				<br>
 				$htmlTable
 				$JumpToTop
 				$HTMLBodyEnd
@@ -3839,7 +3867,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$RecordsReturned = $IndexTbl.Rows.Count
 			if ($RecordsReturned -le 0) {
 				Write-Host " ->No rows returned."
-				Add-LogRow "->Index Frag Info" "No rows returned."
 			}
 			else {
 				if ($IndexLckTbl.Rows.Count -gt 0) {
@@ -3867,7 +3894,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						Write-Host " ->Converting index info to HTML" -fore yellow
 					}
 
-					$htmlTable = Convert-TableToHtml $IndexTbl -TblID "StatsOrIxFragTable" -CSSClass "sortable" -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $IndexTbl -TblID "StatsOrIxFragTable" -ExclCols "database" -CSSClass "sortable" -DebugInfo:$DebugInfo
 					if ($IsAzureSQLDB) {
 						$HtmlTabName = "Index fragmentation info for $ASDBName"
 						$HtmlFileName = "IndexFragInfo_$ASDBName.html"
@@ -3881,7 +3908,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				<title>$HtmlTabName</title>
 				$HTMLBodyStart
 				<h1>$HtmlTabName</h1>
-				$($SearchDiv -replace 'ReplaceSearchFunction', 'SearchStatsAndIndexFrag')
+				$($SearchTableDiv -replace $STDivReplace, "'StatsOrIxFragTable', 0")
 				$SortableTable
 				$htmlTable
 				$JumpToTop
@@ -4310,7 +4337,7 @@ finally {
 			$AzureEnv = "- Azure SQL DB"
 			$DbPortion = "- $ASDBName"
 		}
-		if (!([string]::IsNullOrEmpty($CheckDB))) {
+		elseif (!([string]::IsNullOrEmpty($CheckDB))) {
 			$DbPortion = "- database-specific check: $CheckDB"
 		}
 		else {
@@ -4602,14 +4629,15 @@ finally {
 			}
 			elseif ($File.Name -like "BlitzQueryStore*") {
 				$PageName = "Query Store Info"
+				$QuerySource = "QuickieStore @top = 20"
 				if ($IsAzureSQLDB) {
-					$QuerySource = "sp_BlitzQueryStore;"
+					$QuerySource += ";"
 				}
 				elseif ($DBSwitched -eq "Y") {
-					$QuerySource = "sp_BlitzQueryStore @DatabaseName = '$DBName';"
+					$QuerySource += ", @database_name = '$DBName';"
 				}
 				else {
-					$QuerySource = "sp_BlitzQueryStore @DatabaseName = '$CheckDB';"
+					$QuerySource += ", @database_name = '$CheckDB';"
 				}
 				$Description = "Data collected by the query store for the past 7 days"
 				$AdditionalInfo = "Outputs execution plans as .sqlplan files."
