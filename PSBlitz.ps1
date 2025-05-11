@@ -280,8 +280,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.3.0"
-$VersDate = "2025-04-22"
+$Vers = "5.3.1"
+$VersDate = "2025-05-11"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -3276,7 +3276,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$CheckDBQuery.Parameters["@DBName"].Value = $CheckDB
 		}
 		elseif ($IsAzureSQLDB) {
-			Write-Host "Checking if $ASDBName is eligible for Query Store check..."
+			Write-Host "Checking if $ASDBName is eligible for Query Store check..." -NoNewline
 			$DBQuery = @"
 			IF ( (SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128))) = N'SQL Azure' )
 			BEGIN
@@ -3310,23 +3310,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$CheckDBAdapter.Fill($CheckDBSet) | Out-Null -ErrorAction Stop
 			$SqlConnection.Close()
 			if ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "Yes") {
-				if ($IsAzureSQLDB) {
-					Write-Host " ->$ASDBName - " -NoNewLine -ErrorAction Stop
-				}
-				else {
-					Write-Host " ->$CheckDB - " -NoNewLine -ErrorAction Stop
-				}
-				Write-Host "is eligible for Query Store check" -ErrorAction Stop
+				Write-Host @GreenCheck
+				
 				$CheckQueryStore = 'Y'
 			}
 			elseif ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "No") {
 				$StepEnd = Get-Date
-				if ($IsAzureSQLDB) {
-					Write-Host " ->$ASDBName - is not eligible for Query Store check" -NoNewLine -ErrorAction Stop
-				}
-				else {
-					Write-Host " ->$CheckDB - is not eligible for Query Store check"
-				}
+				Write-Host @RedX
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" "$CheckDB is not eligible"
 			}
 			else {
