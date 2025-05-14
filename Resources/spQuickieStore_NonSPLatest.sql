@@ -19,7 +19,7 @@ SET STATISTICS TIME, IO OFF;
 DECLARE
     @database_name sysname = NULL, /*the name of the database you want to look at query store in*/
     @sort_order varchar(20) = 'cpu', /*the runtime metric you want to prioritize results by*/
-    @top bigint = 25, /*the number of queries you want to pull back*/
+    @top bigint = 20, /*the number of queries you want to pull back*/
     @start_date datetimeoffset(7) = NULL, /*the begin date of your search, will be converted to UTC internally*/
     @end_date datetimeoffset(7) = NULL, /*the end date of your search, will be converted to UTC internally*/
     @timezone sysname = NULL, /*user specified time zone to override dates displayed in results*/

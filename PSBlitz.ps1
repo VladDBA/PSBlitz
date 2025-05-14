@@ -4417,7 +4417,7 @@ finally {
 			elseif ($File.Name -like "BlitzIndex*") {
 				$Mode = $File.Name.Replace('BlitzIndex_', '')
 				$Mode = $Mode.Replace('.html', '')
-				$QuerySource = "sp_BlitzIndex @Mode = $Mode"
+				$QuerySource = "Similar to sp_BlitzIndex @Mode = $Mode"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$QuerySource += ", @DatabaseName = '$CheckDB'; "
 				}
@@ -4453,7 +4453,7 @@ finally {
 				$AdditionalInfo = "Outputs execution plans as .sqlplan files."
 				if ($SortOrder -eq "Mem_Recent_Comp") {
 					$PageName = "Top $CacheTop Queries - Memory and Top 50 - Recently Compiled"
-					$QuerySource = "sp_BlitzCache @SortOrder = 'memory grant', @Top = $CacheTop/'recent compilations' , @Top = 50"
+					$QuerySource = "Similar to sp_BlitzCache @SortOrder = 'memory grant', @Top = $CacheTop/'recent compilations' , @Top = 50"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
 					}
@@ -4473,7 +4473,7 @@ finally {
 				}
 				elseif ($SortOrder -eq "Dupl_Single_Use") {
 					$PageName = "Top $CacheTop Queries - Duplicates and Single Use"
-					$QuerySource = "sp_BlitzCache @Top = $CacheTop, @SortOrder = 'Duplicate'/'Query Hash'"
+					$QuerySource = "Similar to sp_BlitzCache @Top = $CacheTop, @SortOrder = 'Duplicate'/'Query Hash'"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
 					}
@@ -4492,7 +4492,7 @@ finally {
 					}
 				}
 				else {
-					$QuerySource = "sp_BlitzCache , @Top = $CacheTop, @SortOrder = '$SortOrder'/'Avg $SortOrder'"
+					$QuerySource = "Similar to sp_BlitzCache , @Top = $CacheTop, @SortOrder = '$SortOrder'/'Avg $SortOrder'"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
 					}
@@ -4512,13 +4512,13 @@ finally {
 				}
 			}
 			elseif ($File.Name -like "BlitzFirst3*") {
-				$QuerySource = "sp_BlitzFirst @ExpertMode = 1, @Seconds = 30; "
+				$QuerySource = "Similar to sp_BlitzFirst @ExpertMode = 1, @Seconds = 30; "
 				$Description = "What's happening on the instance during a 30 seconds time-frame."
 				$PageName = "Happening Now"
 				$AdditionalInfo = ""
 			}
 			elseif ($File.Name -like "BlitzFirst_*") {
-				$QuerySource = "sp_BlitzFirst @SinceStartup = 1;"
+				$QuerySource = "Similar to sp_BlitzFirst @SinceStartup = 1;"
 				if ($File.Name -like "BlitzFirst_Perfmon*") {
 					$PageName = "Perfmon Stats"
 					$Description = "Performance counters and their curent values since last instance restart from sys.dm_os_performance_counters."
@@ -4534,7 +4534,7 @@ finally {
 				$AdditionalInfo = ""
 			}
 			elseif ($File.Name -like "BlitzWho*") {
-				$QuerySource = "sp_BlitzWho @ExpertMode = 1"
+				$QuerySource = "Similar to sp_BlitzWho @ExpertMode = 1"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$QuerySource += ", @DatabaseName = '$CheckDB'; "
 				}
@@ -4584,7 +4584,7 @@ finally {
 			}
 			elseif ($File.Name -like "BlitzLock*") {
 				$PageName = "Deadlock Information"
-				$QuerySource = "sp_BlitzLock @StartDate = DATEADD(DAY, -15, GETDATE()), @EndDate = GETDATE(); "
+				$QuerySource = "Similar to sp_BlitzLock @StartDate = DATEADD(DAY, -15, GETDATE()), @EndDate = GETDATE(); "
 				$Description = "Information about the deadlocks recorded in the default extended events session."
 				$AdditionalInfo = "Outputs deadlock graphs as .xdl files and execution plans as .sqlplan files."
 			}
@@ -4619,7 +4619,7 @@ finally {
 			}
 			elseif ($File.Name -like "BlitzQueryStore*") {
 				$PageName = "Query Store Info"
-				$QuerySource = "QuickieStore @top = 20"
+				$QuerySource = "Similar to sp_QuickieStore @top = 20"
 				if ($IsAzureSQLDB) {
 					$QuerySource += ";"
 				}
