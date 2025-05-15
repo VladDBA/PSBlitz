@@ -280,8 +280,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.3.1"
-$VersDate = "2025-05-11"
+$Vers = "5.4.0"
+$VersDate = "2025-05-16"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -3247,7 +3247,7 @@ $HTMLBodyEnd
 		}
 		$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
-			Write-Host "Checking if $CheckDB is eligible for Query Store check..." -NoNewline
+			Write-Host "Checking if $CheckDB is eligible for Query Store check... " -NoNewline
 			$DBQuery = @" 
 		IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSION')), 4)) < 13 )
   BEGIN
@@ -3316,13 +3316,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			}
 			elseif ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "No") {
 				$StepEnd = Get-Date
-				Write-Host @RedX
+				Write-Host "X (not eligible)" -Fore Yellow
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" "$CheckDB is not eligible"
 			}
 			else {
 				$StepEnd = Get-Date
 				$QSCheckResult = $CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] 
-				Write-Host " ->$ASDBName - is not eligible for Query Store check" -NoNewLine -ErrorAction Stop
+				Write-Host "X (not eligible)" -Fore Yellow
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" $QSCheckResult
 			}
 		}
