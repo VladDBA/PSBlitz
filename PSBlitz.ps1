@@ -263,7 +263,7 @@ param(
 	[Parameter(Mandatory = $False)]
 	[int]$MaxTimeout = 1000,
 	[Parameter(Mandatory = $False)]
-	[int]$ConnTimeout = 15,
+	[int]$ConnTimeout = 45,
 	[Parameter(Mandatory = $False)]
 	[string]$OutputDir,
 	[Parameter(Mandatory = $False)]
@@ -280,8 +280,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.3.0"
-$VersDate = "2025-04-22"
+$Vers = "5.4.0"
+$VersDate = "2025-05-16"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -600,7 +600,7 @@ function Invoke-PSBlitzQuery {
 		($StepNameIn -eq "sp_BlitzIndex mode 1") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info") -or 
 		($StepNameIn -eq "sp_BlitzLock") -or ($StepNameIn -eq "Return sp_BlitzWho") -or ($StepNameIn -eq "Open Transacion Info") -or 
 		($StepNameIn -eq "Objects with dangerous SET options") -or ($StepNameIn -eq "sp_Blitz") -or 
-		($StepNameIn -eq "sp_BlitzFirst 30 seconds")) {
+		($StepNameIn -eq "sp_BlitzFirst 30 seconds") -or ($StepNameIn -like "Query Store check *")) {
 			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
 			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
 		}
@@ -3247,7 +3247,7 @@ $HTMLBodyEnd
 		}
 		$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
-			Write-Host "Checking if $CheckDB is eligible for Query Store check..."
+			Write-Host "Checking if $CheckDB is eligible for Query Store check... " -NoNewline
 			$DBQuery = @" 
 		IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSION')), 4)) < 13 )
   BEGIN
@@ -3276,7 +3276,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$CheckDBQuery.Parameters["@DBName"].Value = $CheckDB
 		}
 		elseif ($IsAzureSQLDB) {
-			Write-Host "Checking if $ASDBName is eligible for Query Store check..."
+			Write-Host "Checking if $ASDBName is eligible for Query Store check..." -NoNewline
 			$DBQuery = @"
 			IF ( (SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128))) = N'SQL Azure' )
 			BEGIN
@@ -3310,29 +3310,19 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$CheckDBAdapter.Fill($CheckDBSet) | Out-Null -ErrorAction Stop
 			$SqlConnection.Close()
 			if ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "Yes") {
-				if ($IsAzureSQLDB) {
-					Write-Host " ->$ASDBName - " -NoNewLine -ErrorAction Stop
-				}
-				else {
-					Write-Host " ->$CheckDB - " -NoNewLine -ErrorAction Stop
-				}
-				Write-Host "is eligible for Query Store check" -ErrorAction Stop
+				Write-Host @GreenCheck
+				
 				$CheckQueryStore = 'Y'
 			}
 			elseif ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "No") {
 				$StepEnd = Get-Date
-				if ($IsAzureSQLDB) {
-					Write-Host " ->$ASDBName - is not eligible for Query Store check" -NoNewLine -ErrorAction Stop
-				}
-				else {
-					Write-Host " ->$CheckDB - is not eligible for Query Store check"
-				}
+				Write-Host "X (not eligible)" -Fore Yellow
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" "$CheckDB is not eligible"
 			}
 			else {
 				$StepEnd = Get-Date
 				$QSCheckResult = $CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] 
-				Write-Host " ->$ASDBName - is not eligible for Query Store check" -NoNewLine -ErrorAction Stop
+				Write-Host "X (not eligible)" -Fore Yellow
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" $QSCheckResult
 			}
 		}
@@ -3347,30 +3337,37 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 
 			if ($IsAzureSQLDB) {
-				Write-Host " Retrieving Query Store info for $ASDBName..." -NoNewline
+				Write-Host " Retrieving Query Store info for $ASDBName..." 
 			}
 			else {
 				#if ($DBSwitched -eq "Y") {
 					$OldCheckDBStr = ";SET @database_name = NULL;"
 					$NewCheckDBStr = ";SET @database_name = N'" + $CheckDB + "';"
 				#}
-				Write-Host " Retrieving Query Store info for $CheckDB..." -NoNewline
+				Write-Host " Retrieving Query Store info for $CheckDB..." 
 				[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 			}
+			$SortOrders = @("cpu","duration")
+			foreach ($SortOrder in $SortORders){ 
+				Write-Host " ->Top 20 queries by $SortOrder..." -NoNewline
+				#There are only 2 sort orders here and CPU is the default one, so I can be lazy for the time being
+				[string]$Query = $Query -replace ";SET @sort_order = 'cpu';", ";SET @sort_order = '$SortOrder';"
+
+			
 			
 			if ($IsAzureSQLDB) {
 				
-				Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzQueryStore for $ASDBName" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout 
+				Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Query Store check for $ASDBName - $SortOrder" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout 
 			}
 			else {
-				Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzQueryStore for $CheckDB" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
+				Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Query Store check for $CheckDB - $SortOrder" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
 			}
 			if ($global:StepOutcome -eq "Success") {
 			
 				$BlitzQSTbl = $global:PSBlitzSet.Tables[0]
 				#$BlitzQSSumTbl = $global:PSBlitzSet.Tables[1]
 
-				Export-PlansAndDeadlocks $BlitzQSTbl $PlanOutDir "query_plan" "sql_plan_file" -FPrefix "QueryStore" -DebugInfo:$DebugInfo
+				Export-PlansAndDeadlocks $BlitzQSTbl $PlanOutDir "query_plan" "sql_plan_file" -FPrefix "QueryStore_$SortOrder" -DebugInfo:$DebugInfo
 				
 				if ($ToHTML -eq "Y") {
 					
@@ -3383,10 +3380,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
 
 					if ($IsAzureSQLDB) {
-						$HtmlTabName = "Query Store results for $ASDBName"
+						$HtmlTabName = "Query Store results for $ASDBName - $SortOrder"
 					}
 					else {
-						$HtmlTabName = "Query Store results for $CheckDB"
+						$HtmlTabName = "Query Store results for $CheckDB - $SortOrder"
 					}
 					$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
@@ -3402,7 +3399,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$HTMLBodyEnd
 "@
 
-					Save-HtmlFile $html "BlitzQueryStore.html" $HTMLOutDir $DebugInfo
+					Save-HtmlFile $html "BlitzQueryStore_$SortOrder.html" $HTMLOutDir $DebugInfo
 					Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3
 
 				}
@@ -3410,13 +3407,18 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					##export to excel
 					$ExcelSheet = $ExcelFile.Worksheets.Item("Query Store Info")
 					#Specify at which row in the sheet to start adding the data
-					$ExcelStartRow = $DefaultStartRow
+					if($SortOrder -eq "duration"){
+						$ExcelStartRow = 27
+					} else {
+					$ExcelStartRow = 3
+					}
 						
-					Convert-TableToExcel $BlitzQSTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -ExclCols "query", "query_plan", "n"
+					Convert-TableToExcel $BlitzQSTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -ExclCols "query", "query_plan", "n"
 					Save-ExcelFile $ExcelFile					
 				}
 				Invoke-ClearVariables BlitzQSTbl, BlitzQSSumTbl, PSBlitzSet
 			}
+		}
 		}
 		if ($DBSwitched -eq "Y") {
 			$StepStart = get-date
@@ -4427,7 +4429,7 @@ finally {
 			elseif ($File.Name -like "BlitzIndex*") {
 				$Mode = $File.Name.Replace('BlitzIndex_', '')
 				$Mode = $Mode.Replace('.html', '')
-				$QuerySource = "sp_BlitzIndex @Mode = $Mode"
+				$QuerySource = "Similar to sp_BlitzIndex @Mode = $Mode"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$QuerySource += ", @DatabaseName = '$CheckDB'; "
 				}
@@ -4463,7 +4465,7 @@ finally {
 				$AdditionalInfo = "Outputs execution plans as .sqlplan files."
 				if ($SortOrder -eq "Mem_Recent_Comp") {
 					$PageName = "Top $CacheTop Queries - Memory and Top 50 - Recently Compiled"
-					$QuerySource = "sp_BlitzCache @SortOrder = 'memory grant', @Top = $CacheTop/'recent compilations' , @Top = 50"
+					$QuerySource = "Similar to sp_BlitzCache @SortOrder = 'memory grant', @Top = $CacheTop/'recent compilations' , @Top = 50"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
 					}
@@ -4483,7 +4485,7 @@ finally {
 				}
 				elseif ($SortOrder -eq "Dupl_Single_Use") {
 					$PageName = "Top $CacheTop Queries - Duplicates and Single Use"
-					$QuerySource = "sp_BlitzCache @Top = $CacheTop, @SortOrder = 'Duplicate'/'Query Hash'"
+					$QuerySource = "Similar to sp_BlitzCache @Top = $CacheTop, @SortOrder = 'Duplicate'/'Query Hash'"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
 					}
@@ -4502,7 +4504,7 @@ finally {
 					}
 				}
 				else {
-					$QuerySource = "sp_BlitzCache , @Top = $CacheTop, @SortOrder = '$SortOrder'/'Avg $SortOrder'"
+					$QuerySource = "Similar to sp_BlitzCache , @Top = $CacheTop, @SortOrder = '$SortOrder'/'Avg $SortOrder'"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
 					}
@@ -4521,14 +4523,31 @@ finally {
 					}
 				}
 			}
+			elseif ($File.Name -like "BlitzQueryStore*") {
+				$SortOrder = $File.Name.Replace('BlitzQueryStore_', '')
+				$SortOrder = $SortOrder.Replace('.html', '')
+				$PageName = "Query Store Info - $SortOrder"
+				$AdditionalInfo = "Outputs execution plans as .sqlplan files."
+				$Description = "Contains the top 20 queries, captured by the Query Store in the past 7 days, sorted by $SortOrder"
+				$QuerySource = "Similar to sp_QuickieStore @top = 20, @sort_order='$SortOrder'"
+				if ($IsAzureSQLDB) {
+					$QuerySource += ";"
+				}
+				elseif ($DBSwitched -eq "Y") {
+					$QuerySource += ", @database_name = '$DBName';"
+				}
+				else {
+					$QuerySource += ", @database_name = '$CheckDB';"
+				}
+			}
 			elseif ($File.Name -like "BlitzFirst3*") {
-				$QuerySource = "sp_BlitzFirst @ExpertMode = 1, @Seconds = 30; "
+				$QuerySource = "Similar to sp_BlitzFirst @ExpertMode = 1, @Seconds = 30; "
 				$Description = "What's happening on the instance during a 30 seconds time-frame."
 				$PageName = "Happening Now"
 				$AdditionalInfo = ""
 			}
 			elseif ($File.Name -like "BlitzFirst_*") {
-				$QuerySource = "sp_BlitzFirst @SinceStartup = 1;"
+				$QuerySource = "Similar to sp_BlitzFirst @SinceStartup = 1;"
 				if ($File.Name -like "BlitzFirst_Perfmon*") {
 					$PageName = "Perfmon Stats"
 					$Description = "Performance counters and their curent values since last instance restart from sys.dm_os_performance_counters."
@@ -4544,7 +4563,7 @@ finally {
 				$AdditionalInfo = ""
 			}
 			elseif ($File.Name -like "BlitzWho*") {
-				$QuerySource = "sp_BlitzWho @ExpertMode = 1"
+				$QuerySource = "Similar to sp_BlitzWho @ExpertMode = 1"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$QuerySource += ", @DatabaseName = '$CheckDB'; "
 				}
@@ -4594,7 +4613,7 @@ finally {
 			}
 			elseif ($File.Name -like "BlitzLock*") {
 				$PageName = "Deadlock Information"
-				$QuerySource = "sp_BlitzLock @StartDate = DATEADD(DAY, -15, GETDATE()), @EndDate = GETDATE(); "
+				$QuerySource = "Similar to sp_BlitzLock @StartDate = DATEADD(DAY, -15, GETDATE()), @EndDate = GETDATE(); "
 				$Description = "Information about the deadlocks recorded in the default extended events session."
 				$AdditionalInfo = "Outputs deadlock graphs as .xdl files and execution plans as .sqlplan files."
 			}
@@ -4627,21 +4646,7 @@ finally {
 			
 				$AdditionalInfo = ""
 			}
-			elseif ($File.Name -like "BlitzQueryStore*") {
-				$PageName = "Query Store Info"
-				$QuerySource = "QuickieStore @top = 20"
-				if ($IsAzureSQLDB) {
-					$QuerySource += ";"
-				}
-				elseif ($DBSwitched -eq "Y") {
-					$QuerySource += ", @database_name = '$DBName';"
-				}
-				else {
-					$QuerySource += ", @database_name = '$CheckDB';"
-				}
-				$Description = "Data collected by the query store for the past 7 days"
-				$AdditionalInfo = "Outputs execution plans as .sqlplan files."
-			}
+			
 			elseif ($File.Name -like "DangerousSETOpt*") {
 				$PageName = "Objects with dangerous SET options"
 				$Description = "A list of database objects created with dangerous SET options"

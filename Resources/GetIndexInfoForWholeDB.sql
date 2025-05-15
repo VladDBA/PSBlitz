@@ -15,10 +15,10 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-IF OBJECT_ID('tempdb.dbo.#test', 'U') IS NOT NULL
-    DROP TABLE #test;
+IF OBJECT_ID('tempdb.dbo.#PSBlitzIXFrag', 'U') IS NOT NULL
+    DROP TABLE #PSBlitzIXFrag;
 SELECT [l].[resource_associated_entity_id]
-INTO   #test
+INTO   #PSBlitzIXFrag
 FROM   sys.[dm_tran_locks] [l]
 WHERE  [l].[request_mode] = N'X'
        AND [l].[request_type] = N'LOCK'
@@ -58,7 +58,7 @@ WHERE  [ix].[type] IN( 0, 1, 2, 3,
        /*only tables larger than ~400MB */
        AND [ips].[page_count] >= 52000
        AND [obj].[object_id] NOT IN (SELECT [resource_associated_entity_id]
-                                 FROM   #test)
+                                 FROM   #PSBlitzIXFrag)
 GROUP  BY SCHEMA_NAME([obj].[schema_id]) + '.'
           + [obj].[name],
 		  [obj].[object_id],
@@ -74,7 +74,7 @@ ORDER  BY [ips].[avg_fragmentation_in_percent] DESC, [size_in_GB] DESC;
 
 SELECT 'Exclusive Lock'                           AS [xlocked],
        OBJECT_NAME([resource_associated_entity_id]) AS [object_name]
-FROM   #test;
+FROM   #PSBlitzIXFrag;
 
 IF OBJECT_ID('tempdb.dbo.#test', 'U') IS NOT NULL
-    DROP TABLE #test;
+    DROP TABLE #PSBlitzIXFrag;

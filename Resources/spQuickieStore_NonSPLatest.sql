@@ -39,7 +39,7 @@ DECLARE
     @ignore_plan_hashes nvarchar(4000) = NULL, /*a list of query plan hashes to ignore*/
     @ignore_sql_handles nvarchar(4000) = NULL, /*a list of sql handles to ignore*/
     @query_text_search nvarchar(4000) = NULL, /*query text to search for*/
-    @query_text_search_not nvarchar(4000) = NULL, /*query text to exclude*/
+    @query_text_search_not nvarchar(4000) = N'PSBlitz', /*query text to exclude*/
     @escape_brackets bit = 0, /*Set this bit to 1 to search for query text containing square brackets (common in .NET Entity Framework and other ORM queries)*/
     @escape_character nchar(1) = N'\', /*Sets the ESCAPE character for special character searches, defaults to the SQL standard backslash (\) character*/
     @only_queries_with_hints bit = 0, /*Set this bit to 1 to retrieve only queries with query hints*/
@@ -71,6 +71,8 @@ DECLARE
 
 /*PSBlitz specific parameters/options*/
 ;SET @database_name = NULL;
+;SET @sort_order = 'cpu';
+;SET @top = 20;
 
 /*Temp table cleanup*/
 IF OBJECT_ID('tempdb.dbo.#distinct_plans', 'U') IS NOT NULL
