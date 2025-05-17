@@ -3528,12 +3528,12 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				}
 				if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
 					$HtmlTabName += " for $ASDBName$CheckDB"
-					$ExclCols = @("Sample Query Plan","Display Order", "Database Name")
+					$ExclCols = @("Sample Query Plan","Display Order", "Database Name","Finding","URL")
 					$Mode2SearchCol = 0
 					$Mode2CSS = "IndexUsageTableDB sortable"
 				}
 				else {
-					$ExclCols = @("Sample Query Plan","Display Order")
+					$ExclCols = @("Sample Query Plan","Display Order","Finding","URL")
 					$Mode2SearchCol = 1
 					$Mode2CSS = "IndexUsageTable sortable"
 				}						
@@ -3543,7 +3543,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexUsgTable', 2" -replace 'object', 'database'
 						$htmlTabSearch +="<br>"
 					}							
-					$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols $ExclCols -NoCaseChange -HasURLs -TblID "IndexUsgTable" -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols $ExclCols -NoCaseChange -HyperlinkCol "FindingHL" -TblID "IndexUsgTable" -DebugInfo:$DebugInfo
 				}
 				elseif ($Mode -eq "1") {
 					$htmlTable = Convert-TableToHtml $BlitzIxTbl -NoCaseChange -TblID "IndexSummaryTable" -ExclCols $ExclCols -DebugInfo:$DebugInfo
@@ -3586,7 +3586,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				#Specify worksheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
 				if ("0", "4" -Contains $Mode) {
-					Convert-TableToExcel $BlitzIxTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -ExclCols "Sample Query Plan" -URLCols "URL" -MapURLToColNum 2 -URLTextCol "Finding"
+					Convert-TableToExcel $BlitzIxTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -ExclCols "Sample Query Plan","FindingHL" -URLCols "URL" -MapURLToColNum 2 -URLTextCol "Finding"
 				}
 				else {
 					Convert-TableToExcel $BlitzIxTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
