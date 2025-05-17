@@ -637,6 +637,8 @@ function Convert-TableToHtml {
 		[Parameter(Mandatory = $false)]
 		[switch] $HasURLs,
 		[Parameter(Mandatory = $false)]
+		[string] $HyperlinkCol = 'x',
+		[Parameter(Mandatory = $false)]
 		[string[]] $ExclCols,
 		[Parameter(Mandatory = $false)]
 		[string[]] $DateTimeCols,
@@ -726,7 +728,15 @@ function Convert-TableToHtml {
 		elseif ($TblID) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID'>"
 		}
-        
+        if($HyperlinkCol -ne 'x'){
+			# fix hyperlinks
+			$htmlTableOut = $htmlTableOut -replace "&lt;a href=&#39;","<a href='"
+			$htmlTableOut = $htmlTableOut -replace "&#39; target=&#39;_blank&#39;&gt;", "' target='_blank'>"
+			$htmlTableOut = $htmlTableOut -replace "&lt;/a&gt;","</a>"
+			#fix column name
+			$HyperlinkColClean = $HyperlinkCol -replace 'HL',''
+			$htmlTableOut = $htmlTableOut -replace "<th>$HyperlinkCol</th>","<th>$HyperlinkColClean</th>"
+		}
 		if ($HasURLs) {
 			$URLRegex = '(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\".,<>?«»“”]))'
 			$htmlTableOut = $htmlTableOut -replace $URLRegex, '<a href="$&" target="_blank">$&</a>'
@@ -2609,7 +2619,8 @@ $HTMLBodyEnd
 
 			if ($ToHTML -eq "Y") {
 				$tableName = "Instance Health"
-				$htmlTable = Convert-TableToHtml $BlitzTbl -NoCaseChange -TblID "InstanceHealthTable" -HasURLs -DebugInfo:$DebugInfo
+				#$htmlTable = Convert-TableToHtml $BlitzTbl -NoCaseChange -TblID "InstanceHealthTable" -HasURLs -DebugInfo:$DebugInfo
+				$htmlTable = Convert-TableToHtml $BlitzTbl -NoCaseChange -TblID "InstanceHealthTable" -HyperlinkCol "FindingHL" -ExclCols Finding, URL -DebugInfo:$DebugInfo
 				$html = $HTMLPre + @"
 <title>$tableName</title>
 $HTMLBodyStart
@@ -2629,7 +2640,7 @@ $HTMLBodyEnd
 				##Populating the "sp_Blitz" sheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Instance Health")
 					
-				Convert-TableToExcel $BlitzTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
+				Convert-TableToExcel $BlitzTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding" -ExclCols "FindingHL"
 
 				##Saving file 
 				Save-ExcelFile $ExcelFile
@@ -4316,8 +4327,7 @@ finally {
 		} 
 		$HTMLChk = "&#10004;"
 		$HtmlTabName = "PSBlitz Execution Log"
-		$htmlTable = Convert-TableToHtml $LogTbl -NoCaseChange -DebugInfo:$DebugInfo
-		$htmlTable = $htmlTable -replace '<table>', '<table style="white-space:pre-wrap; word-wrap:normal">'
+		$htmlTable = Convert-TableToHtml $LogTbl -NoCaseChange -CSSClass LogTbl -DebugInfo:$DebugInfo
 		$html = $HTMLPre + @"
 						<title>$HtmlTabName</title>
 						$HTMLBodyStart
