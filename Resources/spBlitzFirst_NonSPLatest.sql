@@ -4769,7 +4769,10 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
 						 ELSE [Finding] 
 					END AS [FindingHL],		
                     /*CAST(LEFT(@StockDetailsHeader + [Details] + @StockDetailsFooter,32000) AS TEXT) AS Details,*/
-					CAST(LEFT([Details],32000) AS TEXT) AS Details,
+					REPLACE(REPLACE(
+					REPLACE(CAST(LEFT([Details],32000) AS NVARCHAR(MAX)), N'<SchedulerMonitorEvent>',CHAR(13) + CHAR(10)+N'<SchedulerMonitorEvent>'),
+					N'</SystemIdle>',N'</SystemIdle>'+CHAR(13) + CHAR(10)),N'</PageFaults>',N'</PageFaults>'+CHAR(13) + CHAR(10))
+					AS Details,
 					[URL] 
                     /*CAST(LEFT([HowToStopIt],32000) AS TEXT) AS HowToStopIt,
                     CAST([QueryText] AS NVARCHAR(MAX)) AS QueryText,

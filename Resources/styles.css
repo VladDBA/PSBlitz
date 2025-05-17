@@ -51,12 +51,13 @@ th:last-child {
 
 td {
 	padding-top: 10px;
-    padding-bottom: 10px;
-    padding-left: 15px;
-    padding-right: 15px;
+	padding-bottom: 10px;
+	padding-left: 15px;
+	padding-right: 15px;
 	border: 1px solid;
-	border-color: rgba(200, 200, 200,0.3);
+	border-color: rgba(200, 200, 200, 0.2);
 }
+
 /*td {
 	padding: 8px 7px 7px 10px;
 	border: 1px solid black;
@@ -78,11 +79,28 @@ td:first-child {
 
 
 .QueryStoreTab {
+	td {
+		vertical-align: top;
+	}
+
 	td:nth-child(7) {
 		position: sticky;
 		left: 0;
 		background-color: rgba(255, 255, 255, 0.7);
 	}
+
+	td:nth-child(n+2):nth-child(-n+3) {
+		text-align: right;
+	}
+
+	td:nth-child(n+9):nth-child(-n+10) {
+		text-align: right;
+	}
+
+	td:nth-child(n+14):nth-child(-n+54) {
+		text-align: right;
+	}
+
 }
 
 .ActiveSessionsTab {
@@ -233,20 +251,25 @@ td:first-child {
 		text-align: center;
 	}
 }
+
 .IndexPageTbl {
 	td:nth-child(1) {
 		padding-left: 20px;
 		padding-right: 20px;
 	}
+
 	td:nth-child(2) {
 		padding-left: 20px;
 	}
+
 	td:nth-child(3) {
 		text-align: center;
 	}
+
 	td:nth-child(4) {
 		text-align: center;
 	}
+
 	td:nth-child(5) {
 		text-align: center;
 	}
@@ -256,42 +279,58 @@ td:first-child {
 	td:nth-child(1) {
 		padding-left: 20px;
 	}
+
 	td:nth-child(2) {
 		padding-left: 20px;
 		padding-right: 20px;
 	}
+
 	td:nth-child(3) {
 		padding-left: 20px;
 		padding-right: 20px;
 	}
+
 	td:nth-child(4) {
 		text-align: right;
 	}
+
 	td:nth-child(5) {
 		text-align: center;
 	}
+
 	td:nth-child(6) {
 		padding-left: 20px;
-		white-space: pre-wrap; 
+		white-space: pre-wrap;
 		word-wrap: normal;
 	}
 }
 
 .QueryTbl {
 	td {
-		white-space: pre-wrap; 
+		white-space: pre-wrap;
 		word-wrap: normal;
 		padding-top: 18px;
 		vertical-align: top;
 	}
+
 	td:nth-child(1) {
 		padding-top: 8px;
-		vertical-align: top;	
+		vertical-align: top;
 	}
 }
 
+.First30Tbl {
+	td:first-child {
+		font-weight: bold;
+		text-align: right;
+	}
+
+	white-space: pre-wrap;
+	word-wrap: normal;
+}
+
 .InstCacheTbl {
-	td:not(:first-child){
+	td:not(:first-child) {
 		text-align: right;
 	}
 }
@@ -342,18 +381,19 @@ input.SearchBox {
 	opacity: 0;
 	transition: opacity 0.5s;
 	z-index: 1000;
-	pointer-events: none; /* Ensure the message doesn't interfere with clicks */
-  }
-  
-  #message.show {
+	pointer-events: none;
+	/* Ensure the message doesn't interfere with clicks */
+}
+
+#message.show {
 	opacity: 1;
-  }
-  
-  .copyButton {
+}
+
+.copyButton {
 	cursor: pointer;
 	background: none;
 	border: none;
 	color: blue;
 	text-decoration: underline;
 	margin-left: 8px;
-  }
+}

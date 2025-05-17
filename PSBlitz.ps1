@@ -724,6 +724,10 @@ function Convert-TableToHtml {
 			elseif ($CSSClass -eq "Top10ClientConnTbl") {
 				$htmlTableOut = $htmlTableOut -replace "; </td>", "</td>"
 			}
+			elseif($CSSClass -like "QueryStoreTab*"){
+				$htmlTableOut = $htmlTableOut -replace " ms\)", "&nbsp;ms)"
+				$htmlTableOut = $htmlTableOut -replace " \(", "&nbsp;("
+			}
 		}
 		elseif ($TblID) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID'>"
@@ -1869,7 +1873,7 @@ if ($ToHTML -eq "Y") {
 	.CacheTable1{
 	  td {
 		  vertical-align: top;
-		  padding-top: 7px;
+		  padding-top: 8px;
 		}
 		td:nth-child(3) {
 			position: sticky; left: 0;
@@ -1879,11 +1883,20 @@ if ($ToHTML -eq "Y") {
 			font-weight: bold;
 			background-color: rgba(255, 255, 0, 0.4);
 		}
+		td:nth-child(2){
+		    text-align: right;
+	    }
+		td:nth-child(n+10):nth-child(-n+51){
+    		text-align: right;
+	    }
+		td:nth-child(n+53):nth-child(-n+56){
+    		text-align: right;
+	    }
 	}
 	.CacheTable2{
 	    td {
 		  vertical-align: top;
-		  padding-top: 7px;
+		  padding-top: 8px;
 		}	
 		td:nth-child(3) {
 			position: sticky; left: 0;
@@ -1893,6 +1906,15 @@ if ($ToHTML -eq "Y") {
 			font-weight: bold;
 			background-color: rgba(255, 255, 0, 0.4);
 		}
+		td:nth-child(2){
+		    text-align: right;
+	    }
+		td:nth-child(n+10):nth-child(-n+51){
+    		text-align: right;
+	    }
+		td:nth-child(n+53):nth-child(-n+56){
+    		text-align: right;
+	    }
 	}
 	</style>
 	<script src="sorttable.js"></script>
@@ -2747,7 +2769,7 @@ $HTMLBodyEnd
 		$BlitzFirstTbl = $global:PSBlitzSet.Tables[0]
 
 		if ($ToHTML -eq "Y") {			
-			$htmlTable = Convert-TableToHtml $BlitzFirstTbl -NoCaseChange -ExclCols "Finding","URL" -HyperlinkCol "FindingHL" -DebugInfo:$DebugInfo
+			$htmlTable = Convert-TableToHtml $BlitzFirstTbl -NoCaseChange -CSSClass "First30Tbl" -ExclCols "Finding","URL" -HyperlinkCol "FindingHL" -DebugInfo:$DebugInfo
 			$HtmlTabName = "What's happening on the instance now?"
 			$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
