@@ -6262,6 +6262,11 @@ BEGIN
     SELECT  [Priority],
             FindingsGroup,
             Finding,
+			CASE WHEN [URL] IS NOT NULL 
+					THEN 
+						'<a href='''+[URL]+''' target=''_blank''>'+[Finding]+'</a>'
+					ELSE [Finding] 
+					END AS [FindingHL],		
 			Details,
             URL/*,            
             CheckID*/

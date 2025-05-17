@@ -2468,7 +2468,6 @@ $HTMLBodyEnd
 				##Saving file 
 				Save-ExcelFile $ExcelFile
 
-
 				##Populating the "Database Scoped Configuration" section
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = 36
@@ -2481,7 +2480,6 @@ $HTMLBodyEnd
 			}
 			Invoke-ClearVariables DBInfoTbl, DBFileInfoTbl, RsrcGovTbl, RsrcUsageTbl, ObjImpUpgrTbl, DBConfigTbl, PSBlitzSet
 		}
-
 	}
  else {
 		#if it's not Azure SQL DB
@@ -2619,7 +2617,6 @@ $HTMLBodyEnd
 
 			if ($ToHTML -eq "Y") {
 				$tableName = "Instance Health"
-				#$htmlTable = Convert-TableToHtml $BlitzTbl -NoCaseChange -TblID "InstanceHealthTable" -HasURLs -DebugInfo:$DebugInfo
 				$htmlTable = Convert-TableToHtml $BlitzTbl -NoCaseChange -TblID "InstanceHealthTable" -HyperlinkCol "FindingHL" -ExclCols Finding, URL -DebugInfo:$DebugInfo
 				$html = $HTMLPre + @"
 <title>$tableName</title>
@@ -2736,7 +2733,7 @@ $HTMLBodyEnd
 		$BlitzFirstTbl = $global:PSBlitzSet.Tables[0]
 
 		if ($ToHTML -eq "Y") {			
-			$htmlTable = Convert-TableToHtml $BlitzFirstTbl -NoCaseChange -HasURLs -DebugInfo:$DebugInfo
+			$htmlTable = Convert-TableToHtml $BlitzFirstTbl -NoCaseChange -ExclCols "Finding","URL" -HyperlinkCol "FindingHL" -DebugInfo:$DebugInfo
 			$HtmlTabName = "What's happening on the instance now?"
 			$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
@@ -2754,7 +2751,7 @@ $HTMLBodyEnd
 		else {
 			##Populating the "sp_BlitzFirst 30s" sheet
 			$ExcelSheet = $ExcelFile.Worksheets.Item("Happening Now")
-			Convert-TableToExcel $BlitzFirstTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
+			Convert-TableToExcel $BlitzFirstTbl $ExcelSheet -StartRow $DefaultStartRow -ExclCols "FindingHL" -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
 			##Saving file 
 			Save-ExcelFile $ExcelFile
 		}
@@ -2783,7 +2780,7 @@ $HTMLBodyEnd
 				#Waits
 				$HtmlTabName = "Wait Stats Since Last Startup"
 
-				$htmlTable = Convert-TableToHtml $WaitsTbl -NoCaseChange -HasURLs -CSSClass "WaitStats" -DebugInfo:$DebugInfo
+				$htmlTable = Convert-TableToHtml $WaitsTbl -NoCaseChange -HyperlinkCol "wait_typeHL" -ExclCols "wait_type","URL" -CSSClass "WaitStats" -DebugInfo:$DebugInfo
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>
@@ -2837,7 +2834,7 @@ $HTMLBodyEnd
 			else { 
 				##Populating the "Wait Stats" sheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Wait Stats")					
-				Convert-TableToExcel $WaitsTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 4 -URLTextCol "wait_type"
+				Convert-TableToExcel $WaitsTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 4 -URLTextCol "wait_type" -ExclCols "wait_typeHL"
 
 				##Saving file 
 				Save-ExcelFile $ExcelFile
@@ -3025,7 +3022,7 @@ $HTMLBodyEnd
 					
 				$htmlTable1 = Convert-TableToHtml $BlitzCacheTbl -NoCaseChange -ExclCols "Query Text", "Query Plan" -CSSClass "CacheTabx" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs $FileSOrder
 				
-				$htmlTable2 = Convert-TableToHtml $BlitzCacheWarnTbl -NoCaseChange -HasURLs -DebugInfo:$DebugInfo
+				$htmlTable2 = Convert-TableToHtml $BlitzCacheWarnTbl -NoCaseChange -HyperlinkCol "FindingHL" -ExclCols "Finding","URL" -DebugInfo:$DebugInfo
 
 				$htmlTable3 = Convert-QueryTableToHtml $BlitzCacheTbl -DebugInfo:$DebugInfo -Cols "Query", "Query Text" -AnchorToHere -AnchorID $FileSOrder
 		
@@ -3202,7 +3199,7 @@ $HTMLBodyEnd
 				$ExcelURLCol = $ExcelWarnInitCol + 2
 				$ExcelColNum = $ExcelWarnInitCol
 
-				Convert-TableToExcel $BlitzCacheWarnTbl $ExcelSheet -StartRow $ExcelStartRow -StartCol $ExcelWarnInitCol -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum $ExcelURLCol -URLTextCol "Finding"
+				Convert-TableToExcel $BlitzCacheWarnTbl $ExcelSheet -StartRow $ExcelStartRow -StartCol $ExcelWarnInitCol -ExclCols "FindingHL" -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum $ExcelURLCol -URLTextCol "Finding"
 				##Saving file 
 				Save-ExcelFile $ExcelFile
 			}	
@@ -3385,8 +3382,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					Add-QueryName $BlitzQSTbl "query" "query_sql_text" "QueryStore"
 
 					$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan", "database_name","n" -CSSClass "QueryStoreTab sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
-
-					#$htmlTable2 = Convert-TableToHtml $BlitzQSSumTbl -HasURLs -DebugInfo:$DebugInfo
 
 					$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
 
