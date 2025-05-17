@@ -254,6 +254,7 @@ SELECT CONVERT(VARCHAR(25),@StartTime,120)                                      
        CONVERT(VARCHAR(25),GETDATE(),120)                                                   AS [Sample End],
        DATEDIFF(HOUR, @StartTime, GETDATE())                                                AS [Sample(Hours)],
        [wa1].[wait_type]                                                                    AS [Wait Type],
+	   '<a href=''https://www.sqlskills.com/help/waits/' + LOWER([wa1].[wait_type]) + '/'' target=''_blank''>'+[wa1].[wait_type]+'</a>' AS [Wait TypeHL],
        [wa1].[waiting_tasks_count]                                                          AS [Wait Count],
        CAST([wa1].[percent] AS NUMERIC(5, 2))                                               AS [Wait%],
        CAST([wa1].[wait_time_s] AS NUMERIC(16, 2))                                          AS [Total Wait Time(Sec)],

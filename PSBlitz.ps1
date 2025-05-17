@@ -1861,6 +1861,10 @@ if ($ToHTML -eq "Y") {
 	<link rel="stylesheet" href="styles.css">
 	<style>
 	.CacheTable1{
+	  td {
+		  vertical-align: top;
+		  padding-top: 7px;
+		}
 		td:nth-child(3) {
 			position: sticky; left: 0;
 			background-color: rgba(255, 255, 255, 0.7);
@@ -1871,6 +1875,10 @@ if ($ToHTML -eq "Y") {
 		}
 	}
 	.CacheTable2{
+	    td {
+		  vertical-align: top;
+		  padding-top: 7px;
+		}	
 		td:nth-child(3) {
 			position: sticky; left: 0;
 			background-color: rgba(255, 255, 255, 0.7);
@@ -2358,7 +2366,7 @@ $HTMLBodyEnd
 
 				$htmlTable2 = Convert-TableToHtml $RsrcUsageTbl -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
-				$htmlTable3 = Convert-TableToHtml $Top10WaitsTbl -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange -HasURLs
+				$htmlTable3 = Convert-TableToHtml $Top10WaitsTbl -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange -HyperlinkCol "Wait TypeHL" -ExclCols "Wait Type", "URL"
 
 				$htmlTable4 = Convert-TableToHtml $DBFileInfoTbl -TblID "DBFileInfoTable" -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
@@ -2443,7 +2451,7 @@ $HTMLBodyEnd
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = 22
 				
-				Convert-TableToExcel $Top10WaitsTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -HasURLs -URLCols "URL" -MapURLToColNum 4 -URLTextCol "Wait Type"
+				Convert-TableToExcel $Top10WaitsTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -HasURLs -URLCols "URL" -MapURLToColNum 4 -URLTextCol "Wait Type" -ExclCols "Wait TypeHL"
 
 				##Saving file 
 				Save-ExcelFile $ExcelFile
