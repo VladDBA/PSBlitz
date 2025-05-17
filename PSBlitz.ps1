@@ -781,6 +781,8 @@ function Convert-QueryTableToHtml {
 		[Parameter(Mandatory = $false)]
 		[switch] $AnchorToHere,
 		[Parameter(Mandatory = $false)]
+		[string] $CSSClass,
+		[Parameter(Mandatory = $false)]
 		[string] $AnchorID,
 		[Parameter(Mandatory = $false)]
 		[string] $AnchorExt = '.query'
@@ -831,7 +833,11 @@ function Convert-QueryTableToHtml {
 			$htmlTableOut = $htmlTableOut -replace $AnchorRegex, $AnchorURL
 		}
 		#Ensure CRLF displays correctly in HTML
+		if($CSSClass){
+			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class='$CSSClass'>"
+		} else{
 		$htmlTableOut = $htmlTableOut -replace '<table>', '<table style="white-space:pre-wrap; word-wrap:normal">'
+		}
 		#Lazy way to remove empty rows, will try to fix later 
 		$htmlTableOut = $htmlTableOut -replace "<tr><td></td><td></td></tr>", ""
 		if ($DebugInfo) {
@@ -2085,8 +2091,8 @@ try {
 			$htmlTable3 = Convert-TableToHtml $ConnectionsInfoTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
 			$htmlTable4 = Convert-TableToHtml $SessOptTbl -CSSClass 'SessOptTbl sortable' -ExclCols "Option","URL" -HyperlinkCol "OptionHL" -DebugInfo:$DebugInfo
 
-			$htmlTable5 = Convert-TableToHtml $PlanCacheTypeTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
-			$htmlTable6 = Convert-TableToHtml $PlanCacheByDBTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
+			$htmlTable5 = Convert-TableToHtml $PlanCacheTypeTbl -CSSClass InstCacheTbl -DebugInfo:$DebugInfo
+			$htmlTable6 = Convert-TableToHtml $PlanCacheByDBTbl -CSSClass InstCacheTbl -DebugInfo:$DebugInfo
 
 			$HtmlTabName = "Instance Overview"
 			$html = $HTMLPre + @"
@@ -2174,13 +2180,13 @@ $HTMLBodyEnd
 
 			$htmlTable1 = Convert-TableToHtml $TempDBTbl -CSSClass "TempdbInfoTbl" -DebugInfo:$DebugInfo
 
-			$htmlTable2 = Convert-TableToHtml $TempTabTbl -DebugInfo:$DebugInfo
+			$htmlTable2 = Convert-TableToHtml $TempTabTbl -CSSClass "InstCacheTbl" -DebugInfo:$DebugInfo
 
 			Add-QueryName $TempDBSessTbl "query" "query_text" "TempDB"
 
 			$htmlTable3 = Convert-TableToHtml $TempDBSessTbl -ExclCols "query_text" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs "TempDB"
 			
-			$htmlTable4 = Convert-QueryTableToHtml $TempDBSessTbl -DebugInfo:$DebugInfo -Cols "query", "query_text" -AnchorToHere -AnchorID "TempDB"
+			$htmlTable4 = Convert-QueryTableToHtml $TempDBSessTbl -DebugInfo:$DebugInfo -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "TempDB"
 
 			$HtmlTabName = "TempDB Info"
 
@@ -2299,9 +2305,9 @@ $htmlTable2
 				
 				$htmlTable1 = Convert-TableToHtml $AcTranTbl -ExclCols "current_sql", "current_plan", "most_recent_sql", "most_recent_plan" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs "Current", "MostRecent"
 
-				$htmlTable2 = Convert-QueryTableToHtml $AcTranTbl -Cols "current_query", "current_sql" -AnchorToHere -AnchorID "Current" -DebugInfo:$DebugInfo
+				$htmlTable2 = Convert-QueryTableToHtml $AcTranTbl -Cols "current_query", "current_sql" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "Current" -DebugInfo:$DebugInfo
 	
-				$htmlTable3 = Convert-QueryTableToHtml $AcTranTbl -Cols "most_recent_query", "most_recent_sql" -AnchorToHere -AnchorID "MostRecent" -DebugInfo:$DebugInfo
+				$htmlTable3 = Convert-QueryTableToHtml $AcTranTbl -Cols "most_recent_query", "most_recent_sql" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "MostRecent" -DebugInfo:$DebugInfo
 
 				$html = $HTMLPre + @"
 <title>$tableName</title>
@@ -3032,7 +3038,7 @@ $HTMLBodyEnd
 				
 				$htmlTable2 = Convert-TableToHtml $BlitzCacheWarnTbl -NoCaseChange -HyperlinkCol "FindingHL" -ExclCols "Finding","URL" -DebugInfo:$DebugInfo
 
-				$htmlTable3 = Convert-QueryTableToHtml $BlitzCacheTbl -DebugInfo:$DebugInfo -Cols "Query", "Query Text" -AnchorToHere -AnchorID $FileSOrder
+				$htmlTable3 = Convert-QueryTableToHtml $BlitzCacheTbl -DebugInfo:$DebugInfo -Cols "Query", "Query Text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID $FileSOrder
 		
 				#pairing up related tables in the same HTML file
 				if ("'CPU'", "'Reads'", "'Duration'", "'Executions'", "'Writes'",
@@ -3391,7 +3397,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 
 					$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan", "database_name","n" -CSSClass "QueryStoreTab sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
 
-					$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
+					$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
 
 					if ($IsAzureSQLDB) {
 						$HtmlTabName = "Query Store results for $ASDBName - $SortOrder"
@@ -3670,13 +3676,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			
 				$htmlTable2 = Convert-TableToHtml $TblLockDtl -TblID "DeadlockDtlTable" -CSSClass "DeadlockDetailsTable" -AnchorFromHere -AnchorIDs "DL" -ExclCols "query_text", "deadlock_graph" -DebugInfo:$DebugInfo
 
-				$htmlTable3 = Convert-QueryTableToHtml $TblLockDtl -Cols "query", "query_text" -AnchorToHere -AnchorID "DeadlockDtlTable" -DebugInfo:$DebugInfo
+				$htmlTable3 = Convert-QueryTableToHtml $TblLockDtl -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "DeadlockDtlTable" -DebugInfo:$DebugInfo
 
 				Add-QueryName $TblLockPlans "query" "query_text" "DeadlockPlan"
 
 				$htmlTable4 = Convert-TableToHtml $TblLockPlans -AnchorFromHere -ExclCols "query_text", "query_plan" -AnchorIDs "DeadlockPlan" -DebugInfo:$DebugInfo
 
-				$htmlTable5 = Convert-QueryTableToHtml $TblLockPlans -Cols "query", "query_text" -AnchorToHere -AnchorID "DeadlockPlan" -DebugInfo:$DebugInfo
+				$htmlTable5 = Convert-QueryTableToHtml $TblLockPlans -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "DeadlockPlan" -DebugInfo:$DebugInfo
 		
 				$html = $HTMLPre + @"
 		<title>$HtmlTabName</title>
@@ -4136,7 +4142,7 @@ finally {
 				}
 				Add-QueryName $BlitzWhoAggTbl "Query" "query_text" "RunningNow"
 				$htmlTable = Convert-TableToHtml $BlitzWhoAggTbl -CSSClass "ActiveSessionsTab sortable" -AnchorFromHere -AnchorIDs "RunningNow" -ExclCols "query_text", "query_plan" -DebugInfo:$DebugInfo
-				$htmlTable1 = Convert-QueryTableToHtml $BlitzWhoAggTbl -Cols "query", "query_text" -AnchorToHere -AnchorID "RunningNow" -DebugInfo:$DebugInfo
+				$htmlTable1 = Convert-QueryTableToHtml $BlitzWhoAggTbl -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "RunningNow" -DebugInfo:$DebugInfo
 
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>

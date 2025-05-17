@@ -50,10 +50,18 @@ th:last-child {
 }
 
 td {
+	padding-top: 10px;
+    padding-bottom: 10px;
+    padding-left: 15px;
+    padding-right: 15px;
+	border: 1px solid;
+	border-color: rgba(200, 200, 200,0.3);
+}
+/*td {
 	padding: 8px 7px 7px 10px;
 	border: 1px solid black;
 	vertical-align: top;
-}
+}*/
 
 tr:hover {
 	background-color: rgba(255, 255, 0, 0.4);
@@ -67,6 +75,7 @@ td:first-child {
 	font-weight: bold;
 	text-align: left;
 }
+
 
 .QueryStoreTab {
 	td:nth-child(7) {
@@ -265,6 +274,25 @@ td:first-child {
 		padding-left: 20px;
 		white-space: pre-wrap; 
 		word-wrap: normal;
+	}
+}
+
+.QueryTbl {
+	td {
+		white-space: pre-wrap; 
+		word-wrap: normal;
+		padding-top: 18px;
+		vertical-align: top;
+	}
+	td:nth-child(1) {
+		padding-top: 8px;
+		vertical-align: top;	
+	}
+}
+
+.InstCacheTbl {
+	td:not(:first-child){
+		text-align: right;
 	}
 }
 
