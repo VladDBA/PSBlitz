@@ -247,6 +247,11 @@ WITH OPTCTE
                 'Rolls back a transaction if a Transact-SQL statement raises a run-time error.') ) AS Options([id], [Option], [Description]))
 SELECT [Option],
        CASE
+         WHEN [Description] LIKE '%obsolete%' THEN [Option]
+		 ELSE '<a href=''https://learn.microsoft.com/en-us/sql/t-sql/statements/set-'+
+		 LOWER(REPLACE([Option], '_', '-')) + '-transact-sql'' target=''_blank''>'+[Option]+'</a>'
+		 END AS [OptionHL],
+       CASE
          WHEN ( @@OPTIONS & id ) = id THEN 'ON'
          ELSE 'OFF'
        END AS [Session_Setting],

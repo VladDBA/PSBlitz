@@ -2075,7 +2075,7 @@ try {
 			}
 
 			$htmlTable3 = Convert-TableToHtml $ConnectionsInfoTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
-			$htmlTable4 = Convert-TableToHtml $SessOptTbl -CSSClass 'SessOptTbl sortable' -HasURLs -DebugInfo:$DebugInfo
+			$htmlTable4 = Convert-TableToHtml $SessOptTbl -CSSClass 'SessOptTbl sortable' -ExclCols "Option","URL" -HyperlinkCol "OptionHL" -DebugInfo:$DebugInfo
 
 			$htmlTable5 = Convert-TableToHtml $PlanCacheTypeTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
 			$htmlTable6 = Convert-TableToHtml $PlanCacheByDBTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
@@ -2129,7 +2129,7 @@ $HTMLBodyEnd
 			#Session level options
 			$ExcelStartRow = 14
 			$ExcelColNum = 12
-			Convert-TableToExcel $SessOptTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -StartCol $ExcelColNum -URLCols "URL" -MapURLToColNum 12 -URLTextCol "Option"
+			Convert-TableToExcel $SessOptTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -ExclCols "OptionHL" -StartCol $ExcelColNum -URLCols "URL" -MapURLToColNum 12 -URLTextCol "Option"
 
 			##Saving file 
 			Save-ExcelFile $ExcelFile
