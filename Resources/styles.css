@@ -289,6 +289,19 @@ td:first-child {
 
 }
 
+.TempdbSessionTbl {
+	td:first-child {
+		font-weight: normal;
+		text-align: right;
+	}
+	td:nth-child(2) {
+		text-align: right;
+	}
+	td:nth-child(5):nth-child(-n+12) {
+		text-align: right;
+	}
+}
+
 .IxSummaryTbl {
 	td {
 		text-align: right;
