@@ -894,7 +894,7 @@ function Export-PlansAndDeadlocks {
 		$i = 0
 		foreach ($row in $DataTable) {
 			$i += 1
-			$FileName = "-- N/A --"
+			$FileName = "N/A"
 			if (($DataTable.Rows[$RowNum][$XMLColName] -ne [System.DBNull]::Value) -and 
 			    (($DataTable.Rows[$RowNum][$FNameColName] -like "Deadlock*") -or
 			      ($XMLColName -ne "deadlock_graph")) ) {
@@ -2535,15 +2535,10 @@ $HTMLBodyEnd
 			if ($ToHTML -eq "Y") {
 				$tableName = "Database Info"
 
-				$htmlTable = Convert-TableToHtml $DBInfoTbl -DebugInfo:$DebugInfo
+				$htmlTable = Convert-TableToHtml $DBInfoTbl -TblID "DBInfoTable" -CSSClass "DatabaseInfoTable sortable" -DebugInfo:$DebugInfo
 				
-				$htmlTable1 = Convert-TableToHtml $DBFileInfoTbl -TblID "DBFileInfoTable" -CSSClass "sortable" -DebugInfo:$DebugInfo
-				if (!([string]::IsNullOrEmpty($CheckDB))) {
-					$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable">'
-				}
-				else {
-					$htmlTable = $htmlTable -replace '<table>', '<table id="DBInfoTable" class="DatabaseInfoTable sortable">'
-				}
+				$htmlTable1 = Convert-TableToHtml $DBFileInfoTbl -TblID "DBFileInfoTable" -CSSClass "DatabaseFileInfoTable sortable" -DebugInfo:$DebugInfo
+
 
 				if ((($MajorVers -ge 13) -or ($IsAzureSQLMI)) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 
@@ -2563,7 +2558,7 @@ $HTMLBodyEnd
 $HTMLBodyStart
 <h1 id="top">$tableName</h1>
 $(if($DBInfoTbl.Rows.Count -gt 10){$SearchTableDiv -replace $STDivReplace,"'DBInfoTable', 0" -replace 'object', 'database'})
-$(if ([string]::IsNullOrEmpty($CheckDB)){$SortableTable})
+$SortableTable
 $htmlTable
 $JumpToTop
 <br>
@@ -3380,7 +3375,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Write-Host " Retrieving Query Store info for $CheckDB..." 
 				[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 			}
-			$SortOrders = @("cpu", "duration")
+			$SortOrders = @("CPU", "Duration")
 			foreach ($SortOrder in $SortORders) { 
 				Write-Host " ->Top 20 queries by $SortOrder..." -NoNewline
 				#There are only 2 sort orders here and CPU is the default one, so I can be lazy for the time being
@@ -3406,15 +3401,15 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					
 						Add-QueryName $BlitzQSTbl "query" "query_sql_text" "QueryStore"
 
-						$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan", "database_name", "n" -CSSClass "QueryStoreTab sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
+						$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan", "database_name", "n" -CSSClass "QueryStoreTab$SortOrder sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
 
 						$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
 
 						if ($IsAzureSQLDB) {
-							$HtmlTabName = "Query Store results for $ASDBName - $SortOrder"
+							$HtmlTabName = "Query Store results for $ASDBName - Average $SortOrder"
 						}
 						else {
-							$HtmlTabName = "Query Store results for $CheckDB - $SortOrder"
+							$HtmlTabName = "Query Store results for $CheckDB - Average $SortOrder"
 						}
 						$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
@@ -3569,7 +3564,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexUsgTable', 2" -replace 'object', 'database'
 						$htmlTabSearch += "<br>"
 					}							
-					$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols $ExclCols -NoCaseChange -HyperlinkCol "FindingHL" -TblID "IndexUsgTable" -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols $ExclCols -NoCaseChange -CSSClass "IxDiagTbl" -HyperlinkCol "FindingHL" -TblID "IndexUsgTable" -DebugInfo:$DebugInfo
 				}
 				elseif ($Mode -eq "1") {
 					$htmlTable = Convert-TableToHtml $BlitzIxTbl -NoCaseChange -TblID "IndexSummaryTable" -CSSClass "IxSummaryTbl" -ExclCols $ExclCols -DebugInfo:$DebugInfo
@@ -3690,11 +3685,22 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 
 				$htmlTable3 = Convert-QueryTableToHtml $TblLockDtl -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "DeadlockDtlTable" -DebugInfo:$DebugInfo
 
+				if ($TblLockPlans.Rows.Count -gt 0){
 				Add-QueryName $TblLockPlans "query" "query_text" "DeadlockPlan"
 
-				$htmlTable4 = Convert-TableToHtml $TblLockPlans -AnchorFromHere -ExclCols "query_text", "query_plan" -AnchorIDs "DeadlockPlan" -DebugInfo:$DebugInfo
+				$htmlTable1 = "`n<p><a href=`"#Deadlocks2`">Jump to execution plans</a></p>`n" + $htmlTable1
+
+				$htmlTable4 = Convert-TableToHtml $TblLockPlans -AnchorFromHere -ExclCols "query_text", "query_plan" -CSSClass "DeadlockPlansTable" -AnchorIDs "DeadlockPlan" -DebugInfo:$DebugInfo
+				$htmlTable4 += "`n $JumpToTop"
 
 				$htmlTable5 = Convert-QueryTableToHtml $TblLockPlans -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "DeadlockPlan" -DebugInfo:$DebugInfo
+				$htmlTable5 = "<br>`n<h2>Query Text For Execution Plans Involved in Deadlocks</h2>`n $htmlTable5 `n $JumpToTop"
+				} else {
+
+					$htmlTable4 = "<p>No deadlock-related execution plans were found in the plan cache.</p>"
+					$htmlTable5 = ""
+
+				}
 		
 				$html = $HTMLPre + @"
 		<title>$HtmlTabName</title>
@@ -3702,13 +3708,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		<h1 id="top">$HtmlTabName</h1>
 		<h2>Deadlock Overview</h2>
 		<p><a href="#Deadlocks1">Jump to deadlock details</a></p>
-"@
-				if ($TblLockPlans.Rows.Count -gt 0) {
-					$html += @"
-		<p><a href="#Deadlocks2">Jump to execution plans</a></p>
-"@
-				}
-				$html += @"
+
 		$htmlTable1
 		$JumpToTop
 		<br>
@@ -3718,22 +3718,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			'<br>'})
 		$htmlTable2
 		$JumpToTop
-		
-"@
-				if ($TblLockPlans.Rows.Count -gt 0) {
-					$html += @"
-	    <br>
-		<h2 id="Deadlocks2">Execution Plans Involved in Deadlocks</h2>
 		$htmlTable4
-		$JumpToTop
-		<br>
-		<h2>Query Text For Execution Plans Involved in Deadlocks</h2>
 		$htmlTable5
-		$JumpToTop
-"@
-				}
-
-				$html += @"
 		<br>
 		<h2>Query Text For Deadlock Details</h2>
 		$htmlTable3
@@ -4545,7 +4531,7 @@ finally {
 				if ($DBSwitched -eq "Y") {
 					$Description += " for $DBName"
 				}
-				$Description += ",<br>sorted by $SortOrder."
+				$Description += ",<br>sorted by average $SortOrder."
 				$QuerySource += "Similar to sp_QuickieStore @top = 20, @sort_order='$SortOrder'"
 				if ($IsAzureSQLDB) {
 					$QuerySource += ";"

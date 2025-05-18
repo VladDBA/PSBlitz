@@ -73,6 +73,8 @@ DECLARE
 ;SET @database_name = NULL;
 ;SET @sort_order = 'cpu';
 ;SET @top = 20;
+/*make sure @sort_order is in lowercase*/
+SET @sort_order = LOWER(@sort_order);
 
 /*Temp table cleanup*/
 IF OBJECT_ID('tempdb.dbo.#distinct_plans', 'U') IS NOT NULL

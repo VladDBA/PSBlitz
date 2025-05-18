@@ -78,7 +78,7 @@ td:first-child {
 }
 
 
-.QueryStoreTab {
+.QueryStoreTabCPU {
 	td {
 		vertical-align: top;
 	}
@@ -88,6 +88,39 @@ td:first-child {
 		left: 0;
 		background-color: rgba(255, 255, 255, 0.7);
 	}
+	td:nth-child(23) {
+			font-weight: bold;
+			background-color: rgba(255, 255, 0, 0.4);
+		}
+
+	td:nth-child(n+2):nth-child(-n+3) {
+		text-align: right;
+	}
+
+	td:nth-child(n+9):nth-child(-n+10) {
+		text-align: right;
+	}
+
+	td:nth-child(n+14):nth-child(-n+54) {
+		text-align: right;
+	}
+
+}
+
+.QueryStoreTabDuration {
+	td {
+		vertical-align: top;
+	}
+
+	td:nth-child(7) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+	td:nth-child(20) {
+			font-weight: bold;
+			background-color: rgba(255, 255, 0, 0.4);
+		}
 
 	td:nth-child(n+2):nth-child(-n+3) {
 		text-align: right;
@@ -112,11 +145,71 @@ td:first-child {
 		left: 0;
 		background-color: rgba(255, 255, 255, 0.7);
 	}
+	td:nth-child(1) {
+		text-align: right;
+	}
+	td:nth-child(n+4):nth-child(-n+5) {
+		text-align: right;
+	}
+	td:nth-child(n+11):nth-child(-n+12) {
+		text-align: right;
+	}
+	td:nth-child(n+19):nth-child(-n+33) {
+		text-align: right;
+	}
+	td:nth-child(n+19):nth-child(-n+33) {
+		text-align: right;
+	}
+	td:nth-child(35) {
+		text-align: right;
+	}
+	td:nth-child(n+37):nth-child(-n+38) {
+		text-align: right;
+	}
+	td:nth-child(n+40):nth-child(-n+42) {
+		text-align: right;
+	}
+	td:nth-child(n+44):nth-child(-n+45) {
+		text-align: right;
+	}
+	td:nth-child(49) {
+		text-align: right;
+	}
+	td:nth-child(n+51):nth-child(-n+57) {
+		text-align: right;
+	}
 }
 
 .RawActiveSessionsTab {
 	td {
 		vertical-align: top;
+	}
+	td:nth-child(n+1):nth-child(-n+2) {
+		text-align: right;
+	}
+	td:nth-child(n+5):nth-child(-n+7) {
+		text-align: right;
+	}
+	td:nth-child(n+11):nth-child(-n+25) {
+		text-align: right;
+	}
+	td:nth-child(n+27):nth-child(-n+28) {
+		text-align: right;
+	}
+	td:nth-child(n+30):nth-child(-n+32) {
+		text-align: right;
+	}
+	td:nth-child(n+30):nth-child(-n+32) {
+		text-align: right;
+	}
+	td:nth-child(n+34):nth-child(-n+35) {
+		text-align: right;
+	}
+	td:nth-child(39) {
+		text-align: right;
+	}
+	td:nth-child(n+41):nth-child(-n+47) {
+		text-align: right;
 	}
 }
 
@@ -191,6 +284,15 @@ td:first-child {
 	}
 }
 
+.IxDiagTbl {
+	td {
+		vertical-align: top;
+	}
+	td:nth-child(1) {
+		text-align: right;
+	}
+}
+
 .StatsInfoTbl {
 	td {
 		vertical-align: top;
@@ -218,6 +320,30 @@ td:first-child {
 		position: sticky;
 		left: 0;
 		background-color: rgba(255, 255, 255, 0.7);
+	}
+	td:nth-child(2) {
+		text-align: right;
+	}
+	td:nth-child(n+5):nth-child(-n+14) {
+		text-align: right;
+	}
+	td:nth-child(n+15):nth-child(-n+27) {
+		text-align: center;
+	}
+}
+
+.DatabaseFileInfoTable {
+	td:nth-child(3) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+
+	td:nth-child(n+6):nth-child(-n+15) {
+		text-align: right;
+	}
+	td:nth-child(17) {
+		text-align: center;
 	}
 }
 
@@ -250,6 +376,17 @@ td:first-child {
 		text-align: right;
 	}
 	td:nth-child(n+19):nth-child(-n+23) {
+		text-align: right;
+	}
+
+}
+
+.DeadlockPlansTable {
+	td {
+		vertical-align: top;
+	}
+
+	td:nth-child(n+4):nth-child(-n+25) {
 		text-align: right;
 	}
 
@@ -497,13 +634,15 @@ td:first-child {
 }
 
 .First30Tbl {
+	td {
+		vertical-align: top;
+		white-space: pre-wrap;
+	    word-wrap: normal;
+	}
 	td:first-child {
 		font-weight: bold;
 		text-align: right;
-	}
-
-	white-space: pre-wrap;
-	word-wrap: normal;
+	}	
 }
 
 .InstCacheTbl {
