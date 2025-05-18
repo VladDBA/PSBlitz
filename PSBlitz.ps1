@@ -2325,7 +2325,7 @@ $htmlTable2
 					$tableName += " for $ASDBName"
 				}
 				
-				$htmlTable1 = Convert-TableToHtml $AcTranTbl -ExclCols "current_sql", "current_plan", "most_recent_sql", "most_recent_plan" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs "Current", "MostRecent"
+				$htmlTable1 = Convert-TableToHtml $AcTranTbl -ExclCols "current_sql", "current_plan", "most_recent_sql", "most_recent_plan" -DebugInfo:$DebugInfo -CSSClass "OpenTransTbl" -AnchorFromHere -AnchorIDs "Current", "MostRecent"
 
 				$htmlTable2 = Convert-QueryTableToHtml $AcTranTbl -Cols "current_query", "current_sql" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "Current" -DebugInfo:$DebugInfo
 	
@@ -3582,7 +3582,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols $ExclCols -NoCaseChange -HyperlinkCol "FindingHL" -TblID "IndexUsgTable" -DebugInfo:$DebugInfo
 				}
 				elseif ($Mode -eq "1") {
-					$htmlTable = Convert-TableToHtml $BlitzIxTbl -NoCaseChange -TblID "IndexSummaryTable" -ExclCols $ExclCols -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $BlitzIxTbl -NoCaseChange -TblID "IndexSummaryTable" -CSSClass "IxSummaryTbl" -ExclCols $ExclCols -DebugInfo:$DebugInfo
 				}
 				elseif ($Mode -eq "2") {
 					$htmlTable = Convert-TableToHtml $BlitzIxTbl -TblID "IndexUsgTable" -CSSClass $Mode2CSS -ExclCols $ExclCols -NoCaseChange -DebugInfo:$DebugInfo
@@ -3836,7 +3836,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			else {
 				if ($ToHTML -eq "Y") {
 
-					$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -ExclCols "database" -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -CSSClass "StatsInfoTbl" -ExclCols "database" -DebugInfo:$DebugInfo
 					#add tooltips
 					$htmlTable = $htmlTable -replace '<th>Update ', '<th class="tooltip" title="The commented options are suggestions based on record counts.">Update '
 					#add buttons
@@ -4140,7 +4140,7 @@ finally {
 					$HtmlTabName += " for $ASDBName"
 				}
 
-				$htmlTable = Convert-TableToHtml $BlitzWhoTbl -CSSClass "sortable" -DebugInfo:$DebugInfo
+				$htmlTable = Convert-TableToHtml $BlitzWhoTbl -CSSClass "RawActiveSessionsTab sortable" -DebugInfo:$DebugInfo
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>
 				$HTMLBodyStart
