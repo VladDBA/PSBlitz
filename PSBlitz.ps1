@@ -711,6 +711,10 @@ function Convert-TableToHtml {
         
 		if (($CSSClass) -and ($TblID)) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID' class='$CSSClass'>"
+			if($CSSClass -eq "InstHealthTbl"){
+				#$DotPattern = '\.\s'
+				$htmlTableOut = $htmlTableOut -replace '\.\s',". `n"
+			}
 		}
 		elseif ($CSSClass) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class='$CSSClass'>"
@@ -2637,7 +2641,7 @@ $HTMLBodyEnd
 
 			if ($ToHTML -eq "Y") {
 				$tableName = "Instance Health"
-				$htmlTable = Convert-TableToHtml $BlitzTbl -NoCaseChange -TblID "InstanceHealthTable" -HyperlinkCol "FindingHL" -ExclCols Finding, URL -DebugInfo:$DebugInfo
+				$htmlTable = Convert-TableToHtml $BlitzTbl -NoCaseChange -TblID "InstanceHealthTable" -CSSClass "InstHealthTbl" -HyperlinkCol "FindingHL" -ExclCols Finding, URL -DebugInfo:$DebugInfo
 				$html = $HTMLPre + @"
 <title>$tableName</title>
 $HTMLBodyStart
