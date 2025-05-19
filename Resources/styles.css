@@ -1,3 +1,6 @@
+/* 
+ # General 
+*/
 body {
 	background-color: #FFFFFF;
 	font-family: Tahoma;
@@ -58,6 +61,11 @@ td {
 	border-color: rgba(200, 200, 200, 0.2);
 }
 
+td:first-child {
+	font-weight: bold;
+	text-align: left;
+}
+
 /*td {
 	padding: 8px 7px 7px 10px;
 	border: 1px solid black;
@@ -68,16 +76,31 @@ tr:hover {
 	background-color: rgba(255, 255, 0, 0.35);
 }
 
-/*tr:last-of-type {
-	border-bottom: 2px solid dodgerblue;
-}*/
-
-td:first-child {
-	font-weight: bold;
-	text-align: left;
+h1 {
+	text-align: center;
 }
 
+h2 {
+	text-align: center;
+}
 
+h3 {
+	text-align: center;
+}
+
+p {
+	text-align: center;
+}
+
+footer {
+	text-align: center;
+	margin-left: auto;
+	margin-right: auto;
+}
+
+/*
+ ## Query store info tables
+*/
 .QueryStoreTabCPU {
 	td {
 		vertical-align: top;
@@ -135,6 +158,10 @@ td:first-child {
 	}
 
 }
+
+/*
+ ## Session activity (agg and raw)
+*/
 
 .ActiveSessionsTab {
 	td {
@@ -213,6 +240,10 @@ td:first-child {
 	}
 }
 
+/*
+ ## Index usage instance-wide and db-specific
+*/
+
 .IndexUsageTable {
 	td {
 		vertical-align: top;
@@ -284,6 +315,10 @@ td:first-child {
 	}
 }
 
+/*
+ ## Index diagnostics
+*/
+
 .IxDiagTbl {
 	td {
 		vertical-align: top;
@@ -293,6 +328,22 @@ td:first-child {
 	}
 }
 
+/*
+ ## Index summary
+*/
+.IxSummaryTbl {
+	td {
+		text-align: right;
+	}
+	td:first-child {
+		font-weight: bold;
+		text-align: right;
+	}
+}
+
+/*
+ ## Statistics
+*/
 .StatsInfoTbl {
 	td {
 		vertical-align: top;
@@ -314,6 +365,10 @@ td:first-child {
 	}
 
 }
+
+/*
+ ## Database info
+*/
 
 .DatabaseInfoTable {
 	td:nth-child(1) {
@@ -356,6 +411,86 @@ td:first-child {
 	}
 }
 
+.DBScopedConfTbl {
+	td:nth-child(n+3):nth-child(-n+4) {
+		text-align: center;
+	}
+}
+
+/*
+ ## Azure SQL DB info
+*/
+
+.ASDBRsrcGovTbl {
+	td {
+		text-align: center;
+	}
+}
+
+.ASDBInfoTbl {
+	td:nth-child(3) {
+		text-align: right;
+	}
+	td:nth-child(4) {
+		text-align: center;
+	}
+	td:nth-child(n+5):nth-child(-n+12) {
+		text-align: right;
+	}
+	td:nth-child(n+13):nth-child(-n+24) {
+		text-align: center;
+	}
+}
+
+.ASDBRsrcUsageTbl {
+	td:first-child {
+		font-weight: normal;
+	}
+	td:nth-child(n+3):nth-child(-n+12) {
+		text-align: right;
+	}
+}
+
+.ASDBTop10WaitsTbl {
+	td:first-child {
+		font-weight: normal;
+	}
+	td:nth-child(3) {
+		text-align: right;
+	}
+	td:nth-child(n+6):nth-child(-n+13) {
+		text-align: right;
+	}
+}
+
+.ASDBFileInfoTbl {
+	td:nth-child(2) {
+		text-align: right;
+	}
+	td:nth-child(n+7):nth-child(-n+18) {
+		text-align: right;
+	}
+}
+
+.ASDBObjVersChgTbl {
+	td:first-child {
+		font-weight: normal;
+	}
+}
+
+.ASDBScopedConfTbl {
+	td {
+		text-align: center;
+	}
+	td:first-child {
+		font-weight: bold;
+		text-align: left;
+	}
+}
+
+/*
+ ## Deadlock info
+*/
 .DeadlockDetailsTable {
 	td:nth-child(5) {
 		position: sticky;
@@ -401,6 +536,9 @@ td:first-child {
 
 }
 
+/*
+ ## Instance health
+*/
 .InstHealthTbl {
 	td:nth-child(5) {
 		white-space: pre-wrap;
@@ -411,6 +549,10 @@ td:first-child {
 		text-align: right;
 	}	
 }
+
+/*
+ ## Open transactions
+*/
 
 .OpenTransTbl {
 	td:nth-child(3) {
@@ -446,6 +588,10 @@ td:first-child {
 
 }
 
+/*
+ ## Tempdb info
+*/
+
 .TempdbSessionTbl {
 	td:first-child {
 		font-weight: normal;
@@ -459,14 +605,27 @@ td:first-child {
 	}
 }
 
-.IxSummaryTbl {
+.TempdbInfoTbl {
 	td {
-		text-align: right;
+		font-weight: normal;
+		text-align: center;
+	}
+}
+
+/*
+ ## Waits, perfmon, and storage stats
+*/
+
+.First30Tbl {
+	td {
+		vertical-align: top;
+		white-space: pre-wrap;
+	    word-wrap: normal;
 	}
 	td:first-child {
 		font-weight: bold;
 		text-align: right;
-	}
+	}	
 }
 
 .Perfmon {
@@ -532,13 +691,9 @@ td:first-child {
 
 }
 
-.InstanceInfoTbl {
-	td {
-		font-weight: normal;
-		text-align: center;
-	}
-}
-
+/*
+ ## Instance info page
+*/
 .InstanceInfoTbl {
 	td {
 		font-weight: normal;
@@ -549,6 +704,13 @@ td:first-child {
 		white-space: nowrap;
 	}
 }
+
+.InstCacheTbl {
+	td:not(:first-child) {
+		text-align: right;
+	}
+}
+
 
 .RsrcInfoTbl {
 	td {
@@ -573,13 +735,11 @@ td:first-child {
 	}
 }
 
-.TempdbInfoTbl {
-	td {
-		font-weight: normal;
-		text-align: center;
-	}
-}
 
+
+/* 
+ ## Index/Intro page
+*/
 .IntroTbl {
 	td {
 		text-align: center;
@@ -608,6 +768,10 @@ td:first-child {
 		text-align: center;
 	}
 }
+
+/*
+ ## Execution log
+*/
 
 .LogTbl {
 	td:nth-child(1) {
@@ -639,6 +803,10 @@ td:first-child {
 	}
 }
 
+/*
+ ## query text tables - used on every page where you also have query text
+*/
+
 .QueryTbl {
 	td {
 		white-space: pre-wrap;
@@ -653,46 +821,12 @@ td:first-child {
 	}
 }
 
-.First30Tbl {
-	td {
-		vertical-align: top;
-		white-space: pre-wrap;
-	    word-wrap: normal;
-	}
-	td:first-child {
-		font-weight: bold;
-		text-align: right;
-	}	
-}
 
-.InstCacheTbl {
-	td:not(:first-child) {
-		text-align: right;
-	}
-}
 
-h1 {
-	text-align: center;
-}
 
-h2 {
-	text-align: center;
-}
-
-h3 {
-	text-align: center;
-}
-
-p {
-	text-align: center;
-}
-
-footer {
-	text-align: center;
-	margin-left: auto;
-	margin-right: auto;
-}
-
+/*
+ ## Table filtering/search related
+*/
 div {
 	text-align: center;
 }
@@ -707,7 +841,9 @@ input.SearchBox {
 	width: 220px;
 	border-radius: 10px;
 }
-
+/*
+ ## Copy button related
+*/
 #message {
 	position: absolute;
 	background-color: #333;
@@ -726,10 +862,32 @@ input.SearchBox {
 }
 
 .copyButton {
+	background-color: #F28500; /* Orange - color-blind friendly */
+    border: none;
+    color: black;
+    padding: 5px 10px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
 	cursor: pointer;
-	background: none;
-	border: none;
-	color: blue;
-	text-decoration: underline;
-	margin-left: 8px;
+	margin-top: 4px; /* Add some space above the button */
+    cursor: pointer;
+    border-radius: 4px;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.copyButton:hover {
+    background-color: #fc9517; /* Darker orange for hover state */
+    border: 1px solid rgba(0, 0, 0, 0.2); /* Slightly darker border on hover */
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); /* Enhance shadow on hover */
+}
+
+.header-content {
+    display: flex;
+    flex-direction: column; 
+	align-items: center;
+}
+.button-tooltip {
+    position: relative;
+    display: inline-block;
 }

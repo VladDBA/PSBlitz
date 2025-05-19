@@ -3681,7 +3681,7 @@ BEGIN
                 dr.login_name,
                 dr.host_name,
                 dr.client_app,
-                dr.wait_time,
+                dr.wait_time as wait_time_ms,
                 dr.wait_resource,
                 dr.priority,
                 dr.log_used,

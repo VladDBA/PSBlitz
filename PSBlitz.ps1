@@ -1763,7 +1763,7 @@ elseif ($IsAzureSQLDB -eq $false) {
 		if ($IsIndepth -eq "Y") {
 			Write-Host "   - Index Summary"
 			Write-Host "   - Index Usage Details"
-			Write-Host "   - Detailed Index Diagnosis"
+			Write-Host "   - Extended Index Diagnosis"
 		}
 		else {
 			Write-Host "   - Index Diagnosis"
@@ -2285,7 +2285,7 @@ $htmlTable4
 	}
 
 	#####################################################################################
-	#						Open transaction info - Pass 1								#
+	#						Open transaction info - Pass 1 -there's no pass 2 ATM		#
 	#####################################################################################
 	Write-Host " Retrieving open transaction info" -NoNewline
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetOpenTransactions.sql"
@@ -2381,24 +2381,24 @@ $HTMLBodyEnd
 			if ($ToHTML -eq "Y") {
 				$tableName = "Azure SQL Database Info"
 
-				$htmlTable = Convert-TableToHtml $RsrcGovTbl -DebugInfo:$DebugInfo -NoCaseChange
+				$htmlTable = Convert-TableToHtml $RsrcGovTbl -CSSClass "ASDBRsrcGovTbl" -DebugInfo:$DebugInfo -NoCaseChange
 
-				$htmlTable1 = Convert-TableToHtml $DBInfoTbl -TblID "DBInfoTable" -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
+				$htmlTable1 = Convert-TableToHtml $DBInfoTbl -TblID "DBInfoTable" -CSSClass "ASDBInfoTbl sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
-				$htmlTable2 = Convert-TableToHtml $RsrcUsageTbl -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
+				$htmlTable2 = Convert-TableToHtml $RsrcUsageTbl -CSSClass "ASDBRsrcUsageTbl sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
-				$htmlTable3 = Convert-TableToHtml $Top10WaitsTbl -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange -HyperlinkCol "Wait TypeHL" -ExclCols "Wait Type", "URL"
+				$htmlTable3 = Convert-TableToHtml $Top10WaitsTbl -CSSClass "ASDBTop10WaitsTbl sortable" -DebugInfo:$DebugInfo -NoCaseChange -HyperlinkCol "Wait TypeHL" -ExclCols "Wait Type", "URL"
 
-				$htmlTable4 = Convert-TableToHtml $DBFileInfoTbl -TblID "DBFileInfoTable" -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
+				$htmlTable4 = Convert-TableToHtml $DBFileInfoTbl -TblID "DBFileInfoTable" -CSSClass "ASDBFileInfoTbl sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
 				if ($ObjImpUpgrTbl.Rows.Count -gt 0) {
-					$htmlTable5 = Convert-TableToHtml $ObjImpUpgrTbl -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
+					$htmlTable5 = Convert-TableToHtml $ObjImpUpgrTbl -CSSClass "ASDBObjVersChgTbl sortable" -DebugInfo:$DebugInfo -NoCaseChange
 				}
 				else {
 					$htmlTable5 = '<p>No matching objects found.</p>'
 				}			
 
-				$htmlTable6 = Convert-TableToHtml $DBConfigTbl -CSSClass "sortable" -DebugInfo:$DebugInfo -NoCaseChange
+				$htmlTable6 = Convert-TableToHtml $DBConfigTbl -CSSClass "ASDBScopedConfTbl sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
 				$html = $HTMLPre + @"
 <title>$tableName</title>
@@ -2546,7 +2546,7 @@ $HTMLBodyEnd
 
 				if ((($MajorVers -ge 13) -or ($IsAzureSQLMI)) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 
-					$htmlTable2 = Convert-TableToHtml $DBConfigTbl -NoCaseChange -CSSClass "sortable" -DebugInfo:$DebugInfo
+					$htmlTable2 = Convert-TableToHtml $DBConfigTbl -NoCaseChange -CSSClass "DBScopedConfTbl sortable" -DebugInfo:$DebugInfo
 					$htmlBlock = "`n<br>`n <h2>Database Scoped Configuration for $CheckDB</h2>"
 					$htmlBlock += '<p><a href="https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-scoped-configuration-transact-sql?view=sql-server-ver16" target="_blank">More Info</a></p>'
 					$htmlBlock += "`n $SortableTable `n $htmlTable2 `n"
@@ -3519,7 +3519,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			Write-Host " ->Index usage details... " -NoNewLine
 		}
 		elseif ($Mode -eq "4") {
-			Write-Host " ->Detailed index diagnosis... " -NoNewLine
+			Write-Host " ->Extended index diagnosis... " -NoNewLine
 		}
 		$NewMode = ";SET @Mode = " + $Mode + ";"
 		[string]$Query = $Query -replace $OldMode, $NewMode
@@ -3549,7 +3549,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 
 				}
 				elseif ($Mode -eq "4") {
-					$HtmlTabName = "Detailed Index Diagnosis"
+					$HtmlTabName = "Extended Index Diagnosis"
 				}
 				if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
 					$HtmlTabName += " for $ASDBName$CheckDB"
@@ -3820,10 +3820,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					#add tooltips
 					$htmlTable = $htmlTable -replace '<th>Update ', '<th class="tooltip" title="The commented options are suggestions based on record counts.">Update '
 					#add buttons
-					$htmlTable = $htmlTable -replace '<th>Get Details', '<th>Get Details<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="20">Copy all commands</button>'
-					$htmlTable = $htmlTable -replace 'counts.">Update Table Stats', 'counts.">Update Table Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="21">Copy all commands</button>'
-					$htmlTable = $htmlTable -replace 'counts.">Update Individual Stats', 'counts.">Update Individual Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="22">Copy all commands</button>'
-					$htmlTable = $htmlTable -replace 'counts.">Update Partition Stats', 'counts.">Update Partition Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="23">Copy all commands</button>'
+					$htmlTable = $htmlTable -replace '<th>Get Details', '<th><div class="header-content">Get Details<div class="button-tooltip" title="Click to copy the commands from this column"><button class="copyButton" data-table-id="StatsOrIxFragTable" data-column-index="20">Copy commands</button></div></div>'
+					$htmlTable = $htmlTable -replace 'counts.">Update Table Stats', 'counts.">Update Table Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="21">Copy commands</button>'
+					$htmlTable = $htmlTable -replace 'counts.">Update Individual Stats', 'counts.">Update Individual Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="22">Copy commands</button>'
+					$htmlTable = $htmlTable -replace 'counts.">Update Partition Stats', 'counts.">Update Partition Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="23">Copy commands</button>'
 					if ($IsAzureSQLDB) {
 						$HtmlTabName = "Statistics info for $ASDBName"
 						$HtmlFileName = "StatsInfo_$ASDBName.html"
@@ -4363,10 +4363,10 @@ finally {
 			$DbPortion = "- $ASDBName"
 		}
 		elseif (!([string]::IsNullOrEmpty($CheckDB))) {
-			$DbPortion = "- database-specific check: $CheckDB"
+			$DbPortion = "Database-specific check: $CheckDB"
 		}
 		else {
-			$DbPortion = "- instance-wide check"
+			$DbPortion = "Instance-wide check"
 		}
 		$IndexContent = @"
 				<!DOCTYPE html>
@@ -4376,7 +4376,8 @@ finally {
 				<title>PSBlitz Output For $InstName</title>
 				</head>
 				<body>
-    <h1>PSBlitz Output For $($InstName.Replace(".database.windows.net", "")) $AzureEnv $DbPortion</h1>
+    <h1>PSBlitz Output For $($InstName.Replace(".database.windows.net", "")) $AzureEnv </h1>
+	<h2>$DbPortion</h2>
     <table class="IntroTbl">
 				<tr>
 				<th>Generated With</th>
@@ -4399,9 +4400,9 @@ finally {
 				<tr>
 				<th>Report Page</th>
 				<th>Description<br>(hover over descriptions for query sources)</th>
-				<th class=`"tooltip`" title=`"Exports execution plan files`">sqlplan</th>
-				<th class=`"tooltip`" title=`"Exports deadlock graph files`">xdl</th>
-				<th class=`"tooltip`" title=`"Max rows per page to ensure the it&apos;s still usabe in a browser.`">Max Rows</th>
+				<th class=`"tooltip`" title=`"Exports execution plan files`">sqlplan<br>files</th>
+				<th class=`"tooltip`" title=`"Exports deadlock graph files`">xdl<br>files</th>
+				<th class=`"tooltip`" title=`"Max rows per page to ensure the it'&apos;'s still usabe in a browser.`">Max Rows</th>
 				</tr>
 "@
 
@@ -4608,7 +4609,7 @@ finally {
 			}
 			elseif ($File.Name -like "BlitzLock*") {
 				$PageName = "Deadlock Information"
-				$Plans = "<td>$HTMLChk</td>"
+				$Plans = "<td class=`"tooltip`" title=`"Only if deadlock-related plans are still in the plan cache`">$HTMLChk*</td>"
 				$DLGraphs = "<td>$HTMLChk</td>"
 				$QuerySource += "Similar to sp_BlitzLock @StartDate = DATEADD(DAY, -15, GETDATE()), @EndDate = GETDATE(); "
 				$Description = "Information about the deadlocks recorded in the default extended events session."

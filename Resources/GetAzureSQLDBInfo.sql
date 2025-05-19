@@ -31,7 +31,7 @@ SELECT [database_name]                                                     AS [D
        [db_file_growth_in_mb]                                              AS [Default DataFile Growth Increment(MB)],
        [initial_db_file_size_in_mb]                                        AS [Default Size New DataFile(MB)],
        [log_size_in_mb]                                                    AS [Default Size New LogFile(MB)],
-       CAST([instance_max_log_rate] / 1024. / 1024. AS NUMERIC(23, 3)) AS [Instnace Max Log Rate MB/s],
+       CAST([instance_max_log_rate] / 1024. / 1024. AS NUMERIC(23, 3))     AS [Instnace Max Log Rate MB/s],
        [instance_max_worker_threads]                                       AS [Instance Max Worker Threads],
        CASE
          WHEN [replica_type] = 0 THEN 'Primary'
@@ -40,8 +40,8 @@ SELECT [database_name]                                                     AS [D
        [max_transaction_size]                                              AS [Max TLog Space/Transaction(KB)],
        CONVERT(VARCHAR(25),[last_updated_date_utc],120)                    AS [Settings Last Changed],
        [primary_group_max_workers]                                         AS [User Workload Max Worker Threads],
-       CAST([primary_min_log_rate] / 1024. / 1024. AS NUMERIC(23, 3))  AS [User Workload Min Log Rate MB/s],
-       CAST([primary_max_log_rate] / 1024. / 1024. AS NUMERIC(23, 3))  AS [User Workload Max Log Rate MB/s],
+       CAST([primary_min_log_rate] / 1024. / 1024. AS NUMERIC(23, 3))      AS [User Workload Min Log Rate MB/s],
+       CAST([primary_max_log_rate] / 1024. / 1024. AS NUMERIC(23, 3))      AS [User Workload Max Log Rate MB/s],
        [primary_group_min_io]                                              AS [User Workload Min IOPS],
        [primary_group_max_io]                                              AS [User Workload Max IOPS],
        [primary_group_min_cpu]                                             AS [User Workload Min CPU%],
@@ -50,7 +50,7 @@ SELECT [database_name]                                                     AS [D
        [pool_max_io]                                                       AS [User Workload Pool Max IOPS ],
        [user_data_directory_space_quota_mb]                                AS [Max Local Storage(MB)],
        [user_data_directory_space_usage_mb]                                AS [Used Local Storage(MB)],
-       CAST([pool_max_log_rate] / 1024. / 1024. AS NUMERIC(23, 3))     AS [Pool Max Log Rate MB/s],
+       CAST([pool_max_log_rate] / 1024. / 1024. AS NUMERIC(23, 3))         AS [Pool Max Log Rate MB/s],
        [primary_group_max_outbound_connection_workers],
        [primary_pool_max_outbound_connection_workers],
        CASE
@@ -153,8 +153,8 @@ GROUP  BY [d].[name],
           [l].[Virtual Log Files]
 OPTION (RECOMPILE); 
 
-/*Database resource usage  -- most likely different file and report pages*/
-/*AVG and MAX in the past 64 minutes*/
+/*Database resource usage  
+AVG and MAX in the past 64 minutes*/
 DECLARE @MaxEndTime DATETIME;
 
 SELECT @MaxEndTime = MAX([end_time])
@@ -162,70 +162,70 @@ FROM   sys.[dm_db_resource_stats];
 
 SELECT CONVERT(VARCHAR(25),DATEADD(SECOND, -15, MIN([end_time])),120)   AS [Sample Start],
        CONVERT(VARCHAR(25),MAX([end_time]),120)                         AS [Sample End],
-	   DATEDIFF(MINUTE, MIN([end_time]), MAX([end_time]))     AS [Sample(Minutes)],
-       CAST(AVG([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Avg CPU Usage %],
-       CAST(MAX([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Max CPU Usage %],
-       CAST(AVG([avg_data_io_percent]) AS NUMERIC(5, 2))      AS [Avg Data IO %],
-       CAST(MAX([avg_data_io_percent]) AS NUMERIC(5, 2))      AS [Max Data IO %],
-       CAST(AVG([avg_log_write_percent]) AS NUMERIC(5, 2))    AS [Avg Log Write Usage %],
-       CAST(MAX([avg_log_write_percent]) AS NUMERIC(5, 2))    AS [Max Log Write Usage %],
-       CAST(AVG([avg_memory_usage_percent]) AS NUMERIC(5, 2)) AS [Avg Memory Usage %],
-       CAST(MAX([avg_memory_usage_percent]) AS NUMERIC(5, 2)) AS [Max Memory Usage %]
+	   DATEDIFF(MINUTE, MIN([end_time]), MAX([end_time]))               AS [Sample(Minutes)],
+       CAST(AVG([avg_cpu_percent]) AS NUMERIC(5, 2))                    AS [Avg CPU Usage %],
+       CAST(MAX([avg_cpu_percent]) AS NUMERIC(5, 2))                    AS [Max CPU Usage %],
+       CAST(AVG([avg_data_io_percent]) AS NUMERIC(5, 2))                AS [Avg Data IO %],
+       CAST(MAX([avg_data_io_percent]) AS NUMERIC(5, 2))                AS [Max Data IO %],
+       CAST(AVG([avg_log_write_percent]) AS NUMERIC(5, 2))              AS [Avg Log Write Usage %],
+       CAST(MAX([avg_log_write_percent]) AS NUMERIC(5, 2))              AS [Max Log Write Usage %],
+       CAST(AVG([avg_memory_usage_percent]) AS NUMERIC(5, 2))           AS [Avg Memory Usage %],
+       CAST(MAX([avg_memory_usage_percent]) AS NUMERIC(5, 2))           AS [Max Memory Usage %]
 FROM   sys.[dm_db_resource_stats]
 UNION
 SELECT CONVERT(VARCHAR(25),DATEADD(SECOND, -15, MIN([end_time])),120)   AS [Sample Start],
        CONVERT(VARCHAR(25),MAX([end_time]),120)                         AS [Sample End],
-       DATEDIFF(MINUTE, MIN([end_time]), MAX([end_time]))     AS [Sample(Minutes)],
-	   CAST(AVG([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Avg CPU Usage %],
-       CAST(MAX([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Max CPU Usage %],
-       CAST(AVG([avg_data_io_percent]) AS NUMERIC(5, 2))      AS [Avg Data IO %],
-       CAST(MAX([avg_data_io_percent]) AS NUMERIC(5, 2))      AS [Max Data IO %],
-       CAST(AVG([avg_log_write_percent]) AS NUMERIC(5, 2))    AS [Avg Log Write Usage %],
-       CAST(MAX([avg_log_write_percent]) AS NUMERIC(5, 2))    AS [Max Log Write Usage %],
-       CAST(AVG([avg_memory_usage_percent]) AS NUMERIC(5, 2)) AS [Avg Memory Usage %],
-       CAST(MAX([avg_memory_usage_percent]) AS NUMERIC(5, 2)) AS [Max Memory Usage %]
+       DATEDIFF(MINUTE, MIN([end_time]), MAX([end_time]))               AS [Sample(Minutes)],
+	   CAST(AVG([avg_cpu_percent]) AS NUMERIC(5, 2))                    AS [Avg CPU Usage %],
+       CAST(MAX([avg_cpu_percent]) AS NUMERIC(5, 2))                    AS [Max CPU Usage %],
+       CAST(AVG([avg_data_io_percent]) AS NUMERIC(5, 2))                AS [Avg Data IO %],
+       CAST(MAX([avg_data_io_percent]) AS NUMERIC(5, 2))                AS [Max Data IO %],
+       CAST(AVG([avg_log_write_percent]) AS NUMERIC(5, 2))              AS [Avg Log Write Usage %],
+       CAST(MAX([avg_log_write_percent]) AS NUMERIC(5, 2))              AS [Max Log Write Usage %],
+       CAST(AVG([avg_memory_usage_percent]) AS NUMERIC(5, 2))           AS [Avg Memory Usage %],
+       CAST(MAX([avg_memory_usage_percent]) AS NUMERIC(5, 2))           AS [Max Memory Usage %]
 FROM   sys.[dm_db_resource_stats]
 WHERE  [end_time] >= DATEADD(MINUTE, -30, @MaxEndTime)
 UNION
 SELECT CONVERT(VARCHAR(25),DATEADD(SECOND, -15, MIN([end_time])),120)   AS [Sample Start],
        CONVERT(VARCHAR(25),MAX([end_time]),120)                         AS [Sample End],
-	   DATEDIFF(MINUTE, MIN([end_time]), MAX([end_time]))     AS [Sample(Minutes)],
-       CAST(AVG([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Avg CPU Usage %],
-       CAST(MAX([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Max CPU Usage %],
-       CAST(AVG([avg_data_io_percent]) AS NUMERIC(5, 2))      AS [Avg Data IO %],
-       CAST(MAX([avg_data_io_percent]) AS NUMERIC(5, 2))      AS [Max Data IO %],
-       CAST(AVG([avg_log_write_percent]) AS NUMERIC(5, 2))    AS [Avg Log Write Usage %],
-       CAST(MAX([avg_log_write_percent]) AS NUMERIC(5, 2))    AS [Max Log Write Usage %],
-       CAST(AVG([avg_memory_usage_percent]) AS NUMERIC(5, 2)) AS [Avg Memory Usage %],
-       CAST(MAX([avg_memory_usage_percent]) AS NUMERIC(5, 2)) AS [Max Memory Usage %]
+	   DATEDIFF(MINUTE, MIN([end_time]), MAX([end_time]))               AS [Sample(Minutes)],
+       CAST(AVG([avg_cpu_percent]) AS NUMERIC(5, 2))                    AS [Avg CPU Usage %],
+       CAST(MAX([avg_cpu_percent]) AS NUMERIC(5, 2))                    AS [Max CPU Usage %],
+       CAST(AVG([avg_data_io_percent]) AS NUMERIC(5, 2))                AS [Avg Data IO %],
+       CAST(MAX([avg_data_io_percent]) AS NUMERIC(5, 2))                AS [Max Data IO %],
+       CAST(AVG([avg_log_write_percent]) AS NUMERIC(5, 2))              AS [Avg Log Write Usage %],
+       CAST(MAX([avg_log_write_percent]) AS NUMERIC(5, 2))              AS [Max Log Write Usage %],
+       CAST(AVG([avg_memory_usage_percent]) AS NUMERIC(5, 2))           AS [Avg Memory Usage %],
+       CAST(MAX([avg_memory_usage_percent]) AS NUMERIC(5, 2))           AS [Max Memory Usage %]
 FROM   sys.[dm_db_resource_stats]
 WHERE  [end_time] >= DATEADD(MINUTE, -15, @MaxEndTime)
 UNION
 SELECT CONVERT(VARCHAR(25),DATEADD(SECOND, -15, MIN([end_time])),120)   AS [Sample Start],
        CONVERT(VARCHAR(25),MAX([end_time]),120)                         AS [Sample End],
-	   DATEDIFF(MINUTE, MIN([end_time]), MAX([end_time]))     AS [Sample(Minutes)],
-       CAST(AVG([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Avg CPU Usage %],
-       CAST(MAX([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Max CPU Usage %],
-       CAST(AVG([avg_data_io_percent]) AS NUMERIC(5, 2))      AS [Avg Data IO %],
-       CAST(MAX([avg_data_io_percent]) AS NUMERIC(5, 2))      AS [Max Data IO %],
-       CAST(AVG([avg_log_write_percent]) AS NUMERIC(5, 2))    AS [Avg Log Write Usage %],
-       CAST(MAX([avg_log_write_percent]) AS NUMERIC(5, 2))    AS [Max Log Write Usage %],
-       CAST(AVG([avg_memory_usage_percent]) AS NUMERIC(5, 2)) AS [Avg Memory Usage %],
-       CAST(MAX([avg_memory_usage_percent]) AS NUMERIC(5, 2)) AS [Max Memory Usage %]
+	   DATEDIFF(MINUTE, MIN([end_time]), MAX([end_time]))               AS [Sample(Minutes)],
+       CAST(AVG([avg_cpu_percent]) AS NUMERIC(5, 2))                    AS [Avg CPU Usage %],
+       CAST(MAX([avg_cpu_percent]) AS NUMERIC(5, 2))                    AS [Max CPU Usage %],
+       CAST(AVG([avg_data_io_percent]) AS NUMERIC(5, 2))                AS [Avg Data IO %],
+       CAST(MAX([avg_data_io_percent]) AS NUMERIC(5, 2))                AS [Max Data IO %],
+       CAST(AVG([avg_log_write_percent]) AS NUMERIC(5, 2))              AS [Avg Log Write Usage %],
+       CAST(MAX([avg_log_write_percent]) AS NUMERIC(5, 2))              AS [Max Log Write Usage %],
+       CAST(AVG([avg_memory_usage_percent]) AS NUMERIC(5, 2))           AS [Avg Memory Usage %],
+       CAST(MAX([avg_memory_usage_percent]) AS NUMERIC(5, 2))           AS [Max Memory Usage %]
 FROM   sys.[dm_db_resource_stats]
 WHERE  [end_time] >= DATEADD(MINUTE, -5, @MaxEndTime)
 UNION
 SELECT CONVERT(VARCHAR(25),DATEADD(SECOND, -15, MIN([end_time])),120)   AS [Sample Start],
        CONVERT(VARCHAR(25),MAX([end_time]),120)                         AS [Sample End],
-	   DATEDIFF(MINUTE, MIN([end_time]), MAX([end_time]))     AS [Sample(Minutes)],
-       CAST(AVG([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Avg CPU Usage %],
-       CAST(MAX([avg_cpu_percent]) AS NUMERIC(5, 2))          AS [Max CPU Usage %],
-       CAST(AVG([avg_data_io_percent]) AS NUMERIC(5, 2))      AS [Avg Data IO %],
-       CAST(MAX([avg_data_io_percent]) AS NUMERIC(5, 2))      AS [Max Data IO %],
-       CAST(AVG([avg_log_write_percent]) AS NUMERIC(5, 2))    AS [Avg Log Write Usage %],
-       CAST(MAX([avg_log_write_percent]) AS NUMERIC(5, 2))    AS [Max Log Write Usage %],
-       CAST(AVG([avg_memory_usage_percent]) AS NUMERIC(5, 2)) AS [Avg Memory Usage %],
-       CAST(MAX([avg_memory_usage_percent]) AS NUMERIC(5, 2)) AS [Max Memory Usage %]
+	   DATEDIFF(MINUTE, MIN([end_time]), MAX([end_time]))               AS [Sample(Minutes)],
+       CAST(AVG([avg_cpu_percent]) AS NUMERIC(5, 2))                    AS [Avg CPU Usage %],
+       CAST(MAX([avg_cpu_percent]) AS NUMERIC(5, 2))                    AS [Max CPU Usage %],
+       CAST(AVG([avg_data_io_percent]) AS NUMERIC(5, 2))                AS [Avg Data IO %],
+       CAST(MAX([avg_data_io_percent]) AS NUMERIC(5, 2))                AS [Max Data IO %],
+       CAST(AVG([avg_log_write_percent]) AS NUMERIC(5, 2))              AS [Avg Log Write Usage %],
+       CAST(MAX([avg_log_write_percent]) AS NUMERIC(5, 2))              AS [Max Log Write Usage %],
+       CAST(AVG([avg_memory_usage_percent]) AS NUMERIC(5, 2))           AS [Avg Memory Usage %],
+       CAST(MAX([avg_memory_usage_percent]) AS NUMERIC(5, 2))           AS [Max Memory Usage %]
 FROM   sys.[dm_db_resource_stats]
 WHERE  [end_time] >= DATEADD(MINUTE, -1, @MaxEndTime)
 ORDER  BY 1 DESC
@@ -254,7 +254,8 @@ SELECT CONVERT(VARCHAR(25),@StartTime,120)                                      
        CONVERT(VARCHAR(25),GETDATE(),120)                                                   AS [Sample End],
        DATEDIFF(HOUR, @StartTime, GETDATE())                                                AS [Sample(Hours)],
        [wa1].[wait_type]                                                                    AS [Wait Type],
-	   '<a href=''https://www.sqlskills.com/help/waits/' + LOWER([wa1].[wait_type]) + '/'' target=''_blank''>'+[wa1].[wait_type]+'</a>' AS [Wait TypeHL],
+	   '<a href=''https://www.sqlskills.com/help/waits/' 
+	   + LOWER([wa1].[wait_type]) + '/'' target=''_blank''>'+[wa1].[wait_type]+'</a>'       AS [Wait TypeHL],
        [wa1].[waiting_tasks_count]                                                          AS [Wait Count],
        CAST([wa1].[percent] AS NUMERIC(5, 2))                                               AS [Wait%],
        CAST([wa1].[wait_time_s] AS NUMERIC(16, 2))                                          AS [Total Wait Time(Sec)],
@@ -280,55 +281,56 @@ OPTION (RECOMPILE);
 
 
 /*database files details*/
-SELECT DB_NAME()                                                                                                                                  AS [database],
-       [f].[file_id]                                                                                                                              AS [file_id],
-       [f].[name]                                                                                                                                 AS [file_logical_name],
-       [f].[physical_name]                                                                                                                        AS [file_physical_name],
-       CASE f.[type]
+SELECT DB_NAME()                                                                                                                              AS [database],
+       [f].[file_id]                                                                                                                          AS [file_id],
+       [f].[name]                                                                                                                             AS [file_logical_name],
+       [f].[physical_name]                                                                                                                    AS [file_physical_name],
+       CASE [f].[type]
          WHEN 0 THEN 'Data'
          WHEN 1 THEN 'Transaction Log'
          WHEN 2 THEN 'Filestream'
          WHEN 4 THEN 'Full-Text'
-         ELSE f.[type_desc]
-	   END                                                                                                                                        AS [file_type],
-       [state_desc]                                                                                                                               AS [state],
-       CAST(( CAST([f].[size] AS BIGINT) * 8 / 1024. / 1024. ) AS NUMERIC(23, 3))                                                                 AS [size_GB],
-       CAST(( ( CAST([f].[size] AS BIGINT) - CAST(FILEPROPERTY([f].[name], 'SpaceUsed') AS BIGINT) ) * 8 / 1024. / 1024. ) AS NUMERIC(23, 3))     AS [available_space_GB],
-	   CASE 
-	     WHEN ios.[num_of_bytes_read] > 0
-	     THEN CAST(ios.[num_of_bytes_read]/ 1024./ 1024./1024. AS NUMERIC(23,3))
-	     ELSE 0 
-	   END                                                         AS [total_read_GB],
-	   ios.[num_of_reads]                                          AS [total_reads],
-	   ios.[io_stall_read_ms]                                      AS [total_read_stall_time(ms)],
-	    CASE WHEN ios.num_of_reads = 0 THEN 0.000 ELSE
-	   CAST(ios.io_stall_read_ms /CAST(ios.num_of_reads  AS NUMERIC(38,3)) AS NUMERIC(23,3))
-	   END                                                         AS [avg_read_stall(ms)],	   
-	   CASE 
-	     WHEN ios.[num_of_bytes_written] > 0
-	     THEN CAST(ios.[num_of_bytes_written]/ 1024./ 1024./1024. AS NUMERIC(23,3))
-	     ELSE 0 
-	   END                                                        AS [total_written_GB],
-	   ios.[num_of_writes]                                        AS [total_writes],
-	   ios.[io_stall_write_ms]                                    AS [total_write_stall_time(ms)],
-	   CASE WHEN ios.num_of_writes = 0 THEN 0.000 ELSE
-	   CAST(ios.io_stall_write_ms /CAST(ios.num_of_writes  AS NUMERIC(38,3)) AS NUMERIC(23,3))
-	   END                                                        AS [avg_write_stall(ms)],
+         ELSE [f].[type_desc]
+       END                                                                                                                                    AS [file_type],
+       [state_desc]                                                                                                                           AS [state],
+       CAST(( CAST([f].[size] AS BIGINT) * 8 / 1024. / 1024. ) AS NUMERIC(23, 3))                                                             AS [size_GB],
+       CAST(( ( CAST([f].[size] AS BIGINT) - CAST(FILEPROPERTY([f].[name], 'SpaceUsed') AS BIGINT) ) * 8 / 1024. / 1024. ) AS NUMERIC(23, 3)) AS [available_space_GB],
+       CASE
+         WHEN [ios].[num_of_bytes_read] > 0 THEN CAST([ios].[num_of_bytes_read] / 1024. / 1024. / 1024. AS NUMERIC(23, 3))
+         ELSE 0
+       END                                                                                                                                      AS [total_read_GB],
+       [ios].[num_of_reads]                                                                                                                     AS [total_reads],
+       [ios].[io_stall_read_ms]                                                                                                                 AS [total_read_stall_time(ms)],
+       CASE
+         WHEN [ios].[num_of_reads] = 0 THEN 0.000
+         ELSE CAST([ios].[io_stall_read_ms] / CAST([ios].[num_of_reads] AS NUMERIC(38, 3)) AS NUMERIC(23, 3))
+       END                                                                                                                                    AS [avg_read_stall(ms)],
+       CASE
+         WHEN [ios].[num_of_bytes_written] > 0 THEN CAST([ios].[num_of_bytes_written] / 1024. / 1024. / 1024. AS NUMERIC(23, 3))
+         ELSE 0
+       END                                                                                                                                    AS [total_written_GB],
+       [ios].[num_of_writes]                                                                                                                    AS [total_writes],
+       [ios].[io_stall_write_ms]                                                                                                                AS [total_write_stall_time(ms)],
+       CASE
+         WHEN [ios].[num_of_writes] = 0 THEN 0.000
+         ELSE CAST([ios].[io_stall_write_ms] / CAST([ios].[num_of_writes] AS NUMERIC(38, 3)) AS NUMERIC(23, 3))
+       END                                                                                                                                    AS [avg_write_stall(ms)],
        CASE
          WHEN [max_size] = 0
                OR [growth] = 0 THEN 'File autogrowth is disabled'
          WHEN [max_size] = -1
               AND [growth] > 0 THEN 'Unlimited'
          WHEN [max_size] > 0 THEN CAST(CAST (CAST([max_size] AS BIGINT) * 8 / 1024. / 1024. AS NUMERIC(23, 3)) AS VARCHAR(24))
-       END                                                                                                                                        AS [max_file_size_GB],
+       END                                                                                                                                    AS [max_file_size_GB],
        CASE
          WHEN [is_percent_growth] = 1 THEN CAST([growth] AS VARCHAR(2)) + ' %'
          WHEN [is_percent_growth] = 0 THEN CAST(CAST(CAST([growth] AS BIGINT)*8/1024./1024. AS NUMERIC(23, 3)) AS VARCHAR(24))
                                            + ' GB'
-       END                                                                                                                                        AS [growth_increment]
+       END                                                                                                                                    AS [growth_increment]
 FROM   sys.[database_files] AS [f]
-CROSS APPLY sys.[dm_io_virtual_file_stats](DB_ID(),[f].[file_id]) AS [ios]
-OPTION(MAXDOP 1,RECOMPILE);
+       CROSS APPLY sys.[dm_io_virtual_file_stats](DB_ID(), [f].[file_id]) AS [ios]
+OPTION(MAXDOP 1, RECOMPILE); 
+
 
 /* Objects that might be impacted by a version change
 
@@ -358,4 +360,4 @@ SELECT [name] AS [Config Name],
          WHEN [is_value_default] = 1 THEN 'Yes'
          ELSE 'No'
        END AS [IsDefault]
-FROM   sys.[database_scoped_configurations]; 
+FROM   sys.[database_scoped_configurations];
