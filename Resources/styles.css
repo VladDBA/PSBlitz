@@ -821,9 +821,6 @@ footer {
 	}
 }
 
-
-
-
 /*
  ## Table filtering/search related
 */
@@ -862,7 +859,7 @@ input.SearchBox {
 }
 
 .copyButton {
-	background-color: #F28500; /* Orange - color-blind friendly */
+	background-color: #F28500;
     border: none;
     color: black;
     padding: 5px 10px;
@@ -870,16 +867,16 @@ input.SearchBox {
     text-decoration: none;
     display: inline-block;
 	cursor: pointer;
-	margin-top: 4px; /* Add some space above the button */
+	margin-top: 4px;
     cursor: pointer;
     border-radius: 4px;
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
 .copyButton:hover {
-    background-color: #fc9517; /* Darker orange for hover state */
-    border: 1px solid rgba(0, 0, 0, 0.2); /* Slightly darker border on hover */
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3); /* Enhance shadow on hover */
+    background-color: #fc9517;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
 
 .header-content {
