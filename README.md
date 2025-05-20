@@ -350,4 +350,7 @@ For feature requests, open an issue with the enhancement label
 ![Screenshot2](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img002.png)
 ![Screenshot4](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img004.png)
 
+### Default check intro page
+![Screenshot5](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img005.png)
+
 [*Back to top*](#header1)
