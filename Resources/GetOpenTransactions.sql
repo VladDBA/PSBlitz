@@ -121,7 +121,7 @@ SELECT CONVERT(VARCHAR(25),[qcte].[time_of_check],120) AS [time_of_check],
          WHEN [sqlplan_curr].[query_plan] IS NOT NULL THEN 'OpenTranCurrent'+@CheckPass+'_'
                                                            + CAST([qcte].[session_id] AS VARCHAR(10))
                                                            + '.sqlplan'
-         ELSE '-- N/A --'
+         ELSE ' N/A'
        END                         AS [current_plan_file],
 	   CASE
          WHEN [qcte].[most_recent_sql] IS NOT NULL THEN 'MostRecent_'
@@ -134,7 +134,7 @@ SELECT CONVERT(VARCHAR(25),[qcte].[time_of_check],120) AS [time_of_check],
          WHEN [sqlplan_rec].[query_plan] IS NOT NULL THEN 'OpenTranRecent'+@CheckPass+'_'
                                                           + CAST([qcte].[session_id] AS VARCHAR(10))
                                                           + '.sqlplan'
-         ELSE '-- N/A --'
+         ELSE ' N/A'
        END                         AS [most_recent_plan_file],
        [qcte].[wait_type],
        [qcte].[wait_time_seconds],

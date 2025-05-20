@@ -10438,11 +10438,20 @@ IF @ProductVersionMajor >= 10 AND  NOT EXISTS ( SELECT  1
 							/* --TOURSTOP05-- */
 							/*Vlad - made some column changes for PSBlitz (order and returned columns)*/
 							SELECT  [Priority] ,
-									[FindingsGroup] ,
-									[Finding] ,
+									[FindingsGroup] AS [Findings Group] ,
+									/*-replace "&lt;a href=&#39;","<a href='"
+									  -replace "&#39; target=&#39;_blank&#39;&gt;", "' target='_blank'>"
+									  -replace "&lt;/a&gt;","</a>"									
+									*/
+									CASE WHEN [URL] IS NOT NULL 
+									THEN 
+									'<a href='''+[URL]+''' target=''_blank''>'+[Finding]+'</a>'
+									ELSE [Finding] END AS [FindingHL],									
+									[Finding], /*skip this in PS for HTML*/
 									[DatabaseName] ,
 									[Details] ,
-									[URL] /*,									
+									[URL] /*skip this in PS for HTML*/
+									/*,									
 									[QueryPlan] ,
 									[QueryPlanFiltered] ,
 									CheckID*/

@@ -5546,7 +5546,10 @@ BEGIN
 				/*Vlad - column changes and record count limit for PSBlitz*/
 					SELECT TOP(10000) Priority, ISNULL(br.findings_group,N'') + 
 							CASE WHEN ISNULL(br.finding,N'') <> N'' THEN N': ' ELSE N'' END
-							+ br.finding AS [Finding], 
+							+ br.finding AS [Finding],
+							'<a href='''+[URL]+''' target=''_blank''>'+ISNULL(br.findings_group,N'') + 
+							CASE WHEN ISNULL(br.finding,N'') <> N'' THEN N': ' ELSE N'' END
+							+ br.finding+'</a>' AS  [FindingHL],
 						br.[database_name] AS [Database Name],
 						br.details AS [Details], 
 						br.index_definition AS [Definition], 

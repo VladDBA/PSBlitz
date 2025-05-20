@@ -1,3 +1,6 @@
+/* 
+ # General 
+*/
 body {
 	background-color: #FFFFFF;
 	font-family: Tahoma;
@@ -16,6 +19,10 @@ table.sortable thead {
 }
 
 th.tooltip {
+	cursor: help;
+}
+
+td.tooltip {
 	cursor: help;
 }
 
@@ -46,17 +53,12 @@ th:last-child {
 }
 
 td {
-	padding: 8px 7px 7px 10px;
-	border: 1px solid black;
-	vertical-align: top;
-}
-
-tr:hover {
-	background-color: rgba(255, 255, 0, 0.4);
-}
-
-tr:last-of-type {
-	border-bottom: 2px solid dodgerblue;
+	padding-top: 10px;
+	padding-bottom: 10px;
+	padding-left: 15px;
+	padding-right: 15px;
+	border: 1px solid;
+	border-color: rgba(200, 200, 200, 0.2);
 }
 
 td:first-child {
@@ -64,155 +66,14 @@ td:first-child {
 	text-align: left;
 }
 
-.QueryStoreTab {
-	td:nth-child(7) {
-		position: sticky;
-		left: 0;
-		background-color: rgba(255, 255, 255, 0.7);
-	}
-}
+/*td {
+	padding: 8px 7px 7px 10px;
+	border: 1px solid black;
+	vertical-align: top;
+}*/
 
-.ActiveSessionsTab {
-	td:nth-child(6) {
-		position: sticky;
-		left: 0;
-		background-color: rgba(255, 255, 255, 0.7);
-	}
-}
-
-.IndexUsageTable {
-	td:nth-child(3) {
-		position: sticky;
-		left: 0;
-		background-color: rgba(255, 255, 255, 0.7);
-	}
-}
-
-.IndexUsageTableDB {
-	td:nth-child(2) {
-		position: sticky;
-		left: 0;
-		background-color: rgba(255, 255, 255, 0.7);
-	}
-}
-
-.DatabaseInfoTable {
-	td:nth-child(1) {
-		position: sticky;
-		left: 0;
-		background-color: rgba(255, 255, 255, 0.7);
-	}
-}
-
-.DeadlockDetailsTable {
-	td:nth-child(5) {
-		position: sticky;
-		left: 0;
-		background-color: rgba(255, 255, 255, 0.7);
-	}
-
-	td:first-child {
-		font-weight: normal;
-		text-align: left;
-	}
-
-	td:nth-child(2) {
-		font-weight: bold;
-		text-align: left;
-	}
-}
-
-.Perfmon {
-	td:first-child {
-		font-weight: normal;
-	}
-
-	td:nth-child(2) {
-		font-weight: bold;
-	}
-
-}
-
-.Storage {
-	td:first-child {
-		font-weight: bold;
-	}
-
-	td:nth-child(8) {
-		font-weight: bold;
-	}
-
-	td:nth-child(9) {
-		font-weight: bold;
-	}
-
-}
-
-.WaitStats {
-	td:first-child {
-		font-weight: normal;
-	}
-
-	td:nth-child(4) {
-		font-weight: bold;
-	}
-
-	td:nth-child(6) {
-		font-weight: bold;
-	}
-
-	td:nth-child(11) {
-		font-weight: bold;
-	}
-
-}
-
-.InstanceInfoTbl {
-	td {
-		font-weight: normal;
-		text-align: center;
-	}
-}
-
-.InstanceInfoTbl {
-	td {
-		font-weight: normal;
-		text-align: center;
-	}
-
-	td:nth-child(6) {
-		white-space: nowrap;
-	}
-}
-
-.RsrcInfoTbl {
-	td {
-		font-weight: normal;
-		text-align: center;
-	}
-}
-
-.Top10ClientConnTbl {
-	td:nth-child(2) {
-		text-align: center;
-	}
-}
-
-.SessOptTbl {
-	td:nth-child(2) {
-		text-align: center;
-	}
-
-	td:nth-child(3) {
-		text-align: center;
-	}
-}
-
-.TempdbInfoTbl {
-	td {
-		font-weight: normal;
-		text-align: center;
-	}
+tr:hover {
+	background-color: rgba(255, 255, 0, 0.35);
 }
 
 h1 {
@@ -237,6 +98,732 @@ footer {
 	margin-right: auto;
 }
 
+/*
+ ## Query store info tables
+*/
+.QueryStoreTabCPU {
+	td {
+		vertical-align: top;
+	}
+
+	td:nth-child(7) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+	td:nth-child(23) {
+			font-weight: bold;
+			background-color: rgba(255, 255, 0, 0.4);
+		}
+
+	td:nth-child(n+2):nth-child(-n+3) {
+		text-align: right;
+	}
+
+	td:nth-child(n+9):nth-child(-n+10) {
+		text-align: right;
+	}
+
+	td:nth-child(n+14):nth-child(-n+54) {
+		text-align: right;
+	}
+
+}
+
+.QueryStoreTabDuration {
+	td {
+		vertical-align: top;
+	}
+
+	td:nth-child(7) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+	td:nth-child(20) {
+			font-weight: bold;
+			background-color: rgba(255, 255, 0, 0.4);
+		}
+
+	td:nth-child(n+2):nth-child(-n+3) {
+		text-align: right;
+	}
+
+	td:nth-child(n+9):nth-child(-n+10) {
+		text-align: right;
+	}
+
+	td:nth-child(n+14):nth-child(-n+54) {
+		text-align: right;
+	}
+
+}
+
+/*
+ ## Session activity (agg and raw)
+*/
+
+.ActiveSessionsTab {
+	td {
+		vertical-align: top;
+	}
+	td:nth-child(6) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+	td:nth-child(1) {
+		text-align: right;
+	}
+	td:nth-child(n+4):nth-child(-n+5) {
+		text-align: right;
+	}
+	td:nth-child(n+11):nth-child(-n+12) {
+		text-align: right;
+	}
+	td:nth-child(n+19):nth-child(-n+33) {
+		text-align: right;
+	}
+	td:nth-child(n+19):nth-child(-n+33) {
+		text-align: right;
+	}
+	td:nth-child(35) {
+		text-align: right;
+	}
+	td:nth-child(n+37):nth-child(-n+38) {
+		text-align: right;
+	}
+	td:nth-child(n+40):nth-child(-n+42) {
+		text-align: right;
+	}
+	td:nth-child(n+44):nth-child(-n+45) {
+		text-align: right;
+	}
+	td:nth-child(49) {
+		text-align: right;
+	}
+	td:nth-child(n+51):nth-child(-n+57) {
+		text-align: right;
+	}
+}
+
+.RawActiveSessionsTab {
+	td {
+		vertical-align: top;
+	}
+	td:nth-child(n+1):nth-child(-n+2) {
+		text-align: right;
+	}
+	td:nth-child(n+5):nth-child(-n+7) {
+		text-align: right;
+	}
+	td:nth-child(n+11):nth-child(-n+25) {
+		text-align: right;
+	}
+	td:nth-child(n+27):nth-child(-n+28) {
+		text-align: right;
+	}
+	td:nth-child(n+30):nth-child(-n+32) {
+		text-align: right;
+	}
+	td:nth-child(n+30):nth-child(-n+32) {
+		text-align: right;
+	}
+	td:nth-child(n+34):nth-child(-n+35) {
+		text-align: right;
+	}
+	td:nth-child(39) {
+		text-align: right;
+	}
+	td:nth-child(n+41):nth-child(-n+47) {
+		text-align: right;
+	}
+}
+
+/*
+ ## Index usage instance-wide and db-specific
+*/
+
+.IndexUsageTable {
+	td {
+		vertical-align: top;
+	}
+	td:nth-child(3) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+	td:nth-child(4) {
+		text-align: right;
+	}
+	td:nth-child(8) {
+		text-align: right;
+	}
+	td:nth-child(10) {
+		text-align: right;
+	}
+	td:nth-child(12) {
+		text-align: right;
+	}
+	td:nth-child(n+15):nth-child(-n+25) {
+		text-align: center;
+	}
+	td:nth-child(26) {
+		text-align: right;
+	}
+	td:nth-child(n+27):nth-child(-n+33) {
+		text-align: right;
+	}
+	td:nth-child(n+35):nth-child(-n+50) {
+		text-align: right;
+	}
+
+}
+
+.IndexUsageTableDB {
+	td {
+		vertical-align: top;
+	}
+	td:nth-child(2) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+	td:nth-child(3) {
+		text-align: right;
+	}
+	td:nth-child(7) {
+		text-align: right;
+	}
+	td:nth-child(9) {
+		text-align: right;
+	}
+	td:nth-child(11) {
+		text-align: right;
+	}
+	td:nth-child(n+14):nth-child(-n+24) {
+		text-align: center;
+	}
+	td:nth-child(25) {
+		text-align: right;
+	}
+	td:nth-child(n+26):nth-child(-n+32) {
+		text-align: right;
+	}
+	td:nth-child(n+34):nth-child(-n+49) {
+		text-align: right;
+	}
+}
+
+/*
+ ## Index diagnostics
+*/
+
+.IxDiagTbl {
+	td {
+		vertical-align: top;
+	}
+	td:nth-child(1) {
+		text-align: right;
+	}
+}
+
+/*
+ ## Index summary
+*/
+.IxSummaryTbl {
+	td {
+		text-align: right;
+	}
+	td:first-child {
+		font-weight: bold;
+		text-align: right;
+	}
+}
+
+/*
+ ## Statistics
+*/
+.StatsInfoTbl {
+	td {
+		vertical-align: top;
+	}
+	td:nth-child(n+6):nth-child(-n+12) {
+		text-align: right;
+	}
+	td:nth-child(n+13):nth-child(-n+16) {
+		text-align: center;
+	}
+	td:nth-child(n+17):nth-child(-n+18) {
+		text-align: right;
+	}
+	td:nth-child(19) {
+		text-align: center;
+	}
+	td:nth-child(20) {
+		text-align: right;
+	}
+
+}
+
+/*
+ ## Database info
+*/
+
+.DatabaseInfoTable {
+	td:nth-child(1) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+	td:nth-child(2) {
+		text-align: right;
+	}
+	td:nth-child(n+5):nth-child(-n+14) {
+		text-align: right;
+	}
+	td:nth-child(n+15):nth-child(-n+27) {
+		text-align: center;
+	}
+}
+
+.DatabaseFileInfoTable {
+	td:nth-child(2) {
+		text-align: right;
+	}
+	td:nth-child(3) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+	td:nth-child(6) {
+		text-align: center;
+	}
+
+	td:nth-child(n+7):nth-child(-n+16) {
+		text-align: right;
+	}
+	td:nth-child(17) {
+		text-align: center;
+	}
+	td:nth-child(18) {
+		text-align: right;
+	}
+}
+
+.DBScopedConfTbl {
+	td:nth-child(n+3):nth-child(-n+4) {
+		text-align: center;
+	}
+}
+
+/*
+ ## Azure SQL DB info
+*/
+
+.ASDBRsrcGovTbl {
+	td {
+		text-align: center;
+	}
+}
+
+.ASDBInfoTbl {
+	td:nth-child(3) {
+		text-align: right;
+	}
+	td:nth-child(4) {
+		text-align: center;
+	}
+	td:nth-child(n+5):nth-child(-n+12) {
+		text-align: right;
+	}
+	td:nth-child(n+13):nth-child(-n+24) {
+		text-align: center;
+	}
+}
+
+.ASDBRsrcUsageTbl {
+	td:first-child {
+		font-weight: normal;
+	}
+	td:nth-child(n+3):nth-child(-n+12) {
+		text-align: right;
+	}
+}
+
+.ASDBTop10WaitsTbl {
+	td:first-child {
+		font-weight: normal;
+	}
+	td:nth-child(3) {
+		text-align: right;
+	}
+	td:nth-child(n+6):nth-child(-n+13) {
+		text-align: right;
+	}
+}
+
+.ASDBFileInfoTbl {
+	td:nth-child(2) {
+		text-align: right;
+	}
+	td:nth-child(n+7):nth-child(-n+18) {
+		text-align: right;
+	}
+}
+
+.ASDBObjVersChgTbl {
+	td:first-child {
+		font-weight: normal;
+	}
+}
+
+.ASDBScopedConfTbl {
+	td {
+		text-align: center;
+	}
+	td:first-child {
+		font-weight: bold;
+		text-align: left;
+	}
+}
+
+/*
+ ## Deadlock info
+*/
+.DeadlockDetailsTable {
+	td:nth-child(5) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+	td {
+		vertical-align: top;
+	}
+
+	td:first-child {
+		font-weight: normal;
+		text-align: left;
+	}
+
+	td:nth-child(2) {
+		font-weight: normal;
+		text-align: right;
+	}
+	td:nth-child(4) {
+		text-align: right;
+	}
+	td:nth-child(n+10):nth-child(-n+13) {
+		text-align: center;
+	}
+	td:nth-child(17) {
+		text-align: right;
+	}
+	td:nth-child(n+19):nth-child(-n+23) {
+		text-align: right;
+	}
+
+}
+
+.DeadlockPlansTable {
+	td {
+		vertical-align: top;
+	}
+
+	td:nth-child(n+4):nth-child(-n+25) {
+		text-align: right;
+	}
+
+}
+
+/*
+ ## Instance health
+*/
+.InstHealthTbl {
+	td:nth-child(5) {
+		white-space: pre-wrap;
+		word-wrap: normal;
+	}
+	td:first-child {
+		font-weight: bold;
+		text-align: right;
+	}	
+}
+
+/*
+ ## Open transactions
+*/
+
+.OpenTransTbl {
+	td:nth-child(3) {
+		position: sticky;
+		left: 0;
+		background-color: rgba(255, 255, 255, 0.7);
+	}
+	td {
+		vertical-align: top;
+	}
+
+	td:first-child {
+		font-weight: normal;
+		text-align: right;
+	}
+
+	td:nth-child(4) {
+		text-align: right;
+	}
+	td:nth-child(n+3):nth-child(-n+4) {
+		text-align: center;
+	}
+
+	td:nth-child(n+16):nth-child(-n+17) {
+		text-align: right;
+	}
+	td:nth-child(n+16):nth-child(-n+17) {
+		text-align: right;
+	}
+	td:nth-child(n+20):nth-child(-n+23) {
+		text-align: right;
+	}
+
+}
+
+/*
+ ## Tempdb info
+*/
+
+.TempdbSessionTbl {
+	td:first-child {
+		font-weight: normal;
+		text-align: right;
+	}
+	td:nth-child(2) {
+		text-align: right;
+	}
+	td:nth-child(5):nth-child(-n+12) {
+		text-align: right;
+	}
+}
+
+.TempdbInfoTbl {
+	td {
+		font-weight: normal;
+		text-align: center;
+	}
+}
+
+/*
+ ## Waits, perfmon, and storage stats
+*/
+
+.First30Tbl {
+	td {
+		vertical-align: top;
+		white-space: pre-wrap;
+	    word-wrap: normal;
+	}
+	td:first-child {
+		font-weight: bold;
+		text-align: right;
+	}	
+}
+
+.Perfmon {
+	td:first-child {
+		font-weight: normal;
+	}
+
+	td:nth-child(2) {
+		font-weight: bold;
+	}
+	td:nth-child(5) {
+		text-align: right;
+	}
+	td:nth-child(n+7):nth-child(-n+9) {
+		text-align: right;
+	}
+
+}
+
+.Storage {
+	td:first-child {
+		font-weight: bold;
+	}
+	td:nth-child(3) {
+		text-align: right;
+	}
+
+	td:nth-child(8) {
+		font-weight: bold;
+		text-align: right;
+	}
+
+	td:nth-child(n+6):nth-child(-n+7) {
+		text-align: right;
+	}
+
+}
+
+.WaitStats {
+	td:first-child {
+		font-weight: normal;
+	}
+	td:nth-child(n+2):nth-child(-n+3) {
+		text-align: right;
+	}
+	
+	td:nth-child(4) {
+		font-weight: bold;
+	}
+
+	td:nth-child(6) {
+		font-weight: bold;
+		text-align: right;
+	}
+	td:nth-child(n+7):nth-child(-n+10) {
+		text-align: right;
+	}
+
+	td:nth-child(11) {
+		font-weight: bold;
+		text-align: right;
+	}
+
+}
+
+/*
+ ## Instance info page
+*/
+.InstanceInfoTbl {
+	td {
+		font-weight: normal;
+		text-align: center;
+	}
+
+	td:nth-child(6) {
+		white-space: nowrap;
+	}
+}
+
+.InstCacheTbl {
+	td:not(:first-child) {
+		text-align: right;
+	}
+}
+
+
+.RsrcInfoTbl {
+	td {
+		font-weight: normal;
+		text-align: center;
+	}
+}
+
+.Top10ClientConnTbl {
+	td:nth-child(2) {
+		text-align: center;
+	}
+}
+
+.SessOptTbl {
+	td:nth-child(2) {
+		text-align: center;
+	}
+
+	td:nth-child(3) {
+		text-align: center;
+	}
+}
+
+
+
+/* 
+ ## Index/Intro page
+*/
+.IntroTbl {
+	td {
+		text-align: center;
+	}
+}
+
+.IndexPageTbl {
+	td:nth-child(1) {
+		padding-left: 20px;
+		padding-right: 20px;
+	}
+
+	td:nth-child(2) {
+		padding-left: 20px;
+	}
+
+	td:nth-child(3) {
+		text-align: center;
+	}
+
+	td:nth-child(4) {
+		text-align: center;
+	}
+
+	td:nth-child(5) {
+		text-align: center;
+	}
+}
+
+/*
+ ## Execution log
+*/
+
+.LogTbl {
+	td:nth-child(1) {
+		padding-left: 20px;
+	}
+
+	td:nth-child(2) {
+		padding-left: 20px;
+		padding-right: 20px;
+	}
+
+	td:nth-child(3) {
+		padding-left: 20px;
+		padding-right: 20px;
+	}
+
+	td:nth-child(4) {
+		text-align: right;
+	}
+
+	td:nth-child(5) {
+		text-align: center;
+	}
+
+	td:nth-child(6) {
+		padding-left: 20px;
+		white-space: pre-wrap;
+		word-wrap: normal;
+	}
+}
+
+/*
+ ## query text tables - used on every page where you also have query text
+*/
+
+.QueryTbl {
+	td {
+		white-space: pre-wrap;
+		word-wrap: normal;
+		padding-top: 18px;
+		vertical-align: top;
+	}
+
+	td:nth-child(1) {
+		padding-top: 8px;
+		vertical-align: top;
+	}
+}
+
+/*
+ ## Table filtering/search related
+*/
 div {
 	text-align: center;
 }
@@ -251,7 +838,9 @@ input.SearchBox {
 	width: 220px;
 	border-radius: 10px;
 }
-
+/*
+ ## Copy button related
+*/
 #message {
 	position: absolute;
 	background-color: #333;
@@ -261,18 +850,41 @@ input.SearchBox {
 	opacity: 0;
 	transition: opacity 0.5s;
 	z-index: 1000;
-	pointer-events: none; /* Ensure the message doesn't interfere with clicks */
-  }
-  
-  #message.show {
+	pointer-events: none;
+	/* Ensure the message doesn't interfere with clicks */
+}
+
+#message.show {
 	opacity: 1;
-  }
-  
-  .copyButton {
+}
+
+.copyButton {
+	background-color: #F28500;
+    border: none;
+    color: black;
+    padding: 5px 10px;
+    text-align: center;
+    text-decoration: none;
+    display: inline-block;
 	cursor: pointer;
-	background: none;
-	border: none;
-	color: blue;
-	text-decoration: underline;
-	margin-left: 8px;
-  }
+	margin-top: 4px;
+    cursor: pointer;
+    border-radius: 4px;
+	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.copyButton:hover {
+    background-color: #fc9517;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.header-content {
+    display: flex;
+    flex-direction: column; 
+	align-items: center;
+}
+.button-tooltip {
+    position: relative;
+    display: inline-block;
+}

@@ -11,6 +11,9 @@ SET QUOTED_IDENTIFIER ON;
 SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET NOCOUNT ON;
+
+DECLARE @TimeOfCheck DATETIME = GETDATE();
+
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
 SELECT COUNT([file_id])                                                                                                             AS [data_files],
@@ -25,7 +28,10 @@ FROM   [tempdb].[sys].[dm_db_file_space_usage];
 SELECT TOP(30) [tb].[name]                                             AS [table_name],
        [pst].[row_count]                                               AS [rows],
        CAST([pst].[used_page_count] * 1.0 / 128 AS DECIMAL(15, 2))     AS [used_space_MB],
-       CAST([pst].[reserved_page_count] * 1.0 / 128 AS DECIMAL(15, 2)) AS [reserved_space_MB]
+       CAST([pst].[reserved_page_count] * 1.0 / 128 AS DECIMAL(15, 2)) AS [reserved_space_MB],
+	   CONVERT(VARCHAR(25), [tb].[create_date], 121)                   AS [created],
+	   DATEDIFF(MINUTE,[tb].[create_date],@TimeOfCheck)                AS [table_lifespan_minutes],
+	   CONVERT(VARCHAR(25), @TimeOfCheck, 121)                         AS [time_of_check]
 FROM   [tempdb].[sys].[partitions] AS [prt]
        INNER JOIN [tempdb].[sys].[dm_db_partition_stats] AS [pst]
                ON [prt].[partition_id] = [pst].[partition_id]

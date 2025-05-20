@@ -4764,8 +4764,15 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
             SELECT  [Priority] ,
                     [FindingsGroup] ,
                     [Finding] ,
+					CASE WHEN [URL] IS NOT NULL 
+						 THEN '<a href='''+[URL]+''' target=''_blank''>'+[Finding]+'</a>'
+						 ELSE [Finding] 
+					END AS [FindingHL],		
                     /*CAST(LEFT(@StockDetailsHeader + [Details] + @StockDetailsFooter,32000) AS TEXT) AS Details,*/
-					CAST(LEFT([Details],32000) AS TEXT) AS Details,
+					REPLACE(REPLACE(
+					REPLACE(CAST(LEFT([Details],32000) AS NVARCHAR(MAX)), N'<SchedulerMonitorEvent>',CHAR(13) + CHAR(10)+N'<SchedulerMonitorEvent>'),
+					N'</SystemIdle>',N'</SystemIdle>'+CHAR(13) + CHAR(10)),N'</PageFaults>',N'</PageFaults>'+CHAR(13) + CHAR(10))
+					AS Details,
 					[URL] 
                     /*CAST(LEFT([HowToStopIt],32000) AS TEXT) AS HowToStopIt,
                     CAST([QueryText] AS NVARCHAR(MAX)) AS QueryText,
@@ -4858,6 +4865,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                     CAST(DATEDIFF(mi,wd1.SampleTime, wd2.SampleTime) / 60. AS DECIMAL(18,1)) AS [Hours Sample],
 					CAST(c.[Total Thread Time (Seconds)] / 60. / 60. AS DECIMAL(18,1)) AS [Thread Time (Hours)],
                     wd1.wait_type,
+					'<a href=''https://www.sqlskills.com/help/waits/' + LOWER(wd1.wait_type) + '/'' target=''_blank''>'+wd1.wait_type+'</a>' AS [wait_typeHL],
 					COALESCE(wcat.WaitCategory, 'Other') AS wait_category,
                     CAST(c.[Wait Time (Seconds)] / 60. / 60. AS DECIMAL(18,1)) AS [Wait Time (Hours)],
                     CAST((wd2.wait_time_ms - wd1.wait_time_ms) / 1000.0 / cores.cpu_count / DATEDIFF(ss, wd1.SampleTime, wd2.SampleTime) AS DECIMAL(18,1)) AS [Per Core Per Hour],
@@ -4871,7 +4879,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                         CAST((wd2.wait_time_ms-wd1.wait_time_ms)/
                             (1.0*(wd2.waiting_tasks_count - wd1.waiting_tasks_count)) AS NUMERIC(12,1))
                     ELSE 0 END AS [Avg ms Per Wait],
-                    N'https://www.sqlskills.com/help/waits/' + LOWER(wd1.wait_type) + '/' AS URL
+                    N'https://www.sqlskills.com/help/waits/' + LOWER(wd1.wait_type) + N'/' AS URL
                 FROM  max_batch b
                 JOIN #WaitStats wd2 ON
                     wd2.SampleTime =b.SampleTime
@@ -4902,6 +4910,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                     DATEDIFF(ss,wd1.SampleTime, wd2.SampleTime) AS [Seconds Sample],
 					c.[Total Thread Time (Seconds)],
                     wd1.wait_type,
+					'<a href=''https://www.sqlskills.com/help/waits/' + LOWER(wd1.wait_type) + '/'' target=''_blank''>'+wd1.wait_type+'</a>' AS [wait_typeHL],
 					COALESCE(wcat.WaitCategory, 'Other') AS wait_category,
                     c.[Wait Time (Seconds)],
                     CAST((CAST(wd2.wait_time_ms - wd1.wait_time_ms AS MONEY)) / 1000.0 / cores.cpu_count / DATEDIFF(ss, wd1.SampleTime, wd2.SampleTime) AS DECIMAL(18,1)) AS [Per Core Per Second],
