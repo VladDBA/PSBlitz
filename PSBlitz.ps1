@@ -310,24 +310,26 @@ $DefaultStartRow = 2
 $BlitzWhoPass = 1
 
 #symbols
-	#Success
-	$GreenCheck = @{
-		Object          = [Char]8730
-		ForegroundColor = 'Green'
-		NoNewLine       = $false
-	}
-	#Failure
-	$RedX = @{
-		Object          = 'x (Failed)'
-		ForegroundColor = 'Red'
-		NoNewLine       = $false
-	}
-	#Command Timeout
-	$RedXTimeout = @{
-		Object          = 'x (Command timeout)'
-		ForegroundColor = 'Red'
-		NoNewLine       = $false
-	}
+# Success
+$GreenCheck = @{
+    Object          = [Char]8730
+    ForegroundColor = 'Green'
+    NoNewLine       = $DebugInfo
+}
+
+# Failure
+$RedX = @{
+    Object          = 'x (Failed)'
+    ForegroundColor = 'Red'
+    NoNewLine       = $DebugInfo
+}
+
+# Command Timeout
+$RedXTimeout = @{
+    Object          = 'x (Command timeout)'
+    ForegroundColor = 'Red'
+    NoNewLine       = $DebugInfo
+}
 
 ###Functions
 #Function to return a brief help menu
@@ -2026,9 +2028,7 @@ try {
 		}
 		$JobError = $Job | Select-Object -ExpandProperty Error
 		Add-LogRow "Start sp_BlitzWho background process" $JobStatus $JobError
-		Write-Host " ->Switching to foreground execution."
-		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
-		$BlitzWhoPass += 1
+		Write-Host " ->Session activity will not be captured."
 	}
  else {
 		Write-Host @GreenCheck
@@ -2130,11 +2130,6 @@ $HTMLBodyEnd
 		Invoke-ClearVariables ResourceInfoTbl, InstanceInfoTbl, ConnectionsInfoTbl, SessOptTbl, PSBlitzSet
 	}
 
-	if ($JobStatus -ne "Running") {
-		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
-		$BlitzWhoPass += 1
-	}
-
 	#####################################################################################
 	#						TempDB usage info	 										#
 	#####################################################################################
@@ -2225,11 +2220,6 @@ $htmlTable4
 		Invoke-ClearVariables TempDBTbl, TempTabTbl, TempDBSessTbl, PSBlitzSet
 	}
 
-	if ($JobStatus -ne "Running") {
-		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
-		$BlitzWhoPass += 1
-	}
-
 	#####################################################################################
 	#						Open transaction info - Pass 1 -there's no pass 2 ATM		#
 	#####################################################################################
@@ -2251,7 +2241,6 @@ $htmlTable4
 			Write-Host " ->No open transactions found."
 		}
 		else {
-
 			Export-PlansAndDeadlocks $AcTranTbl $PlanOutDir "current_plan" "current_plan_file" -DebugInfo:$DebugInfo -FileNameFromColumn
 			Export-PlansAndDeadlocks $AcTranTbl $PlanOutDir "most_recent_plan" "most_recent_plan_file" -DebugInfo:$DebugInfo -FileNameFromColumn
 			if ($ToHTML -eq "Y") {
@@ -2295,11 +2284,6 @@ $HTMLBodyEnd
 		}
 		##Cleaning up variables 
 		Invoke-ClearVariables AcTranTbl, PSBlitzSet
-	}
-
-	if ($JobStatus -ne "Running") {
-		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
-		$BlitzWhoPass += 1
 	}
 
 	#####################################################################################
@@ -2556,10 +2540,6 @@ $HTMLBodyEnd
 		}
 	}
 
-	if ($JobStatus -ne "Running") {
-		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
-		$BlitzWhoPass += 1
-	}
 	#####################################################################################
 	#						sp_Blitz 													#
 	#####################################################################################
@@ -2621,11 +2601,6 @@ $HTMLBodyEnd
 		}
 	}
 
-	if ($JobStatus -ne "Running") {
-		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
-		$BlitzWhoPass += 1
-	}
-
 	#####################################################################################
 	#						Objects with dangerous SET options							#
 	#####################################################################################
@@ -2680,13 +2655,8 @@ $HTMLBodyEnd
 				}
 			}
 			##Cleaning up variables
-			Invoke-ClearVariables DangerousSetTbl, PSBlitzSet
-		 	
+			Invoke-ClearVariables DangerousSetTbl, PSBlitzSet	 	
 		}
-	}
-	if ($JobStatus -ne "Running") {
-		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
-		$BlitzWhoPass += 1
 	}
 
 	#####################################################################################
@@ -3765,10 +3735,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			Invoke-ClearVariables StatsTbl, PSBlitzSet		
 		}
 
-		if ($JobStatus -ne "Running") {
-			Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
-			$BlitzWhoPass += 1
-		}
 		### get index frag info
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetIndexInfoForWholeDB.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
