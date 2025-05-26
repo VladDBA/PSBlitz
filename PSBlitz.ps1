@@ -394,7 +394,7 @@ from Brent Ozar's FirstResponderKit (https://www.brentozar.com/first-aid/):
 `n You can find the scripts in the '$ResourcesPath' directory
 "
 }
-#Function to execute sp_BlitzWho
+<#Function to execute sp_BlitzWho
 function Invoke-BlitzWho {
 	param (
 		[string]$BlitzWhoQuery,
@@ -425,7 +425,7 @@ function Invoke-BlitzWho {
 		$StepEnd = Get-Date
 		Add-LogRow $StepName "Failure"
 	}
-}
+}#>
 
 #Function to properly format XML contents for deadlock graphs and execution plans
 function Format-XML {
