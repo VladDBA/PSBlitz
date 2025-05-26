@@ -297,13 +297,11 @@ $DefaultTimeout = 600
 $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
 	"spBlitzCache_NonSPLatest.sql", "spBlitzFirst_NonSPLatest.sql",
 	"spBlitzIndex_NonSPLatest.sql", "spBlitzLock_NonSPLatest.sql",
-	"spBlitzWho_NonSPLatest.sql",
-	"GetBlitzWhoData.sql", "GetInstanceInfo.sql",
-	"GetTempDBUsageInfo.sql", "GetOpenTransactions.sql",
-	"GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql",
-	"GetDbInfo.sql", "GetAzureSQLDBInfo.sql",
-	"GetObjectsWithDangerousOptions.sql", 
-	"searchtable.js", "sorttable.js", "styles.css", "copy.js", "spQuickieStore_NonSPLatest.sql")
+	"spBlitzWho_NonSPLatest.sql",	"GetBlitzWhoData.sql", "GetInstanceInfo.sql",
+	"GetTempDBUsageInfo.sql", "GetOpenTransactions.sql","GetStatsInfoForWholeDB.sql", 
+	"GetIndexInfoForWholeDB.sql","GetDbInfo.sql", "GetAzureSQLDBInfo.sql",
+	"GetObjectsWithDangerousOptions.sql", "searchtable.js", "sorttable.js", "styles.css", 
+	"copy.js", "spQuickieStore_NonSPLatest.sql")
 #Set path+name of the input Excel file
 $OrigExcelF = Join-Path -Path $ResourcesPath -ChildPath $OrigExcelFName
 #Set default start row for Excel output
@@ -311,27 +309,7 @@ $DefaultStartRow = 2
 #BlitzWho initial pass number
 $BlitzWhoPass = 1
 
-if ($DebugInfo) {
-	#Success
-	$GreenCheck = @{
-		Object          = [Char]8730
-		ForegroundColor = 'Green'
-		NoNewLine       = $true
-	}
-	#Failure
-	$RedX = @{
-		Object          = 'x (Failed)'
-		ForegroundColor = 'Red'
-		NoNewLine       = $true
-	}
-	#Command Timeout
-	$RedXTimeout = @{
-		Object          = 'x (Command timeout)'
-		ForegroundColor = 'Red'
-		NoNewLine       = $true
-	}
-}
-else {
+#symbols
 	#Success
 	$GreenCheck = @{
 		Object          = [Char]8730
@@ -350,7 +328,6 @@ else {
 		ForegroundColor = 'Red'
 		NoNewLine       = $false
 	}
-}
 
 ###Functions
 #Function to return a brief help menu
@@ -410,13 +387,8 @@ YourDatabase only, via integrated security"
 `n######	What it runs	######
 PSBlitz.ps1 uses slightly modified, non-stored procedure versions, of the following components 
 from Brent Ozar's FirstResponderKit (https://www.brentozar.com/first-aid/):
-   sp_Blitz
-   sp_BlitzCache
-   sp_BlitzFirst
-   sp_BlitzIndex
-   sp_BlitzLock
-   sp_BlitzWho
-   sp_BlitzQueryStore
+   sp_Blitz`n   sp_BlitzCache`n   sp_BlitzFirst`n   sp_BlitzIndex
+   sp_BlitzLock`n   sp_BlitzWho`n   sp_BlitzQueryStore
 `n You can find the scripts in the '$ResourcesPath' directory
 "
 }
@@ -712,7 +684,7 @@ function Convert-TableToHtml {
 		if (($CSSClass) -and ($TblID)) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID' class='$CSSClass'>"
 			if($CSSClass -eq "InstHealthTbl"){
-				#$DotPattern = '\.\s'
+				#Split Instance Health details after each dot to avoid wide table
 				$htmlTableOut = $htmlTableOut -replace '\.\s',". `n"
 			}
 		}
@@ -1681,17 +1653,18 @@ if ($ConnCheckSet.Tables[0].Rows.Count -eq 1) {
 		Write-Host " Product Major Version - $MajorVers"  -Fore Yellow
 	}
  else {
+	    $Message = "->Estimated response latency: $ConnTest seconds"
 		if ($ConnTest -ge 2) {
-			Write-Host "->Estimated response latency: $ConnTest seconds" -Fore Red
+			Write-Host $Message -Fore Red
 		}
 		elseif ($ConnTest -ge 0.5) {
-			Write-Host "->Estimated response latency: $ConnTest seconds" -Fore Yellow
+			Write-Host $Message -Fore Yellow
 		}
 		elseif ($ConnTest -ge 0.2) {
-			Write-Host "->Estimated response latency: $ConnTest seconds"
+			Write-Host $Message
 		}
 		elseif ($ConnTest -lt 0.2) {
-			Write-Host "->Estimated response latency: $ConnTest seconds" -Fore Green
+			Write-Host $Message -Fore Green
 		}
 
 	}
@@ -1874,10 +1847,7 @@ if ($ToHTML -eq "Y") {
 	#HTML elements and styles used in most report pages
 	$HTMLPre = @"
 	<!DOCTYPE html>
-	<html>
-	<head>
-	<link rel="stylesheet" href="styles.css">
-	<style>
+	<html>`n<head>`n<link rel="stylesheet" href="styles.css">`n<style>
 	.CacheTable1{
 	  td {
 		  vertical-align: top;
@@ -1923,12 +1893,8 @@ if ($ToHTML -eq "Y") {
 		td:nth-child(n+53):nth-child(-n+56){
     		text-align: right;
 	    }
-	}
-	</style>
-	<script src="sorttable.js"></script>
-	<script src="searchtable.js"></script>
-	<script src="copy.js"></script>
-	
+	}`n</style>`n<script src="sorttable.js"></script>`n<script src="searchtable.js"></script>
+	<script src="copy.js"></script>	
 "@
 	$URLRegex = '(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\".,<>?«»“”]))'
 	$SortableTable = '<p>Click on the column headers to sort the results.</p>'
@@ -1941,21 +1907,12 @@ if ($ToHTML -eq "Y") {
 "@
 	$STDivReplace = "'ReplaceTableID', ReplaceColIdx"
 	$Footer = @"
-	<br>
-	<footer>  
+	<br>`n<footer>
 	<p>Report generated with <a href='https://github.com/VladDBA/PSBlitz' target='_blank'>PSBlitz</a> - created by <a href='https://vladdba.com/?ref=PSBlitz' target='_blank'>Vlad Drumea</a></p>
-	</footer>
-	<br>
+	</footer>`n<br>
 "@
-	$HTMLBodyStart = @"
-			</head>
-			<body>
-"@
-	$HTMLBodyEnd = @"
-        <br>
-	  </body>
-	 </html>
-"@
+	$HTMLBodyStart = "`n</head>`n<body>`n"
+	$HTMLBodyEnd = "`n<br>`n </body>`n</html>"
 	$htmlResources = @("styles.css", "sorttable.js", "searchtable.js", "copy.js")
 }
 else {
@@ -1968,9 +1925,6 @@ else {
 	}
 	$OutExcelF = Join-Path -Path $OutDir -ChildPath $OutExcelFName
 	###Copy Excel template to output directory
-	<#
-	This is a fix for https://github.com/VladDBA/PSBlitz/issues/4
-	#>
 	Copy-Item $OrigExcelF  -Destination $OutExcelF
 }
 #Set output table for sp_BlitzWho
@@ -2472,7 +2426,7 @@ $HTMLBodyEnd
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = 22
 				
-				Convert-TableToExcel $Top10WaitsTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -HasURLs -URLCols "URL" -MapURLToColNum 4 -URLTextCol "Wait Type" -ExclCols "Wait TypeHL"
+				Convert-TableToExcel $Top10WaitsTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 4 -URLTextCol "Wait Type" -ExclCols "Wait TypeHL"
 
 				##Saving file 
 				Save-ExcelFile $ExcelFile
