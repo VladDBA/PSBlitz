@@ -1492,7 +1492,6 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 		$ConnString = "Server=$ServerName;Database=master;User Id=$SQLLogin;Password=$SQLPass;Connection Timeout=$ConnTimeout;Application Name=$AppName"
 	}
 	else {
-
 		$ConnString = "Server=$ServerName;Database=master;trusted_connection=true;Connection Timeout=$ConnTimeout;Application Name=$AppName"
 	}
 	$SqlConnection.ConnectionString = $ConnString
@@ -2085,20 +2084,15 @@ try {
 <h1>$HtmlTabName</h1>
 <h2>Instance information</h2>
 $htmlTable1
-<br>
-<h2>Resource information</h2>
+<br>`n<h2>Resource information</h2>
 $htmlTable2
-<br>
-<h2>Top 10 clients by connections</h2>
+<br>`n<h2>Top 10 clients by connections</h2>
 $htmlTable3
-<br>
-<h2>Plan cache usage by type</h2>
+<br>`n<h2>Plan cache usage by type</h2>
 $htmlTable5
-<br>
-<h2>Top 10 databases by plan cache usage</h2>
+<br>`n<h2>Top 10 databases by plan cache usage</h2>
 $htmlTable6
-<br>
-<h2>Session level SET options</h2>
+<br>`n<h2>Session level SET options</h2>
 $htmlTable4
 $HTMLBodyEnd
 "@
@@ -2192,11 +2186,9 @@ $HTMLBodyStart
 <h1>$HtmlTabName</h1>
 <h2>TempDB space usage</h2>
 $htmlTable1
-<br>
-<h2>Top 30 temp tables by reserved space</h2>
+<br>`n<h2>Top 30 temp tables by reserved space</h2>
      $htmlTable2
-     <br>
-			<h2>Top 30 sessions using TempDB by total allocation</h2>
+     <br>`n<h2>Top 30 sessions using TempDB by total allocation</h2>
 $htmlTable3
 $htmlTable4
 			$HTMLBodyEnd
@@ -2263,7 +2255,6 @@ $htmlTable4
 			Export-PlansAndDeadlocks $AcTranTbl $PlanOutDir "current_plan" "current_plan_file" -DebugInfo:$DebugInfo -FileNameFromColumn
 			Export-PlansAndDeadlocks $AcTranTbl $PlanOutDir "most_recent_plan" "most_recent_plan_file" -DebugInfo:$DebugInfo -FileNameFromColumn
 			if ($ToHTML -eq "Y") {
-
 				$tableName = "Open transaction info"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$tableName += " for $CheckDB" 
@@ -2283,11 +2274,9 @@ $htmlTable4
 $HTMLBodyStart
 <h1 id="top">$tableName</h1>
 $htmlTable1
-<br>
-<h2>Current Query text</h2>
+<br>`n<h2>Current Query text</h2>
 $htmlTable2
-<br>
-<h2>Most Recent Query Text</h2>
+<br>`n<h2>Most Recent Query Text</h2>
 $htmlTable3
 $JumpToTop
 $HTMLBodyEnd
@@ -2735,10 +2724,6 @@ $HTMLBodyEnd
 		}
 		Invoke-ClearVariables BlitzFirstTbl, PSBlitzSet
 	}
-	if ($JobStatus -ne "Running") {
-		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
-		$BlitzWhoPass += 1
-	}
 
 	#####################################################################################
 	#						sp_BlitzFirst since startup									#
@@ -2835,10 +2820,6 @@ $HTMLBodyEnd
 			##Cleaning up variables
 			Invoke-ClearVariables WaitsTbl, StorageTbl, PerfmonTbl, PSBlitzSet
 		}
-		if ($JobStatus -ne "Running") {
-			Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
-			$BlitzWhoPass += 1
-		}
 	}		
 
 	#####################################################################################
@@ -2853,8 +2834,7 @@ $HTMLBodyEnd
 		$SortOrders = @("'CPU'", "'Average CPU'", "'Reads'", "'Average Reads'",
 			"'Duration'", "'Average Duration'", "'Executions'", "'Executions per Minute'",
 			"'Writes'", "'Average Writes'", "'Spills'", "'Average Spills'",
-			"'Duplicate'", "'Query Hash'",
-			"'Memory Grant'", "'Recent Compilations'")
+			"'Duplicate'", "'Query Hash'", "'Memory Grant'", "'Recent Compilations'")
 	}
 	else {
 		$SortOrders = @("'CPU'", "'Average CPU'", "'Duration'",
@@ -3117,7 +3097,6 @@ $HTMLBodyEnd
 					#Save the partial HTML file
 					Save-HtmlFile $html3 $HtmlFileName $HTMLOutDir $DebugInfo "Partial "
 				}
-				
 
 			}
 			else {
@@ -3183,9 +3162,7 @@ $HTMLBodyEnd
 			}	
 			##Cleaning up variables 
 			Invoke-ClearVariables BlitzCacheWarnTbl, BlitzCacheTbl, PSBlitzSet
-
 		}
-
 		$OldSortOrder = $SortOrder
 
 		# Set @MinutesBack to NULL for the next sort order
@@ -3194,11 +3171,6 @@ $HTMLBodyEnd
 				Write-Host " ->Setting @MinutesBack to NULL for the next sort order" -fore yellow
 			}
 			[string]$Query = $Query -replace $NewCacheMinutesBackStr, $OldCacheMinutesBackStr
-		}
-
-		if ($JobStatus -ne "Running") {
-			Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop Y
-			$BlitzWhoPass += 1
 		}
 	}
 	
@@ -3243,10 +3215,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
   BEGIN
       IF(SELECT COUNT(*)
          FROM   sys.databases AS d
-         WHERE  d.is_query_store_on = 1
-                AND d.user_access_desc = 'MULTI_USER'
-                AND d.state_desc = 'ONLINE'
-                AND d.name = @DBName
+         WHERE  d.is_query_store_on = 1 AND d.user_access_desc = 'MULTI_USER'
+                AND d.state_desc = 'ONLINE' AND d.name = @DBName
                 AND d.is_distributor = 0) > 0
         BEGIN
             SELECT 'Yes' AS [EligibleForBlitzQueryStore]
@@ -3412,10 +3382,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			Add-LogRow "CheckDB value" "Switched" "Switched back to empty from $DBName"
 		}
 	}
-	if ($JobStatus -ne "Running") {
-		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
-		$BlitzWhoPass += 1
-	}
 
 	#####################################################################################
 	#						sp_BlitzIndex												#
@@ -3579,11 +3545,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		}
 		#Update $OldMode
 		$OldMode = $NewMode
-
-		if ($JobStatus -ne "Running") {
-			Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop Y
-			$BlitzWhoPass += 1
-		}
 	}	
 
 	####################################################################
@@ -3664,13 +3625,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		<title>$HtmlTabName</title>
 		$HTMLBodyStart
 		<h1 id="top">$HtmlTabName</h1>
-		<h2>Deadlock Overview</h2>
-		<p><a href="#Deadlocks1">Jump to deadlock details</a></p>
-
+		<h2>Deadlock Overview</h2>`n<p><a href="#Deadlocks1">Jump to deadlock details</a></p>
 		$htmlTable1
 		$JumpToTop
-		<br>
-		<h2 id="Deadlocks1">Deadlock Details</h2>
+		<br>`n<h2 id="Deadlocks1">Deadlock Details</h2>
 		$(if($TblLockDtl.Rows.Count -ge 10){
 			$SearchTableDiv -replace $STDivReplace, "'DeadlockDtlTable',7"
 			'<br>'})
@@ -3678,8 +3636,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		$JumpToTop
 		$htmlTable4
 		$htmlTable5
-		<br>
-		<h2>Query Text For Deadlock Details</h2>
+		<br>`n<h2>Query Text For Deadlock Details</h2>
 		$htmlTable3
 		$JumpToTop
 		$HTMLBodyEnd
@@ -3719,12 +3676,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			Invoke-ClearVariables TblLockDtl, TblLockPlans, TblLockOver, PSBlitzSet
 		}
 	}
-
-	if ($JobStatus -ne "Running") {
-		Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
-		$BlitzWhoPass += 1
-	}
-
 
 	#####################################################################################
 	#						Stats & Index info											#
@@ -3905,12 +3856,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				##Cleaning up variables
 				Invoke-ClearVariables IndexTbl, PSBlitzSet
 			} 
-		}
-	
-
-		if ($JobStatus -ne "Running") {
-			Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoRepl -IsInLoop N
-			$BlitzWhoPass += 1
 		}
 
 		if ($DBSwitched -eq "Y") {
@@ -4159,9 +4104,8 @@ finally {
 	if ($ToHTML -ne "Y") {
 		if ($IsIndepth -ne "Y") {
 			$DeleteSheets = @("Wait Stats", "Storage Stats", "Perfmon Stats", "Index Summary",
-				"Index Usage", "Extended Index Diagnostics", 
-				"Top Queries - Reads", "Top Queries - Executions", "Top Queries - Writes",
-				"Top Queries - Spills", "Top Queries - Mem & Recent Comp", "Intro")
+				"Index Usage", "Extended Index Diagnostics", "Top Queries - Reads", "Top Queries - Executions", 
+				"Top Queries - Writes",	"Top Queries - Spills", "Top Queries - Mem & Recent Comp", "Intro")
 			foreach ($SheetName in $DeleteSheets) {
 				$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
 				#$ExcelSheet.Visible = $false
@@ -4323,13 +4267,9 @@ finally {
 			$DbPortion = "Instance-wide check"
 		}
 		$IndexContent = @"
-				<!DOCTYPE html>
-				<html>
-				<head>
-				<link rel="stylesheet" href="HTMLFiles\styles.css">
+				<!DOCTYPE html>`n<html>`n<head>`n<link rel="stylesheet" href="HTMLFiles\styles.css">
 				<title>PSBlitz Output For $InstName</title>
-				</head>
-				<body>
+				</head>`n<body>
     <h1>PSBlitz Output For $($InstName.Replace(".database.windows.net", "")) $AzureEnv </h1>
 	<h2>$DbPortion</h2>
     <table class="IntroTbl">
@@ -4339,16 +4279,12 @@ finally {
 				<th>Execution start</th>
 				<th>Execution end</th>
 				<th>Duration<br>(hh:mm:ss)</th>
-				</tr>
-				<tr>
+				</tr>`n<tr>
 				<td><a href='https://github.com/VladDBA/PSBlitz' target='_blank'>PSBlitz.ps1</a></td>
 				<td>$Vers</td>
 				<td>$($StartDate.ToString("yyyy-MM-dd HH:mm:ss"))</td>
 				<td>$($EndDate.ToString("yyyy-MM-dd HH:mm:ss"))</td>
-				<td>$ExecTime</td>
-				</tr>
-    </table>
-    <br>
+				<td>$ExecTime</td>`n</tr></table>`n<br>
     <h1>Table of contents</h1>
     <table class="IndexPageTbl">
 				<tr>
@@ -4675,6 +4611,5 @@ finally {
 		[System.Runtime.InteropServices.Marshal]::ZeroFreeBSTR($BSTR)
 	}
 }
-## Experimental fix for https://github.com/VladDBA/PSBlitz/issues/161
 Remove-Variable * -ErrorAction SilentlyContinue
 $error.Clear();
