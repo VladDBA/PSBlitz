@@ -307,7 +307,7 @@ $OrigExcelF = Join-Path -Path $ResourcesPath -ChildPath $OrigExcelFName
 #Set default start row for Excel output
 $DefaultStartRow = 2
 #BlitzWho initial pass number
-$BlitzWhoPass = 1
+#$BlitzWhoPass = 1
 
 #symbols
 # Success
@@ -1735,9 +1735,7 @@ elseif ($IsAzureSQLDB -eq $false) {
 		Write-Host "->Instance has $UsrDBCount user databases" -Fore Yellow
 		Write-Host "->The following checks will be limited to the database that shows up the most in plan cache info:"
 		if ($IsIndepth -eq "Y") {
-			Write-Host "   - Index Summary"
-			Write-Host "   - Index Usage Details"
-			Write-Host "   - Extended Index Diagnosis"
+			Write-Host "   - Index Summary`n   - Index Usage Details`n   - Extended Index Diagnosis"
 		}
 		else {
 			Write-Host "   - Index Diagnosis"
@@ -1834,8 +1832,7 @@ if ($ToHTML -ne "Y") {
 
 if (($ToHTML -ne "Y") -and ($CacheTop -ne 10)) {
 	Write-Host " Output type is Excel, but -CacheTop was specified with a value <> 10." -Fore Red
-	Write-Host " ->These two options aren't compatible."
-	Write-Host " ->Switching -CacheTop back to 10"
+	Write-Host " ->These two options aren't compatible.`n ->Switching -CacheTop back to 10"
 	$CacheTop = 10
 }
 
@@ -2673,12 +2670,8 @@ $HTMLBodyEnd
 			$htmlTable = Convert-TableToHtml $BlitzFirstTbl -NoCaseChange -CSSClass "First30Tbl" -ExclCols "Finding", "URL" -HyperlinkCol "FindingHL" -DebugInfo:$DebugInfo
 			$HtmlTabName = "What's happening on the instance now?"
 			$html = $HTMLPre + @"
-<title>$HtmlTabName</title>
-$HTMLBodyStart
-<h1>$HtmlTabName</h1>
-<h2>30 seconds time-frame</h2>
-$htmlTable
-$HTMLBodyEnd
+<title>$HtmlTabName</title>`n$HTMLBodyStart`n<h1>$HtmlTabName</h1>
+<h2>30 seconds time-frame</h2>`n$htmlTable`n$HTMLBodyEnd
 "@
 
 			#Save HTML file
@@ -2985,18 +2978,13 @@ $HTMLBodyEnd
 					
 					$html = @"
 					<title>$HtmlTabName</title>
-					$HTMLBodyStart
-					<h1 id="top">$HtmlTabName</h1>
-					<br>
+					$HTMLBodyStart`n<h1 id="top">$HtmlTabName</h1>`n<br>
 					<h2>Top $CacheTop Queries by $HtmlTabName2</h2>
 					<p><a href="#Queries1">Jump to query text</a></p>
 					$htmlTable1
-					<br>
-					<h2>Warnings Explained</h2>
+					<br>`n<h2>Warnings Explained</h2>
 					$htmlTable2
-					$JumpToTop
-					<br>
-
+					$JumpToTop`n<br>
 "@
 
 					$html2 = @"
@@ -3363,6 +3351,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	else {
 		$Modes = @("0")
 	}
+	#Messages 
+	$modeMessages = @{
+    "0" = " ->Index diagnosis... "
+    "1" = " ->Index summary... "
+    "2" = " ->Index usage details... "
+    "4" = " ->Extended index diagnosis... "
+    }
 	# Set OldMode variable 
 	$OldMode = ";SET @Mode = 0;"
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzIndex_NonSPLatest.sql"
@@ -3399,18 +3394,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	}
 	#Loop through $Modes
 	foreach ($Mode in $Modes) {
-		if ($Mode -eq "0") {
-			Write-Host " ->Index diagnosis... " -NoNewLine
-		}
-		elseif ($Mode -eq "1") {
-			Write-Host " ->Index summary... " -NoNewLine
-		}
-		elseif ($Mode -eq "2") {
-			Write-Host " ->Index usage details... " -NoNewLine
-		}
-		elseif ($Mode -eq "4") {
-			Write-Host " ->Extended index diagnosis... " -NoNewLine
-		}
+		Write-Host $modeMessages[$Mode] -NoNewLine
 		$NewMode = ";SET @Mode = " + $Mode + ";"
 		[string]$Query = $Query -replace $OldMode, $NewMode
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzIndex mode $Mode" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
@@ -3459,14 +3443,17 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						$htmlTabSearch += "<br>"
 					}							
 					$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols $ExclCols -NoCaseChange -CSSClass "IxDiagTbl" -HyperlinkCol "FindingHL" -TblID "IndexUsgTable" -DebugInfo:$DebugInfo
+					$htmlTable += "`n<br>`n $JumpToTop`n"
 				}
 				elseif ($Mode -eq "1") {
 					$htmlTable = Convert-TableToHtml $BlitzIxTbl -NoCaseChange -TblID "IndexSummaryTable" -CSSClass "IxSummaryTbl" -ExclCols $ExclCols -DebugInfo:$DebugInfo
+					$htmlTable +="`n<br>`n"
 				}
 				elseif ($Mode -eq "2") {
 					$htmlTable = Convert-TableToHtml $BlitzIxTbl -TblID "IndexUsgTable" -CSSClass $Mode2CSS -ExclCols $ExclCols -NoCaseChange -DebugInfo:$DebugInfo
 					$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexUsgTable', $Mode2SearchCol"
 					$htmlTabSearch += "`n$SortableTable"
+					$htmlTable += "`n<br>`n $JumpToTop`n"
 				}
 		
 				$html = $HTMLPre + @"
@@ -3475,8 +3462,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				<h1 id="top">$HtmlTabName</h1>
 				$htmlTabSearch
 				$htmlTable 
-				<br>
-				$(if ($Mode -ne "1") {$JumpToTop})
 				$HTMLBodyEnd
 "@
 
@@ -3511,7 +3496,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Save-ExcelFile $ExcelFile
 			}
 			##Cleaning up variables
-			Invoke-ClearVariables BlitzIxTbl, PSBlitzSet
+			Invoke-ClearVariables BlitzIxTbl, PSBlitzSet, modeMessages
 		}
 		#Update $OldMode
 		$OldMode = $NewMode
