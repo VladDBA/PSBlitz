@@ -394,38 +394,6 @@ from Brent Ozar's FirstResponderKit (https://www.brentozar.com/first-aid/):
 `n You can find the scripts in the '$ResourcesPath' directory
 "
 }
-<#Function to execute sp_BlitzWho
-function Invoke-BlitzWho {
-	param (
-		[string]$BlitzWhoQuery,
-		[string]$IsInLoop
-	)
-	if ($IsInLoop -eq "Y") {
-		Write-Host " ->Active session data capture - pass $BlitzWhoPass... " -NoNewLine
-	}
- else {
-		Write-Host " Active session data capture - pass $BlitzWhoPass... " -NoNewLine
-	}
-	$StepStart = Get-Date
-	$StepName = "sp_BlitzWho - pass $BlitzWhoPass"
-	$BlitzWhoCommand = new-object System.Data.SqlClient.SqlCommand
-	$BlitzWhoCommand.CommandText = $BlitzWhoQuery
-	$BlitzWhoCommand.CommandTimeout = 120
-	$SqlConnection.Open()
-	$BlitzWhoCommand.Connection = $SqlConnection
-	Try {
-		$BlitzWhoCommand.ExecuteNonQuery() | Out-Null -ErrorAction Stop
-		$SqlConnection.Close()
-		Write-Host @GreenCheck
-		$StepEnd = Get-Date
-		Add-LogRow $StepName "Success"
-	}
- Catch {
-		Write-Host @RedX
-		$StepEnd = Get-Date
-		Add-LogRow $StepName "Failure"
-	}
-}#>
 
 #Function to properly format XML contents for deadlock graphs and execution plans
 function Format-XML {
@@ -842,7 +810,6 @@ function Convert-QueryTableToHtml {
 	}
 
 }
-
 function Export-PlansAndDeadlocks {
 	param (
 		[Parameter(Position = 0, Mandatory = $true)]
@@ -1091,8 +1058,6 @@ $InitScriptBlock = {
 		)
 		$BlitzWhoCommand = new-object System.Data.SqlClient.SqlCommand
 		$BlitzWhoCommand.CommandText = $BlitzWhoQuery
-		#increased BlitzWho command timeout from 20 to 60 because some people have been getting errors
-		#considering setting @ExpertMode = 0 if this keeps up
 		$BlitzWhoCommand.CommandTimeout = 60
 		$SqlConnection.Open()
 		$BlitzWhoCommand.Connection = $SqlConnection
@@ -1160,15 +1125,13 @@ $InitScriptBlock = {
             
 		}
 		Catch {
-			[string]$IsFlagTbl = "X"
-            
+			[string]$IsFlagTbl = "X"            
 		}
 		if ($IsFlagTbl -eq "Y") {
 			$CleanupCommand = new-object System.Data.SqlClient.SqlCommand
 			$Cleanup = "DECLARE @SQL NVARCHAR(400);`nSELECT @SQL = N'DROP TABLE '+ CASE "
 			$Cleanup += "`nWHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure' "
-			$Cleanup += "`nAND SERVERPROPERTY('EngineEdition') IN (5, 6) "
-			$Cleanup += "`nTHEN N'[BlitzWhoOutFlag_$FlagTblDt];' "
+			$Cleanup += "`nAND SERVERPROPERTY('EngineEdition') IN (5, 6) `nTHEN N'[BlitzWhoOutFlag_$FlagTblDt];' "
 			$Cleanup += "`nELSE N'[tempdb].[dbo].[BlitzWhoOutFlag_$FlagTblDt];' `nEND; `nEXEC(@SQL);"
 			$CleanupCommand.CommandText = $Cleanup
 			$CleanupCommand.CommandTimeout = 20
@@ -1353,7 +1316,6 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 		if ($HostName -like ".") {
 			$pos = $HostName.IndexOf(".")
 			$HostName = $HostName.Substring(0, $pos)
-
 		}
 	}
  else	{
@@ -1559,7 +1521,6 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 			Write-Host " Edition - $Edition; EngineEdition - $EngineEdition"
 		}
 	}
-
 }
 
 #If Azure SQL DB make sure database name is provided regardless of mode
@@ -1667,7 +1628,6 @@ if ($ConnCheckSet.Tables[0].Rows.Count -eq 1) {
 		elseif ($ConnTest -lt 0.2) {
 			Write-Host $Message -Fore Green
 		}
-
 	}
 }
 ###Test existence of value provided for $CheckDB
@@ -1786,7 +1746,6 @@ if ($DebugInfo) {
 	Write-Host "`n Output directory: `n$OutDir" -Fore Yellow
 }
 
-
 #Check if output directory exists
 if (!(Test-Path $OutDir)) {
 	New-Item -ItemType Directory -Force -Path $OutDir | Out-Null
@@ -1827,7 +1786,6 @@ if ($ToHTML -ne "Y") {
 		$ToHTML = "Y"
 		$ErrorActionPreference = "Continue"
 	}
-	
 }
 
 if (($ToHTML -ne "Y") -and ($CacheTop -ne 10)) {
@@ -1891,8 +1849,7 @@ if ($ToHTML -eq "Y") {
 		td:nth-child(n+53):nth-child(-n+56){
     		text-align: right;
 	    }
-	}`n</style>`n<script src="sorttable.js"></script>`n<script src="searchtable.js"></script>
-	<script src="copy.js"></script>	
+	}`n</style>`n<script src="sorttable.js"></script>`n<script src="searchtable.js"></script>`n<script src="copy.js"></script>	
 "@
 	$URLRegex = '(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\".,<>?«»“”]))'
 	$SortableTable = '<p>Click on the column headers to sort the results.</p>'
@@ -2174,7 +2131,6 @@ $htmlTable4 `n $HTMLBodyEnd
 
 		}
 		else {
-
 			###Populating the "TempDB" sheet
 			$ExcelSheet = $ExcelFile.Worksheets.Item("TempDB")
 			##TempDB space usage section
@@ -3034,7 +2990,6 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			$StepEnd = get-date
 			Add-LogRow "CheckDB value" "Switched" "$DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
 		}
-		
 	}
 
 	##Check if DB is eligible for sp_BlitzQueryStore first
@@ -3105,8 +3060,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$CheckDBAdapter.Fill($CheckDBSet) | Out-Null -ErrorAction Stop
 			$SqlConnection.Close()
 			if ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "Yes") {
-				Write-Host @GreenCheck
-				
+				Write-Host @GreenCheck				
 				$CheckQueryStore = 'Y'
 			}
 			elseif ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "No") {
@@ -3426,10 +3380,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$htmlTable5 = Convert-QueryTableToHtml $TblLockPlans -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "DeadlockPlan" -DebugInfo:$DebugInfo
 				$htmlTable5 = "<br>`n<h2>Query Text For Execution Plans Involved in Deadlocks</h2>`n $htmlTable5 `n $JumpToTop"
 				} else {
-
 					$htmlTable4 = "<p>No deadlock-related execution plans were found in the plan cache.</p>"
 					$htmlTable5 = ""
-
 				}
 		
 				$html = $HTMLPre + @"
@@ -3482,7 +3434,6 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	#####################################################################################
 	#						Stats & Index info											#
 	#####################################################################################
-
 	<#
 		if db was switched for querystore we can switch it again without doing all the math again
 	#>
@@ -3929,7 +3880,6 @@ finally {
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Azure SQL DB Info")
 				$ExcelSheet.Delete()
 			}
-
 		}
 
 		if (([string]::IsNullOrEmpty($CheckDB)) -and ([string]::IsNullOrEmpty($DBName)) -and ($IsAzureSQLDB -eq $false)) {
@@ -4159,8 +4109,7 @@ finally {
 					}
 					else {
 						$Description += "Average $SortOrder."
-					}
-					
+					}	
 				}
 			}
 			elseif ($File.Name -like "BlitzQueryStore*") {
