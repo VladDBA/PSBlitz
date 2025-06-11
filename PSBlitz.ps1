@@ -294,13 +294,11 @@ $ResourcesPath = Join-Path -Path $ScriptPath -ChildPath "Resources"
 $OrigExcelFName = "PSBlitzOutput.xlsx"
 $DefaultTimeout = 600
 
-$ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql",
-	"spBlitzCache_NonSPLatest.sql", "spBlitzFirst_NonSPLatest.sql",
-	"spBlitzIndex_NonSPLatest.sql", "spBlitzLock_NonSPLatest.sql",
-	"spBlitzWho_NonSPLatest.sql",	"GetBlitzWhoData.sql", "GetInstanceInfo.sql",
-	"GetTempDBUsageInfo.sql", "GetOpenTransactions.sql","GetStatsInfoForWholeDB.sql", 
-	"GetIndexInfoForWholeDB.sql","GetDbInfo.sql", "GetAzureSQLDBInfo.sql",
-	"GetObjectsWithDangerousOptions.sql", "searchtable.js", "sorttable.js", "styles.css", 
+$ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql","spBlitzCache_NonSPLatest.sql", 
+    "spBlitzFirst_NonSPLatest.sql",	"spBlitzIndex_NonSPLatest.sql", "spBlitzLock_NonSPLatest.sql",
+	"spBlitzWho_NonSPLatest.sql","GetBlitzWhoData.sql", "GetInstanceInfo.sql","GetTempDBUsageInfo.sql", 
+	"GetOpenTransactions.sql","GetStatsInfoForWholeDB.sql","GetIndexInfoForWholeDB.sql","GetDbInfo.sql", 
+	"GetAzureSQLDBInfo.sql","GetObjectsWithDangerousOptions.sql", "searchtable.js", "sorttable.js", "styles.css", 
 	"copy.js", "spQuickieStore_NonSPLatest.sql")
 #Set path+name of the input Excel file
 $OrigExcelF = Join-Path -Path $ResourcesPath -ChildPath $OrigExcelFName
