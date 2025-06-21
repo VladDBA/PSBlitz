@@ -294,11 +294,11 @@ $ResourcesPath = Join-Path -Path $ScriptPath -ChildPath "Resources"
 $OrigExcelFName = "PSBlitzOutput.xlsx"
 $DefaultTimeout = 600
 
-$ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql","spBlitzCache_NonSPLatest.sql", 
-    "spBlitzFirst_NonSPLatest.sql",	"spBlitzIndex_NonSPLatest.sql", "spBlitzLock_NonSPLatest.sql",
-	"spBlitzWho_NonSPLatest.sql","GetBlitzWhoData.sql", "GetInstanceInfo.sql","GetTempDBUsageInfo.sql", 
-	"GetOpenTransactions.sql","GetStatsInfoForWholeDB.sql","GetIndexInfoForWholeDB.sql","GetDbInfo.sql", 
-	"GetAzureSQLDBInfo.sql","GetObjectsWithDangerousOptions.sql", "searchtable.js", "sorttable.js", "styles.css", 
+$ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql", "spBlitzCache_NonSPLatest.sql", 
+	"spBlitzFirst_NonSPLatest.sql",	"spBlitzIndex_NonSPLatest.sql", "spBlitzLock_NonSPLatest.sql",
+	"spBlitzWho_NonSPLatest.sql", "GetBlitzWhoData.sql", "GetInstanceInfo.sql", "GetTempDBUsageInfo.sql", 
+	"GetOpenTransactions.sql", "GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql", "GetDbInfo.sql", 
+	"GetAzureSQLDBInfo.sql", "GetObjectsWithDangerousOptions.sql", "searchtable.js", "sorttable.js", "styles.css", 
 	"copy.js", "spQuickieStore_NonSPLatest.sql")
 #Set path+name of the input Excel file
 $OrigExcelF = Join-Path -Path $ResourcesPath -ChildPath $OrigExcelFName
@@ -310,23 +310,23 @@ $DefaultStartRow = 2
 #symbols
 # Success
 $GreenCheck = @{
-    Object          = [Char]8730
-    ForegroundColor = 'Green'
-    NoNewLine       = $DebugInfo
+	Object          = [Char]8730
+	ForegroundColor = 'Green'
+	NoNewLine       = $DebugInfo
 }
 
 # Failure
 $RedX = @{
-    Object          = 'x (Failed)'
-    ForegroundColor = 'Red'
-    NoNewLine       = $DebugInfo
+	Object          = 'x (Failed)'
+	ForegroundColor = 'Red'
+	NoNewLine       = $DebugInfo
 }
 
 # Command Timeout
 $RedXTimeout = @{
-    Object          = 'x (Command timeout)'
-    ForegroundColor = 'Red'
-    NoNewLine       = $DebugInfo
+	Object          = 'x (Command timeout)'
+	ForegroundColor = 'Red'
+	NoNewLine       = $DebugInfo
 }
 
 ###Functions
@@ -425,8 +425,7 @@ function Format-ExceptionMsg {
 			[string]$SQLErrMsg = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Message
 			##formatting the error message in SQL Server style if there's an error number
 			Write-Output "SQL Error: MSg $SQLErrNo, Level $SQLErrLev, State $SQLErrState, Line $SQLErrLineNo `n $SQLErrMsg"
-		}
-		else {
+		} else {
 			#Get PS related error info
 			[string]$PSErrMsg = $ErrorMessageString
 			[string]$PSErrLine = $ErrorMessage | Select-Object -ExpandProperty InvocationInfo | Select-Object -ExpandProperty ScriptLineNumber -ErrorAction Stop
@@ -436,13 +435,11 @@ function Format-ExceptionMsg {
 			}
 			if (!([string]::IsNullOrEmpty($PSErrMsg))) {
 				Write-Output "PS Error: Script Line $PSErrLine `n Message $PSErrMsg `n Statement $PSErrStatement"
-			}
-			else {
+			} else {
 				Write-Output "No exceptions encountered."
 			}			
 		}
-	}
- catch {
+	} catch {
 
 		Write-Output $ErrorMessageString
 	}
@@ -458,8 +455,7 @@ function Invoke-ErrMsg {
 		}
 		$OutErr = Format-ExceptionMsg
 		Write-Host "  $OutErr" -fore Red	
-	}
- else {
+	} else {
 		Write-Host @RedX
 		if ($DebugInfo) {
 			Write-Host " - $RunTime seconds" -Fore Yellow
@@ -494,11 +490,9 @@ function Add-LogRow {
 	$LogRow.Outcome = $StepStatus
 	if ("Interrupted", "Failure" -contains $StepStatus ) {
 		$LogRow.Message = $ErrMsg
-	}
- elseif ($StepStatus -eq "Success") {
+	} elseif ($StepStatus -eq "Success") {
 		$LogRow.Message = $MoreInfo
-	}
-	else {
+	} else {
 		$LogRow.Message = $MoreInfo
 	}
 	$LogTbl.Rows.Add($LogRow)
@@ -543,8 +537,7 @@ function Invoke-PSBlitzQuery {
 		($StepNameIn -eq "sp_BlitzFirst 30 seconds") -or ($StepNameIn -like "Query Store check *")) {
 			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
 			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
-		}
-		elseif ('Stats Info', 'sp_BlitzIndex mode 0', 'sp_BlitzIndex mode 2', 'sp_BlitzIndex mode 4' -contains $StepNameIn) {
+		} elseif ('Stats Info', 'sp_BlitzIndex mode 0', 'sp_BlitzIndex mode 2', 'sp_BlitzIndex mode 4' -contains $StepNameIn) {
 			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
 			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
 			$TotalRecords = $global:PSBlitzSet.Tables[1].Rows[0]["RecordCount"]
@@ -552,18 +545,15 @@ function Invoke-PSBlitzQuery {
 				Add-LogRow "->$StepNameIn" "Record limit exceeded" "Result was limited to top $RecordsReturned records out of $TotalRecords"
 				Write-Host "  ->Record limit exceeded `n -> Result was limited to top $RecordsReturned records out of $TotalRecords" -Fore Yellow
 			}
-		}
-		else {
+		} else {
 			Add-LogRow $StepNameIn $global:StepOutcome
 		}
-	}
- Catch {
+	} Catch {
 		$StepEnd = get-date
 		Invoke-ErrMsg
 		$global:StepOutcome = "Failure"
 		Add-LogRow $StepNameIn $global:StepOutcome
-	}
-	Finally {
+	} Finally {
 		$IBQConnection.Close()
 		$IBQConnection.Dispose()
 	}
@@ -612,14 +602,11 @@ function Convert-TableToHtml {
 			$currentColumn = $column.ColumnName
 			$formattedName = if ($currentColumn -like "*_*") {
 				$cultureInfo.TextInfo.ToTitleCase(($currentColumn -replace "_", " "))
-			}
-			elseif ($currentColumn -like "* *") {
+			} elseif ($currentColumn -like "* *") {
 				$cultureInfo.TextInfo.ToTitleCase($currentColumn)
-			}
-			elseif ($NoCaseChange -eq $true) {
+			} elseif ($NoCaseChange -eq $true) {
 				$currentColumn
-			}
-			else {
+			} else {
 				$cultureInfo.TextInfo.ToTitleCase($currentColumn)
 			}
 			#handle lower case KB, MB, GB
@@ -637,8 +624,7 @@ function Convert-TableToHtml {
 					Name       = $formattedName
 					Expression = [ScriptBlock]::Create('if ($_["' + $currentColumn + '"] -and $_["' + $currentColumn + '"] -ne [System.DBNull]::Value) { $_["' + $currentColumn + '"].ToString("yyyy-MM-dd HH:mm:ss") } else { $_["' + $currentColumn + '"] }')
 				}
-			}
-			else {
+			} else {
 				@{
 					Name       = $formattedName
 					Expression = [ScriptBlock]::Create('$_["' + $currentColumn + '"]')
@@ -651,12 +637,11 @@ function Convert-TableToHtml {
         
 		if (($CSSClass) -and ($TblID)) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID' class='$CSSClass'>"
-			if($CSSClass -eq "InstHealthTbl"){
+			if ($CSSClass -eq "InstHealthTbl") {
 				#Split Instance Health details after each dot to avoid wide table
-				$htmlTableOut = $htmlTableOut -replace '\.\s',". `n"
+				$htmlTableOut = $htmlTableOut -replace '\.\s', ". `n"
 			}
-		}
-		elseif ($CSSClass) {
+		} elseif ($CSSClass) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class='$CSSClass'>"
 			#clean up XML noise and extra charcters in specific tables
 			if ($CSSClass -eq "CacheTabx") {
@@ -664,16 +649,13 @@ function Convert-TableToHtml {
 				$htmlTableOut = $htmlTableOut -replace "\?&gt;</td>", "</td>"
 				$htmlTableOut = $htmlTableOut -replace "<td>&lt;MissingIndexes&gt;", "<td>"
 				$htmlTableOut = $htmlTableOut -replace "&lt;/MissingIndexes&gt;</td>", "</td>"
-			}
-			elseif ($CSSClass -eq "Top10ClientConnTbl") {
+			} elseif ($CSSClass -eq "Top10ClientConnTbl") {
 				$htmlTableOut = $htmlTableOut -replace "; </td>", "</td>"
-			}
-			elseif ($CSSClass -like "QueryStoreTab*") {
+			} elseif ($CSSClass -like "QueryStoreTab*") {
 				$htmlTableOut = $htmlTableOut -replace " ms\)", "&nbsp;ms)"
 				$htmlTableOut = $htmlTableOut -replace " \(", "&nbsp;("
 			}
-		}
-		elseif ($TblID) {
+		} elseif ($TblID) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID'>"
 		}
 		if ($HyperlinkCol -ne 'x') {
@@ -693,8 +675,7 @@ function Convert-TableToHtml {
 			foreach ($AnchorID in $AnchorIDs) {
 				$AnchorRegex = if ($TblID -eq "DeadlockDtlTable") {
 					"DL(\d+)Q(\d+)V{0,}$AnchorExt"
-				}
-				else { "$AnchorID(_\d+)$AnchorExt" }
+				} else { "$AnchorID(_\d+)$AnchorExt" }
 				$AnchorURL = '<a href="#$&">$&</a>'
 				$htmlTableOut = $htmlTableOut -replace $AnchorRegex, $AnchorURL
 			}
@@ -709,8 +690,7 @@ function Convert-TableToHtml {
 		}
         
 		return $htmlTableOut
-	}
-	catch {
+	} catch {
 		Invoke-ErrMsg
 		if ($DebugInfo) {
 			Add-LogRow "->Convert data to HTML" "Failure"
@@ -747,17 +727,13 @@ function Convert-QueryTableToHtml {
 			$currentColumn = $column
 			$formattedName = if ("current_query", "most_recent_query" -contains $currentColumn) {
 				"Query"
-			} 
-			elseif ("current_sql", "most_recent_sql", "query_sql_text" -contains $currentColumn) {
+			} elseif ("current_sql", "most_recent_sql", "query_sql_text" -contains $currentColumn) {
 				"Query Text"
-			}
-			elseif ($currentColumn -like "*_*") {
+			} elseif ($currentColumn -like "*_*") {
 				$cultureInfo.TextInfo.ToTitleCase(($currentColumn -replace "_", " "))
-			}
-			elseif ($currentColumn -like "* *") {
+			} elseif ($currentColumn -like "* *") {
 				$cultureInfo.TextInfo.ToTitleCase($currentColumn)
-			}
-			else {
+			} else {
 				$cultureInfo.TextInfo.ToTitleCase($currentColumn)
 			}
 			$property = @{
@@ -772,8 +748,7 @@ function Convert-QueryTableToHtml {
 			if ($AnchorID -eq "DeadlockDtlTable") {
 				$AnchorRegex = "<td>DL(\d+)Q(\d+)(V{0,})$AnchorExt"
 				$AnchorURL = '<td id=' + "DL" + '$1' + "Q" + '$2' + '$3' + "$AnchorExt>" + "DL" + '$1' + "Q" + '$2' + '$3' + "$AnchorExt"
-			}
-			else {
+			} else {
 				$AnchorRegex = "<td>$AnchorID(_\d+)$AnchorExt"
 				$AnchorURL = '<td id=' + "$AnchorID" + '$1' + "$AnchorExt>" + "$AnchorID" + '$1' + "$AnchorExt"
 			}
@@ -783,8 +758,7 @@ function Convert-QueryTableToHtml {
 		#Ensure CRLF displays correctly in HTML
 		if ($CSSClass) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class='$CSSClass'>"
-		}
-		else {
+		} else {
 			$htmlTableOut = $htmlTableOut -replace '<table>', '<table style="white-space:pre-wrap; word-wrap:normal">'
 		}
 		#Lazy way to remove empty rows, will try to fix later 
@@ -798,8 +772,7 @@ function Convert-QueryTableToHtml {
 			Add-LogRow "->Convert query data to HTML" "Success"
 		}
 		return $htmlTableOut
-	}
- catch {
+	} catch {
 		#Write-Host " Error converting query table to HTML: $_" -ForegroundColor Red
 		Invoke-ErrMsg
 		if ($DebugInfo) {
@@ -843,8 +816,7 @@ function Export-PlansAndDeadlocks {
 			      ($XMLColName -ne "deadlock_graph")) ) {
 				if ($FileNameFromColumn) {
 					$FileName = $DataTable.Rows[$RowNum][$FNameColName]
-				}
-				else {
+				} else {
 					$FileName = $FPrefix + '_' + $i + '.' + $OutputType
 				}
 				$DataTable.Rows[$RowNum][$XMLColName] | Format-XML | Set-Content -Path "$FileDir\$FileName" -Force
@@ -862,8 +834,7 @@ function Export-PlansAndDeadlocks {
 			$RunTime = [Math]::Round($StepRunTime, 2)
 			Write-Host " - $RunTime seconds" -Fore Yellow
 		}
-	}
-	catch {
+	} catch {
 		Invoke-ErrMsg
 		#Write-Host " Error exporting deadlock and plan data: $_" -ForegroundColor Red
 	}
@@ -887,16 +858,13 @@ function Add-QueryName {
 			if ($DataTable.Rows[$RowNum][$QueryTextColName] -ne [System.DBNull]::Value) {
 				$i += 1
 				$QueryName = $QPrefix + "_" + $i + ".query"					
-			}
-			elseif($QPrefix -eq "TempDB"){
+			} elseif ($QPrefix -eq "TempDB") {
 				$QueryName = "N/A*"
-			}
-			else { $QueryName = "N/A" }
+			} else { $QueryName = "N/A" }
 			$DataTable.Rows[$RowNum][$QueryNameColName] = $QueryName
 			$RowNum += 1
 		}
-	}
-	catch {
+	} catch {
 		Write-Host " Error adding query names: $_" -ForegroundColor Red
 	}
 }
@@ -934,8 +902,7 @@ function Convert-TableToExcel {
 		# Determine columns to process
 		$DataSetCols = if ($ColumnOrder) {
 			$ColumnOrder
-		}
-		else {
+		} else {
 			$DataTable.Columns.ColumnName | Where-Object { $ExclCols -notcontains $_ }
 		}
 
@@ -958,8 +925,7 @@ function Convert-TableToExcel {
 							$DataTable.Rows[$RowNum][$URLTextCol]
 						) | Out-Null
 					}
-				}
-				else {
+				} else {
 					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DataTable.Rows[$RowNum][$col]
 				}
 				$ExcelColNum += 1
@@ -978,8 +944,7 @@ function Convert-TableToExcel {
 			Add-LogRow "->Write data to Excel worksheet" "Success"
 		}
 		
-	}
- catch {
+	} catch {
 		Invoke-ErrMsg
 		#Write-Host " Error converting table to Excel: $_" -ForegroundColor Red
 		Write-Host "  Debug Column: $global:DebugCol"
@@ -1002,8 +967,7 @@ function Save-ExcelFile {
 		if ($DebugInfo) {
 			Write-Host " ->Excel file saved successfully" -ForegroundColor Yellow
 		}
-	}
-	catch {
+	} catch {
 		Write-Host " Error saving Excel file: $_" -ForegroundColor Red
 	}
 
@@ -1031,8 +995,7 @@ function Save-HtmlFile {
 		if ($DebugInfo) {
 			Write-Host " ->$($AdditionalInfo)HTML file saved successfully" -ForegroundColor Yellow
 		}
-	}
-	catch {
+	} catch {
 		Write-Host " Error saving HTML file: $_" -ForegroundColor Red
 	}
 }
@@ -1077,8 +1040,7 @@ $InitScriptBlock = {
 				[string]$SQLErrMsg = $ErrorMessage | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty InnerException | Select-Object -ExpandProperty Message
 				##formatting the error message in SQL Server style if there's an error number
 				Write-Output "SQL Error: MSg $SQLErrNo, Level $SQLErrLev, State $SQLErrState, Line $SQLErrLineNo `n $SQLErrMsg"
-			}
-			else {
+			} else {
 				#Get PS related error info
 				[string]$PSErrMsg = $ErrorMessageString
 				[string]$PSErrLine = $ErrorMessage | Select-Object -ExpandProperty InvocationInfo | Select-Object -ExpandProperty ScriptLineNumber -ErrorAction Stop
@@ -1088,13 +1050,11 @@ $InitScriptBlock = {
 				}
 				if (!([string]::IsNullOrEmpty($PSErrMsg))) {
 					Write-Output "PS Error: Script Line $PSErrLine `n Message $PSErrMsg `n Statement $PSErrStatement"
-				}
-				else {
+				} else {
 					Write-Output "No exceptions encountered."
 				}			
 			}
-		}
-	 catch {
+		} catch {
 			Write-Output $ErrorMessageString
 		}
 	}
@@ -1121,8 +1081,7 @@ $InitScriptBlock = {
 			$SqlConnection.Close()
 			[string]$IsFlagTbl = $CheckFlagTblSet.Tables[0].Rows[0]["FlagFound"]
             
-		}
-		Catch {
+		} Catch {
 			[string]$IsFlagTbl = "X"            
 		}
 		if ($IsFlagTbl -eq "Y") {
@@ -1157,8 +1116,7 @@ $MainScriptblock = {
 		Try {
 			Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoIn 
 			$SuccessCount += 1
-		}
-		Catch {
+		} Catch {
 			$FailedCount += 1
 		}
 		[string]$IsFlagTbl = Invoke-FlagTableCheck -FlagTblDt $DirDateIn
@@ -1187,8 +1145,7 @@ $MainScriptblock = {
 			$OutErr = Format-ExceptionMsg
 			$OutMsg += "`n $OutErr"
 			Write-Output $OutMsg
-		}
-		else {
+		} else {
 			$OutMsg += ""
 			#Write-Host ""
 			$OutErr = Format-ExceptionMsg
@@ -1197,16 +1154,14 @@ $MainScriptblock = {
 			#Write-Host "  $OutErr" -fore Red
 		}
 		$SqlConnection.Dispose()
-	}
-	else {
+	} else {
 		$OutMsg = " ->Successful runs: $SuccessCount"
 		#Write-Host " ->Successful runs: $SuccessCount" -NoNewLine
 		if ($FlagCheckRetry -gt 0) {
 			$OutMsg += "; Consecutive retries: $FlagCheckRetry"
 			#Write-Host "; Consecutive retries: $FlagCheckRetry"
 			Write-Output $OutMsg
-		}
-		else {
+		} else {
 			$OutMsg += ""
 			#Write-Host ""
 			Write-Output $OutMsg
@@ -1292,8 +1247,7 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 		if ($ServerName -like "*,*") {
 			$pos = $ServerName.IndexOf(",")
 			$HostName = $ServerName.Substring(0, $pos)		
-		}
-		else {
+		} else {
 			$HostName = $ServerName
 		}
 	
@@ -1303,8 +1257,7 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 		if ($TCPStripped) {
 			$ServerName = "tcp:$ServerName"
 		}
-	}
- elseif ($ServerName -like "*,*") {
+	} elseif ($ServerName -like "*,*") {
 		$pos = $ServerName.IndexOf(",")
 		$HostName = $ServerName.Substring(0, $pos)
 		$InstName = $ServerName -replace ",", "-"
@@ -1315,8 +1268,7 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 			$pos = $HostName.IndexOf(".")
 			$HostName = $HostName.Substring(0, $pos)
 		}
-	}
- else	{
+	} else	{
 		$InstName = $ServerName
 		$HostName = $ServerName
 	}
@@ -1373,8 +1325,7 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 		##custom output dir
 		[string]$OutputDir = Read-Host -Prompt "Specify another existing directory path to save the output.(empty defaults to PSBlitz's path)"
 	}
-}
-else {
+} else {
 	$InteractiveMode = 0
 	if ($ServerName -like "*\*") {
 		$pos = $ServerName.IndexOf("\")
@@ -1402,8 +1353,7 @@ else {
 		if ($ServerName -like "*,*") {
 			$pos = $ServerName.IndexOf(",")
 			$HostName = $ServerName.Substring(0, $pos)		
-		}
-		else {
+		} else {
 			$HostName = $ServerName
 		}
 	
@@ -1413,13 +1363,11 @@ else {
 		if ($TCPStripped) {
 			$ServerName = "tcp:$ServerName"
 		}
-	}
-	elseif ($ServerName -like "*,*") {
+	} elseif ($ServerName -like "*,*") {
 		$pos = $ServerName.IndexOf(",")
 		$HostName = $ServerName.Substring(0, $pos)
 		$InstName = $ServerName -replace ",", "-"
-	}
-	else	{
+	} else	{
 		$InstName = $ServerName
 		$HostName = $ServerName
 	}
@@ -1452,8 +1400,7 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 	$AppName = "PSBlitz " + $Vers
 	if (!([string]::IsNullOrEmpty($SQLLogin))) {
 		$ConnString = "Server=$ServerName;Database=master;User Id=$SQLLogin;Password=$SQLPass;Connection Timeout=$ConnTimeout;Application Name=$AppName"
-	}
-	else {
+	} else {
 		$ConnString = "Server=$ServerName;Database=master;trusted_connection=true;Connection Timeout=$ConnTimeout;Application Name=$AppName"
 	}
 	$SqlConnection.ConnectionString = $ConnString
@@ -1474,8 +1421,7 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 		$AzCheckAdapter.Fill($AzCheckSet) | Out-Null -ErrorAction Stop
 		$SqlConnection.Close()
 		$StepEnd = get-date
-	}
-	Catch {
+	} Catch {
 		$StepEnd = get-date
 		Invoke-ErrMsg
 		$Help = Read-Host -Prompt "Need help?[Y/N]"
@@ -1486,8 +1432,7 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 				Read-Host -Prompt "Press Enter to close this window."
 				Exit
 			}
-		}
-		else {
+		} else {
 			Exit
 		}
 	}
@@ -1505,16 +1450,13 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 			if ($EngineEdition -eq 8) {
 				$IsAzureSQLMI = $true
 				Write-Host "->Azure SQL MI"
-			}
-			elseif ($EngineEdition -eq 5) {
+			} elseif ($EngineEdition -eq 5) {
 				$IsAzureSQLDB = $true
 				Write-Host "->Azure SQL DB"
 			} 
-		}
-		elseif ($EngineEdition -in 2, 3, 4) {
+		} elseif ($EngineEdition -in 2, 3, 4) {
 			Write-Host "->SQL Server $Edition"
-		}
-		else {
+		} else {
 			Write-Host "->Well this is awquard, use the following info to debug:"
 			Write-Host " Edition - $Edition; EngineEdition - $EngineEdition"
 		}
@@ -1526,15 +1468,13 @@ if (($IsAzureSQLDB) -and ([string]::IsNullOrEmpty($ASDBName))) {
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		$ASDBName = $CheckDB
 		$CheckDB = ""
-	}
-	else {
+	} else {
 		Write-Host " The environment has been identified as Azure SQL DB, but a database name was not provide." -Fore yellow
 		while ([string]::IsNullOrEmpty($ASDBName)) {
 			$ASDBName = Read-Host -Prompt "Name of the Azure SQL DB database (cannot be empty)"
 		}
 	}
-}
-elseif (($IsAzureSQLMI) -and ($InteractiveMode -eq 1) -and ([string]::IsNullOrEmpty($CheckDB))) {
+} elseif (($IsAzureSQLMI) -and ($InteractiveMode -eq 1) -and ([string]::IsNullOrEmpty($CheckDB))) {
 	$CheckDB = Read-Host -Prompt "Name of the database you want to check (leave empty for all)"
 }
 
@@ -1550,17 +1490,14 @@ $SqlConnection = New-Object System.Data.SqlClient.SqlConnection
 if (!([string]::IsNullOrEmpty($SQLLogin))) {
 	if ($IsAzureSQLDB) {
 		$ConnString = "Server=$ServerName;Database=$ASDBName;User Id=$SQLLogin;Password=$SQLPass;Connection Timeout=$ConnTimeout;Application Name=$AppName"
-	}
- else {
+	} else {
 		$ConnString = "Server=$ServerName;Database=master;User Id=$SQLLogin;Password=$SQLPass;Connection Timeout=$ConnTimeout;Application Name=$AppName"
 	}
 	$Auth = "SQL"
-}
-else {
+} else {
 	if ($IsAzureSQLDB) {
 		$ConnString = "Server=$ServerName;Database=$ASDBName;trusted_connection=true;Connection Timeout=$ConnTimeout;Application Name=$AppName"
-	}
- else {
+	} else {
 		$ConnString = "Server=$ServerName;Database=master;trusted_connection=true;Connection Timeout=$ConnTimeout;Application Name=$AppName"
 	}
 	$Auth = "Trusted"
@@ -1584,8 +1521,7 @@ Try {
 	$ConnCheckAdapter.Fill($ConnCheckSet) | Out-Null -ErrorAction Stop
 	$SqlConnection.Close()
 	$StepEnd = get-date
-}
-Catch {
+} Catch {
 	$StepEnd = get-date
 	Invoke-ErrMsg
 	$Help = Read-Host -Prompt "Need help?[Y/N]"
@@ -1596,8 +1532,7 @@ Catch {
 			Read-Host -Prompt "Press Enter to close this window."
 			Exit
 		}
-	}
- else {
+	} else {
 		Exit
 	}
 }
@@ -1611,19 +1546,15 @@ if ($ConnCheckSet.Tables[0].Rows.Count -eq 1) {
 	if ($DebugInfo) {
 		Write-Host " - $ConnTest seconds"
 		Write-Host " Product Major Version - $MajorVers"  -Fore Yellow
-	}
- else {
-	    $Message = "->Estimated response latency: $ConnTest seconds"
+	} else {
+		$Message = "->Estimated response latency: $ConnTest seconds"
 		if ($ConnTest -ge 2) {
 			Write-Host $Message -Fore Red
-		}
-		elseif ($ConnTest -ge 0.5) {
+		} elseif ($ConnTest -ge 0.5) {
 			Write-Host $Message -Fore Yellow
-		}
-		elseif ($ConnTest -ge 0.2) {
+		} elseif ($ConnTest -ge 0.2) {
 			Write-Host $Message
-		}
-		elseif ($ConnTest -lt 0.2) {
+		} elseif ($ConnTest -lt 0.2) {
 			Write-Host $Message -Fore Green
 		}
 	}
@@ -1648,14 +1579,12 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 			Write-Host "->Database $CheckDB - " -NoNewLine -ErrorAction Stop
 			Write-Host "is online" -fore green -ErrorAction Stop
 		}
-	}
- Catch {
+	} Catch {
 		Write-Host "->Database $CheckDB either does not exist or is offline" -fore red
 		$InstanceWide = Read-Host -Prompt "Switch to instance-wide plan cache, index, and deadlock check?[Y/N]"
 		if ($InstanceWide -eq "Y") {
 			$CheckDB = ""
-		}
-		else {
+		} else {
 			$Help = Read-Host -Prompt "Need help?[Y/N]"
 			if ($Help -eq "Y") {
 				Get-PSBlitzHelp
@@ -1664,16 +1593,14 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 					Read-Host -Prompt "Press Enter to close this window."
 					Exit
 				}
-			}
-			else {
+			} else {
 				Exit
 			}
 		}
 	}
 	Invoke-ClearVariables CheckDBSet, CheckDBAdapter, CheckDBQuery
 
-}
-elseif ($IsAzureSQLDB -eq $false) {
+} elseif ($IsAzureSQLDB -eq $false) {
 	#if we're not in Azure SQL DB mode and no database was provided, get a user database count
 	Write-Host "Checking user database count..." -NoNewline
 	$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
@@ -1694,12 +1621,10 @@ elseif ($IsAzureSQLDB -eq $false) {
 		Write-Host "->The following checks will be limited to the database that shows up the most in plan cache info:"
 		if ($IsIndepth -eq "Y") {
 			Write-Host "   - Index Summary`n   - Index Usage Details`n   - Extended Index Diagnosis"
-		}
-		else {
+		} else {
 			Write-Host "   - Index Diagnosis"
 		}			
-	}
- else {
+	} else {
 		Write-Host @GreenCheck
 	}	
 }
@@ -1712,21 +1637,17 @@ $DirDate = $sdate.ToString("yyyyMMddHHmm")
 if ((!([string]::IsNullOrEmpty($OutputDir))) -and (Test-Path $OutputDir)) {
 
 	$OutDir = $OutputDir
-}
-else {
+} else {
 	$OutDir = $scriptPath
 	$OutputDir = $scriptPath
 }
 if ($IsAzureSQLDB) {
 	$SubDir = "AzureSQLDB_$ASDBName" + "_"
-}
-elseif ($IsAzureSQLMI) {
+} elseif ($IsAzureSQLMI) {
 	$SubDir = $InstName.Replace('.database.windows.net', '') + "_"
-}
-elseif ($HostName -ne $InstName) {
+} elseif ($HostName -ne $InstName) {
 	$SubDir = $HostName + "_" + $InstName + "_"
-}
-else {
+} else {
 	$SubDir = $InstName + "_"
 }
 if (!([string]::IsNullOrEmpty($CheckDB))) {
@@ -1767,8 +1688,7 @@ if ($ToHTML -ne "Y") {
 	if ($DebugInfo) {
 		$ErrorActionPreference = "Continue"
 		Write-Host "Opening excel file" -fore yellow
-	}
-	else {
+	} else {
 		#Do not display the occasional "out of memory" errors
 		$ErrorActionPreference = "SilentlyContinue"
 	}
@@ -1777,8 +1697,7 @@ if ($ToHTML -ne "Y") {
 		$ExcelApp = New-Object -comobject Excel.Application	-ErrorAction Stop
 		Write-Host "PSBlitz is writing the report to Excel." -Fore Green
 		Write-Host " Warning: Do not open or close Excel during this execution of PSBlitz." -Fore Yellow	
-	}
-	catch {
+	} catch {
 		Write-Host "Could not open Excel." -fore Red
 		Write-Host "->Switching to HTML output."
 		$ToHTML = "Y"
@@ -1867,13 +1786,11 @@ if ($ToHTML -eq "Y") {
 	$HTMLBodyStart = "`n</head>`n<body>`n"
 	$HTMLBodyEnd = "`n<br>`n </body>`n</html>"
 	$htmlResources = @("styles.css", "sorttable.js", "searchtable.js", "copy.js")
-}
-else {
+} else {
 	###Set output Excel name and destination
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		$OutExcelFName = "Active_$InstName_$CheckDB.xlsx"
-	}
-	else {
+	} else {
 		$OutExcelFName = "Active_$InstName.xlsx"
 	}
 	$OutExcelF = Join-Path -Path $OutDir -ChildPath $OutExcelFName
@@ -1889,8 +1806,7 @@ if ($ToHTML -ne "Y") {
 	###Open Excel FIle
 	if ($DebugInfo) {
 		$ExcelApp.visible = $True
-	}
-	else {
+	} else {
 		$ExcelApp.visible = $False
 	}
 	$ExcelFile = $ExcelApp.Workbooks.Open("$OutExcelF")
@@ -1946,11 +1862,9 @@ try {
 	Write-Host " check for " -NoNewLine 
 	if ($IsAzureSQLDB) {
 		Write-Host "Azure SQL DB - $ASDBName"
-	}
-	elseif ($IsAzureSQLMI) {
+	} elseif ($IsAzureSQLMI) {
 		Write-Host "Azure SQL MI - $($ServerName.Replace('.database.windows.net',''))" 
-	}
-	else {
+	} else {
 		Write-Host "$ServerName"
 	}
 	Write-Host $("-" * 80)
@@ -1981,8 +1895,7 @@ try {
 		$JobError = $Job | Select-Object -ExpandProperty Error
 		Add-LogRow "Start sp_BlitzWho background process" $JobStatus $JobError
 		Write-Host " ->Session activity will not be captured."
-	}
- else {
+	} else {
 		Write-Host @GreenCheck
 		if ($DebugInfo) {
 			Write-Host ""
@@ -2017,8 +1930,7 @@ try {
 
 			if ($IsAzureSQLDB) {
 				$htmlTable2 = '<p>Instance resource information is not available for Azure SQL DB.</p>'
-			}
-			else {
+			} else {
 
 				$htmlTable2 = Convert-TableToHtml $ResourceInfoTbl -CSSClass RsrcInfoTbl -DebugInfo:$DebugInfo
 			}
@@ -2041,8 +1953,7 @@ $htmlTable6 `n<br>`n<h2>Session level SET options</h2> `n $htmlTable4 `n $HTMLBo
 			#Save HTML file
 			Save-HtmlFile $html "InstanceInfo.html" $HTMLOutDir $DebugInfo
 			Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3, htmlTable4
-		}
-		else {
+		} else {
 			###Populating the "Instance Info" sheet
 			$ExcelSheet = $ExcelFile.Worksheets.Item("Instance Info")
 			##Instance Info section
@@ -2097,8 +2008,7 @@ $htmlTable6 `n<br>`n<h2>Session level SET options</h2> `n $htmlTable4 `n $HTMLBo
 
 			if ($TempTabTbl.Rows.Count -gt 0) {
 				$htmlTable2 = Convert-TableToHtml $TempTabTbl -CSSClass "InstCacheTbl" -DebugInfo:$DebugInfo
-			}
-			else {
+			} else {
 				$htmlTable2 = "<p>No temp tables found.</p>"
 			}
 
@@ -2109,8 +2019,7 @@ $htmlTable6 `n<br>`n<h2>Session level SET options</h2> `n $htmlTable4 `n $HTMLBo
 			
 				$htmlTable4 = Convert-QueryTableToHtml $TempDBSessTbl -DebugInfo:$DebugInfo -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "TempDB"
 				$htmlTable4 = "<br>`n<h3>Query text</h3>`n" + $htmlTable4
-			}
-			else {
+			} else {
 				$htmlTable3 = "<p>No sessions were using tempdb at this time.</p>`n<br>"
 				$htmlTable4 = ""
 			}
@@ -2127,8 +2036,7 @@ $htmlTable4 `n $HTMLBodyEnd
 			Save-HtmlFile $html "TempDBInfo.html" $HTMLOutDir $DebugInfo
 			Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3, htmlTable4
 
-		}
-		else {
+		} else {
 			###Populating the "TempDB" sheet
 			$ExcelSheet = $ExcelFile.Worksheets.Item("TempDB")
 			##TempDB space usage section
@@ -2173,16 +2081,14 @@ $htmlTable4 `n $HTMLBodyEnd
 		[int]$RowsReturned = $AcTranTbl.Rows.Count
 		if ($RowsReturned -le 0) {
 			Write-Host " ->No open transactions found."
-		}
-		else {
+		} else {
 			Export-PlansAndDeadlocks $AcTranTbl $PlanOutDir "current_plan" "current_plan_file" -DebugInfo:$DebugInfo -FileNameFromColumn
 			Export-PlansAndDeadlocks $AcTranTbl $PlanOutDir "most_recent_plan" "most_recent_plan_file" -DebugInfo:$DebugInfo -FileNameFromColumn
 			if ($ToHTML -eq "Y") {
 				$tableName = "Open transaction info"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$tableName += " for $CheckDB" 
-				}
-				elseif ($IsAzureSQLDB) {
+				} elseif ($IsAzureSQLDB) {
 					$tableName += " for $ASDBName"
 				}
 				
@@ -2201,8 +2107,7 @@ $HTMLBodyEnd
 				#Save HTML file
 				Save-HtmlFile $html "OpenTransactions.html" $HTMLOutDir $DebugInfo
 				Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3
-			}
-			else {
+			} else {
 				##Populating the "Open Transactions" sheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Open Transactions")
 				Convert-TableToExcel $AcTranTbl $ExcelSheet -DebugInfo:$DebugInfo -StartRow $DefaultStartRow -ExclCols "current_query", "most_recent_query", "current_plan", "most_recent_plan"
@@ -2248,8 +2153,7 @@ $HTMLBodyEnd
 
 				if ($ObjImpUpgrTbl.Rows.Count -gt 0) {
 					$htmlTable5 = Convert-TableToHtml $ObjImpUpgrTbl -CSSClass "ASDBObjVersChgTbl sortable" -DebugInfo:$DebugInfo -NoCaseChange
-				}
-				else {
+				} else {
 					$htmlTable5 = '<p>No matching objects found.</p>'
 				}			
 
@@ -2269,8 +2173,7 @@ $SortableTable `n $htmlTable6 `n $JumpToTop `n $HTMLBodyEnd
 				#Save HTML file
 				Save-HtmlFile $html "AzureSQLDBInfo.html" $HTMLOutDir $DebugInfo
 				Invoke-ClearVariables html, htmlTable, htmlTable1, htmlTable2, htmlTable3, htmlTable4, htmlTable5, htmlTable6
-			}
-			else {
+			} else {
 				#Populate the Azure SQL DB Resource Governance section
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Azure SQL DB Info")
 				#Specify at which row in the sheet to start adding the data
@@ -2339,8 +2242,7 @@ $SortableTable `n $htmlTable6 `n $JumpToTop `n $HTMLBodyEnd
 			}
 			Invoke-ClearVariables DBInfoTbl, DBFileInfoTbl, RsrcGovTbl, RsrcUsageTbl, ObjImpUpgrTbl, DBConfigTbl, PSBlitzSet
 		}
-	}
- else {
+	} else {
 		#if it's not Azure SQL DB
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetDbInfo.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
@@ -2348,8 +2250,7 @@ $SortableTable `n $htmlTable6 `n $JumpToTop `n $HTMLBodyEnd
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
 			Write-Host " Retrieving database info for $CheckDB... " -NoNewLine
 			[string]$Query = $Query -replace "SET @DatabaseName = N'';", "SET @DatabaseName = N'$CheckDB';"
-		}
-		else {
+		} else {
 			Write-Host " Retrieving database info... " -NoNewLine
 		}
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Database Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
@@ -2361,8 +2262,7 @@ $SortableTable `n $htmlTable6 `n $JumpToTop `n $HTMLBodyEnd
 				#the 3rd result set exists only for SQL Server 2016 and above
 				#$DBConfigTbl = New-Object System.Data.DataTable
 				$DBConfigTbl = $global:PSBlitzSet.Tables[2]
-			}
-			elseif (($MajorVers -lt 13) -and (!([string]::IsNullOrEmpty($CheckDB))) -and ($IsAzureSQLMI -eq $false)) {
+			} elseif (($MajorVers -lt 13) -and (!([string]::IsNullOrEmpty($CheckDB))) -and ($IsAzureSQLMI -eq $false)) {
 				Add-LogRow "->Database Scoped Config" "Skipped" "Major Version is $MajorVers"
 			}
 
@@ -2380,8 +2280,7 @@ $SortableTable `n $htmlTable6 `n $JumpToTop `n $HTMLBodyEnd
 					$htmlBlock = "`n<br>`n <h2>Database Scoped Configuration for $CheckDB</h2>"
 					$htmlBlock += '<p><a href="https://learn.microsoft.com/en-us/sql/t-sql/statements/alter-database-scoped-configuration-transact-sql?view=sql-server-ver16" target="_blank">More Info</a></p>'
 					$htmlBlock += "`n $SortableTable `n $htmlTable2 `n<p><a href=`"#top`">Jump to top</a></p>`n<br>`n"
-				}
-				else {
+				} else {
 					$htmlBlock = "<br>`n"
 				}
 
@@ -2396,8 +2295,7 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 				#Save HTML file
 				Save-HtmlFile $html "DatabaseInfo.html" $HTMLOutDir $DebugInfo
 				Invoke-ClearVariables html, htmlTable, htmlTable1, htmlBlock
-			}
-			else {
+			} else {
 				##Populating the "Database Info" sheet with the database files data first because 
 				#it's narrower and leaves room to fit some of the database info
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Database Info")
@@ -2439,8 +2337,7 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 		$StepEnd = get-date
 		Write-Host " Azure SQL DB - skipping instance health."
 		Add-LogRow "sp_Blitz" "Skipped" "Azure SQL DB"
-	}
-	else {
+	} else {
 		Write-Host " Retrieving instance health data... " -NoNewLine
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitz_NonSPLatest.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
@@ -2465,8 +2362,7 @@ $($SearchTableDiv -replace $STDivReplace, "'InstanceHealthTable', 3" -replace 'o
 				#Save HTML file
 				Save-HtmlFile $html "spBlitz.html" $HTMLOutDir $DebugInfo
 				Invoke-ClearVariables html, htmlTable
-			}
-			else {
+			} else {
 				##Populating the "sp_Blitz" sheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Instance Health")
 					
@@ -2496,11 +2392,9 @@ $($SearchTableDiv -replace $STDivReplace, "'InstanceHealthTable', 3" -replace 'o
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		if ($IsAzureSQLDB) {
 			[string]$Query = $Query -replace 'SET @IsAzureSQLDB = 0;', 'SET @IsAzureSQLDB = 1;'
-		}
-		elseif (!([string]::IsNullOrEmpty($CheckDB))) {
+		} elseif (!([string]::IsNullOrEmpty($CheckDB))) {
 			$Query = $Query -replace '..PSBlitzReplace..', "$CheckDB"
-		}
-		elseif ($GetUsrDBObj) {
+		} elseif ($GetUsrDBObj) {
 			$InsertString = ''
 			foreach ($DB in $DangerousObjDBs) {
 				$InsertString += "(N'$($DB.DatabaseName)'),"
@@ -2514,8 +2408,7 @@ $($SearchTableDiv -replace $STDivReplace, "'InstanceHealthTable', 3" -replace 'o
 			[int]$RowsReturned = $DangerousSetTbl.Rows.Count
 			if ($RowsReturned -le 0) {
 				Write-Host " ->No rows returned."
-			}
-			else {
+			} else {
 				if ($ToHTML -eq "Y") {
 					$HtmlTabName = "Database objects with dangerous SET options"
 					$htmlTable = Convert-TableToHtml $DangerousSetTbl -CSSClass "sortable" -DebugInfo:$DebugInfo
@@ -2526,8 +2419,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 "@
 					Save-HtmlFile $html "DangerousSETOpt.html" $HTMLOutDir $DebugInfo
 					Invoke-ClearVariables html, htmlTable
-				}
-				else {
+				} else {
 					$ExcelSheet = $ExcelFile.Worksheets.Item("Objects Dangerous SET")
 					
 					Convert-TableToExcel $DangerousSetTbl $ExcelSheet -StartRow 4 -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
@@ -2561,8 +2453,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			#Save HTML file
 			Save-HtmlFile $html "BlitzFirst30s.html" $HTMLOutDir $DebugInfo
 			Invoke-ClearVariables html, htmlTable
-		}
-		else {
+		} else {
 			##Populating the "sp_BlitzFirst 30s" sheet
 			$ExcelSheet = $ExcelFile.Worksheets.Item("Happening Now")
 			Convert-TableToExcel $BlitzFirstTbl $ExcelSheet -StartRow $DefaultStartRow -ExclCols "FindingHL" -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
@@ -2626,8 +2517,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				#Save HTML file
 				Save-HtmlFile $html "BlitzFirst_Perfmon.html" $HTMLOutDir $DebugInfo
 				Invoke-ClearVariables html, htmlTable
-			}
-			else { 
+			} else { 
 				##Populating the "Wait Stats" sheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Wait Stats")					
 				Convert-TableToExcel $WaitsTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 4 -URLTextCol "wait_type" -ExclCols "wait_typeHL"
@@ -2668,8 +2558,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			"'Duration'", "'Average Duration'", "'Executions'", "'Executions per Minute'",
 			"'Writes'", "'Average Writes'", "'Spills'", "'Average Spills'",
 			"'Duplicate'", "'Query Hash'", "'Memory Grant'", "'Recent Compilations'")
-	}
-	else {
+	} else {
 		$SortOrders = @("'CPU'", "'Average CPU'", "'Duration'",
 			"'Average Duration'")
 	}
@@ -2681,11 +2570,9 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 		Write-Host " Retrieving plan cache info for $CheckDB" -NoNewline
-	}
-	elseif ($IsAzureSQLDB) {
+	} elseif ($IsAzureSQLDB) {
 		Write-Host " Retrieving plan cache info for $ASDBName" -NoNewline
-	}
-	else {
+	} else {
 		Write-Host " Retrieving plan cache info for all user databases" -NoNewline
 		#Create array to store database names
 		$DBArray = New-Object System.Collections.ArrayList
@@ -2699,8 +2586,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		$NewCacheMinutesBackStr = ";SET @MinutesBack = " + $CacheMinutesBack + ";"
 		[string]$Query = $Query -replace $OldCacheMinutesBackStr, $NewCacheMinutesBackStr
 		Write-Host " for the past $CacheMinutesBack minutes + current execution time"
-	}
-	else { 
+	} else { 
 		Write-Host "" 
 	}
 	#Loop through sort orders
@@ -2718,8 +2604,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		if ($SortOrder -eq "'recent compilations'") {
 			$OldSortString = $OldSortString + ", @Top = $CacheTop;"
 			$NewSortString = $NewSortString + ", @Top = 50;"
-		}
-		elseif (($CacheTop -ne 10) -and ($SortOrder -eq "'CPU'")) {
+		} elseif (($CacheTop -ne 10) -and ($SortOrder -eq "'CPU'")) {
 			#Since we're only reading the script once and then using it from memory, 
 			#we only have to change @Top once if it's not the default
 			$OldSortString = $OldSortString + ", @Top = 10;"
@@ -2744,58 +2629,49 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		Write-Host " ->Top $(if($SortOrder -eq "'recent compilations'"){"50"}else{$CacheTop}) queries by $($SortOrder -replace "'",'')... " -NoNewLine
 		if ($OrigCacheMinutesBack -ne 0) {
 			$AdditionalInfo = ", MinutesBack=$CacheMinutesBack"
-		}
-		else {
+		} else {
 			$AdditionalInfo = ""
 		}
 		$PreviousOutcome = $global:StepOutcome
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzCache $SortOrder  $AdditionalInfo" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
 
 		$SheetName = "Top Queries - "
-			if ($SortOrder -like '*CPU*') {
-				$SheetName = $SheetName + "CPU"
-				$HighlightCol = 16
-				$ExcelWarnInitCol = 1
-			}
-			elseif ($SortOrder -like '*Reads*') {
-				$SheetName = $SheetName + "Reads"
-				$HighlightCol = 24
-				$ExcelWarnInitCol = 11
-			}
-			elseif ($SortOrder -like '*Duration*') {
-				$SheetName = $SheetName + "Duration"
-				$HighlightCol = 20
-				$ExcelWarnInitCol = 6
-			}
-			elseif ($SortOrder -like '*Executions*') {
-				$SheetName = $SheetName + "Executions"
-				$HighlightCol = 10
-				$ExcelWarnInitCol = 21
-			}
-			elseif ($SortOrder -like '*Writes*') {
-				$SheetName = $SheetName + "Writes"
-				$HighlightCol = 28
-				$ExcelWarnInitCol = 16
-			}
-			elseif ($SortOrder -like '*Spills*') {
-				$SheetName = $SheetName + "Spills"
-				$HighlightCol = 43
-				$ExcelWarnInitCol = 26
-			}
-			elseif ("'Duplicate'", "'Query Hash'" -contains $SortOrder) {
-				$SheetName = $SheetName + "Dupl & Single Use"
-				$HighlightCol = 0
-			}
-			elseif ($SortOrder -like '*Memory*') {
-				$SheetName = $SheetName + "Mem & Recent Comp"
-				$HighlightCol = 40
-				$ExcelWarnInitCol = 31
-			}
-			elseif ($SortOrder -eq "'Recent compilations'") {
-				$SheetName = $SheetName + "Mem & Recent Comp"
-				$HighlightCol = 47
-				$ExcelWarnInitCol = 31
-			}
+		if ($SortOrder -like '*CPU*') {
+			$SheetName = $SheetName + "CPU"
+			$HighlightCol = 16
+			$ExcelWarnInitCol = 1
+		} elseif ($SortOrder -like '*Reads*') {
+			$SheetName = $SheetName + "Reads"
+			$HighlightCol = 24
+			$ExcelWarnInitCol = 11
+		} elseif ($SortOrder -like '*Duration*') {
+			$SheetName = $SheetName + "Duration"
+			$HighlightCol = 20
+			$ExcelWarnInitCol = 6
+		} elseif ($SortOrder -like '*Executions*') {
+			$SheetName = $SheetName + "Executions"
+			$HighlightCol = 10
+			$ExcelWarnInitCol = 21
+		} elseif ($SortOrder -like '*Writes*') {
+			$SheetName = $SheetName + "Writes"
+			$HighlightCol = 28
+			$ExcelWarnInitCol = 16
+		} elseif ($SortOrder -like '*Spills*') {
+			$SheetName = $SheetName + "Spills"
+			$HighlightCol = 43
+			$ExcelWarnInitCol = 26
+		} elseif ("'Duplicate'", "'Query Hash'" -contains $SortOrder) {
+			$SheetName = $SheetName + "Dupl & Single Use"
+			$HighlightCol = 0
+		} elseif ($SortOrder -like '*Memory*') {
+			$SheetName = $SheetName + "Mem & Recent Comp"
+			$HighlightCol = 40
+			$ExcelWarnInitCol = 31
+		} elseif ($SortOrder -eq "'Recent compilations'") {
+			$SheetName = $SheetName + "Mem & Recent Comp"
+			$HighlightCol = 47
+			$ExcelWarnInitCol = 31
+		}
 	
 		if ($global:StepOutcome -eq "Success") {
 			$BlitzCacheTbl = $global:PSBlitzSet.Tables[0]
@@ -2834,17 +2710,14 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					
 					if ($SheetName -eq "Mem & Recent Comp") {
 						$HtmlTabName = "Queries by Memory Grants & Recent Compilations"
-					}
-					elseif ($SheetName -eq "Dupl & Single Use") {
+					} elseif ($SheetName -eq "Dupl & Single Use") {
 						$HtmlTabName = "Queries by Duplicate Plans & Query Hash"
-					}
-					else {
+					} else {
 						$HtmlTabName = "Queries by $SheetName"
 					}
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$HtmlTabName += " for $CheckDB" 
-					}
-					elseif ($IsAzureSQLDB) {
+					} elseif ($IsAzureSQLDB) {
 						$HtmlTabName += " for $ASDBName"
 					}
 					
@@ -2882,8 +2755,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					} 					
 					if ($SortOrder -eq "'Recent Compilations'") {
 						$TopCount = "50"						
-					}
-					else {
+					} else {
 						$TopCount = "$CacheTop"
 						$HighlightCol += 1
 					}
@@ -2899,8 +2771,8 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					$html3 = $CacheHTMLPre + $html + $html2 + "`n $HTMLBodyEnd"
 					$SecondHalf = "Done"					
 					#Save the HTML file containing both pairs
-					try{
-					Save-HtmlFile $html3 $HtmlFileName $HTMLOutDir $DebugInfo "Complete "
+					try {
+						Save-HtmlFile $html3 $HtmlFileName $HTMLOutDir $DebugInfo "Complete "
 					} catch {
 						Invoke-ErrMsg
 						Add-LogRow "->Write Complete HTML file" "Failure"
@@ -2914,16 +2786,15 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					$HTMLBodyEnd
 "@
 					#Save the partial HTML file
-					try{
-					Save-HtmlFile $html3 $HtmlFileName $HTMLOutDir $DebugInfo "Partial "
+					try {
+						Save-HtmlFile $html3 $HtmlFileName $HTMLOutDir $DebugInfo "Partial "
 					} catch {
 						Invoke-ErrMsg
 						Add-LogRow "->Write Partial HTML file" "Failure"
 					}
 				}
 
-			}
-			else {
+			} else {
 				#Specify worksheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
 				#Specify at which row in the sheet to start adding the data
@@ -3023,8 +2894,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$CheckDBQuery.CommandText = $DBQuery
 			$CheckDBQuery.Parameters.Add("@DBName", [Data.SQLDBType]::NVarChar, 256) | Out-Null
 			$CheckDBQuery.Parameters["@DBName"].Value = $CheckDB
-		}
-		elseif ($IsAzureSQLDB) {
+		} elseif ($IsAzureSQLDB) {
 			$DBQuery = @"
 			IF ( (SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128))) = N'SQL Azure' )
 			BEGIN
@@ -3060,20 +2930,17 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			if ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "Yes") {
 				Write-Host @GreenCheck				
 				$CheckQueryStore = 'Y'
-			}
-			elseif ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "No") {
+			} elseif ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "No") {
 				$StepEnd = Get-Date
 				Write-Host "X (not eligible)" -Fore Yellow
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" "$databaseName is not eligible"
-			}
-			else {
+			} else {
 				$StepEnd = Get-Date
 				$QSCheckResult = $CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] 
 				Write-Host "X (not eligible)" -Fore Yellow
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" $QSCheckResult
 			}
-		}
-		Catch {
+		} Catch {
 			$CheckQueryStore = 'N'
 			Invoke-ErrMsg
 			$StepEnd = Get-Date
@@ -3126,15 +2993,13 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						Save-HtmlFile $html "BlitzQueryStore_$SortOrder.html" $HTMLOutDir $DebugInfo
 						Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3
 
-					}
-					else {
+					} else {
 						##export to excel
 						$ExcelSheet = $ExcelFile.Worksheets.Item("Query Store Info")
 						#Specify at which row in the sheet to start adding the data
 						if ($SortOrder -eq "duration") {
 							$ExcelStartRow = 27
-						}
-						else {
+						} else {
 							$ExcelStartRow = 3
 						}
 						
@@ -3159,17 +3024,16 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	#Building a list of values for $Modes
 	if ($IsIndepth -eq "Y") {
 		$Modes = @("1", "2", "4")
-	}
-	else {
+	} else {
 		$Modes = @("0")
 	}
 	#Messages 
 	$modeMessages = @{
-    "0" = " ->Index diagnosis... "
-    "1" = " ->Index summary... "
-    "2" = " ->Index usage details... "
-    "4" = " ->Extended index diagnosis... "
-    }
+		"0" = " ->Index diagnosis... "
+		"1" = " ->Index summary... "
+		"2" = " ->Index usage details... "
+		"4" = " ->Extended index diagnosis... "
+	}
 	# Set OldMode variable 
 	$OldMode = ";SET @Mode = 0;"
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzIndex_NonSPLatest.sql"
@@ -3179,12 +3043,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 		[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
 		Write-Host " Retrieving index info for $CheckDB"
-	}
-	elseif ($IsAzureSQLDB) {
+	} elseif ($IsAzureSQLDB) {
 		[string]$Query = $Query -replace ";SET @GetAllDatabases = 1;", ";SET @GetAllDatabases = 0;"
 		Write-Host " Retrieving index info for $ASDBName"
-	}
-	elseif ($UsrDBCount -ge $MaxUsrDBs) {
+	} elseif ($UsrDBCount -ge $MaxUsrDBs) {
 		#If the number of user databases >= MaxUsrDBs
 		#set the database to the one that accounts for the most records in the plan cache
 		$TopDBinCache = $DBArray | Where-Object { $_ -ne "-- N/A --" } | Group-Object | Sort-Object Count -Descending | Select-Object -First 1
@@ -3222,19 +3084,16 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$htmlTabSearch = ""
 				if ($Mode -eq "0") {
 					$HtmlTabName = "Index Diagnosis"
-				}
-				elseif ($Mode -eq "1") {
+				} elseif ($Mode -eq "1") {
 					$HtmlTabName = "Index Summary"
 					if ($BlitzIxTbl.Rows.Count -ge 5) {
 						$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexSummaryTable', 0" -replace 'object', 'database'
 						$htmlTabSearch += "<br>"
 					}
-				}
-				elseif ($Mode -eq "2") {
+				} elseif ($Mode -eq "2") {
 					$HtmlTabName = "Index Usage Details"
 
-				}
-				elseif ($Mode -eq "4") {
+				} elseif ($Mode -eq "4") {
 					$HtmlTabName = "Extended Index Diagnosis"
 				}
 				if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
@@ -3242,8 +3101,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					$ExclCols = @("Sample Query Plan", "Display Order", "Database Name", "Finding", "URL")
 					$Mode2SearchCol = 0
 					$Mode2CSS = "IndexUsageTableDB sortable"
-				}
-				else {
+				} else {
 					$ExclCols = @("Sample Query Plan", "Display Order", "Finding", "URL")
 					$Mode2SearchCol = 1
 					$Mode2CSS = "IndexUsageTable sortable"
@@ -3256,12 +3114,10 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 					}							
 					$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols $ExclCols -NoCaseChange -CSSClass "IxDiagTbl" -HyperlinkCol "FindingHL" -TblID "IndexUsgTable" -DebugInfo:$DebugInfo
 					$htmlTable += "`n<br>`n $JumpToTop`n"
-				}
-				elseif ($Mode -eq "1") {
+				} elseif ($Mode -eq "1") {
 					$htmlTable = Convert-TableToHtml $BlitzIxTbl -NoCaseChange -TblID "IndexSummaryTable" -CSSClass "IxSummaryTbl" -ExclCols $ExclCols -DebugInfo:$DebugInfo
-					$htmlTable +="`n<br>`n"
-				}
-				elseif ($Mode -eq "2") {
+					$htmlTable += "`n<br>`n"
+				} elseif ($Mode -eq "2") {
 					$htmlTable = Convert-TableToHtml $BlitzIxTbl -TblID "IndexUsgTable" -CSSClass $Mode2CSS -ExclCols $ExclCols -NoCaseChange -DebugInfo:$DebugInfo
 					$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexUsgTable', $Mode2SearchCol"
 					$htmlTabSearch += "`n$SortableTable"
@@ -3275,19 +3131,15 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 
 				Save-HtmlFile $html "BlitzIndex_$Mode.html" $HTMLOutDir $DebugInfo
 				Invoke-ClearVariables html, htmlTable
-			}
-			else {
+			} else {
 			
 				if ($Mode -eq "0") {
 					$SheetName = "Index Diagnostics"
-				}
-				elseif ($Mode -eq "1") {
+				} elseif ($Mode -eq "1") {
 					$SheetName = "Index Summary"
-				}
-				elseif ($Mode -eq "2") {
+				} elseif ($Mode -eq "2") {
 					$SheetName = "Index Usage"
-				}
-				elseif ($Mode -eq "4") {
+				} elseif ($Mode -eq "4") {
 					$SheetName = "Extended Index Diagnostics"
 				}
 			
@@ -3295,8 +3147,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
 				if ("0", "4" -Contains $Mode) {
 					Convert-TableToExcel $BlitzIxTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -ExclCols "Sample Query Plan", "FindingHL" -URLCols "URL" -MapURLToColNum 2 -URLTextCol "Finding"
-				}
-				else {
+				} else {
 					Convert-TableToExcel $BlitzIxTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
 				}
 			
@@ -3317,11 +3168,9 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 	$CurrRunTime = (New-TimeSpan -Start $StartDate -End $CurrTime).TotalMinutes
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
 		Write-Host " Retrieving deadlock info for $CheckDB... " -NoNewLine
-	}
-	elseif ($IsAzureSQLDB) {
+	} elseif ($IsAzureSQLDB) {
 		Write-Host " Retrieving deadlock info for $ASDBName... " -NoNewLine
-	}
-	else {
+	} else {
 		Write-Host " Retrieving deadlock info for all user databases... " -NoNewLine
 	}
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzLock_NonSPLatest.sql"
@@ -3347,8 +3196,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		[int]$RowsReturned = $TblLockDtl.Rows.Count
 		if ($RowsReturned -le 0) {
 			Write-Host " ->No deadlocks found"
-		}
-		else {
+		} else {
 			##Exporting deadlock graphs to file
 			Export-PlansAndDeadlocks $TblLockDtl $XDLOutDir "deadlock_graph" "deadlock_graph_file" -DebugInfo:$DebugInfo -FileNameFromColumn
 
@@ -3367,16 +3215,16 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 
 				$htmlTable3 = Convert-QueryTableToHtml $TblLockDtl -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "DeadlockDtlTable" -DebugInfo:$DebugInfo
 
-				if ($TblLockPlans.Rows.Count -gt 0){
-				Add-QueryName $TblLockPlans "query" "query_text" "DeadlockPlan"
+				if ($TblLockPlans.Rows.Count -gt 0) {
+					Add-QueryName $TblLockPlans "query" "query_text" "DeadlockPlan"
 
-				$htmlTable1 = "`n<p><a href=`"#Deadlocks2`">Jump to execution plans</a></p>`n" + $htmlTable1
+					$htmlTable1 = "`n<p><a href=`"#Deadlocks2`">Jump to execution plans</a></p>`n" + $htmlTable1
 
-				$htmlTable4 = Convert-TableToHtml $TblLockPlans -AnchorFromHere -ExclCols "query_text", "query_plan" -CSSClass "DeadlockPlansTable" -AnchorIDs "DeadlockPlan" -DebugInfo:$DebugInfo
-				$htmlTable4 += "`n $JumpToTop"
+					$htmlTable4 = Convert-TableToHtml $TblLockPlans -AnchorFromHere -ExclCols "query_text", "query_plan" -CSSClass "DeadlockPlansTable" -AnchorIDs "DeadlockPlan" -DebugInfo:$DebugInfo
+					$htmlTable4 += "`n $JumpToTop"
 
-				$htmlTable5 = Convert-QueryTableToHtml $TblLockPlans -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "DeadlockPlan" -DebugInfo:$DebugInfo
-				$htmlTable5 = "<br>`n<h2>Query Text For Execution Plans Involved in Deadlocks</h2>`n $htmlTable5 `n $JumpToTop"
+					$htmlTable5 = Convert-QueryTableToHtml $TblLockPlans -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "DeadlockPlan" -DebugInfo:$DebugInfo
+					$htmlTable5 = "<br>`n<h2>Query Text For Execution Plans Involved in Deadlocks</h2>`n $htmlTable5 `n $JumpToTop"
 				} else {
 					$htmlTable4 = "<p>No deadlock-related execution plans were found in the plan cache.</p>"
 					$htmlTable5 = ""
@@ -3398,8 +3246,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				Save-HtmlFile $html "BlitzLock.html" $HTMLOutDir $DebugInfo
 				Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3, htmlTable4, htmlTable5
 				
-			}
-			else {
+			} else {
 				## populating the "sp_BlitzLock Details" sheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Deadlock Details")
 
@@ -3458,8 +3305,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		if ($IsAzureSQLDB) {		
 			#if it's Azure SQL DB, we can't switch databases
 			[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
-		}
-		else {		
+		} else {		
 			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
 		}
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Stats Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
@@ -3469,8 +3315,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			[int]$RowsReturned = $StatsTbl.Rows.Count
 			if ($RowsReturned -le 0) {
 				Write-Host " ->No rows returned."
-			}
-			else {
+			} else {
 				if ($ToHTML -eq "Y") {
 
 					$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -CSSClass "StatsInfoTbl" -ExclCols "database" -DebugInfo:$DebugInfo
@@ -3491,8 +3336,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 "@
 					Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
 					Invoke-ClearVariables html, htmlTable			
-				}
-				else {
+				} else {
 
 					$ExcelSheet = $ExcelFile.Worksheets.Item("Statistics Info")
 
@@ -3510,8 +3354,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		if ($DBSwitched -ne "Y") {
 			Write-Host " " -NoNewLine
-		}
-		elseif ($DBSwitched -eq "Y") {
+		} elseif ($DBSwitched -eq "Y") {
 			Write-Host " ->" -NoNewLine
 		}
 		Write-Host "Retrieving index fragmentation info for $databaseName... " -NoNewLine
@@ -3519,8 +3362,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			#if it's Azure SQL DB, we can't switch databases
 			[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
 			[string]$Query = $Query -replace "AzureSQLDBReplace", "$DirDate"
-		}
-		else {		
+		} else {		
 			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
 		}
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Index Frag Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout	
@@ -3530,8 +3372,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			$RecordsReturned = $IndexTbl.Rows.Count
 			if ($RecordsReturned -le 0) {
 				Write-Host " ->No rows returned."
-			}
-			else {
+			} else {
 				if ($IndexLckTbl.Rows.Count -gt 0) {
 					$RowNum = 0
 					Write-Host " ->Exclusive lock detected on table(s):"
@@ -3542,8 +3383,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 						Write-Host "  - $LockedTab"
 						if ($RowNum -eq 0) { 
 							$LockedTabList += "$LockedTab" 
-						}
-						else {
+						} else {
 							$LockedTabList += ", $LockedTab"
 						}
 						$RowNum += 1
@@ -3569,8 +3409,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 
 					Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
 					Invoke-ClearVariables html, htmlTable
-				}
-				else {
+				} else {
 					$ExcelSheet = $ExcelFile.Worksheets.Item("Index Fragmentation")
 					Convert-TableToExcel $IndexTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
 					##Saving file
@@ -3600,8 +3439,7 @@ finally {
 		[string]$TerminatingErrorMessage = Format-ExceptionMsg
 		if ($TerminatingErrorMessage -eq "No exceptions encountered.") {
 			Write-Host " $TerminatingErrorMessage" -Fore green
-		}
-		else {
+		} else {
 			Write-Host " $TerminatingErrorMessage" -fore red
 			if ($ToHTML -ne "Y") {
 				Write-Host "  Debug Column: $global:DebugCol"
@@ -3624,8 +3462,7 @@ finally {
 		if ($JobStatus -eq "Running") {
 			if ($TryCompleted -eq "N") {
 				Write-Host " Attempting to stop session activity collection background process... " -NoNewline
-			}
-			else {
+			} else {
 				Write-Host " Stopping session activity collection background process... " -NoNewline
 			}
 			$CreatFlagTbl = "DECLARE @SQL NVARCHAR(400);`nSELECT @SQL = N'CREATE TABLE '+ CASE "
@@ -3650,8 +3487,7 @@ finally {
 				$StepOutcome = "Success"
 				$StepEnd = Get-Date
 				Add-LogRow "BlitzWho Flag table creation" $StepOutcome
-			}
-			Catch {
+			} Catch {
 				$StepEnd = Get-Date
 				$JobOutcome = Stop-Job $JobName
 				Write-Host $JobOutcome 
@@ -3662,8 +3498,7 @@ finally {
 					Write-Host " ->Failed to create " -NoNewline -Fore Yellow
 					if ($IsAzureSQLDB) {
 						Write-Host "[BlitzWhoOutFlag_$DirDate]" -Fore Yellow
-					}
-					else {
+					} else {
 						Write-Host "[tempdb].[dbo].[BlitzWhoOutFlag_$DirDate]" -Fore Yellow
 					}
 					Write-Host " ->Forcing background process stop." -Fore Yellow
@@ -3702,8 +3537,7 @@ finally {
 	}
 	if ($TryCompleted -eq "N") {
 		Write-Host	" Attempting to retrieve session actvity data... " -NoNewLine
-	}
-	else {
+	} else {
 		Write-Host " Retrieving session actvity data... " -NoNewLine
 	}
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetBlitzWhoData.sql"
@@ -3722,8 +3556,7 @@ finally {
 		[int]$RowsReturned = $BlitzWhoTbl.Rows.Count
 		if ($RowsReturned -le 0) {
 			Write-Host " ->No active sessions"
-		}
-		else {
+		} else {
 
 			##Exporting execution plans to file and setting plan file names
 			Export-PlansAndDeadlocks $BlitzWhoAggTbl $PlanOutDir "query_plan" "sqlplan_file" -FPrefix "RunningNow" -DebugInfo:$DebugInfo
@@ -3736,8 +3569,7 @@ finally {
 				$HtmlTabName = "Session Activity"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$HtmlTabName += " for $CheckDB" 
-				}
-				elseif ($IsAzureSQLDB) {
+				} elseif ($IsAzureSQLDB) {
 					$HtmlTabName += " for $ASDBName"
 				}
 
@@ -3754,8 +3586,7 @@ finally {
 				$HtmlTabName = "Aggregated Session Activity"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$HtmlTabName += " for $CheckDB" 
-				}
-				elseif ($IsAzureSQLDB) {
+				} elseif ($IsAzureSQLDB) {
 					$HtmlTabName += " for $ASDBName"
 				}
 				Add-QueryName $BlitzWhoAggTbl "Query" "query_text" "RunningNow"
@@ -3773,8 +3604,7 @@ finally {
 				Save-HtmlFile $html "BlitzWho_Agg.html" $HTMLOutDir $DebugInfo
 				Invoke-ClearVariables html, htmlTable, htmlTable1
 
-			}
-			else {
+			} else {
 
 				###Populating the "sp_BlitzWho" sheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Session Activity - Raw")
@@ -3830,8 +3660,7 @@ finally {
 					$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
 					$ExcelSheet.Delete()
 				}
-			}
-			elseif ($IsAzureSQLDB -eq $false) {
+			} elseif ($IsAzureSQLDB -eq $false) {
 				if (($MajorVers -lt 13) -or ([string]::IsNullOrEmpty($CheckDB))) {
 					$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro ")
 					$ExcelSheetUpd.Cells.Item(12, 1).EntireRow.Delete() | Out-Null
@@ -3844,8 +3673,7 @@ finally {
 				$ExcelSheet = $ExcelFile.Worksheets.Item("Azure SQL DB Info")
 				$ExcelSheet.Delete()
 			}
-		}
-		else {
+		} else {
 			#Delete unused sheet (yes, this sheet has a space in its name)
 			$DeleteSheets = @("Intro ", "Index Diagnostics")
 			foreach ($SheetName in $DeleteSheets) {
@@ -3864,8 +3692,7 @@ finally {
 					$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
 					$ExcelSheet.Delete()
 				}
-			}
-			elseif ($IsAzureSQLDB -eq $false) {
+			} elseif ($IsAzureSQLDB -eq $false) {
 				if (($MajorVers -lt 13) -or ([string]::IsNullOrEmpty($CheckDB))) {
 					$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro")
 					$ExcelSheetUpd.Cells.Item(12, 1).EntireRow.Delete() | Out-Null
@@ -3908,8 +3735,7 @@ finally {
 	if ($ToHTML -ne "Y") {
 		if ($IsIndepth -eq "Y") {
 			$ExcelSheet = $ExcelFile.Worksheets.Item("Intro")
-		}
-		else {
+		} else {
 			$ExcelSheet = $ExcelFile.Worksheets.Item("Intro ")
 		}
 		$ExcelSheet.Cells.Item(5, 6) = $StartDate.ToString("yyyy-MM-dd HH:mm:ss")
@@ -3927,8 +3753,7 @@ finally {
 		###Rename output file 
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
 			$OutExcelFName = "PSBlitzOutput_$InstName_$CheckDB.xlsx"
-		}
-		else {
+		} else {
 			$OutExcelFName = "PSBlitzOutput_$InstName.xlsx"
 		}
 		Rename-Item -Path $OutExcelF -NewName $OutExcelFName -Force
@@ -3963,11 +3788,9 @@ finally {
 		if ($IsAzureSQLDB) {
 			$AzureEnv = "- Azure SQL DB"
 			$DbPortion = "- $ASDBName"
-		}
-		elseif (!([string]::IsNullOrEmpty($CheckDB))) {
+		} elseif (!([string]::IsNullOrEmpty($CheckDB))) {
 			$DbPortion = "Database-specific check: $CheckDB"
-		}
-		else {
+		} else {
 			$DbPortion = "Instance-wide check"
 		}
 		$IndexContent = @"
@@ -4013,34 +3836,28 @@ finally {
 				}	
 				$QuerySource += ";"
 				$Description += "."
-			}
-			elseif ($File.Name -like "InstanceInfo*") {
+			} elseif ($File.Name -like "InstanceInfo*") {
 				$PageName = "Instance Information"
 				$QuerySource += "sys.dm_os_sys_info, sys.dm_os_performance_counters and SERVERPROPERTY()"
 				$Description = "Summary information about the instance and its resources."
-			}
-			elseif ($File.Name -like "TempDBInfo*") {
+			} elseif ($File.Name -like "TempDBInfo*") {
 				$PageName = "TempDB Information"
 				$QuerySource += "dm_db_file_space_usage, dm_db_partition_stats, dm_exec_requests"
 				$Description = "Information pertaining to TempDB usage, size and configuration."
-			}
-			elseif ($File.Name -like "OpenTransactions*") {
+			} elseif ($File.Name -like "OpenTransactions*") {
 				$PageName = "Open Transactions"
 				$Plans = "<td>$HTMLChk</td>"
 				$QuerySource += "sys.dm_tran_session_transactions, sys.dm_tran_active_transactions, sys.dm_exec_sessions, sys.dm_exec_connections, and sys.dm_exec_requests"
 				$Description = "Information about currently open transactions."
-			}
-			elseif ($File.Name -like "BlitzIndex*") {
+			} elseif ($File.Name -like "BlitzIndex*") {
 				$Mode = $File.Name.Replace('BlitzIndex_', '')
 				$Mode = $Mode.Replace('.html', '')
 				$QuerySource += "Similar to sp_BlitzIndex @Mode = $Mode"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$QuerySource += ", @DatabaseName = '$CheckDB'; "
-				}
-				elseif ($UsrDBCount -ge $MaxUsrDBs) {
+				} elseif ($UsrDBCount -ge $MaxUsrDBs) {
 					$QuerySource += ", @DatabaseName = '$TopCacheDB'; "
-				}
-				else {
+				} else {
 					$QuerySource += ", @GetAllDatabases = 1; "
 				}
 				$AdditionalInfo = ""
@@ -4052,19 +3869,16 @@ finally {
 					$Description = "Index-related diagnosis outlining high-value missing indexes,<br> duplicate or almost duplicate indexes, indexes with more writes than reads, etc."
 					$RLim = "<td>10k</td>"
 					$Plans = "<td class=`"tooltip`" title=`"Only for SQL Server 2019 and above`">$HTMLChk*</td>"
-				}
-				elseif ($File.Name -like "BlitzIndex_1*") {
+				} elseif ($File.Name -like "BlitzIndex_1*") {
 					$PageName = "Index Summary"
 					$Description = "Summary of database, tables and index sizes and counts."
-				}
-				elseif ($File.Name -like "BlitzIndex_2*") {
+				} elseif ($File.Name -like "BlitzIndex_2*") {
 					$PageName = "Index Usage"
 					$Description = "Index details and usage information.<br>If your browser struggles to load the page,"
 					$Description += "<br>you can load it into SQL Server using <a href='https://github.com/VladDBA/PSBlitzHTMLParser/blob/main/PSBlitzIndexUsage_HTML2SQL.sql' target='_blank'>this script</a>"
 					$RLim = "<td>10k</td>"
 				}
-			}
-			elseif ($File.Name -like "BlitzCache*") {
+			} elseif ($File.Name -like "BlitzCache*") {
 				$SortOrder = $File.Name.Replace('BlitzCache_', '')
 				$SortOrder = $SortOrder.Replace('.html', '')
 				$PageName = "Top $CacheTop Queries - $SortOrder"
@@ -4074,43 +3888,36 @@ finally {
 					$QuerySource += "Similar to sp_BlitzCache @SortOrder = 'memory grant', @Top = $CacheTop/'recent compilations' , @Top = 50"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
-					}
-					else {
+					} else {
 						$QuerySource += "; "
 					}
 					$Description = "Top $CacheTop queries found in the plan cache, sorted by memory grant size,<br>and the top 50 most recently compiled queries."
-				}
-				elseif ($SortOrder -eq "Dupl_Single_Use") {
+				} elseif ($SortOrder -eq "Dupl_Single_Use") {
 					$PageName = "Top $CacheTop Queries - Duplicates &amp; Single Use"
 					$QuerySource += "Similar to sp_BlitzCache @Top = $CacheTop, @SortOrder = 'Duplicate'/'Query Hash'"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
-					}
-					else {
+					} else {
 						$QuerySource += "; "
 					}
 					$Description = "Top $CacheTop queries found in the plan cache, sorted by number of cached plans and query hash."
 					$Description += "<br>Helps finding queries that have multiple plans and potential parameterization problems."
 					
-				}
-				else {
+				} else {
 					$QuerySource += "Similar to sp_BlitzCache , @Top = $CacheTop, @SortOrder = '$SortOrder'/'Avg $SortOrder'"
 					if (!([string]::IsNullOrEmpty($CheckDB))) {
 						$QuerySource += ", @DatabaseName = '$CheckDB'; "
-					}
-					else {
+					} else {
 						$QuerySource += "; "
 					}
 					$Description = "Top $CacheTop queries found in the plan cache, sorted by Total $SortOrder and "
 					if ($SortOrder -eq "Executions") {
 						$Description += "$SortOrder per Minute."
-					}
-					else {
+					} else {
 						$Description += "Average $SortOrder."
 					}	
 				}
-			}
-			elseif ($File.Name -like "BlitzQueryStore*") {
+			} elseif ($File.Name -like "BlitzQueryStore*") {
 				$SortOrder = $File.Name.Replace('BlitzQueryStore_', '')
 				$SortOrder = $SortOrder.Replace('.html', '')
 				$PageName = "Query Store Info - $SortOrder"
@@ -4124,40 +3931,32 @@ finally {
 				$QuerySource += "Similar to sp_QuickieStore @top = 20, @sort_order='$SortOrder'"
 				if ($IsAzureSQLDB) {
 					$QuerySource += ";"
-				}
-				elseif ($DBSwitched -eq "Y") {
+				} elseif ($DBSwitched -eq "Y") {
 					$QuerySource += ", @database_name = '$DBName';"
-				}
-				else {
+				} else {
 					$QuerySource += ", @database_name = '$CheckDB';"
 				}
-			}
-			elseif ($File.Name -like "BlitzFirst3*") {
+			} elseif ($File.Name -like "BlitzFirst3*") {
 				$QuerySource += "Similar to sp_BlitzFirst @ExpertMode = 1, @Seconds = 30; "
 				$Description = "What's happening on the instance during a 30 seconds time-frame."
 				$PageName = "Happening Now"
-			}
-			elseif ($File.Name -like "BlitzFirst_*") {
+			} elseif ($File.Name -like "BlitzFirst_*") {
 				$QuerySource += "Similar to sp_BlitzFirst @SinceStartup = 1;"
 				if ($File.Name -like "BlitzFirst_Perfmon*") {
 					$PageName = "Perfmon Stats"
 					$Description = "Perfmon stats since last instance restart."
-				}
-				elseif ($File.Name -like "BlitzFirst_Storage*") {
+				} elseif ($File.Name -like "BlitzFirst_Storage*") {
 					$PageName = "Storage Stats"
 					$Description = "Database file usage and throughput since the last instance restart."
-				}
-				elseif ($File.Name -like "BlitzFirst_Waits*") {
+				} elseif ($File.Name -like "BlitzFirst_Waits*") {
 					$PageName = "Wait Stats"
 					$Description = "Instance-wide wait stats since last instance restart."
 				}
-			}
-			elseif ($File.Name -like "BlitzWho*") {
+			} elseif ($File.Name -like "BlitzWho*") {
 				$QuerySource += "Similar to sp_BlitzWho @ExpertMode = 1"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$QuerySource += ", @DatabaseName = '$CheckDB'; "
-				}
-				else {
+				} else {
 					$QuerySource += "; "
 				}
 				if ($File.Name -like "BlitzWho_Agg*") {
@@ -4165,13 +3964,11 @@ finally {
 					$Description = "Aggregatd session activity sorted by duration descending."
 					$PageName = "Session Activity - Aggregated"
 					#$AdditionalInfo = "Outputs execution plans as .sqlplan files."
-				}
-				else {
+				} else {
 					$PageName = "Session Activity - Raw"
 					$Description = "All session activity data collected while PSBlitz was running."
 				}
-			}
-			elseif ($File.Name -like "StatsInfo*") {
+			} elseif ($File.Name -like "StatsInfo*") {
 				$PageName = "Statistics Information"
 				$QuerySource += "sys.stats, sys.dm_db_stats_properties, dm_db_incremental_stats_properties"
 				$RLim = "<td>10k</td>"
@@ -4180,8 +3977,7 @@ finally {
 					$Description += " for $DBName"
 				}
 				$Description += ".<br>Tables with at least 10k records ordered by modified% descending." 
-			}
-			elseif ($File.Name -like "IndexFragInfo*") {
+			} elseif ($File.Name -like "IndexFragInfo*") {
 				$QuerySource += "dm_db_index_physical_stats"
 				$PageName = "Index Fragmentation"
 				$RLim = "<td>20k</td>"
@@ -4190,22 +3986,19 @@ finally {
 					$Description += " for $DBName"
 				}
 				$Description += ".<br>Tables/partitions containing at least 52k pages (~400MB),<br>ordered by avg fragmentation% & size descending."
-			}
-			elseif ($File.Name -like "BlitzLock*") {
+			} elseif ($File.Name -like "BlitzLock*") {
 				$PageName = "Deadlock Information"
 				$Plans = "<td class=`"tooltip`" title=`"Only if deadlock-related plans are still in the plan cache`">$HTMLChk*</td>"
 				$DLGraphs = "<td>$HTMLChk</td>"
 				$QuerySource += "Similar to sp_BlitzLock @StartDate = DATEADD(DAY, -15, GETDATE()), @EndDate = GETDATE(); "
 				$Description = "Information about the deadlocks recorded in the default extended events session."
 				#$AdditionalInfo = "Outputs deadlock graphs as .xdl files and execution plans as .sqlplan files."
-			}
-			elseif ($File.Name -like "ExecutionLog*") {
+			} elseif ($File.Name -like "ExecutionLog*") {
 				$QuerySource = ""
 				$PageName = "Execution Log"
 				$Description = "Log for the current run of PSBlitz.<br>Contains step status and potential error messages."
 				#$AdditionalInfo = "Contains step status and any error messages that might have been thrown"
-			}
-			elseif ($File.Name -like "DatabaseInfo*") {
+			} elseif ($File.Name -like "DatabaseInfo*") {
 				$PageName = "Database Information"
 				$QuerySource += "sys.databases, sys.master_files, sys.database_files, sys.dm_db_log_info"
 				if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
@@ -4214,14 +4007,12 @@ finally {
 				$Description = "Database and database files information for "
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$Description += "$CheckDB and system databases."
-				}
-				else {
+				} else {
 					$Description += "all databases on the instance."
 				}
 			
 				$AdditionalInfo = ""
-			}
-			elseif ($File.Name -like "AzureSQLDBInfo*") {
+			} elseif ($File.Name -like "AzureSQLDBInfo*") {
 				$PageName = "Azure SQL DB Info"
 				$QuerySource += "sys.dm_user_db_resource_governance, sys.database_files, sys.dm_db_resource_stats, sys.dm_db_wait_stats, sys.databases, database_scoped_configurations, sys.dm_db_objects_impacted_on_version_change"
 				$Description = "Azure SQL DB resources, resource and database usage, and database configuration for $ASDBName"
@@ -4240,9 +4031,8 @@ finally {
 		# Close the HTML tags.
 		$IndexContent += "</table>`n$Footer `n</body>`n</html>"
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
-			$IndexFileName = "PSBlitzOutput_$InstName"+"_"+"$CheckDB.html"
-		}
-		else {
+			$IndexFileName = "PSBlitzOutput_$InstName" + "_" + "$CheckDB.html"
+		} else {
 			$IndexFileName = "PSBlitzOutput_$InstName.html"
 		}
 		#Save index page
@@ -4261,8 +4051,7 @@ finally {
 	if ($OutDir.Length -gt 40) {
 		Write-Host "Generated files have been saved in: "
 		Write-Host " $OutDir"
-	}
-	else {
+	} else {
 		Write-Host "Generated files have been saved in: " -NoNewLine
 		Write-Host "$OutDir"
 	}
@@ -4274,8 +4063,7 @@ finally {
 		if ($ZipFile.Length -gt 30) {
 			Write-Host "The following zip archive has also been created: "
 			Write-Host " $ZipFile"
-		}
-		else {
+		} else {
 			Write-Host "The following zip archive has also been created: " -NoNewLine
 			Write-Host " $ZipFile"
 		}
