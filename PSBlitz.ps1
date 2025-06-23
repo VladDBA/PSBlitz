@@ -970,7 +970,6 @@ function Save-ExcelFile {
 	} catch {
 		Write-Host " Error saving Excel file: $_" -ForegroundColor Red
 	}
-
 }
 
 function Save-HtmlFile {
