@@ -302,6 +302,26 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql", "spBlitzCache
 	"GetOpenTransactions.sql", "GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql", "GetDbInfo.sql", 
 	"GetAzureSQLDBInfo.sql", "GetObjectsWithDangerousOptions.sql", "searchtable.js", "sorttable.js", "styles.css", 
 	"copy.js", "spQuickieStore_NonSPLatest.sql")
+
+## we use these to make sure someone didn't modify the scripts in the Resources folder
+$storedHashes = @{"spBlitz_NonSPLatest.sql" = "3FB5FE921595CF84C551A07389BF93C24C9B70BB11BF1E4EEF025B1BEC2B23EE"
+"spBlitzCache_NonSPLatest.sql" = "66200133B55EEF7A16800AB07AD1FFB1A68DEEF9697A07AD33817A53D1453FE7"
+"spBlitzFirst_NonSPLatest.sql" = "28922F9EF60BF86DA354CF24979CF1F4BF7924B17EB803C260DE2073C3EDF702"
+"spBlitzIndex_NonSPLatest.sql" = "B4C3FD55125A844D248B21C46B62617DB5401D351D772BEECF01F61EA29754EE"
+"spBlitzLock_NonSPLatest.sql" = "70416A46D3ADC63EC3A1331B0352B9574900C917A3424FC30E393E3F169C41D6"
+"spBlitzWho_NonSPLatest.sql" = "9E2915BF6F5229BD087974717EBDDB6D25449037531DC6139B0270021A50DF3C"
+"GetBlitzWhoData.sql" = "165A9A4660385A69218196A1569CC35E1A44E5B9FBDAF74722545249567E4298"
+"GetInstanceInfo.sql" = "0E84569B2E97D6F59B4CC6D4AB0F2D41637573970CF14A1F99F9961AF8F3175A"
+"GetTempDBUsageInfo.sql" = "20620509996A6F7BB45410397D0CB5C7C0D044FEA15944950171DF14436AE9D1"
+"GetOpenTransactions.sql" = "76EBCB1758CBC86DAC4FE8E5C02E88AB4B96FEDB2E21570B8C0D410FF8A69F7D"
+"GetStatsInfoForWholeDB.sql" = "CF3A8B06AD68880F5BF44DE45206778F1515FB7DD930E2D3CCCC71149AFF5544"
+"GetIndexInfoForWholeDB.sql" = "6C58B79C4EDF06ADBE4EE79373A522A7C538B331D74E9E4AF32C77C6ED951F9B"
+"GetDbInfo.sql" = "103B639ED78B099A5C2D133E6555B7073CE23DF2DBE4CD7CAD24D44EDB261F7F"
+"GetAzureSQLDBInfo.sql" = "8A18348F7B87C2F5DA047B103E3BF4FEBB455E7498F0C93644DC2CD7E7255506"
+"GetObjectsWithDangerousOptions.sql" = "AFE74F2FE6D6077AEBF169CC16DE036B08980846E6795DC342372AB8C2A132A9"
+"spQuickieStore_NonSPLatest.sql" = "9C6DF47EF2BD1100A659F05911A7653F952C2646323C170E23C17ADE8D36699F"
+}
+
 #Set path+name of the input Excel file
 $OrigExcelF = Join-Path -Path $ResourcesPath -ChildPath $OrigExcelFName
 #Set default start row for Excel output
@@ -462,7 +482,38 @@ function Invoke-ErrMsg {
 		Write-Host "  $OutErr" -fore Red		
 	}
 }
+function Get-FileIntegrity {
+    param (
+        [string[]]$fileList,
+        [string]$FilesPath,
+        [hashtable]$storedHashes
+    )
+    $integrityOK = $true
+    $failedFiles = @()
 
+    # Only check .sql files
+    $sqlFiles = $fileList | Where-Object { $_.ToLower().EndsWith('.sql') }
+
+    foreach ($file in $sqlFiles) {
+        $FileToHash = Join-Path -Path $FilesPath -ChildPath $file
+        [string]$currentHash = Get-FileHash $FileToHash | Select-Object -ExpandProperty Hash
+        if ($storedHashes[$file] -ne $currentHash) {
+            Write-Host "Integrity check failed for $file" -ForegroundColor Red
+            $failedFiles += $file
+            $integrityOK = $false
+        }
+    }
+
+    if ($integrityOK) {
+       Write-PSBlitzDebug "All .sql files passed the integrity check."
+    } else {
+        Write-Host "The following file(s) failed the integrity check:" -ForegroundColor Red
+        $failedFiles | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
+        Write-Host "File integrity check failed. Script execution terminated." -ForegroundColor Red
+		Read-Host -Prompt "Press Enter to end script execution."
+		Exit
+    }
+}
 function Get-ExecTime {
 	$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
 	[string]$StepDUration = [Math]::Round($StepRunTime, 2).ToString()
@@ -1194,7 +1245,7 @@ if (!(Test-Path $ResourcesPath )) {
 	Write-Host "The Resources directory was not found in $ScriptPath!" -fore red
 	Write-Host " Make sure to download the latest release from https://github.com/VladDBA/PSBlitz/releases" -fore yellow
 	Write-Host "and properly extract the contents" -fore yellow
-	Read-Host -Prompt "Press Enter to close this window."
+	Read-Host -Prompt "Press Enter to end script execution."
 	Exit
 }
 #Check individual files
@@ -1212,9 +1263,12 @@ if ($MissingFiles.Count -gt 0) {
 	}
 	Write-Host " Make sure to download the latest release from https://github.com/VladDBA/PSBlitz/releases" -fore yellow
 	Write-Host "and properly extract the contents" -fore yellow
-	Read-Host -Prompt "Press Enter to close this window."
+	Read-Host -Prompt "Press Enter to end script execution."
 	Exit
 }
+#If we have the files, check file integrity
+Get-FileIntegrity -fileList $ResourceList -FilesPath $ResourcesPath -storedHashes $storedHashes
+#Setting the default for Azure related variables
 $IsAzureSQLDB = $false
 $IsAzureSQLMI = $false
 $IsAzure = $false
@@ -1291,7 +1345,7 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 	#Return help menu if $ServerName is ? or Help
 	if ("?", "Help" -Contains $ServerName) {
 		Get-PSBlitzHelp
-		Read-Host -Prompt "Press Enter to close this window."
+		Read-Host -Prompt "Press Enter to end script execution."
 		Exit
 	}
 	
@@ -1438,7 +1492,7 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 			Get-PSBlitzHelp
 			#Don't close the window automatically if in interactive mode
 			if ($InteractiveMode -eq 1) {
-				Read-Host -Prompt "Press Enter to close this window."
+				Read-Host -Prompt "Press Enter to end script execution."
 				Exit
 			}
 		} else {
@@ -1536,7 +1590,7 @@ Try {
 		Get-PSBlitzHelp
 		#Don't close the window automatically if in interactive mode
 		if ($InteractiveMode -eq 1) {
-			Read-Host -Prompt "Press Enter to close this window."
+			Read-Host -Prompt "Press Enter to end script execution."
 			Exit
 		}
 	} else {
@@ -1594,7 +1648,7 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 				Get-PSBlitzHelp
 				#Don't close the window automatically if in interactive mode
 				if ($InteractiveMode -eq 1) {
-					Read-Host -Prompt "Press Enter to close this window."
+					Read-Host -Prompt "Press Enter to end script execution."
 					Exit
 				}
 			} else {
@@ -4071,7 +4125,7 @@ finally {
 	Write-PSBlitzDebug "      >>>>>>>  https://github.com/VladDBA/PSBlitz/issues/216 <<<<<<<"
 
 	if ($InteractiveMode -eq 1) {
-		Read-Host -Prompt "Done. Press Enter to close this window."
+		Read-Host -Prompt "Done. Press Enter to end script execution."
 	}
 	$SqlConnection.Close()
 	$SqlConnection.Dispose()
