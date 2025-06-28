@@ -3420,7 +3420,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 				}
 			} 
 		} else {
-			Write-Host "Skipping index fragmentation check as requested."
+			Write-Host " ->Skipping index fragmentation check as requested."
 			Add-LogRow "Index Fragmentation" "Skipped" "Index fragmentation check skipped as requested."
 		}
 
