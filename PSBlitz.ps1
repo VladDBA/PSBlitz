@@ -275,7 +275,9 @@ param(
 	[Parameter(Mandatory = $False)]
 	[int]$CacheMinutesBack = 0,
 	[Parameter(Mandatory = $False)]
-	[int]$MaxUsrDBs = 50
+	[int]$MaxUsrDBs = 50,
+	[Parameter(Mandatory = $False)]
+	[string[]]$SkipChecks
 )
 
 ###Internal params
@@ -450,16 +452,12 @@ function Invoke-ErrMsg {
 	$RunTime = [Math]::Round($StepRunTime, 2)
 	if ($RunTime -ge $CmdTimeout) {
 		Write-Host @RedXTimeout
-		if ($DebugInfo) {
-			Write-Host " - $RunTime seconds" -Fore Yellow
-		}
+		Write-PSBlitzDebug " - $RunTime seconds" 
 		$OutErr = Format-ExceptionMsg
 		Write-Host "  $OutErr" -fore Red	
 	} else {
 		Write-Host @RedX
-		if ($DebugInfo) {
-			Write-Host " - $RunTime seconds" -Fore Yellow
-		}
+		Write-PSBlitzDebug " - $RunTime seconds" 
 		$OutErr = Format-ExceptionMsg
 		Write-Host "  $OutErr" -fore Red		
 	}
@@ -526,9 +524,7 @@ function Invoke-PSBlitzQuery {
 		Write-Host @GreenCheck
 		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
 		$RunTime = [Math]::Round($StepRunTime, 2)
-		if ($DebugInfo) {
-			Write-Host " - $RunTime seconds" -Fore Yellow
-		}
+		Write-PSBlitzDebug " - $RunTime seconds"
 		$global:StepOutcome = "Success"
 		if (($StepNameIn -like "sp_BlitzCache*") -or ($StepNameIn -like "sp_BlitzQueryStore*") -or 
 		($StepNameIn -eq "sp_BlitzIndex mode 1") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info") -or 
@@ -964,9 +960,7 @@ function Save-ExcelFile {
 	)
 	try {
 		$ExcelFile.Save()
-		if ($DebugInfo) {
-			Write-Host " ->Excel file saved successfully" -ForegroundColor Yellow
-		}
+		Write-PSBlitzDebug  " ->Excel file saved successfully"
 	} catch {
 		Write-Host " Error saving Excel file: $_" -ForegroundColor Red
 	}
@@ -991,9 +985,7 @@ function Save-HtmlFile {
 	try {
 		$HTMLFilePath = Join-Path -Path $HtmlOutputDir -ChildPath $HtmlFileName
 		$HtmlData | Out-File -Encoding utf8 -FilePath "$HTMLFilePath"
-		if ($DebugInfo) {
-			Write-Host " ->$($AdditionalInfo)HTML file saved successfully" -ForegroundColor Yellow
-		}
+		Write-PSBlitzDebug " ->$($AdditionalInfo)HTML file saved successfully"
 	} catch {
 		Write-Host " Error saving HTML file: $_" -ForegroundColor Red
 	}
@@ -1006,6 +998,24 @@ function Invoke-ClearVariables {
 	foreach ($Var in $VarNames) {
 		Clear-Variable -Name $Var #-ErrorAction SilentlyContinue
 		Remove-Variable -Name $Var #-ErrorAction SilentlyContinue
+	}
+}
+
+function Write-PSBlitzDebug {
+	param (
+		[Parameter(Mandatory = $true)]
+		[string]$Message,
+		[Parameter(Mandatory = $false)]
+		[string]$Color = "Yellow",
+		[Parameter(Mandatory = $false)]
+		[switch]$NoNewLine
+	)
+	if ($DebugInfo) {
+		if ($NoNewLine) {
+			Write-Host $Message -ForegroundColor $Color -NoNewline
+		} else {
+			Write-Host $Message -ForegroundColor $Color
+		}
 	}
 }
 
@@ -1442,9 +1452,7 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 		[string]$Edition = $AzCheckTbl.Rows[0]["Edition"]
 		Write-Host @GreenCheck
 		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-		if ($DebugInfo) {
-			Write-Host " Engine Edition - $EngineEdition"  -Fore Yellow
-		}
+		Write-PSBlitzDebug " Engine Edition - $EngineEdition"
 		if ($Edition -eq "SQL Azure") {
 			if ($EngineEdition -eq 8) {
 				$IsAzureSQLMI = $true
@@ -1542,21 +1550,18 @@ if ($ConnCheckSet.Tables[0].Rows.Count -eq 1) {
 	Write-Host @GreenCheck
 	$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
 	$ConnTest = [Math]::Round($StepRunTime, 3)
-	if ($DebugInfo) {
-		Write-Host " - $ConnTest seconds"
-		Write-Host " Product Major Version - $MajorVers"  -Fore Yellow
-	} else {
-		$Message = "->Estimated response latency: $ConnTest seconds"
-		if ($ConnTest -ge 2) {
-			Write-Host $Message -Fore Red
-		} elseif ($ConnTest -ge 0.5) {
-			Write-Host $Message -Fore Yellow
-		} elseif ($ConnTest -ge 0.2) {
-			Write-Host $Message
-		} elseif ($ConnTest -lt 0.2) {
-			Write-Host $Message -Fore Green
-		}
+	Write-PSBlitzDebug " Product Major Version - $MajorVers"
+	$Message = "->Estimated response latency: $ConnTest seconds"
+	if ($ConnTest -ge 2) {
+		Write-Host $Message -Fore Red
+	} elseif ($ConnTest -ge 0.5) {
+		Write-Host $Message -Fore Yellow
+	} elseif ($ConnTest -ge 0.2) {
+		Write-Host $Message
+	} elseif ($ConnTest -lt 0.2) {
+		Write-Host $Message -Fore Green
 	}
+	
 }
 ###Test existence of value provided for $CheckDB
 if (!([string]::IsNullOrEmpty($CheckDB))) {
@@ -1660,9 +1665,7 @@ if ($ZipOutput -eq "Y") {
 
 	$ZipFile = $SubDir + ".zip"
 }
-if ($DebugInfo) {
-	Write-Host "`n Output directory: `n$OutDir" -Fore Yellow
-}
+Write-PSBlitzDebug "`n Output directory: `n$OutDir"
 
 #Check if output directory exists
 if (!(Test-Path $OutDir)) {
@@ -2561,6 +2564,9 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		$SortOrders = @("'CPU'", "'Average CPU'", "'Duration'",
 			"'Average Duration'")
 	}
+	##progress
+	$TotalSortOrders = $SortOrders.Count
+	$CurrentSortOrder = 0
 	#Set initial SortOrder value
 	$OldSortOrder = "'CPU'"
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzCache_NonSPLatest.sql"
@@ -2590,6 +2596,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	}
 	#Loop through sort orders
 	foreach ($SortOrder in $SortOrders) {
+		$CurrentSortOrder++
 		#Filename sort order portion
 		$FileSOrder = $SortOrder.Replace('Average', 'Avg')
 		$FileSOrder = $SortOrder.Replace('Executions per Minute', 'ExPM')
@@ -2616,16 +2623,16 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			$CurrMin = [Math]::Round($CurrRunTime)
 			
 			$CacheMinutesBack = $CurrMin + $OrigCacheMinutesBack
-			if ($DebugInfo) {
-				Write-Host " ->Adjusting the value of -CacheMinutesBack to the current runtime of $CurrMin minutes" -fore yellow
-				Write-Host "  ->The past $CacheMinutesBack minutes ($CurrMin + $OrigCacheMinutesBack) will now be analyzed" -fore yellow
-			}			
+			
+			Write-PSBlitzDebug " ->Adjusting the value of -CacheMinutesBack to the current runtime of $CurrMin minutes" 
+			Write-PSBlitzDebug "  ->The past $CacheMinutesBack minutes ($CurrMin + $OrigCacheMinutesBack) will now be analyzed"
+						
 			$NewCacheMinutesBackStr = ";SET @MinutesBack = " + $CacheMinutesBack + ";"
 			[string]$Query = $Query -replace $OldCacheMinutesBackStr, $NewCacheMinutesBackStr
 		}
 
 		[string]$Query = $Query -replace $OldSortString, $NewSortString
-		Write-Host " ->Top $(if($SortOrder -eq "'recent compilations'"){"50"}else{$CacheTop}) queries by $($SortOrder -replace "'",'')... " -NoNewLine
+		Write-Host " ->Top $(if($SortOrder -eq "'recent compilations'"){"50"}else{$CacheTop}) queries by $($SortOrder -replace "'",'') ($CurrentSortOrder of $TotalSortOrders)... " -NoNewLine
 		if ($OrigCacheMinutesBack -ne 0) {
 			$AdditionalInfo = ", MinutesBack=$CacheMinutesBack"
 		} else {
@@ -2830,9 +2837,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 
 		# Set @MinutesBack to NULL for the next sort order
 		if (($OrigCacheMinutesBack -gt 0) -and $SortOrder -ne "'Recent Compilations'") {
-			if ($DebugInfo) {
-				Write-Host " ->Setting @MinutesBack to NULL for the next sort order" -fore yellow
-			}
+			Write-PSBlitzDebug " ->Setting @MinutesBack to NULL for the next sort order"
 			[string]$Query = $Query -replace $NewCacheMinutesBackStr, $OldCacheMinutesBackStr
 		}
 	}
@@ -2849,7 +2854,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		[int]$TwoThirdsBlitzCache = [Math]::Floor([decimal]($BlitzCacheRecs / 1.5))
 		[string]$DBName = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Name | Select-Object -Last 1
 		[int]$DBCount = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Count | Select-Object -Last 1
-		if (($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --") -and (!([string]::IsNullOrEmpty($DBName)))) {
+		if (($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --") -and ($DBName -ne "N/A") -and (!([string]::IsNullOrEmpty($DBName)))) {
 			Write-Host " $DBName accounts for 2/3 of the records returned from cache"
 			Write-Host " ->" -NoNewLine
 			$StepStart = get-date
@@ -2951,11 +2956,8 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			Write-Host " Retrieving Query Store info for $databaseName..."
 
 			if ($IsAzureSQLDB -eq $false) { 
-				#if ($DBSwitched -eq "Y") {
 				$OldCheckDBStr = ";SET @database_name = NULL;"
 				$NewCheckDBStr = ";SET @database_name = N'" + $CheckDB + "';"
-				#}
-				Write-Host " Retrieving Query Store info for $CheckDB..." 
 				[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
 			}
 			$SortOrders = @("CPU", "Duration")
@@ -3349,74 +3351,77 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 		}
 
 		### get index frag info
-		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetIndexInfoForWholeDB.sql"
-		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-		if ($DBSwitched -ne "Y") {
-			Write-Host " " -NoNewLine
-		} elseif ($DBSwitched -eq "Y") {
-			Write-Host " ->" -NoNewLine
-		}
-		Write-Host "Retrieving index fragmentation info for $databaseName... " -NoNewLine
-		if ($IsAzureSQLDB) { 			
-			#if it's Azure SQL DB, we can't switch databases
-			[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
-			[string]$Query = $Query -replace "AzureSQLDBReplace", "$DirDate"
-		} else {		
-			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
-		}
-		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Index Frag Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout	
-		if ($global:StepOutcome -eq "Success") {
-			$IndexTbl = $global:PSBlitzSet.Tables[0]
-			$IndexLckTbl = $global:PSBlitzSet.Tables[1]
-			$RecordsReturned = $IndexTbl.Rows.Count
-			if ($RecordsReturned -le 0) {
-				Write-Host " ->No rows returned."
-			} else {
-				if ($IndexLckTbl.Rows.Count -gt 0) {
-					$RowNum = 0
-					Write-Host " ->Exclusive lock detected on table(s):"
-					$LockedTabList = ""
-					$LockedTabLogMsg = "Exclusive locks on table(s):"
-					foreach ($row in $IndexLckTbl) {
-						$LockedTab = $IndexLckTbl.Rows[$RowNum]["object_name"]
-						Write-Host "  - $LockedTab"
-						if ($RowNum -eq 0) { 
-							$LockedTabList += "$LockedTab" 
-						} else {
-							$LockedTabList += ", $LockedTab"
+		if ($SkipChecks -notcontains "IndexFrag") {
+			$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetIndexInfoForWholeDB.sql"
+			[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
+			if ($DBSwitched -ne "Y") {
+				Write-Host " " -NoNewLine
+			} elseif ($DBSwitched -eq "Y") {
+				Write-Host " ->" -NoNewLine
+			}
+			Write-Host "Retrieving index fragmentation info for $databaseName... " -NoNewLine
+			if ($IsAzureSQLDB) { 			
+				#if it's Azure SQL DB, we can't switch databases
+				[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
+				[string]$Query = $Query -replace "AzureSQLDBReplace", "$DirDate"
+			} else {		
+				[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
+			}
+			Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Index Frag Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout	
+			if ($global:StepOutcome -eq "Success") {
+				$IndexTbl = $global:PSBlitzSet.Tables[0]
+				$IndexLckTbl = $global:PSBlitzSet.Tables[1]
+				$RecordsReturned = $IndexTbl.Rows.Count
+				if ($RecordsReturned -le 0) {
+					Write-Host " ->No rows returned."
+				} else {
+					if ($IndexLckTbl.Rows.Count -gt 0) {
+						$RowNum = 0
+						Write-Host " ->Exclusive lock detected on table(s):"
+						$LockedTabList = ""
+						$LockedTabLogMsg = "Exclusive locks on table(s):"
+						foreach ($row in $IndexLckTbl) {
+							$LockedTab = $IndexLckTbl.Rows[$RowNum]["object_name"]
+							Write-Host "  - $LockedTab"
+							if ($RowNum -eq 0) { 
+								$LockedTabList += "$LockedTab" 
+							} else {
+								$LockedTabList += ", $LockedTab"
+							}
+							$RowNum += 1
 						}
-						$RowNum += 1
-					}
 				
-					Add-LogRow "->Index Frag Info" "Skipped XLocked Tables" "$LockedTabLogMsg $LockedTabList"
-				}
-				if ($ToHTML -eq "Y") {
-				
-					if ($DebugInfo) {
-						Write-Host " ->Converting index info to HTML" -fore yellow
+						Add-LogRow "->Index Frag Info" "Skipped XLocked Tables" "$LockedTabLogMsg $LockedTabList"
 					}
+					if ($ToHTML -eq "Y") {
+				
+						Write-PSBlitzDebug " ->Converting index info to HTML"
 
-					$htmlTable = Convert-TableToHtml $IndexTbl -TblID "StatsOrIxFragTable" -ExclCols "database" -CSSClass "sortable" -DebugInfo:$DebugInfo
-					$HtmlTabName = "Index fragmentation info for $databaseName"
-					$HtmlFileName = "IndexFragInfo_$databaseName.html"
+						$htmlTable = Convert-TableToHtml $IndexTbl -TblID "StatsOrIxFragTable" -ExclCols "database" -CSSClass "sortable" -DebugInfo:$DebugInfo
+						$HtmlTabName = "Index fragmentation info for $databaseName"
+						$HtmlFileName = "IndexFragInfo_$databaseName.html"
 			
-					$html = $HTMLPre + @"
+						$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1>$HtmlTabName</h1>
 				$($SearchTableDiv -replace $STDivReplace, "'StatsOrIxFragTable', 0")
 				$SortableTable `n $htmlTable `n	$JumpToTop `n $HTMLBodyEnd
 "@
 
-					Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
-					Invoke-ClearVariables html, htmlTable
-				} else {
-					$ExcelSheet = $ExcelFile.Worksheets.Item("Index Fragmentation")
-					Convert-TableToExcel $IndexTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
-					##Saving file
-					Save-ExcelFile $ExcelFile
+						Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
+						Invoke-ClearVariables html, htmlTable
+					} else {
+						$ExcelSheet = $ExcelFile.Worksheets.Item("Index Fragmentation")
+						Convert-TableToExcel $IndexTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
+						##Saving file
+						Save-ExcelFile $ExcelFile
+					}
+					##Cleaning up variables
+					Invoke-ClearVariables IndexTbl, PSBlitzSet
 				}
-				##Cleaning up variables
-				Invoke-ClearVariables IndexTbl, PSBlitzSet
 			} 
+		} else {
+			Write-Host "Skipping index fragmentation check as requested."
+			Add-LogRow "Index Fragmentation" "Skipped" "Index fragmentation check skipped as requested."
 		}
 
 		if ($DBSwitched -eq "Y") {
@@ -3509,19 +3514,15 @@ finally {
 			if ($FlagCreated -eq "Y") {
 				$BlitzWhoDelay += 10
 				Start-Sleep -Seconds $BlitzWhoDelay
-				if ($DebugInfo) {
-					Write-Host " ->Waiting for $BlitzWhoDelay seconds before getting session activity output." -Fore Yellow
-				}
+				Write-PSBlitzDebug " ->Waiting for $BlitzWhoDelay seconds before getting session activity output."
 			}
 			$JobStatus = Get-Job -Name $JobName | Select-Object -ExpandProperty State
 			if ($JobStatus -ne "Running") {
-				if ($DebugInfo) {
-					Write-Host " ->Session activity collection process no longer running " -NoNewline -Fore Yellow
-				}
+				Write-PSBlitzDebug " ->Session activity collection process no longer running " -NoNewline
+
 				Write-Host @GreenCheck
-				if ($DebugInfo) {
-					Write-Host ""
-				}
+				Write-PSBlitzDebug " "
+	
 				$JobOutcome = Receive-Job -Name $JobName
 				Write-Host $JobOutcome
 				$LogtxtFilePath = Join-Path -Path $OutDir -ChildPath "sp_BlitzWhoBackgroundJobLog.txt"
@@ -3716,9 +3717,7 @@ finally {
 
 		##Insert log data in Excel
 		##Populating the "ExecutionLog" sheet
-		if ($DebugInfo) {
-			Write-Host " Saving execution log for this run of PSBlitz..."
-		}
+		Write-PSBlitzDebug " Saving execution log for this run of PSBlitz..."
 		$ExcelSheet = $ExcelFile.Worksheets.Item("ExecutionLog")
 
 		Convert-TableToExcel $LogTbl $ExcelSheet -StartRow 3 -DebugInfo:$DebugInfo
@@ -3761,9 +3760,7 @@ finally {
 	$ExecTime = (New-TimeSpan -Start $StartDate -End $EndDate).ToString()
 	$ExecTime = $ExecTime.Substring(0, $ExecTime.IndexOf('.'))
 	if ($ToHTML -eq "Y") {
-		if ($DebugInfo) {
-			Write-Host " ->Generating index and execution log pages." -fore yellow
-		} 
+		Write-PSBlitzDebug " ->Generating index and execution log pages." 
 		$HTMLChk = "&#10004;"
 		$HtmlTabName = "PSBlitz Execution Log"
 		$htmlTable = Convert-TableToHtml $LogTbl -NoCaseChange -CSSClass LogTbl -DebugInfo:$DebugInfo
@@ -4070,10 +4067,8 @@ finally {
 	Write-Host " "
 	Write-Host $("-" * 80)
 
-	If ($DebugInfo) {
-		Write-Host "  If you want to report an issue, please use GitHub and read this first:" -Fore Yellow
-		Write-Host "      >>>>>>>  https://github.com/VladDBA/PSBlitz/issues/216 <<<<<<<" -Fore Yellow
-	}
+	Write-PSBlitzDebug "  If you want to report an issue, please use GitHub and read this first:"
+	Write-PSBlitzDebug "      >>>>>>>  https://github.com/VladDBA/PSBlitz/issues/216 <<<<<<<"
 
 	if ($InteractiveMode -eq 1) {
 		Read-Host -Prompt "Done. Press Enter to close this window."
