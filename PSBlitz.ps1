@@ -169,6 +169,10 @@
  limited to only the "loudest" database in the cache results. Defaults to 50 - only change it if you're using using HTML output
  and have enough RAM to handle the increased data that PS will have to process.
 
+.PARAMETER SkipChecks
+ Used to specify one or more (comma-separated) checks to skip. 
+ Currently only supports IndexFrag as input, which will skip the index fragmentation check.
+
 .PARAMETER DebugInfo
  Switch used to get more information for debugging and troubleshooting purposes.
 
@@ -282,8 +286,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.6.0"
-$VersDate = "2025-05-20"
+$Vers = "5.7.0"
+$VersDate = "2025-07-01"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -3010,9 +3014,9 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			Write-Host " Retrieving Query Store info for $databaseName..."
 
 			if ($IsAzureSQLDB -eq $false) { 
-				$OldCheckDBStr = ";SET @database_name = NULL;"
-				$NewCheckDBStr = ";SET @database_name = N'" + $CheckDB + "';"
-				[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
+                $OldCheckQSDBStr = ";SET @database_name = NULL;"
+				$NewCheckQSDBStr = ";SET @database_name = N'" + $CheckDB + "';"
+				[string]$Query = $Query -replace $OldCheckQSDBStr, $NewCheckQSDBStr
 			}
 			$SortOrders = @("CPU", "Duration")
 			foreach ($SortOrder in $SortORders) { 
