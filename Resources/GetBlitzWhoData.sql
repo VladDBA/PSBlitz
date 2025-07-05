@@ -78,12 +78,14 @@ WHERE  [database_name] = CASE
 AND [program_name] NOT LIKE N'PSBlitz%';
 
 /*Aggregate output*/
-;WITH agg ( ID, [session_id], [query_hash], start_time, [TotalExecTime])
+;WITH agg ( ID, [session_id], [query_hash], start_time, [TotalExecTime],[first_seen],[last_seen])
      AS (SELECT MAX(ID),
                 [session_id],
                 [query_hash],
                 [start_time],
-                MAX([elapsed_time]) AS [TotalExecTime]
+                MAX([elapsed_time]) AS [TotalExecTime],
+                MIN([CheckDate]) AS [first_seen],
+                MAX([CheckDate]) AS [last_seen]
          FROM   [tempdb].[dbo].[BlitzWho_..BlitzWhoOut..]
          WHERE  [database_name] = CASE
                                     WHEN @DatabaseName = N'' THEN [database_name]
@@ -94,6 +96,8 @@ AND [program_name] NOT LIKE N'PSBlitz%';
                    [query_hash],
                    [start_time])
 SELECT CONVERT(VARCHAR(25),[agg].[start_time],120) AS [start_time],
+       CONVERT(VARCHAR(25),CAST([agg].[first_seen] AS DATETIME),120) AS [first_seen],
+       CONVERT(VARCHAR(25),CAST([agg].[last_seen] AS DATETIME),120) AS [last_seen],
        [who].[elapsed_time],
 	   [who].[database_name],
        [agg].[session_id],
