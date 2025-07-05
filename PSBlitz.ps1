@@ -308,12 +308,12 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql", "spBlitzCache
 	"copy.js", "spQuickieStore_NonSPLatest.sql")
 
 ## we use these to make sure someone didn't modify the scripts in the Resources folder
-$storedHashes = @{"spBlitz_NonSPLatest.sql" = "3FB5FE921595CF84C551A07389BF93C24C9B70BB11BF1E4EEF025B1BEC2B23EE"
-"spBlitzCache_NonSPLatest.sql" = "66200133B55EEF7A16800AB07AD1FFB1A68DEEF9697A07AD33817A53D1453FE7"
-"spBlitzFirst_NonSPLatest.sql" = "28922F9EF60BF86DA354CF24979CF1F4BF7924B17EB803C260DE2073C3EDF702"
-"spBlitzIndex_NonSPLatest.sql" = "B4C3FD55125A844D248B21C46B62617DB5401D351D772BEECF01F61EA29754EE"
-"spBlitzLock_NonSPLatest.sql" = "70416A46D3ADC63EC3A1331B0352B9574900C917A3424FC30E393E3F169C41D6"
-"spBlitzWho_NonSPLatest.sql" = "9E2915BF6F5229BD087974717EBDDB6D25449037531DC6139B0270021A50DF3C"
+$storedHashes = @{"spBlitz_NonSPLatest.sql" = "F6A467C796EBF299BC67BBFD8B75E00FA4D4BC7EE4A70524C240D4843D89D11F"
+"spBlitzCache_NonSPLatest.sql" = "BBBB196DFCBBDA633D9567A660AE72B188D5838B9F736D5E420D8B423706EB3F"
+"spBlitzFirst_NonSPLatest.sql" = "9D5C5C16C5D12E5E77ABFF427678C259C5B030C89E2C95A6B32A13014BA7D0BB"
+"spBlitzIndex_NonSPLatest.sql" = "B43BE58493F2BCA53E6FBD59A0E4F03C876472E173961DA50D40FAD6C7D7A111"
+"spBlitzLock_NonSPLatest.sql" = "3486DC155F106CEC5C8FCE690D6491E3350EE253EB26D605282A3B203BC2402C"
+"spBlitzWho_NonSPLatest.sql" = "65C3B3B6BED5024D40C720517EB0869550C9FC61718FF4F7DAE9888D9547F263"
 "GetBlitzWhoData.sql" = "165A9A4660385A69218196A1569CC35E1A44E5B9FBDAF74722545249567E4298"
 "GetInstanceInfo.sql" = "0E84569B2E97D6F59B4CC6D4AB0F2D41637573970CF14A1F99F9961AF8F3175A"
 "GetTempDBUsageInfo.sql" = "20620509996A6F7BB45410397D0CB5C7C0D044FEA15944950171DF14436AE9D1"
@@ -323,7 +323,7 @@ $storedHashes = @{"spBlitz_NonSPLatest.sql" = "3FB5FE921595CF84C551A07389BF93C24
 "GetDbInfo.sql" = "103B639ED78B099A5C2D133E6555B7073CE23DF2DBE4CD7CAD24D44EDB261F7F"
 "GetAzureSQLDBInfo.sql" = "8A18348F7B87C2F5DA047B103E3BF4FEBB455E7498F0C93644DC2CD7E7255506"
 "GetObjectsWithDangerousOptions.sql" = "AFE74F2FE6D6077AEBF169CC16DE036B08980846E6795DC342372AB8C2A132A9"
-"spQuickieStore_NonSPLatest.sql" = "9C6DF47EF2BD1100A659F05911A7653F952C2646323C170E23C17ADE8D36699F"
+"spQuickieStore_NonSPLatest.sql" = "DC1949A1FC33DD0184EF99621BF16601DC56C0B965509ED1CE764E006CE14BCC"
 }
 
 #Set path+name of the input Excel file
@@ -2933,25 +2933,29 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
 			$DBQuery = @" 
-		IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSION')), 4)) < 13 )
+		DECLARE @NextStep BIT;
+IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSION')), 4)) < 13 )
   BEGIN
       SELECT 'No' AS [EligibleForBlitzQueryStore]
   END
 ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSION')), 4)) >= 13 )
   BEGIN
-      IF(SELECT COUNT(*)
-         FROM   sys.databases AS d
+      IF(SELECT COUNT(*) `n FROM   sys.databases AS d
          WHERE  d.is_query_store_on = 1 AND d.user_access_desc = 'MULTI_USER'
-                AND d.state_desc = 'ONLINE' AND d.name = @DBName
-                AND d.is_distributor = 0) > 0
+                AND d.state_desc = 'ONLINE' AND d.name = @DBName `n AND d.is_distributor = 0) > 0
         BEGIN
-            SELECT 'Yes' AS [EligibleForBlitzQueryStore]
+            SELECT 'Yes' AS [EligibleForBlitzQueryStore]; `n  SET @NextStep = 1;
         END
       ELSE
         BEGIN
-            SELECT 'No' AS [EligibleForBlitzQueryStore]
-        END
-  END;
+            SELECT 'No' AS [EligibleForBlitzQueryStore]; `n    SET @NextStep = 0;
+        END `n  END;
+
+  IF (@NextStep = 1)
+  BEGIN
+  DECLARE @sql NVARCHAR(400);
+  SET @sql = N'USE ['+@DBName+N'] `n BEGIN TRY `n EXEC sp_query_store_flush_db; `n END TRY `n'
+  SET @sql += N'BEGIN CATCH `n PRINT ''could not flush''`n END CATCH;' `n  EXEC (@sql); `n  END;
 "@
 			$CheckDBQuery.CommandText = $DBQuery
 			$CheckDBQuery.Parameters.Add("@DBName", [Data.SQLDBType]::NVarChar, 256) | Out-Null
@@ -2962,14 +2966,9 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			BEGIN
 				IF ( (SELECT SERVERPROPERTY ('EngineEdition')) NOT IN (5,8)
 					  OR (SELECT [compatibility_level]
-						  FROM   sys.[databases]
-						  WHERE  [name] = DB_NAME()) < 130 )
-				  BEGIN
-					  SELECT 'No' AS [EligibleForBlitzQueryStore];
-				  END;
-				ELSE
-				  BEGIN
-					  SELECT 'Yes' AS [EligibleForBlitzQueryStore];
+						  FROM   sys.[databases] `nWHERE  [name] = DB_NAME()) < 130 )
+				  BEGIN `nSELECT 'No' AS [EligibleForBlitzQueryStore]; `n   END;
+				ELSE `n	  BEGIN `n	  SELECT 'Yes' AS [EligibleForBlitzQueryStore];
 				  END;
 			END;
 		  ELSE
