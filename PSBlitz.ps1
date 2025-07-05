@@ -309,21 +309,21 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql", "spBlitzCache
 
 ## we use these to make sure someone didn't modify the scripts in the Resources folder
 $storedHashes = @{"spBlitz_NonSPLatest.sql" = "F6A467C796EBF299BC67BBFD8B75E00FA4D4BC7EE4A70524C240D4843D89D11F"
-"spBlitzCache_NonSPLatest.sql" = "BBBB196DFCBBDA633D9567A660AE72B188D5838B9F736D5E420D8B423706EB3F"
-"spBlitzFirst_NonSPLatest.sql" = "9D5C5C16C5D12E5E77ABFF427678C259C5B030C89E2C95A6B32A13014BA7D0BB"
-"spBlitzIndex_NonSPLatest.sql" = "B43BE58493F2BCA53E6FBD59A0E4F03C876472E173961DA50D40FAD6C7D7A111"
-"spBlitzLock_NonSPLatest.sql" = "3486DC155F106CEC5C8FCE690D6491E3350EE253EB26D605282A3B203BC2402C"
-"spBlitzWho_NonSPLatest.sql" = "65C3B3B6BED5024D40C720517EB0869550C9FC61718FF4F7DAE9888D9547F263"
-"GetBlitzWhoData.sql" = "165A9A4660385A69218196A1569CC35E1A44E5B9FBDAF74722545249567E4298"
-"GetInstanceInfo.sql" = "0E84569B2E97D6F59B4CC6D4AB0F2D41637573970CF14A1F99F9961AF8F3175A"
-"GetTempDBUsageInfo.sql" = "20620509996A6F7BB45410397D0CB5C7C0D044FEA15944950171DF14436AE9D1"
-"GetOpenTransactions.sql" = "76EBCB1758CBC86DAC4FE8E5C02E88AB4B96FEDB2E21570B8C0D410FF8A69F7D"
-"GetStatsInfoForWholeDB.sql" = "CF3A8B06AD68880F5BF44DE45206778F1515FB7DD930E2D3CCCC71149AFF5544"
-"GetIndexInfoForWholeDB.sql" = "6C58B79C4EDF06ADBE4EE79373A522A7C538B331D74E9E4AF32C77C6ED951F9B"
-"GetDbInfo.sql" = "103B639ED78B099A5C2D133E6555B7073CE23DF2DBE4CD7CAD24D44EDB261F7F"
-"GetAzureSQLDBInfo.sql" = "8A18348F7B87C2F5DA047B103E3BF4FEBB455E7498F0C93644DC2CD7E7255506"
-"GetObjectsWithDangerousOptions.sql" = "AFE74F2FE6D6077AEBF169CC16DE036B08980846E6795DC342372AB8C2A132A9"
-"spQuickieStore_NonSPLatest.sql" = "DC1949A1FC33DD0184EF99621BF16601DC56C0B965509ED1CE764E006CE14BCC"
+	"spBlitzCache_NonSPLatest.sql"             = "BBBB196DFCBBDA633D9567A660AE72B188D5838B9F736D5E420D8B423706EB3F"
+	"spBlitzFirst_NonSPLatest.sql"             = "9D5C5C16C5D12E5E77ABFF427678C259C5B030C89E2C95A6B32A13014BA7D0BB"
+	"spBlitzIndex_NonSPLatest.sql"             = "B43BE58493F2BCA53E6FBD59A0E4F03C876472E173961DA50D40FAD6C7D7A111"
+	"spBlitzLock_NonSPLatest.sql"              = "3486DC155F106CEC5C8FCE690D6491E3350EE253EB26D605282A3B203BC2402C"
+	"spBlitzWho_NonSPLatest.sql"               = "65C3B3B6BED5024D40C720517EB0869550C9FC61718FF4F7DAE9888D9547F263"
+	"GetBlitzWhoData.sql"                      = "165A9A4660385A69218196A1569CC35E1A44E5B9FBDAF74722545249567E4298"
+	"GetInstanceInfo.sql"                      = "0E84569B2E97D6F59B4CC6D4AB0F2D41637573970CF14A1F99F9961AF8F3175A"
+	"GetTempDBUsageInfo.sql"                   = "20620509996A6F7BB45410397D0CB5C7C0D044FEA15944950171DF14436AE9D1"
+	"GetOpenTransactions.sql"                  = "76EBCB1758CBC86DAC4FE8E5C02E88AB4B96FEDB2E21570B8C0D410FF8A69F7D"
+	"GetStatsInfoForWholeDB.sql"               = "CF3A8B06AD68880F5BF44DE45206778F1515FB7DD930E2D3CCCC71149AFF5544"
+	"GetIndexInfoForWholeDB.sql"               = "6C58B79C4EDF06ADBE4EE79373A522A7C538B331D74E9E4AF32C77C6ED951F9B"
+	"GetDbInfo.sql"                            = "103B639ED78B099A5C2D133E6555B7073CE23DF2DBE4CD7CAD24D44EDB261F7F"
+	"GetAzureSQLDBInfo.sql"                    = "8A18348F7B87C2F5DA047B103E3BF4FEBB455E7498F0C93644DC2CD7E7255506"
+	"GetObjectsWithDangerousOptions.sql"       = "AFE74F2FE6D6077AEBF169CC16DE036B08980846E6795DC342372AB8C2A132A9"
+	"spQuickieStore_NonSPLatest.sql"           = "DC1949A1FC33DD0184EF99621BF16601DC56C0B965509ED1CE764E006CE14BCC"
 }
 
 #Set path+name of the input Excel file
@@ -487,36 +487,36 @@ function Invoke-ErrMsg {
 	}
 }
 function Get-FileIntegrity {
-    param (
-        [string[]]$fileList,
-        [string]$FilesPath,
-        [hashtable]$storedHashes
-    )
-    $integrityOK = $true
-    $failedFiles = @()
+	param (
+		[string[]]$fileList,
+		[string]$FilesPath,
+		[hashtable]$storedHashes
+	)
+	$integrityOK = $true
+	$failedFiles = @()
 
-    # Only check .sql files
-    $sqlFiles = $fileList | Where-Object { $_.ToLower().EndsWith('.sql') }
+	# Only check .sql files
+	$sqlFiles = $fileList | Where-Object { $_.ToLower().EndsWith('.sql') }
 
-    foreach ($file in $sqlFiles) {
-        $FileToHash = Join-Path -Path $FilesPath -ChildPath $file
-        [string]$currentHash = Get-FileHash $FileToHash | Select-Object -ExpandProperty Hash
-        if ($storedHashes[$file] -ne $currentHash) {
-            Write-Host "Integrity check failed for $file" -ForegroundColor Red
-            $failedFiles += $file
-            $integrityOK = $false
-        }
-    }
+	foreach ($file in $sqlFiles) {
+		$FileToHash = Join-Path -Path $FilesPath -ChildPath $file
+		[string]$currentHash = Get-FileHash $FileToHash | Select-Object -ExpandProperty Hash
+		if ($storedHashes[$file] -ne $currentHash) {
+			Write-Host "Integrity check failed for $file" -ForegroundColor Red
+			$failedFiles += $file
+			$integrityOK = $false
+		}
+	}
 
-    if ($integrityOK) {
-       Write-PSBlitzDebug "All .sql files passed the integrity check."
-    } else {
-        Write-Host "The following file(s) failed the integrity check:" -ForegroundColor Red
-        $failedFiles | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
-        Write-Host "File integrity check failed. Script execution terminated." -ForegroundColor Red
+	if ($integrityOK) {
+		Write-PSBlitzDebug "All .sql files passed the integrity check."
+	} else {
+		Write-Host "The following file(s) failed the integrity check:" -ForegroundColor Red
+		$failedFiles | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
+		Write-Host "File integrity check failed. Script execution terminated." -ForegroundColor Red
 		Read-Host -Prompt "Press Enter to end script execution."
 		Exit
-    }
+	}
 }
 function Get-ExecTime {
 	$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
@@ -576,16 +576,18 @@ function Invoke-PSBlitzQuery {
 		$IBQConnection.Open()
 		$IBQAdapter.Fill($global:PSBlitzSet) | Out-Null -ErrorAction Stop
 		$StepEnd = get-date
+		if($StepNameIn -notlike "Query Store pre-check for*" ){
 		Write-Host @GreenCheck
+		}
 		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
 		$RunTime = [Math]::Round($StepRunTime, 2)
 		Write-PSBlitzDebug " - $RunTime seconds"
 		$global:StepOutcome = "Success"
 		if (($StepNameIn -like "sp_BlitzCache*") -or ($StepNameIn -like "sp_BlitzQueryStore*") -or 
-		($StepNameIn -eq "sp_BlitzIndex mode 1") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info") -or 
-		($StepNameIn -eq "sp_BlitzLock") -or ($StepNameIn -eq "Return sp_BlitzWho") -or ($StepNameIn -eq "Open Transacion Info") -or 
-		($StepNameIn -eq "Objects with dangerous SET options") -or ($StepNameIn -eq "sp_Blitz") -or 
-		($StepNameIn -eq "sp_BlitzFirst 30 seconds") -or ($StepNameIn -like "Query Store check *")) {
+			($StepNameIn -eq "sp_BlitzIndex mode 1") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info") -or 
+			($StepNameIn -eq "sp_BlitzLock") -or ($StepNameIn -eq "Return sp_BlitzWho") -or ($StepNameIn -eq "Open Transacion Info") -or 
+			($StepNameIn -eq "Objects with dangerous SET options") -or ($StepNameIn -eq "sp_Blitz") -or 
+			($StepNameIn -eq "sp_BlitzFirst 30 seconds") -or ($StepNameIn -like "Query Store check *")) {
 			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
 			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
 		} elseif ('Stats Info', 'sp_BlitzIndex mode 0', 'sp_BlitzIndex mode 2', 'sp_BlitzIndex mode 4' -contains $StepNameIn) {
@@ -863,8 +865,8 @@ function Export-PlansAndDeadlocks {
 			$i += 1
 			$FileName = "N/A"
 			if (($DataTable.Rows[$RowNum][$XMLColName] -ne [System.DBNull]::Value) -and 
-			    (($DataTable.Rows[$RowNum][$FNameColName] -like "Deadlock*") -or
-			      ($XMLColName -ne "deadlock_graph")) ) {
+				(($DataTable.Rows[$RowNum][$FNameColName] -like "Deadlock*") -or
+				($XMLColName -ne "deadlock_graph")) ) {
 				if ($FileNameFromColumn) {
 					$FileName = $DataTable.Rows[$RowNum][$FNameColName]
 				} else {
@@ -2930,82 +2932,33 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		}
 		$databaseName = if ($IsAzureSQLDB) { $ASDBName } else { $CheckDB }
 		Write-Host "Checking if $databaseName is eligible for Query Store check... " -NoNewline
-		$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
-		if (!([string]::IsNullOrEmpty($CheckDB))) {
-			$DBQuery = @" 
-		DECLARE @NextStep BIT;
-IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSION')), 4)) < 13 )
-  BEGIN
-      SELECT 'No' AS [EligibleForBlitzQueryStore]
-  END
-ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSION')), 4)) >= 13 )
-  BEGIN
-      IF(SELECT COUNT(*) `n FROM   sys.databases AS d
-         WHERE  d.is_query_store_on = 1 AND d.user_access_desc = 'MULTI_USER'
-                AND d.state_desc = 'ONLINE' AND d.name = @DBName `n AND d.is_distributor = 0) > 0
-        BEGIN
-            SELECT 'Yes' AS [EligibleForBlitzQueryStore]; `n  SET @NextStep = 1;
-        END
-      ELSE
-        BEGIN
-            SELECT 'No' AS [EligibleForBlitzQueryStore]; `n    SET @NextStep = 0;
-        END `n  END;
-
-  IF (@NextStep = 1)
-  BEGIN
-  DECLARE @sql NVARCHAR(400);
-  SET @sql = N'USE ['+@DBName+N'] `n BEGIN TRY `n EXEC sp_query_store_flush_db; `n END TRY `n'
-  SET @sql += N'BEGIN CATCH `n PRINT ''could not flush''`n END CATCH;' `n  EXEC (@sql); `n  END;
-"@
-			$CheckDBQuery.CommandText = $DBQuery
-			$CheckDBQuery.Parameters.Add("@DBName", [Data.SQLDBType]::NVarChar, 256) | Out-Null
-			$CheckDBQuery.Parameters["@DBName"].Value = $CheckDB
-		} elseif ($IsAzureSQLDB) {
-			$DBQuery = @"
-			IF ( (SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128))) = N'SQL Azure' )
-			BEGIN
-				IF ( (SELECT SERVERPROPERTY ('EngineEdition')) NOT IN (5,8)
-					  OR (SELECT [compatibility_level]
-						  FROM   sys.[databases] `nWHERE  [name] = DB_NAME()) < 130 )
-				  BEGIN `nSELECT 'No' AS [EligibleForBlitzQueryStore]; `n   END;
-				ELSE `n	  BEGIN `n	  SELECT 'Yes' AS [EligibleForBlitzQueryStore];
-				  END;
-			END;
-		  ELSE
-			BEGIN
-				SELECT 'Dunno what this is' AS [EligibleForBlitzQueryStore];
-			END;
-"@
-			$CheckDBQuery.CommandText = $DBQuery
+		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetQSStatus.sql"
+		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
+		if ((!([string]::IsNullOrEmpty($CheckDB))) -and (($IsAzureSQLDB -eq $false))){
+			$NewCheckQSDBStr = ";SET @DatabaseName = N'$CheckDB';"
+			$OldCheckQSDBStr = ";SET @DatabaseName = NULL;"
+			[string]$Query = $Query -replace $OldCheckQSDBStr, $NewCheckQSDBStr
 		}
+
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Query Store pre-check for $databaseName" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout 
+		if ($global:StepOutcome -eq "Success") {
+			$BlitzQSTbl = $global:PSBlitzSet.Tables[0]
 		
-		$CheckDBQuery.Connection = $SqlConnection
-		$CheckDBQuery.CommandTimeout = 100
-		$CheckDBAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-		$CheckDBAdapter.SelectCommand = $CheckDBQuery
-		$CheckDBSet = new-object System.Data.DataSet
-		Try {
-			$StepStart = get-date
-			$CheckDBAdapter.Fill($CheckDBSet) | Out-Null -ErrorAction Stop
-			$SqlConnection.Close()
-			if ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "Yes") {
+			if ($BlitzQSTbl.Rows[0]["EligibleForBlitzQueryStore"] -eq "Yes") {
 				Write-Host @GreenCheck				
 				$CheckQueryStore = 'Y'
-			} elseif ($CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] -eq "No") {
+			} elseif ($BlitzQSTbl.Rows[0]["EligibleForBlitzQueryStore"] -eq "No") {
 				$StepEnd = Get-Date
 				Write-Host "X (not eligible)" -Fore Yellow
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" "$databaseName is not eligible"
 			} else {
 				$StepEnd = Get-Date
-				$QSCheckResult = $CheckDBSet.Tables[0].Rows[0]["EligibleForBlitzQueryStore"] 
+				$QSCheckResult = $BlitzQSTbl.Rows[0]["EligibleForBlitzQueryStore"] 
 				Write-Host "X (not eligible)" -Fore Yellow
 				Add-LogRow "sp_BlitzQueryStore" "Skipped" $QSCheckResult
 			}
-		} Catch {
+		} else {
 			$CheckQueryStore = 'N'
-			Invoke-ErrMsg
-			$StepEnd = Get-Date
-			Add-LogRow "sp_BlitzQueryStore precheck" "Failure"
 		}
 		if ($CheckQueryStore -eq 'Y') {
 			$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spQuickieStore_NonSPLatest.sql"
@@ -3013,7 +2966,7 @@ ELSE IF ( (SELECT PARSENAME(CONVERT(NVARCHAR(128), SERVERPROPERTY ('PRODUCTVERSI
 			Write-Host " Retrieving Query Store info for $databaseName..."
 
 			if ($IsAzureSQLDB -eq $false) { 
-                $OldCheckQSDBStr = ";SET @database_name = NULL;"
+				$OldCheckQSDBStr = ";SET @database_name = NULL;"
 				$NewCheckQSDBStr = ";SET @database_name = N'" + $CheckDB + "';"
 				[string]$Query = $Query -replace $OldCheckQSDBStr, $NewCheckQSDBStr
 			}
