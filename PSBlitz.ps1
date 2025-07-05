@@ -3329,11 +3329,11 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			} else {
 				if ($ToHTML -eq "Y") {
 
-					$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -CSSClass "StatsInfoTbl" -ExclCols "database" -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -CSSClass "StatsInfoTbl sortable" -ExclCols "database" -DebugInfo:$DebugInfo
 					#add tooltips
-					$htmlTable = $htmlTable -replace '<th>Update ', '<th class="tooltip" title="The commented options are suggestions based on record counts.">Update '
+					$htmlTable = $htmlTable -replace '<th>Update ', '<th class="sorttable_nosort tooltip" title="The commented options are suggestions based on record counts.">Update '
 					#add buttons
-					$htmlTable = $htmlTable -replace '<th>Get Details', '<th><div class="header-content">Get Details<div class="button-tooltip" title="Click to copy the commands from this column"><button class="copyButton" data-table-id="StatsOrIxFragTable" data-column-index="20">Copy commands</button></div></div>'
+					$htmlTable = $htmlTable -replace '<th>Get Details', '<th class="sorttable_nosort"><div class="header-content">Get Details<div class="button-tooltip" title="Click to copy the commands from this column"><button class="copyButton" data-table-id="StatsOrIxFragTable" data-column-index="20">Copy commands</button></div></div>'
 					$htmlTable = $htmlTable -replace 'counts.">Update Table Stats', 'counts.">Update Table Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="21">Copy commands</button>'
 					$htmlTable = $htmlTable -replace 'counts.">Update Individual Stats', 'counts.">Update Individual Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="22">Copy commands</button>'
 					$htmlTable = $htmlTable -replace 'counts.">Update Partition Stats', 'counts.">Update Partition Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="23">Copy commands</button>'
