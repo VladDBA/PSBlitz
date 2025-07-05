@@ -67,13 +67,13 @@ DECLARE
 
 
 /* Everything from here down is straight out of sp_BlitzWho without 
-the GO at the end  and without the block that creates the view at line 351*/
+the GO at the end and anything marked as "changes for PSBlitz"*/
 
 	SET NOCOUNT ON;
 	SET STATISTICS XML OFF;
 	SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 	
-	SELECT @Version = '8.22', @VersionDate = '20241019';
+	SELECT @Version = '8.25', @VersionDate = '20250704';
     
 	IF(@VersionCheckMode = 1)
 	BEGIN
@@ -356,7 +356,7 @@ IF @OutputDatabaseName IS NOT NULL AND @OutputSchemaName IS NOT NULL AND @Output
 
 	SET @ObjectFullName = @OutputDatabaseName + N'.' + @OutputSchemaName + N'.' +  @OutputTableNameQueryStats_View;
 
-        /* Vlad - removed create view portion - https://github.com/VladDBA/PSBlitz/issues/55 */
+        /* Vlad - removed create view portion - https://github.com/VladDBA/PSBlitz/issues/55 - changes for PSBlitz*/
 
  END
 
