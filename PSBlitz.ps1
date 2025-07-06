@@ -305,26 +305,26 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql", "spBlitzCache
 	"spBlitzWho_NonSPLatest.sql", "GetBlitzWhoData.sql", "GetInstanceInfo.sql", "GetTempDBUsageInfo.sql", 
 	"GetOpenTransactions.sql", "GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql", "GetDbInfo.sql", 
 	"GetAzureSQLDBInfo.sql", "GetObjectsWithDangerousOptions.sql", "searchtable.js", "sorttable.js", "styles.css", 
-	"copy.js", "spQuickieStore_NonSPLatest.sql","GetQSStatus.sql")
+	"copy.js", "spQuickieStore_NonSPLatest.sql", "GetQSStatus.sql")
 
 ## we use these to make sure someone didn't modify the scripts in the Resources folder
 $storedHashes = @{"spBlitz_NonSPLatest.sql" = "F6A467C796EBF299BC67BBFD8B75E00FA4D4BC7EE4A70524C240D4843D89D11F"
-"spBlitzCache_NonSPLatest.sql" = "BBBB196DFCBBDA633D9567A660AE72B188D5838B9F736D5E420D8B423706EB3F"
-"spBlitzFirst_NonSPLatest.sql" = "9D5C5C16C5D12E5E77ABFF427678C259C5B030C89E2C95A6B32A13014BA7D0BB"
-"spBlitzIndex_NonSPLatest.sql" = "B43BE58493F2BCA53E6FBD59A0E4F03C876472E173961DA50D40FAD6C7D7A111"
-"spBlitzLock_NonSPLatest.sql" = "3486DC155F106CEC5C8FCE690D6491E3350EE253EB26D605282A3B203BC2402C"
-"spBlitzWho_NonSPLatest.sql" = "65C3B3B6BED5024D40C720517EB0869550C9FC61718FF4F7DAE9888D9547F263"
-"GetBlitzWhoData.sql" = "1A23F1F9C4CB51252D088919500A7E472B56B98DD5096DBA79B5D96AEEB5F6FC"
-"GetInstanceInfo.sql" = "0E84569B2E97D6F59B4CC6D4AB0F2D41637573970CF14A1F99F9961AF8F3175A"
-"GetTempDBUsageInfo.sql" = "20620509996A6F7BB45410397D0CB5C7C0D044FEA15944950171DF14436AE9D1"
-"GetOpenTransactions.sql" = "76EBCB1758CBC86DAC4FE8E5C02E88AB4B96FEDB2E21570B8C0D410FF8A69F7D"
-"GetStatsInfoForWholeDB.sql" = "CF3A8B06AD68880F5BF44DE45206778F1515FB7DD930E2D3CCCC71149AFF5544"
-"GetIndexInfoForWholeDB.sql" = "6C58B79C4EDF06ADBE4EE79373A522A7C538B331D74E9E4AF32C77C6ED951F9B"
-"GetDbInfo.sql" = "103B639ED78B099A5C2D133E6555B7073CE23DF2DBE4CD7CAD24D44EDB261F7F"
-"GetAzureSQLDBInfo.sql" = "8A18348F7B87C2F5DA047B103E3BF4FEBB455E7498F0C93644DC2CD7E7255506"
-"GetObjectsWithDangerousOptions.sql" = "AFE74F2FE6D6077AEBF169CC16DE036B08980846E6795DC342372AB8C2A132A9"
-"spQuickieStore_NonSPLatest.sql" = "DC1949A1FC33DD0184EF99621BF16601DC56C0B965509ED1CE764E006CE14BCC"
-"GetQSStatus.sql" = "A0D6E7B1C6BC5B0ED5FDF6FD14C5927729F883CB491342F81DCD9BD48A4ACCFE"
+	"spBlitzCache_NonSPLatest.sql"             = "BBBB196DFCBBDA633D9567A660AE72B188D5838B9F736D5E420D8B423706EB3F"
+	"spBlitzFirst_NonSPLatest.sql"             = "9D5C5C16C5D12E5E77ABFF427678C259C5B030C89E2C95A6B32A13014BA7D0BB"
+	"spBlitzIndex_NonSPLatest.sql"             = "B43BE58493F2BCA53E6FBD59A0E4F03C876472E173961DA50D40FAD6C7D7A111"
+	"spBlitzLock_NonSPLatest.sql"              = "3486DC155F106CEC5C8FCE690D6491E3350EE253EB26D605282A3B203BC2402C"
+	"spBlitzWho_NonSPLatest.sql"               = "65C3B3B6BED5024D40C720517EB0869550C9FC61718FF4F7DAE9888D9547F263"
+	"GetBlitzWhoData.sql"                      = "1A23F1F9C4CB51252D088919500A7E472B56B98DD5096DBA79B5D96AEEB5F6FC"
+	"GetInstanceInfo.sql"                      = "0E84569B2E97D6F59B4CC6D4AB0F2D41637573970CF14A1F99F9961AF8F3175A"
+	"GetTempDBUsageInfo.sql"                   = "20620509996A6F7BB45410397D0CB5C7C0D044FEA15944950171DF14436AE9D1"
+	"GetOpenTransactions.sql"                  = "76EBCB1758CBC86DAC4FE8E5C02E88AB4B96FEDB2E21570B8C0D410FF8A69F7D"
+	"GetStatsInfoForWholeDB.sql"               = "CF3A8B06AD68880F5BF44DE45206778F1515FB7DD930E2D3CCCC71149AFF5544"
+	"GetIndexInfoForWholeDB.sql"               = "6C58B79C4EDF06ADBE4EE79373A522A7C538B331D74E9E4AF32C77C6ED951F9B"
+	"GetDbInfo.sql"                            = "103B639ED78B099A5C2D133E6555B7073CE23DF2DBE4CD7CAD24D44EDB261F7F"
+	"GetAzureSQLDBInfo.sql"                    = "8A18348F7B87C2F5DA047B103E3BF4FEBB455E7498F0C93644DC2CD7E7255506"
+	"GetObjectsWithDangerousOptions.sql"       = "AFE74F2FE6D6077AEBF169CC16DE036B08980846E6795DC342372AB8C2A132A9"
+	"spQuickieStore_NonSPLatest.sql"           = "DC1949A1FC33DD0184EF99621BF16601DC56C0B965509ED1CE764E006CE14BCC"
+	"GetQSStatus.sql"                          = "A0D6E7B1C6BC5B0ED5FDF6FD14C5927729F883CB491342F81DCD9BD48A4ACCFE"
 }
 
 #Set path+name of the input Excel file
@@ -577,8 +577,8 @@ function Invoke-PSBlitzQuery {
 		$IBQConnection.Open()
 		$IBQAdapter.Fill($global:PSBlitzSet) | Out-Null -ErrorAction Stop
 		$StepEnd = get-date
-		if($StepNameIn -notlike "Query Store pre-check for*" ){
-		Write-Host @GreenCheck
+		if ($StepNameIn -notlike "Query Store pre-check for*" ) {
+			Write-Host @GreenCheck
 		}
 		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
 		$RunTime = [Math]::Round($StepRunTime, 2)
@@ -587,7 +587,7 @@ function Invoke-PSBlitzQuery {
 		if (($StepNameIn -like "sp_BlitzCache*") -or ($StepNameIn -like "sp_BlitzQueryStore*") -or 
 			($StepNameIn -eq "sp_BlitzIndex mode 1") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info") -or 
 			($StepNameIn -eq "sp_BlitzLock") -or ($StepNameIn -eq "Return sp_BlitzWho") -or ($StepNameIn -eq "Open Transacion Info") -or 
-			($StepNameIn -eq "Objects with dangerous SET options") -or ($StepNameIn -eq "sp_Blitz") -or 
+			($StepNameIn -eq "Objects with dangerous SET options") -or ($StepNameIn -eq "Instance Health") -or 
 			($StepNameIn -eq "sp_BlitzFirst 30 seconds") -or ($StepNameIn -like "Query Store check *")) {
 			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
 			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
@@ -690,13 +690,18 @@ function Convert-TableToHtml {
 		$htmlTableOut = $DataTable | Select-Object -Property $properties | ConvertTo-Html -As Table -Fragment
         
 		if (($CSSClass) -and ($TblID)) {
-			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID' class='$CSSClass'>"
+			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id=`"$TblID`" class=`"$CSSClass`">"
 			if ($CSSClass -eq "InstHealthTbl") {
 				#Split Instance Health details after each dot to avoid wide table
 				$htmlTableOut = $htmlTableOut -replace '\.\s', ". `n"
+				#change background for Priority 1-50
+				$htmlTableOut = $htmlTableOut -replace '>([1-9]|[1-4][0-9]|50)<', ' style="background-color: #FFB6C1;">$1<'
+			} elseif ($TblID -eq "setopt"){
+				#Change background color for OFF options
+				$htmlTableOut = $htmlTableOut -replace '>(OFF)<', ' style="background-color: #FFB6C1;">$1<'
 			}
 		} elseif ($CSSClass) {
-			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class='$CSSClass'>"
+			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class=`"$CSSClass`">"
 			#clean up XML noise and extra charcters in specific tables
 			if ($CSSClass -eq "CacheTabx") {
 				$htmlTableOut = $htmlTableOut -replace "<td>&lt;\?ClickMe ", "<td>"
@@ -710,12 +715,12 @@ function Convert-TableToHtml {
 				$htmlTableOut = $htmlTableOut -replace " \(", "&nbsp;("
 			}
 		} elseif ($TblID) {
-			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id='$TblID'>"
+			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id=`"$TblID`">"
 		}
 		if ($HyperlinkCol -ne 'x') {
 			# fix hyperlinks
-			$htmlTableOut = $htmlTableOut -replace "&lt;a href=&#39;", "<a href='"
-			$htmlTableOut = $htmlTableOut -replace "&#39; target=&#39;_blank&#39;&gt;", "' target='_blank'>"
+			$htmlTableOut = $htmlTableOut -replace "&lt;a href=&#39;", "<a href=`""
+			$htmlTableOut = $htmlTableOut -replace "&#39; target=&#39;_blank&#39;&gt;", "' target=`"_blank`">"
 			$htmlTableOut = $htmlTableOut -replace "&lt;/a&gt;", "</a>"
 			#fix column name
 			$HyperlinkColClean = $HyperlinkCol -replace 'HL', ''
@@ -2408,7 +2413,7 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 			[string]$Query = $Query -replace ";SET @CheckUserDatabaseObjects = 0;", ";SET @CheckUserDatabaseObjects = 1;"
 			$GetUsrDBObj = $true
 		}
-		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_Blitz" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Instance Health" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		if ($global:StepOutcome -eq "Success") {
 			#$BlitzTbl = New-Object System.Data.DataTable
 			$BlitzTbl = $global:PSBlitzSet.Tables[0]
@@ -2474,7 +2479,7 @@ $($SearchTableDiv -replace $STDivReplace, "'InstanceHealthTable', 3" -replace 'o
 			} else {
 				if ($ToHTML -eq "Y") {
 					$HtmlTabName = "Database objects with dangerous SET options"
-					$htmlTable = Convert-TableToHtml $DangerousSetTbl -CSSClass "sortable" -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $DangerousSetTbl -TblID "setopt" -CSSClass "sortable SetOpt" -DebugInfo:$DebugInfo
 					$html = $HTMLPre + @"
 	<title>$HtmlTabName</title>`n $HTMLBodyStart `n <h1 id="top">$HtmlTabName</h1>
 <p><a href='https://vladdba.com/2025/03/03/dangerous-set-options-stored-procedures/' target='_blank'>More information about SET options inheritance in stored procedures</a></p>
@@ -2935,7 +2940,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		Write-Host "Checking if $databaseName is eligible for Query Store check... " -NoNewline
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetQSStatus.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-		if ((!([string]::IsNullOrEmpty($CheckDB))) -and (($IsAzureSQLDB -eq $false))){
+		if ((!([string]::IsNullOrEmpty($CheckDB))) -and (($IsAzureSQLDB -eq $false))) {
 			$NewCheckQSDBStr = ";SET @DatabaseName = N'$CheckDB';"
 			$OldCheckQSDBStr = ";SET @DatabaseName = NULL;"
 			[string]$Query = $Query -replace $OldCheckQSDBStr, $NewCheckQSDBStr

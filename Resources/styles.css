@@ -160,6 +160,16 @@ footer {
 }
 
 /*
+ ## Objects with dangerious SET options
+*/
+
+.SetOpt {
+	td:nth-child(n+4):nth-child(-n+5) {
+		text-align: center;
+	}
+}
+
+/*
  ## Session activity (agg and raw)
 */
 
