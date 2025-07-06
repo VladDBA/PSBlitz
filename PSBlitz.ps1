@@ -586,7 +586,7 @@ function Invoke-PSBlitzQuery {
 		$global:StepOutcome = "Success"
 		if (($StepNameIn -like "sp_BlitzCache*") -or ($StepNameIn -like "sp_BlitzQueryStore*") -or 
 			($StepNameIn -eq "sp_BlitzIndex mode 1") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info") -or 
-			($StepNameIn -eq "sp_BlitzLock") -or ($StepNameIn -eq "Return sp_BlitzWho") -or ($StepNameIn -eq "Open Transacion Info") -or 
+			($StepNameIn -eq "Deadlock Info") -or ($StepNameIn -eq "Return sp_BlitzWho") -or ($StepNameIn -eq "Open Transacion Info") -or 
 			($StepNameIn -eq "Objects with dangerous SET options") -or ($StepNameIn -eq "Instance Health") -or 
 			($StepNameIn -eq "sp_BlitzFirst 30 seconds") -or ($StepNameIn -like "Query Store check *")) {
 			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
@@ -696,7 +696,7 @@ function Convert-TableToHtml {
 				$htmlTableOut = $htmlTableOut -replace '\.\s', ". `n"
 				#change background for Priority 1-50
 				$htmlTableOut = $htmlTableOut -replace '>([1-9]|[1-4][0-9]|50)<', ' style="background-color: #FFB6C1;">$1<'
-			} elseif ($TblID -eq "setopt"){
+			} elseif ($TblID -eq "setopt") {
 				#Change background color for OFF options
 				$htmlTableOut = $htmlTableOut -replace '>(OFF)<', ' style="background-color: #FFB6C1;">$1<'
 			}
@@ -3181,6 +3181,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	####################################################################
 	#						sp_BlitzLock
 	####################################################################
+	if ($SkipChecks -notcontains "Deadlock") {
 	$CurrTime = get-date
 	$CurrRunTime = (New-TimeSpan -Start $StartDate -End $CurrTime).TotalMinutes
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
@@ -3204,7 +3205,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		Write-Host " ->Retrieving deadlock info for the last 7 days instead of 15... " -NoNewLine
 		[string]$Query = $Query -replace "@StartDate = DATEADD(DAY,-15, GETDATE()),", "@StartDate = DATEADD(DAY,-7, GETDATE()),"
 	}
-	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzLock" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
+	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Deadlock Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
 		
 	if ($global:StepOutcome -eq "Success") {
 		$TblLockDtl = $global:PSBlitzSet.Tables[0]
@@ -3292,6 +3293,10 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			Invoke-ClearVariables TblLockDtl, TblLockPlans, TblLockOver, PSBlitzSet
 		}
 	}
+}else {
+		Write-Host " Skipping Deadlock check as requested"
+		Add-LogRow "Deadlock Info" "Skipped" "Deadlock check skipped by user"
+	}
 
 	#####################################################################################
 	#						Stats & Index info											#
@@ -3310,145 +3315,153 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	}
 	
 	#Only run the check if a specific database name has been provided
-	if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
-		if ($DBSwitched -ne "Y") {
-			Write-Host " " -NoNewLine
-		}
-		$databaseName = if ($IsAzureSQLDB) { $ASDBName } else { $CheckDB }
-		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetStatsInfoForWholeDB.sql"
-		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-		Write-Host "Retrieving stats info for $databaseName... " -NoNewLine
+	#
+		if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
+			if ($DBSwitched -ne "Y") {
+				Write-Host " " -NoNewLine
+			}
+			
+			$databaseName = if ($IsAzureSQLDB) { $ASDBName } else { $CheckDB }
+			if ($SkipChecks -notcontains "StatsInfo") {
+			$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetStatsInfoForWholeDB.sql"
+			[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
+			Write-Host "Retrieving stats info for $databaseName... " -NoNewLine
 
-		if ($IsAzureSQLDB) {		
-			#if it's Azure SQL DB, we can't switch databases
-			[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
-		} else {		
-			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
-		}
-		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Stats Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
+			if ($IsAzureSQLDB) {		
+				#if it's Azure SQL DB, we can't switch databases
+				[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
+			} else {		
+				[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
+			}
+			Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Stats Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
 		
-		if ($global:StepOutcome -eq "Success") {
-			$StatsTbl = $global:PSBlitzSet.Tables[0]
-			[int]$RowsReturned = $StatsTbl.Rows.Count
-			if ($RowsReturned -le 0) {
-				Write-Host " ->No rows returned."
-			} else {
-				if ($ToHTML -eq "Y") {
+			if ($global:StepOutcome -eq "Success") {
+				$StatsTbl = $global:PSBlitzSet.Tables[0]
+				[int]$RowsReturned = $StatsTbl.Rows.Count
+				if ($RowsReturned -le 0) {
+					Write-Host " ->No rows returned."
+				} else {
+					if ($ToHTML -eq "Y") {
 
-					$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -CSSClass "StatsInfoTbl sortable" -ExclCols "database" -DebugInfo:$DebugInfo
-					#add tooltips
-					$htmlTable = $htmlTable -replace '<th>Update ', '<th class="sorttable_nosort tooltip" title="The commented options are suggestions based on record counts.">Update '
-					#add buttons
-					$htmlTable = $htmlTable -replace '<th>Get Details', '<th class="sorttable_nosort"><div class="header-content">Get Details<div class="button-tooltip" title="Click to copy the commands from this column"><button class="copyButton" data-table-id="StatsOrIxFragTable" data-column-index="20">Copy commands</button></div></div>'
-					$htmlTable = $htmlTable -replace 'counts.">Update Table Stats', 'counts.">Update Table Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="21">Copy commands</button>'
-					$htmlTable = $htmlTable -replace 'counts.">Update Individual Stats', 'counts.">Update Individual Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="22">Copy commands</button>'
-					$htmlTable = $htmlTable -replace 'counts.">Update Partition Stats', 'counts.">Update Partition Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="23">Copy commands</button>'
-					$HtmlTabName = "Statistics info for $databaseName"
-					$HtmlFileName = "StatsInfo_$databaseName.html"
-					$html = $HTMLPre + @"
+						$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -CSSClass "StatsInfoTbl sortable" -ExclCols "database" -DebugInfo:$DebugInfo
+						#add tooltips
+						$htmlTable = $htmlTable -replace '<th>Update ', '<th class="sorttable_nosort tooltip" title="The commented options are suggestions based on record counts.">Update '
+						#add buttons
+						$htmlTable = $htmlTable -replace '<th>Get Details', '<th class="sorttable_nosort"><div class="header-content">Get Details<div class="button-tooltip" title="Click to copy the commands from this column"><button class="copyButton" data-table-id="StatsOrIxFragTable" data-column-index="20">Copy commands</button></div></div>'
+						$htmlTable = $htmlTable -replace 'counts.">Update Table Stats', 'counts.">Update Table Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="21">Copy commands</button>'
+						$htmlTable = $htmlTable -replace 'counts.">Update Individual Stats', 'counts.">Update Individual Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="22">Copy commands</button>'
+						$htmlTable = $htmlTable -replace 'counts.">Update Partition Stats', 'counts.">Update Partition Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="23">Copy commands</button>'
+						$HtmlTabName = "Statistics info for $databaseName"
+						$HtmlFileName = "StatsInfo_$databaseName.html"
+						$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n $HTMLBodyStart `n	<h1>$HtmlTabName</h1>
 				$($SearchTableDiv -replace $STDivReplace, "'StatsOrIxFragTable', 0")
 				<!-- Message container -->`n<div id="message">Copied to clipboard!</div>`n<br>
 				$htmlTable `n $JumpToTop `n $HTMLBodyEnd
 "@
-					Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
-					Invoke-ClearVariables html, htmlTable			
-				} else {
+						Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
+						Invoke-ClearVariables html, htmlTable			
+					} else {
 
-					$ExcelSheet = $ExcelFile.Worksheets.Item("Statistics Info")
+						$ExcelSheet = $ExcelFile.Worksheets.Item("Statistics Info")
 
-					Convert-TableToExcel $StatsTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
-					##Saving file
-					Save-ExcelFile $ExcelFile
-				}
-			}
-			##Cleaning up variables
-			Invoke-ClearVariables StatsTbl, PSBlitzSet		
-		}
-
-		### get index frag info
-		if ($SkipChecks -notcontains "IndexFrag") {
-			$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetIndexInfoForWholeDB.sql"
-			[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-			if ($DBSwitched -ne "Y") {
-				Write-Host " " -NoNewLine
-			} elseif ($DBSwitched -eq "Y") {
-				Write-Host " ->" -NoNewLine
-			}
-			Write-Host "Retrieving index fragmentation info for $databaseName... " -NoNewLine
-			if ($IsAzureSQLDB) { 			
-				#if it's Azure SQL DB, we can't switch databases
-				[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
-				[string]$Query = $Query -replace "AzureSQLDBReplace", "$DirDate"
-			} else {		
-				[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
-			}
-			Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Index Frag Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout	
-			if ($global:StepOutcome -eq "Success") {
-				$IndexTbl = $global:PSBlitzSet.Tables[0]
-				$IndexLckTbl = $global:PSBlitzSet.Tables[1]
-				$RecordsReturned = $IndexTbl.Rows.Count
-				if ($RecordsReturned -le 0) {
-					Write-Host " ->No rows returned."
-				} else {
-					if ($IndexLckTbl.Rows.Count -gt 0) {
-						$RowNum = 0
-						Write-Host " ->Exclusive lock detected on table(s):"
-						$LockedTabList = ""
-						$LockedTabLogMsg = "Exclusive locks on table(s):"
-						foreach ($row in $IndexLckTbl) {
-							$LockedTab = $IndexLckTbl.Rows[$RowNum]["object_name"]
-							Write-Host "  - $LockedTab"
-							if ($RowNum -eq 0) { 
-								$LockedTabList += "$LockedTab" 
-							} else {
-								$LockedTabList += ", $LockedTab"
-							}
-							$RowNum += 1
-						}
-				
-						Add-LogRow "->Index Frag Info" "Skipped XLocked Tables" "$LockedTabLogMsg $LockedTabList"
+						Convert-TableToExcel $StatsTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
+						##Saving file
+						Save-ExcelFile $ExcelFile
 					}
-					if ($ToHTML -eq "Y") {
-				
-						Write-PSBlitzDebug " ->Converting index info to HTML"
+				}
+				##Cleaning up variables
+				Invoke-ClearVariables StatsTbl, PSBlitzSet		
+			}
+		} 
+	 else {
+		Write-Host " ->Skipping stats info check as requested."
+		Add-LogRow "Statistics Info" "Skipped" "Statistics info check skipped as requested."
+	}
 
-						$htmlTable = Convert-TableToHtml $IndexTbl -TblID "StatsOrIxFragTable" -ExclCols "database" -CSSClass "sortable" -DebugInfo:$DebugInfo
-						$HtmlTabName = "Index fragmentation info for $databaseName"
-						$HtmlFileName = "IndexFragInfo_$databaseName.html"
+	### get index frag info
+	if ($SkipChecks -notcontains "IndexFrag") {
+		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetIndexInfoForWholeDB.sql"
+		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
+		if ($DBSwitched -ne "Y") {
+			Write-Host " " -NoNewLine
+		} elseif ($DBSwitched -eq "Y") {
+			Write-Host " ->" -NoNewLine
+		}
+		Write-Host "Retrieving index fragmentation info for $databaseName... " -NoNewLine
+		if ($IsAzureSQLDB) { 			
+			#if it's Azure SQL DB, we can't switch databases
+			[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
+			[string]$Query = $Query -replace "AzureSQLDBReplace", "$DirDate"
+		} else {		
+			[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
+		}
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Index Frag Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout	
+		if ($global:StepOutcome -eq "Success") {
+			$IndexTbl = $global:PSBlitzSet.Tables[0]
+			$IndexLckTbl = $global:PSBlitzSet.Tables[1]
+			$RecordsReturned = $IndexTbl.Rows.Count
+			if ($RecordsReturned -le 0) {
+				Write-Host " ->No rows returned."
+			} else {
+				if ($IndexLckTbl.Rows.Count -gt 0) {
+					$RowNum = 0
+					Write-Host " ->Exclusive lock detected on table(s):"
+					$LockedTabList = ""
+					$LockedTabLogMsg = "Exclusive locks on table(s):"
+					foreach ($row in $IndexLckTbl) {
+						$LockedTab = $IndexLckTbl.Rows[$RowNum]["object_name"]
+						Write-Host "  - $LockedTab"
+						if ($RowNum -eq 0) { 
+							$LockedTabList += "$LockedTab" 
+						} else {
+							$LockedTabList += ", $LockedTab"
+						}
+						$RowNum += 1
+					}
+				
+					Add-LogRow "->Index Frag Info" "Skipped XLocked Tables" "$LockedTabLogMsg $LockedTabList"
+				}
+				if ($ToHTML -eq "Y") {
+				
+					Write-PSBlitzDebug " ->Converting index info to HTML"
+
+					$htmlTable = Convert-TableToHtml $IndexTbl -TblID "StatsOrIxFragTable" -ExclCols "database" -CSSClass "sortable" -DebugInfo:$DebugInfo
+					$HtmlTabName = "Index fragmentation info for $databaseName"
+					$HtmlFileName = "IndexFragInfo_$databaseName.html"
 			
-						$html = $HTMLPre + @"
+					$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1>$HtmlTabName</h1>
 				$($SearchTableDiv -replace $STDivReplace, "'StatsOrIxFragTable', 0")
 				$SortableTable `n $htmlTable `n	$JumpToTop `n $HTMLBodyEnd
 "@
 
-						Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
-						Invoke-ClearVariables html, htmlTable
-					} else {
-						$ExcelSheet = $ExcelFile.Worksheets.Item("Index Fragmentation")
-						Convert-TableToExcel $IndexTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
-						##Saving file
-						Save-ExcelFile $ExcelFile
-					}
-					##Cleaning up variables
-					Invoke-ClearVariables IndexTbl, PSBlitzSet
+					Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
+					Invoke-ClearVariables html, htmlTable
+				} else {
+					$ExcelSheet = $ExcelFile.Worksheets.Item("Index Fragmentation")
+					Convert-TableToExcel $IndexTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
+					##Saving file
+					Save-ExcelFile $ExcelFile
 				}
-			} 
-		} else {
-			Write-Host " ->Skipping index fragmentation check as requested."
-			Add-LogRow "Index Fragmentation" "Skipped" "Index fragmentation check skipped as requested."
-		}
-
-		if ($DBSwitched -eq "Y") {
-			$StepStart = get-date
-			$CheckDB = ""
-			$StepEnd = Get-Date
-			Add-LogRow "CheckDB value" "Switched" "Switched back to empty from $DBName"
-		}
+				##Cleaning up variables
+				Invoke-ClearVariables IndexTbl, PSBlitzSet
+			}
+		} 
+	} else {
+		Write-Host " ->Skipping index fragmentation check as requested."
+		Add-LogRow "Index Fragmentation" "Skipped" "Index fragmentation check skipped as requested."
 	}
 
-	$TryCompleted = "Y"
+	if ($DBSwitched -eq "Y") {
+		$StepStart = get-date
+		$CheckDB = ""
+		$StepEnd = Get-Date
+		Add-LogRow "CheckDB value" "Switched" "Switched back to empty from $DBName"
+	}
+}
+
+$TryCompleted = "Y"
 }
 
 finally {

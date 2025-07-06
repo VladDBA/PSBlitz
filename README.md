@@ -176,7 +176,7 @@ Open PSBlitzOutput.xlsx (found in PSBlitz's Resources folder) click on the first
 |`-ConnTimeout`| Can be used to increased the timeout limit in seconds for connecting to SQL Server. <br>Defaults to 45 seconds if not specified.|
 |`-MaxTimeout`| Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. <br>Defaults to 1000 (16.6 minutes).|
 |`-MaxUsrDBs`| Can be used to tell PSBlitz to raise the limit of user databases based on which index-related info is limited to only the "loudest" database in the cache results. <br>Defaults to 50. <br>Only change it if you're using using HTML output and have enough RAM to handle the increased data that PS will have to process.|
-|`-SkipChecks`| Used to specify one or more (comma-separated) checks to skip.<br> Currently only supports `IndexFrag` as input, which will skip the index fragmentation check. |
+|`-SkipChecks`| Used to specify one or more (comma-separated) checks to skip.<br> Currently supports <br> `IndexFrag` - skip the index fragmentation check. <br> `StatsInfo` - skip the statistics information check. <br> `Deadlock` - skip the deadlock information cehck. |
 |`-DebugInfo`| Switch used to get more information for debugging and troubleshooting purposes.|
 
 [*Back to top*](#header1)
