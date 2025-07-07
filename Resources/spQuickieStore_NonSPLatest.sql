@@ -71,6 +71,8 @@ DECLARE
 ;SET @database_name = NULL;
 ;SET @sort_order = 'cpu';
 ;SET @top = 20;
+;SET @start_date = NULL;
+;SET @end_date = NULL;
 /*make sure @sort_order is in lowercase*/
 SET @sort_order = LOWER(@sort_order);
 
