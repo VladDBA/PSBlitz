@@ -1458,7 +1458,7 @@ $IsQueryStoreInterval = $false
 if (![string]::IsNullOrEmpty($QueryStoreIntervalStart)) {
 	$datePattern = '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$'
 	$parsedDate = [DateTime]::MinValue;
-$isStartValid = $QueryStoreIntervalStart -match $datePattern -and ([datetime]::TryParseExact($QueryStoreIntervalStart, 'yyyy-MM-dd HH:mm', $null, [System.Globalization.DateTimeStyles]::None, [ref]$parsedDate))
+	$isStartValid = $QueryStoreIntervalStart -match $datePattern -and ([datetime]::TryParseExact($QueryStoreIntervalStart, 'yyyy-MM-dd HH:mm', $null, [System.Globalization.DateTimeStyles]::None, [ref]$parsedDate))
 	if (-not $isStartValid) {
 		Write-Host " QueryStoreIntervalStart must be a valid date in the format YYYY-MM-DD hh:mm." -ForegroundColor Red
 		Read-Host -Prompt "$ExitPrompt"
@@ -1468,7 +1468,7 @@ $isStartValid = $QueryStoreIntervalStart -match $datePattern -and ([datetime]::T
 	if ([string]::IsNullOrEmpty($QueryStoreIntervalEnd)) {
 		$QueryStoreIntervalEnd = (Get-Date).ToString('yyyy-MM-dd HH:mm')
 	} else {
-$isEndValid = $QueryStoreIntervalEnd -match $datePattern -and ([datetime]::TryParseExact($QueryStoreIntervalEnd, 'yyyy-MM-dd HH:mm', $null, [System.Globalization.DateTimeStyles]::None, [ref]$parsedDate))
+		$isEndValid = $QueryStoreIntervalEnd -match $datePattern -and ([datetime]::TryParseExact($QueryStoreIntervalEnd, 'yyyy-MM-dd HH:mm', $null, [System.Globalization.DateTimeStyles]::None, [ref]$parsedDate))
 		if (-not $isEndValid) {
 			Write-Host " QueryStoreIntervalEnd must be a valid date in the format YYYY-MM-DD hh:mm." -ForegroundColor Red
 			Read-Host -Prompt "$ExitPrompt"
@@ -1942,6 +1942,7 @@ $StepStart = get-date
 $StepEnd = Get-Date
 $ParametersUsed = "IsIndepth:$IsIndepth; CheckDB:$CheckDB;`n BlitzWhoDelay:$BlitzWhoDelay; MaxTimeout:$MaxTimeout"
 $ParametersUsed += ";`n ConnTimeout:$ConnTimeout; CacheTop:$CacheTop;`n ASDBName:$ASDBName; CacheMinutesBack:$CacheMinutesBack"
+$ParametersUsed += if ($IsQueryStoreInterval) { ";`n QueryStoreIntervalStart:$QueryStoreIntervalStart; QueryStoreIntervalEnd:$QueryStoreIntervalEnd" } else { "" }
 $ParametersUsed += ";`n Auth:$Auth; DebugInfo:$DebugInfo"
 Add-LogRow "Check start" "Started" $ParametersUsed
 try {
@@ -3987,7 +3988,7 @@ finally {
 				$Plans = "<td>$HTMLChk</td>"
 				#$AdditionalInfo = "Outputs execution plans as .sqlplan files."
 				$Description = "Top 20 queries captured by the Query Store"
-				if($IsQueryStoreInterval){
+				if ($IsQueryStoreInterval) {
 					$Description += ", between $QueryStoreIntervalStart and $QueryStoreIntervalEnd"
 				} else {
 					$Description += "in the last 7 days"
@@ -3997,7 +3998,7 @@ finally {
 				}
 				$Description += ",<br>sorted by average $SortOrder."
 				$QuerySource += "Similar to sp_QuickieStore @top = 20, @sort_order='$SortOrder'"
-				if($IsQueryStoreInterval){
+				if ($IsQueryStoreInterval) {
 					$QuerySource += ", @start_time = '$QueryStoreIntervalStart', @end_time = '$QueryStoreIntervalEnd'"
 				}
 				if ($IsAzureSQLDB) {
