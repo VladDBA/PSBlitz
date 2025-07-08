@@ -144,6 +144,17 @@
  In order to avoid missing the desired timeframe, the value is dynamically adjusted based on 
  the runtime of PSBlitz up until the plan cache analysis point.
 
+.PARAMETER QueryStoreIntervalStart
+ Used to specify the start of the Query Store interval in the format 'yyyy-MM-dd HH:mm:ss'.
+ If not specified, the script will get the top 20 queries from the past 7 days.
+ If provided, the script will validate the format and use it as the lower bound for queries retrieved from Query Store.
+
+.PARAMETER QueryStoreIntervalEnd
+ Used to specify the start of the Query Store interval in the format 'yyyy-MM-dd HH:mm:ss'.
+ If -QueryStoreIntervalStart is provided and -QueryStoreIntervalEnd is not provided,
+ it defaults to the current date and time.
+ If provided, the script will validate the format and use it as the upper bound for queries retrieved from Query Store.
+
 .PARAMETER OutputDir
  Used to provide a path where the output directory should be saved to. Defaults to PSBlitz.ps1's directory 
  if not specified or a non-existent path is provided.
@@ -171,7 +182,8 @@
 
 .PARAMETER SkipChecks
  Used to specify one or more (comma-separated) checks to skip. 
- Currently only supports IndexFrag as input, which will skip the index fragmentation check.
+ Currently supports IndexFrag (skips index fragmentation check), StatsInfo (skips statistics info check), 
+ and Deadlock (skips deadlock check).
 
 .PARAMETER DebugInfo
  Switch used to get more information for debugging and troubleshooting purposes.
@@ -1401,6 +1413,14 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 
 		##How many minutes back to check for cache
 		[int]$CacheMinutesBack = Read-Host -Prompt "How many minutes in the past to check the plan cache?(empty defaults to everything in the plan cache)"
+
+		##Query Store interval start
+		[string]$QueryStoreIntervalStart = Read-Host -Prompt "Query Store interval start date and time in the format YYYY-MM-DD hh:mm (empty defaults 7 days ago)"
+
+		##Query Store interval end
+		if(!([string]::IsNullOrEmpty($QueryStoreIntervalStart))) {
+			[string]$QueryStoreIntervalEnd = Read-Host -Prompt "Query Store interval end date and time in the format YYYY-MM-DD hh:mm (empty defaults to now)"
+		}
 
 		##custom output dir
 		[string]$OutputDir = Read-Host -Prompt "Specify another existing directory path to save the output.(empty defaults to PSBlitz's path)"
@@ -4003,10 +4023,8 @@ finally {
 				}
 				if ($IsAzureSQLDB) {
 					$QuerySource += ";"
-				} elseif ($DBSwitched -eq "Y") {
-					$QuerySource += ", @database_name = '$DBName';"
 				} else {
-					$QuerySource += ", @database_name = '$CheckDB';"
+					$QuerySource += ", @database_name = '$databaseName';"
 				}
 			} elseif ($File.Name -like "BlitzFirst3*") {
 				$QuerySource += "Similar to sp_BlitzFirst @ExpertMode = 1, @Seconds = 30; "
