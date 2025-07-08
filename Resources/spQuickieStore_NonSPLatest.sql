@@ -14,8 +14,6 @@ SET NUMERIC_ROUNDABORT OFF;
 SET IMPLICIT_TRANSACTIONS OFF;
 SET STATISTICS TIME, IO OFF;
 
-
-
 DECLARE
     @database_name sysname = NULL, /*the name of the database you want to look at query store in*/
     @sort_order varchar(20) = 'cpu', /*the runtime metric you want to prioritize results by*/
@@ -73,6 +71,8 @@ DECLARE
 ;SET @database_name = NULL;
 ;SET @sort_order = 'cpu';
 ;SET @top = 20;
+;SET @start_date = NULL;
+;SET @end_date = NULL;
 /*make sure @sort_order is in lowercase*/
 SET @sort_order = LOWER(@sort_order);
 

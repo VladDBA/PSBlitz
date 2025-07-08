@@ -30,6 +30,7 @@ DECLARE
     @IgnoreQueryHashes VARCHAR(MAX),
     @OnlySqlHandles VARCHAR(MAX),
     @IgnoreSqlHandles VARCHAR(MAX),
+    @IgnoreReadableReplicaDBs BIT,
     @QueryFilter VARCHAR(10),
     @DatabaseName NVARCHAR(128),
 	@SortOrder VARCHAR(50),
@@ -45,18 +46,16 @@ DECLARE
 	@Top INT,
     @Version     VARCHAR(30),
     @VersionDate DATETIME,
-    @VersionCheckMode BIT;
-	/*PSBlitz-specific parameters*/
-	DECLARE @KeepCRLF BIT = 0;
-
+    @VersionCheckMode BIT,
+	@KeepCRLF BIT;
 
 /*Making it easier to replace the value of @SortOrder and @Top via PS*/
 ;SELECT @SortOrder = 'CPU', @Top = 10;
 ;SET @DatabaseName = NULL;
 ;SET @MinutesBack = NULL;
-;SET @KeepCRLF = 1;
 
 SELECT
+    @KeepCRLF = 1,
     @Help = 0,
     @UseTriggersAnyway = NULL,
     @ExportToExcel = 0,
@@ -72,6 +71,7 @@ SELECT
     @DurationFilter = NULL ,
     @HideSummary = 0 ,
     @IgnoreSystemDBs = 1 ,
+    @IgnoreReadableReplicaDBs = 1 ,
     @OnlyQueryHashes = NULL ,
     @IgnoreQueryHashes = NULL ,
     @OnlySqlHandles = NULL ,
@@ -117,7 +117,7 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-SELECT @Version = '8.22', @VersionDate = '20241019';
+SELECT @Version = '8.25', @VersionDate = '20250704';
 SET @OutputType = UPPER(@OutputType);
 
 IF(@VersionCheckMode = 1)
@@ -319,7 +319,12 @@ IF @Help = 1
 	UNION ALL
 	SELECT N'@VersionCheckMode',
 			N'BIT',
-			N'Setting this to 1 will make the procedure stop after setting @Version and @VersionDate.';
+			N'Setting this to 1 will make the procedure stop after setting @Version and @VersionDate.'
+
+	UNION ALL
+	SELECT N'@KeepCRLF',
+			N'BIT',
+			N'Retain CR/LF in query text to avoid issues caused by line comments.';
 
 
 	/* Column definitions */
@@ -1235,7 +1240,7 @@ CREATE TABLE #plan_usage
 );
 
 
-IF EXISTS (SELECT * FROM sys.all_objects o WHERE o.name = 'dm_hadr_database_replica_states')
+IF @IgnoreReadableReplicaDBs = 1 AND EXISTS (SELECT * FROM sys.all_objects o WHERE o.name = 'dm_hadr_database_replica_states')
 BEGIN
 	RAISERROR('Checking for Read intent databases to exclude',0,0) WITH NOWAIT;
 
@@ -1654,7 +1659,7 @@ IF @VersionShowsAirQuoteActualPlans = 1
 
 SET @body += N'        WHERE  1 = 1 ' +  @nl ;
 
-	IF EXISTS (SELECT * FROM sys.all_objects o WHERE o.name = 'dm_hadr_database_replica_states')
+	IF @IgnoreReadableReplicaDBs = 1 AND EXISTS (SELECT * FROM sys.all_objects o WHERE o.name = 'dm_hadr_database_replica_states')
     BEGIN
     RAISERROR(N'Ignoring readable secondaries databases by default', 0, 1) WITH NOWAIT;
     SET @body += N'               AND CAST(xpa.value AS INT) NOT IN (SELECT database_id FROM #ReadableDBs)' + @nl ;
@@ -2596,7 +2601,6 @@ SET     PercentCPU = y.PercentCPU,
         /* Strip newlines and tabs. Tabs are replaced with multiple spaces
            so that the later whitespace trim will completely eliminate them
          */
-		 /* Vlad - change for - https://github.com/VladDBA/PSBlitz/issues/314*/
         QueryText = CASE WHEN @KeepCRLF = 1 
                          THEN REPLACE(QueryText, @tab, '  ')
                          ELSE REPLACE(REPLACE(REPLACE(QueryText, @cr, ' '), @lf, ' '), @tab, '  ')
@@ -2656,7 +2660,6 @@ SET     PercentCPU = y.PercentCPU,
         /* Strip newlines and tabs. Tabs are replaced with multiple spaces
            so that the later whitespace trim will completely eliminate them
          */
-        /* Vlad - change for - https://github.com/VladDBA/PSBlitz/issues/314*/
         QueryText = CASE WHEN @KeepCRLF = 1 
                          THEN REPLACE(QueryText, @tab, '  ')
                          ELSE REPLACE(REPLACE(REPLACE(QueryText, @cr, ' '), @lf, ' '), @tab, '  ')
@@ -4160,11 +4163,11 @@ RAISERROR(N'Filling in implicit conversion and cached plan parameter info', 0, 1
 UPDATE b
 SET b.implicit_conversion_info = CASE WHEN b.implicit_conversion_info IS NULL 
 									  OR CONVERT(NVARCHAR(MAX), b.implicit_conversion_info) = N''
-									  THEN '' 
+									  THEN '' /*changes for PSBlitz*/
 							     ELSE b.implicit_conversion_info END,
 	b.cached_execution_parameters = CASE WHEN b.cached_execution_parameters IS NULL 
 										 OR CONVERT(NVARCHAR(MAX), b.cached_execution_parameters) = N''
-										 THEN '' 
+										 THEN '' /*changes for PSBlitz*/
 									ELSE b.cached_execution_parameters END
 FROM ##BlitzCacheProcs AS b
 WHERE b.SPID = @@SPID
@@ -4384,7 +4387,7 @@ IF EXISTS ( SELECT 1/0
 	UPDATE b
 	SET b.missing_indexes = 
 		CASE WHEN b.missing_indexes IS NULL 
-			 THEN '' 
+			 THEN '' /*changes for PSBlitz*/ 
 			 ELSE b.missing_indexes 
 		END
 	FROM ##BlitzCacheProcs AS b
@@ -5020,7 +5023,7 @@ BEGIN
 				  CASE WHEN select_with_writes > 0 THEN '', 66'' ELSE '''' END
 				  , 3, 200000) AS opserver_warning , ' + @nl ;
     END;
-    /*Vlad - column list changes, datetime and varbinary to varchar conversions for PSBlitz*/
+    /*Vlad - column list, datetime and varbinary to varchar conversions changes for PSBlitz*/
     SET @columns += N'        
         CONVERT(NVARCHAR(30), CAST((ExecutionCount) AS BIGINT), 1) AS [# Executions],
         CONVERT(NVARCHAR(30), CAST((ExecutionsPerMinute) AS BIGINT), 1) AS [Executions / Minute],
@@ -6258,7 +6261,7 @@ BEGIN
 	
 		END;            
     
-	/*Vlad - column changes fpr PSBlitz*/
+	/*Vlad - column changes for PSBlitz*/
     SELECT  [Priority],
             FindingsGroup,
             Finding,
