@@ -302,12 +302,12 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.8.0"
-$VersDate = "2025-07-08"
+$Vers = "5.8.1"
+$VersDate = "2025-07-30"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
-$ScriptPath = split-path -parent $MyInvocation.MyCommand.Definition
+$ScriptPath = Split-Path -Parent $MyInvocation.MyCommand.Definition
 #clear previous errors
 $error.Clear();
 #Set resources path
@@ -440,7 +440,7 @@ from Brent Ozar's FirstResponderKit (https://www.brentozar.com/first-aid/):
 #Function to properly format XML contents for deadlock graphs and execution plans
 function Format-XML {
 	[CmdletBinding()]
-	Param ([
+	param ([
 		Parameter(ValueFromPipeline = $true, Mandatory = $true)]
 		[string]$XMLContent)
 	$XMLDoc = New-Object -TypeName System.Xml.XmlDocument
@@ -533,7 +533,7 @@ function Get-FileIntegrity {
 		$failedFiles | ForEach-Object { Write-Host $_ -ForegroundColor Yellow }
 		Write-Host "File integrity check failed. Script execution terminated." -ForegroundColor Red
 		Read-Host -Prompt "$ExitPrompt"
-		Exit
+		exit
 	}
 }
 function Get-ExecTime {
@@ -543,7 +543,7 @@ function Get-ExecTime {
 }
 function Add-LogRow {
 	[CmdletBinding()]
-	Param ([
+	param ([
 		Parameter(Position = 0, Mandatory = $true)]
 		[string]$StepName,
 		[Parameter(Position = 1, Mandatory = $true)]
@@ -589,11 +589,11 @@ function Invoke-PSBlitzQuery {
 	$IBQAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
 	$IBQAdapter.SelectCommand = $IBQCommand
 
-	Try {
-		$StepStart = get-date
+	try {
+		$StepStart = Get-Date
 		$IBQConnection.Open()
 		$IBQAdapter.Fill($global:PSBlitzSet) | Out-Null -ErrorAction Stop
-		$StepEnd = get-date
+		$StepEnd = Get-Date
 		if ($StepNameIn -notlike "Query Store pre-check for*" ) {
 			Write-Host @GreenCheck
 		}
@@ -619,12 +619,12 @@ function Invoke-PSBlitzQuery {
 		} else {
 			Add-LogRow $StepNameIn $global:StepOutcome
 		}
-	} Catch {
-		$StepEnd = get-date
+	} catch {
+		$StepEnd = Get-Date
 		Invoke-ErrMsg
 		$global:StepOutcome = "Failure"
 		Add-LogRow $StepNameIn $global:StepOutcome
-	} Finally {
+	} finally {
 		$IBQConnection.Close()
 		$IBQConnection.Dispose()
 	}
@@ -662,7 +662,7 @@ function Convert-TableToHtml {
 	try {
 		if ($DebugInfo) {
 			Write-Host " ->Converting data to HTML... " -ForegroundColor Yellow -NoNewline
-			$StepStart = get-date
+			$StepStart = Get-Date
 		}
 		$properties = @()
 		$cultureInfo = [System.Globalization.CultureInfo]::CurrentCulture
@@ -757,7 +757,7 @@ function Convert-TableToHtml {
 			}
 		}
 		if ($DebugInfo) {
-			$StepEnd = get-date
+			$StepEnd = Get-Date
 			Write-Host @GreenCheck
 			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
 			$RunTime = [Math]::Round($StepRunTime, 2)
@@ -794,7 +794,7 @@ function Convert-QueryTableToHtml {
 	try {
 		if ($DebugInfo) {
 			Write-Host " ->Converting query data to HTML... " -ForegroundColor Yellow -NoNewline
-			$StepStart = get-date
+			$StepStart = Get-Date
 		}
 
 		$properties = @()
@@ -840,7 +840,7 @@ function Convert-QueryTableToHtml {
 		#Lazy way to remove empty rows, will try to fix later 
 		$htmlTableOut = $htmlTableOut -replace "<tr><td></td><td></td></tr>", ""
 		if ($DebugInfo) {
-			$StepEnd = get-date
+			$StepEnd = Get-Date
 			Write-Host @GreenCheck
 			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
 			$RunTime = [Math]::Round($StepRunTime, 2)
@@ -880,7 +880,7 @@ function Export-PlansAndDeadlocks {
 		if ($DebugInfo) {
 			Write-Host " ->Exporting $(if($XMLColName -eq 'deadlock_graph'){"deadlock graphs"}
 			else{"execution plans"})... " -ForegroundColor Yellow -NoNewline
-			$StepStart = get-date
+			$StepStart = Get-Date
 		}
 		$RowNum = 0
 		$i = 0
@@ -904,7 +904,7 @@ function Export-PlansAndDeadlocks {
 		}
 
 		if ($DebugInfo) {
-			$StepEnd = get-date
+			$StepEnd = Get-Date
 			Write-Host @GreenCheck
 			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
 			$RunTime = [Math]::Round($StepRunTime, 2)
@@ -970,7 +970,7 @@ function Convert-TableToExcel {
 	)
 
 	try {
-		$StepStart = get-date
+		$StepStart = Get-Date
 		$ExcelStartRow = $StartRow
 		$ExcelColNum = $StartCol
 		$RowNum = 0
@@ -984,7 +984,7 @@ function Convert-TableToExcel {
 
 		if ($DebugInfo) {
 			Write-Host " ->Writing data to Excel worksheet... " -ForegroundColor Yellow -NoNewline
-			$StepStart = get-date
+			$StepStart = Get-Date
 		}
 
 		foreach ($row in $DataTable) {
@@ -1012,7 +1012,7 @@ function Convert-TableToExcel {
 			$ExcelColNum = $StartCol
 		}
 		if ($DebugInfo) {
-			$StepEnd = get-date
+			$StepEnd = Get-Date
 			Write-Host @GreenCheck
 			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
 			$RunTime = [Math]::Round($StepRunTime, 2)
@@ -1040,7 +1040,7 @@ function Save-ExcelFile {
 	)
 	try {
 		$ExcelFile.Save()
-		Write-PSBlitzDebug  " ->Excel file saved successfully"
+		Write-PSBlitzDebug " ->Excel file saved successfully"
 	} catch {
 		Write-Host " Error saving Excel file: $_" -ForegroundColor Red
 	}
@@ -1106,7 +1106,7 @@ $InitScriptBlock = {
 		param (
 			[string]$BlitzWhoQuery
 		)
-		$BlitzWhoCommand = new-object System.Data.SqlClient.SqlCommand
+		$BlitzWhoCommand = New-Object System.Data.SqlClient.SqlCommand
 		$BlitzWhoCommand.CommandText = $BlitzWhoQuery
 		$BlitzWhoCommand.CommandTimeout = 60
 		$SqlConnection.Open()
@@ -1151,7 +1151,7 @@ $InitScriptBlock = {
 		param (
 			[string]$FlagTblDt
 		)
-		$CheckFlagTblQuery = new-object System.Data.SqlClient.SqlCommand
+		$CheckFlagTblQuery = New-Object System.Data.SqlClient.SqlCommand
 		$FlagTblQuery = "DECLARE @FlagTable NVARCHAR(300); `n SELECT @FlagTable = CASE "
 		$FlagTblQuery += "WHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128)) = N'SQL Azure' "
 		$FlagTblQuery += "`nAND SERVERPROPERTY('EngineEdition') IN (5, 6) "
@@ -1164,17 +1164,17 @@ $InitScriptBlock = {
 		$CheckFlagTblQuery.CommandTimeout = 30
 		$CheckFlagTblAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
 		$CheckFlagTblAdapter.SelectCommand = $CheckFlagTblQuery
-		$CheckFlagTblSet = new-object System.Data.DataSet
-		Try {
+		$CheckFlagTblSet = New-Object System.Data.DataSet
+		try {
 			$CheckFlagTblAdapter.Fill($CheckFlagTblSet) | Out-Null -ErrorAction Stop
 			$SqlConnection.Close()
 			[string]$IsFlagTbl = $CheckFlagTblSet.Tables[0].Rows[0]["FlagFound"]
             
-		} Catch {
+		} catch {
 			[string]$IsFlagTbl = "X"            
 		}
 		if ($IsFlagTbl -eq "Y") {
-			$CleanupCommand = new-object System.Data.SqlClient.SqlCommand
+			$CleanupCommand = New-Object System.Data.SqlClient.SqlCommand
 			$Cleanup = "DECLARE @SQL NVARCHAR(400);`nSELECT @SQL = N'DROP TABLE '+ CASE "
 			$Cleanup += "`nWHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure' "
 			$Cleanup += "`nAND SERVERPROPERTY('EngineEdition') IN (5, 6) `nTHEN N'[BlitzWhoOutFlag_$FlagTblDt];' "
@@ -1192,7 +1192,7 @@ $InitScriptBlock = {
 }
 
 $MainScriptblock = {
-	Param([string]$ConnStringIn , [string]$BlitzWhoIn, [string]$DirDateIn, [int]$BlitzWhoDelayIn)
+	param([string]$ConnStringIn , [string]$BlitzWhoIn, [string]$DirDateIn, [int]$BlitzWhoDelayIn)
 	$SqlConnection = New-Object System.Data.SqlClient.SqlConnection
 	$SqlConnection.ConnectionString = $ConnStringIn
 	[int]$SuccessCount = 0
@@ -1202,10 +1202,10 @@ $MainScriptblock = {
 	[string]$FlagErrCheck = "N"
 	while (($IsFlagTbl -ne "Y") -and ($FlagCheckRetry -le 3)) {
 
-		Try {
+		try {
 			Invoke-BlitzWho -BlitzWhoQuery $BlitzWhoIn 
 			$SuccessCount += 1
-		} Catch {
+		} catch {
 			$FailedCount += 1
 		}
 		[string]$IsFlagTbl = Invoke-FlagTableCheck -FlagTblDt $DirDateIn
@@ -1263,9 +1263,9 @@ $MainScriptblock = {
 [string]$ServerName = $ServerName -join ","
 
 ###Return help if requested during execution
-if (("Y", "Yes" -Contains $Help) -or ("?", "Help" -Contains $ServerName)) {
+if (("Y", "Yes" -contains $Help) -or ("?", "Help" -contains $ServerName)) {
 	Get-PSBlitzHelp
-	Exit
+	exit
 }
 
 ###Validate existence of dependencies
@@ -1275,7 +1275,7 @@ if (!(Test-Path $ResourcesPath )) {
 	Write-Host " Make sure to download the latest release from https://github.com/VladDBA/PSBlitz/releases" -fore yellow
 	Write-Host "and properly extract the contents" -fore yellow
 	Read-Host -Prompt "$ExitPrompt"
-	Exit
+	exit
 }
 #Check individual files
 $MissingFiles = @()
@@ -1293,7 +1293,7 @@ if ($MissingFiles.Count -gt 0) {
 	Write-Host " Make sure to download the latest release from https://github.com/VladDBA/PSBlitz/releases" -fore yellow
 	Write-Host "and properly extract the contents" -fore yellow
 	Read-Host -Prompt "$ExitPrompt"
-	Exit
+	exit
 }
 #If we have the files, check file integrity
 Get-FileIntegrity -fileList $ResourceList -FilesPath $ResourcesPath -storedHashes $storedHashes
@@ -1372,10 +1372,10 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 		$HostName = $HostName.Substring(0, $pos)
 	}
 	#Return help menu if $ServerName is ? or Help
-	if ("?", "Help" -Contains $ServerName) {
+	if ("?", "Help" -contains $ServerName) {
 		Get-PSBlitzHelp
 		Read-Host -Prompt "$ExitPrompt"
-		Exit
+		exit
 	}
 	
 	##Have sp_BlitzIndex, sp_BlitzCache, sp_BlitzLock executed against a specific database
@@ -1418,7 +1418,7 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 		[string]$QueryStoreIntervalStart = Read-Host -Prompt "Query Store interval start date and time in the format YYYY-MM-DD hh:mm (empty defaults 7 days ago)"
 
 		##Query Store interval end
-		if(!([string]::IsNullOrEmpty($QueryStoreIntervalStart))) {
+		if (!([string]::IsNullOrEmpty($QueryStoreIntervalStart))) {
 			[string]$QueryStoreIntervalEnd = Read-Host -Prompt "Query Store interval end date and time in the format YYYY-MM-DD hh:mm (empty defaults to now)"
 		}
 
@@ -1482,7 +1482,7 @@ if (![string]::IsNullOrEmpty($QueryStoreIntervalStart)) {
 	if (-not $isStartValid) {
 		Write-Host " QueryStoreIntervalStart must be a valid date in the format YYYY-MM-DD hh:mm." -ForegroundColor Red
 		Read-Host -Prompt "$ExitPrompt"
-		Exit
+		exit
 	}
 	$IsQueryStoreInterval = $true
 	if ([string]::IsNullOrEmpty($QueryStoreIntervalEnd)) {
@@ -1492,7 +1492,7 @@ if (![string]::IsNullOrEmpty($QueryStoreIntervalStart)) {
 		if (-not $isEndValid) {
 			Write-Host " QueryStoreIntervalEnd must be a valid date in the format YYYY-MM-DD hh:mm." -ForegroundColor Red
 			Read-Host -Prompt "$ExitPrompt"
-			Exit
+			exit
 		}
 	}
 }
@@ -1530,8 +1530,8 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 	$SqlConnection.ConnectionString = $ConnString
 
 	[int]$CmdTimeout = 100
-	Write-Host "Detecting environment type... " -NoNewLine
-	$AzCheckQuery = new-object System.Data.SqlClient.SqlCommand
+	Write-Host "Detecting environment type... " -NoNewline
+	$AzCheckQuery = New-Object System.Data.SqlClient.SqlCommand
 	$Query = "SELECT CAST(SERVERPROPERTY('EngineEdition') AS INT) AS [EngineEdition],"
 	$Query += "`nCAST(SERVERPROPERTY('Edition') AS NVARCHAR(128)) AS [Edition];"
 	$AzCheckQuery.CommandText = $Query
@@ -1539,14 +1539,14 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 	$AzCheckQuery.CommandTimeout = $CmdTimeout
 	$AzCheckAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
 	$AzCheckAdapter.SelectCommand = $AzCheckQuery
-	$AzCheckSet = new-object System.Data.DataSet
-	Try {
-		$StepStart = get-date
+	$AzCheckSet = New-Object System.Data.DataSet
+	try {
+		$StepStart = Get-Date
 		$AzCheckAdapter.Fill($AzCheckSet) | Out-Null -ErrorAction Stop
 		$SqlConnection.Close()
-		$StepEnd = get-date
-	} Catch {
-		$StepEnd = get-date
+		$StepEnd = Get-Date
+	} catch {
+		$StepEnd = Get-Date
 		Invoke-ErrMsg
 		$Help = Read-Host -Prompt "Need help?[Y/N]"
 		if ($Help -eq "Y") {
@@ -1554,10 +1554,10 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 			#Don't close the window automatically if in interactive mode
 			if ($InteractiveMode -eq 1) {
 				Read-Host -Prompt "$ExitPrompt"
-				Exit
+				exit
 			}
 		} else {
-			Exit
+			exit
 		}
 	}
 	if ($AzCheckSet.Tables[0].Rows.Count -eq 1) {
@@ -1628,8 +1628,8 @@ $SqlConnection.ConnectionString = $ConnString
 
 ###Test connection to instance
 [int]$CmdTimeout = 100
-Write-Host "Testing connection to $ServerName... " -NoNewLine
-$ConnCheckQuery = new-object System.Data.SqlClient.SqlCommand
+Write-Host "Testing connection to $ServerName... " -NoNewline
+$ConnCheckQuery = New-Object System.Data.SqlClient.SqlCommand
 $Query = "SELECT CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128)) AS [Edition],"
 $Query += "`nCAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'),0) AS TINYINT) AS [MajorVersion];"
 $ConnCheckQuery.CommandText = $Query
@@ -1637,14 +1637,14 @@ $ConnCheckQuery.Connection = $SqlConnection
 $ConnCheckQuery.CommandTimeout = $CmdTimeout
 $ConnCheckAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
 $ConnCheckAdapter.SelectCommand = $ConnCheckQuery
-$ConnCheckSet = new-object System.Data.DataSet
-Try {
-	$StepStart = get-date
+$ConnCheckSet = New-Object System.Data.DataSet
+try {
+	$StepStart = Get-Date
 	$ConnCheckAdapter.Fill($ConnCheckSet) | Out-Null -ErrorAction Stop
 	$SqlConnection.Close()
-	$StepEnd = get-date
-} Catch {
-	$StepEnd = get-date
+	$StepEnd = Get-Date
+} catch {
+	$StepEnd = Get-Date
 	Invoke-ErrMsg
 	$Help = Read-Host -Prompt "Need help?[Y/N]"
 	if ($Help -eq "Y") {
@@ -1652,10 +1652,10 @@ Try {
 		#Don't close the window automatically if in interactive mode
 		if ($InteractiveMode -eq 1) {
 			Read-Host -Prompt "$ExitPrompt"
-			Exit
+			exit
 		}
 	} else {
-		Exit
+		exit
 	}
 }
 if ($ConnCheckSet.Tables[0].Rows.Count -eq 1) {
@@ -1681,7 +1681,7 @@ if ($ConnCheckSet.Tables[0].Rows.Count -eq 1) {
 ###Test existence of value provided for $CheckDB
 if (!([string]::IsNullOrEmpty($CheckDB))) {
 	Write-Host "Checking existence of database $CheckDB..."
-	$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
+	$CheckDBQuery = New-Object System.Data.SqlClient.SqlCommand
 	$DBQuery = "SELECT [name] from sys.databases WHERE [name] = @DBName AND [state] = 0 AND [user_access_desc] = 'MULTI_USER';"
 	$CheckDBQuery.CommandText = $DBQuery
 	$CheckDBQuery.Parameters.Add("@DBName", [Data.SQLDBType]::NVarChar, 256) | Out-Null
@@ -1690,15 +1690,15 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 	$CheckDBQuery.CommandTimeout = 100
 	$CheckDBAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
 	$CheckDBAdapter.SelectCommand = $CheckDBQuery
-	$CheckDBSet = new-object System.Data.DataSet
+	$CheckDBSet = New-Object System.Data.DataSet
 	$CheckDBAdapter.Fill($CheckDBSet) | Out-Null
 	$SqlConnection.Close()
-	Try {
+	try {
 		if ($CheckDBSet.Tables[0].Rows[0]["name"] -eq $CheckDB) {
-			Write-Host "->Database $CheckDB - " -NoNewLine -ErrorAction Stop
+			Write-Host "->Database $CheckDB - " -NoNewline -ErrorAction Stop
 			Write-Host "is online" -fore green -ErrorAction Stop
 		}
-	} Catch {
+	} catch {
 		Write-Host "->Database $CheckDB either does not exist or is offline" -fore red
 		$InstanceWide = Read-Host -Prompt "Switch to instance-wide plan cache, index, and deadlock check?[Y/N]"
 		if ($InstanceWide -eq "Y") {
@@ -1710,10 +1710,10 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 				#Don't close the window automatically if in interactive mode
 				if ($InteractiveMode -eq 1) {
 					Read-Host -Prompt "$ExitPrompt"
-					Exit
+					exit
 				}
 			} else {
-				Exit
+				exit
 			}
 		}
 	}
@@ -1722,7 +1722,7 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 } elseif ($IsAzureSQLDB -eq $false) {
 	#if we're not in Azure SQL DB mode and no database was provided, get a user database count
 	Write-Host "Checking user database count..." -NoNewline
-	$CheckDBQuery = new-object System.Data.SqlClient.SqlCommand
+	$CheckDBQuery = New-Object System.Data.SqlClient.SqlCommand
 	$DBQuery = "SELECT COUNT([name]) AS [DBCount] from sys.databases WHERE [state] = 0 AND [user_access_desc] = 'MULTI_USER'"
 	$DBQuery += " AND [name] NOT IN ('master', 'tempdb', 'model', 'msdb');"
 	$CheckDBQuery.CommandText = $DBQuery
@@ -1730,7 +1730,7 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 	$CheckDBQuery.CommandTimeout = 100
 	$CheckDBAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
 	$CheckDBAdapter.SelectCommand = $CheckDBQuery
-	$CheckDBSet = new-object System.Data.DataSet
+	$CheckDBSet = New-Object System.Data.DataSet
 	$CheckDBAdapter.Fill($CheckDBSet) | Out-Null
 	$SqlConnection.Close()
 	[int]$UsrDBCount = $CheckDBSet.Tables[0].Rows[0]["DBCount"]
@@ -1750,7 +1750,7 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 
 ###Create directories
 #Turn current date time into string for output directory name
-$sdate = get-date
+$sdate = Get-Date
 $DirDate = $sdate.ToString("yyyyMMddHHmm")
 #Set output directory
 if ((!([string]::IsNullOrEmpty($OutputDir))) -and (Test-Path $OutputDir)) {
@@ -1811,7 +1811,7 @@ if ($ToHTML -ne "Y") {
 	}
 
 	try {
-		$ExcelApp = New-Object -comobject Excel.Application	-ErrorAction Stop
+		$ExcelApp = New-Object -ComObject Excel.Application	-ErrorAction Stop
 		Write-Host "PSBlitz is writing the report to Excel." -Fore Green
 		Write-Host " Warning: Do not open or close Excel during this execution of PSBlitz." -Fore Yellow	
 	} catch {
@@ -1912,7 +1912,7 @@ if ($ToHTML -eq "Y") {
 	}
 	$OutExcelF = Join-Path -Path $OutDir -ChildPath $OutExcelFName
 	###Copy Excel template to output directory
-	Copy-Item $OrigExcelF  -Destination $OutExcelF
+	Copy-Item $OrigExcelF -Destination $OutExcelF
 }
 #Set output table for sp_BlitzWho
 #Set replace strings
@@ -1958,7 +1958,7 @@ if ($global:StepOutcome -eq "Success") {
 #####################################################################################
 #						Check start													#
 #####################################################################################
-$StepStart = get-date
+$StepStart = Get-Date
 $StepEnd = Get-Date
 $ParametersUsed = "IsIndepth:$IsIndepth; CheckDB:$CheckDB;`n BlitzWhoDelay:$BlitzWhoDelay; MaxTimeout:$MaxTimeout"
 $ParametersUsed += ";`n ConnTimeout:$ConnTimeout; CacheTop:$CacheTop;`n ASDBName:$ASDBName; CacheMinutesBack:$CacheMinutesBack"
@@ -1970,14 +1970,14 @@ try {
 	$TryCompleted = "N"
 
 	Write-Host $("-" * 80)
-	Write-Host "       Starting" -NoNewLine 
+	Write-Host "       Starting" -NoNewline 
 	if ($IsIndepth -eq "Y") {
-		Write-Host " in-depth" -NoNewLine
+		Write-Host " in-depth" -NoNewline
 	}
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		Write-Host " database-specific" -NoNewLine
+		Write-Host " database-specific" -NoNewline
 	}
-	Write-Host " check for " -NoNewLine 
+	Write-Host " check for " -NoNewline 
 	if ($IsAzureSQLDB) {
 		Write-Host "Azure SQL DB - $ASDBName"
 	} elseif ($IsAzureSQLMI) {
@@ -1998,7 +1998,7 @@ try {
 	[string]$BlitzWhoRepl = $Query -replace $OldBlitzWhoOut, $NewBlitzWhoOut
 
 	###Execution start time
-	$StartDate = get-date
+	$StartDate = Get-Date
 	###Collecting first pass of sp_BlitzWho data
 	$JobName = "BlitzWho"
 	Write-Host " Starting session activity collection process... " -NoNewline
@@ -2027,7 +2027,7 @@ try {
 	#						Instance Info												#
 	#####################################################################################
 	$StepOutcome = "Failure"
-	Write-Host " Retrieving instance information... " -NoNewLine
+	Write-Host " Retrieving instance information... " -NoNewline
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetInstanceInfo.sql"
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Instance Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
@@ -2104,7 +2104,7 @@ $htmlTable6 `n<br>`n<h2>Session level SET options</h2> `n $htmlTable4 `n $HTMLBo
 	#####################################################################################
 	#						TempDB usage info	 										#
 	#####################################################################################
-	Write-Host " Retrieving TempDB usage data... " -NoNewLine
+	Write-Host " Retrieving TempDB usage data... " -NoNewline
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetTempDBUsageInfo.sql"
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	[string]$Query = $Query -replace '..PSBlitzReplace..', "$DirDate"
@@ -2244,7 +2244,7 @@ $HTMLBodyEnd
 
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetAzureSQLDBInfo.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-		Write-Host " Retrieving database info for $ASDBName... " -NoNewLine 
+		Write-Host " Retrieving database info for $ASDBName... " -NoNewline 
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Azure SQL DB Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		
 		if ($global:StepOutcome -eq "Success") {
@@ -2366,10 +2366,10 @@ $SortableTable `n $htmlTable6 `n $JumpToTop `n $HTMLBodyEnd
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 			
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
-			Write-Host " Retrieving database info for $CheckDB... " -NoNewLine
+			Write-Host " Retrieving database info for $CheckDB... " -NoNewline
 			[string]$Query = $Query -replace "SET @DatabaseName = N'';", "SET @DatabaseName = N'$CheckDB';"
 		} else {
-			Write-Host " Retrieving database info... " -NoNewLine
+			Write-Host " Retrieving database info... " -NoNewline
 		}
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Database Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		
@@ -2451,12 +2451,12 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 	#						sp_Blitz 													#
 	#####################################################################################
 	if ($IsAzureSQLDB) {
-		$StepStart = get-date
-		$StepEnd = get-date
+		$StepStart = Get-Date
+		$StepEnd = Get-Date
 		Write-Host " Azure SQL DB - skipping instance health."
 		Add-LogRow "sp_Blitz" "Skipped" "Azure SQL DB"
 	} else {
-		Write-Host " Retrieving instance health data... " -NoNewLine
+		Write-Host " Retrieving instance health data... " -NoNewline
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitz_NonSPLatest.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		if (($IsIndepth -eq "Y") -and ([string]::IsNullOrEmpty($CheckDB))) {
@@ -2505,7 +2505,7 @@ $($SearchTableDiv -replace $STDivReplace, "'InstanceHealthTable', 3" -replace 'o
 	#						Objects with dangerous SET options							#
 	#####################################################################################
 	if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB) -or (($GetUsrDBObj) -and ($DangerousObjDBsCount -gt 0))) {
-		Write-Host " Retrieving objects created with dangerous SET options... " -NoNewLine
+		Write-Host " Retrieving objects created with dangerous SET options... " -NoNewline
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetObjectsWithDangerousOptions.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		if ($IsAzureSQLDB) {
@@ -2553,7 +2553,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	#####################################################################################
 	#						sp_BlitzFirst 30 seconds									#
 	#####################################################################################
-	Write-Host " What's happening in a 30 seconds time-frame... " -NoNewLine
+	Write-Host " What's happening in a 30 seconds time-frame... " -NoNewline
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzFirst_NonSPLatest.sql"
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzFirst 30 seconds" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
@@ -2585,7 +2585,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	#						sp_BlitzFirst since startup									#
 	#####################################################################################
 	if ($IsIndepth -eq "Y") {
-		Write-Host " Retrieving waits recorded since instance startup... " -NoNewLine
+		Write-Host " Retrieving waits recorded since instance startup... " -NoNewline
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzFirst_NonSPLatest.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		[string]$Query = $Query -replace ";SET @SinceStartup = 0;", ";SET @SinceStartup = 1;"
@@ -2734,7 +2734,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		}
 		#Adjust the value of -CacheMinutesBack/@MinutesBack to the current runtime
 		if ($OrigCacheMinutesBack -gt 0) {
-			$CurrTime = get-date
+			$CurrTime = Get-Date
 			$CurrRunTime = (New-TimeSpan -Start $StartDate -End $CurrTime).TotalMinutes
 			$CurrMin = [Math]::Round($CurrRunTime)
 			
@@ -2748,7 +2748,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		}
 
 		[string]$Query = $Query -replace $OldSortString, $NewSortString
-		Write-Host " ->Top $(if($SortOrder -eq "'recent compilations'"){"50"}else{$CacheTop}) queries by $($SortOrder -replace "'",'') ($CurrentSortOrder of $TotalSortOrders)... " -NoNewLine
+		Write-Host " ->Top $(if($SortOrder -eq "'recent compilations'"){"50"}else{$CacheTop}) queries by $($SortOrder -replace "'",'') ($CurrentSortOrder of $TotalSortOrders)... " -NoNewline
 		if ($OrigCacheMinutesBack -ne 0) {
 			$AdditionalInfo = ", MinutesBack=$CacheMinutesBack"
 		} else {
@@ -2972,11 +2972,11 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		[int]$DBCount = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Count | Select-Object -Last 1
 		if (($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --") -and ($DBName -ne "N/A") -and (!([string]::IsNullOrEmpty($DBName)))) {
 			Write-Host " $DBName accounts for 2/3 of the records returned from cache"
-			Write-Host " ->" -NoNewLine
-			$StepStart = get-date
+			Write-Host " ->" -NoNewline
+			$StepStart = Get-Date
 			[string]$CheckDB = $DBName
 			$DBSwitched = "Y"
-			$StepEnd = get-date
+			$StepEnd = Get-Date
 			Add-LogRow "CheckDB value" "Switched" "$DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
 		}
 	}
@@ -2984,7 +2984,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	##Check if DB is eligible for sp_BlitzQueryStore first
 	if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
 		if ($DBSwitched -ne "Y") {
-			Write-Host " " -NoNewLine
+			Write-Host " " -NoNewline
 		}
 		$databaseName = if ($IsAzureSQLDB) { $ASDBName } else { $CheckDB }
 		Write-Host "Checking if $databaseName is eligible for Query Store check... " -NoNewline
@@ -3088,7 +3088,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			}
 		}
 		if ($DBSwitched -eq "Y") {
-			$StepStart = get-date
+			$StepStart = Get-Date
 			$CheckDB = ""
 			$StepEnd = Get-Date
 			Add-LogRow "CheckDB value" "Switched" "Switched back to empty from $DBName"
@@ -3145,14 +3145,14 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	}
 	#Loop through $Modes
 	foreach ($Mode in $Modes) {
-		Write-Host $modeMessages[$Mode] -NoNewLine
+		Write-Host $modeMessages[$Mode] -NoNewline
 		$NewMode = ";SET @Mode = " + $Mode + ";"
 		[string]$Query = $Query -replace $OldMode, $NewMode
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzIndex mode $Mode" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
 		
 		if ($global:StepOutcome -eq "Success") {
 			$BlitzIxTbl = $global:PSBlitzSet.Tables[0]
-			if ("0", "4" -Contains $Mode) {
+			if ("0", "4" -contains $Mode) {
 				#Export sample execution plans for missing indexes (SQL Server 2019 only)
 					
 				Export-PlansAndDeadlocks $BlitzIxTbl $PlanOutDir "Sample Query Plan" "Sample Plan File" -FPrefix "MissingIndex" -DebugInfo:$DebugInfo
@@ -3184,7 +3184,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					$Mode2CSS = "IndexUsageTable sortable"
 				}						
 		
-				if ("0", "4" -Contains $Mode) {	
+				if ("0", "4" -contains $Mode) {	
 					if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
 						$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexUsgTable', 2" -replace 'object', 'database'
 						$htmlTabSearch += "<br>"
@@ -3222,7 +3222,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			
 				#Specify worksheet
 				$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
-				if ("0", "4" -Contains $Mode) {
+				if ("0", "4" -contains $Mode) {
 					Convert-TableToExcel $BlitzIxTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -ExclCols "Sample Query Plan", "FindingHL" -URLCols "URL" -MapURLToColNum 2 -URLTextCol "Finding"
 				} else {
 					Convert-TableToExcel $BlitzIxTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
@@ -3242,14 +3242,14 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	#						sp_BlitzLock
 	####################################################################
 	if ($SkipChecks -notcontains "Deadlock") {
-		$CurrTime = get-date
+		$CurrTime = Get-Date
 		$CurrRunTime = (New-TimeSpan -Start $StartDate -End $CurrTime).TotalMinutes
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
-			Write-Host " Retrieving deadlock info for $CheckDB... " -NoNewLine
+			Write-Host " Retrieving deadlock info for $CheckDB... " -NoNewline
 		} elseif ($IsAzureSQLDB) {
-			Write-Host " Retrieving deadlock info for $ASDBName... " -NoNewLine
+			Write-Host " Retrieving deadlock info for $ASDBName... " -NoNewline
 		} else {
-			Write-Host " Retrieving deadlock info for all user databases... " -NoNewLine
+			Write-Host " Retrieving deadlock info for all user databases... " -NoNewline
 		}
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzLock_NonSPLatest.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
@@ -3262,7 +3262,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			$CurrMin = [Math]::Round($CurrRunTime)
 			Write-Host ""
 			Write-Host " ->Current execution time is $CurrMin minutes"
-			Write-Host " ->Retrieving deadlock info for the last 7 days instead of 15... " -NoNewLine
+			Write-Host " ->Retrieving deadlock info for the last 7 days instead of 15... " -NoNewline
 			[string]$Query = $Query -replace "@StartDate = DATEADD(DAY,-15, GETDATE()),", "@StartDate = DATEADD(DAY,-7, GETDATE()),"
 		}
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Deadlock Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
@@ -3299,7 +3299,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 						$htmlTable1 = "`n<p><a href=`"#Deadlocks2`">Jump to execution plans</a></p>`n" + $htmlTable1
 
 						$htmlTable4 = Convert-TableToHtml $TblLockPlans -AnchorFromHere -ExclCols "query_text", "query_plan" -CSSClass "DeadlockPlansTable" -AnchorIDs "DeadlockPlan" -DebugInfo:$DebugInfo
-						$htmlTable4 += "`n $JumpToTop"
+						$htmlTable4 = "<br>`n<h2 id=`"Deadlocks2`">Execution Plans Involved in Deadlocks</h2>`n $htmlTable4 `n $JumpToTop"
 
 						$htmlTable5 = Convert-QueryTableToHtml $TblLockPlans -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "DeadlockPlan" -DebugInfo:$DebugInfo
 						$htmlTable5 = "<br>`n<h2>Query Text For Execution Plans Involved in Deadlocks</h2>`n $htmlTable5 `n $JumpToTop"
@@ -3366,11 +3366,11 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	#>
 	if ($DBSwitched -eq "Y") {
 		Write-Host " $DBName accounts for 2/3 of the records returned from cache"
-		$StepStart = get-date
+		$StepStart = Get-Date
 		Write-Host " ->" -NoNewline
 		[string]$CheckDB = $DBName
 		$DBSwitched = "Y"
-		$StepEnd = get-date
+		$StepEnd = Get-Date
 		Add-LogRow "CheckDB value" "Switched" "$DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
 	}
 	
@@ -3378,14 +3378,14 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	#
 	if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
 		if ($DBSwitched -ne "Y") {
-			Write-Host " " -NoNewLine
+			Write-Host " " -NoNewline
 		}
 			
 		$databaseName = if ($IsAzureSQLDB) { $ASDBName } else { $CheckDB }
 		if ($SkipChecks -notcontains "StatsInfo") {
 			$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetStatsInfoForWholeDB.sql"
 			[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-			Write-Host "Retrieving stats info for $databaseName... " -NoNewLine
+			Write-Host "Retrieving stats info for $databaseName... " -NoNewline
 
 			if ($IsAzureSQLDB) {		
 				#if it's Azure SQL DB, we can't switch databases
@@ -3443,11 +3443,11 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetIndexInfoForWholeDB.sql"
 			[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 			if ($DBSwitched -ne "Y") {
-				Write-Host " " -NoNewLine
+				Write-Host " " -NoNewline
 			} elseif ($DBSwitched -eq "Y") {
-				Write-Host " ->" -NoNewLine
+				Write-Host " ->" -NoNewline
 			}
-			Write-Host "Retrieving index fragmentation info for $databaseName... " -NoNewLine
+			Write-Host "Retrieving index fragmentation info for $databaseName... " -NoNewline
 			if ($IsAzureSQLDB) { 			
 				#if it's Azure SQL DB, we can't switch databases
 				[string]$Query = $Query.replace('USE [..PSBlitzReplace..];', '')
@@ -3513,7 +3513,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		}
 
 		if ($DBSwitched -eq "Y") {
-			$StepStart = get-date
+			$StepStart = Get-Date
 			$CheckDB = ""
 			$StepEnd = Get-Date
 			Add-LogRow "CheckDB value" "Switched" "Switched back to empty from $DBName"
@@ -3562,10 +3562,10 @@ finally {
 			$CreatFlagTbl += "`nAND SERVERPROPERTY('EngineEdition') IN (5, 6) "
 			$CreatFlagTbl += "`nTHEN N'[BlitzWhoOutFlag_$DirDate](ID INT);' "
 			$CreatFlagTbl += "`nELSE N'[tempdb].[dbo].[BlitzWhoOutFlag_$DirDate](ID INT);' `nEND; `nEXEC(@SQL);"
-			$CreatFlagTblCommand = new-object System.Data.SqlClient.SqlCommand
+			$CreatFlagTblCommand = New-Object System.Data.SqlClient.SqlCommand
 			$CreatFlagTblCommand.CommandText = $CreatFlagTbl
 			$CreatFlagTblCommand.CommandTimeout = 30
-			Try {
+			try {
 				$StepStart = Get-Date
 				$SqlConnection.Open() | Out-Null -ErrorAction Stop
 				$CreatFlagTblCommand.Connection = $SqlConnection
@@ -3579,7 +3579,7 @@ finally {
 				$StepOutcome = "Success"
 				$StepEnd = Get-Date
 				Add-LogRow "BlitzWho Flag table creation" $StepOutcome
-			} Catch {
+			} catch {
 				$StepEnd = Get-Date
 				$JobOutcome = Stop-Job $JobName
 				Write-Host $JobOutcome 
@@ -3624,9 +3624,9 @@ finally {
 		}
 	}
 	if ($TryCompleted -eq "N") {
-		Write-Host	" Attempting to retrieve session actvity data... " -NoNewLine
+		Write-Host	" Attempting to retrieve session actvity data... " -NoNewline
 	} else {
-		Write-Host " Retrieving session actvity data... " -NoNewLine
+		Write-Host " Retrieving session actvity data... " -NoNewline
 	}
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetBlitzWhoData.sql"
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
@@ -3655,9 +3655,7 @@ finally {
 
 			if ($ToHTML -eq "Y") {
 				$HtmlTabName = "Session Activity"
-				if (!([string]::IsNullOrEmpty($CheckDB))) {
-					$HtmlTabName += " for $CheckDB" 
-				} elseif ($IsAzureSQLDB) {
+				if ($IsAzureSQLDB) {
 					$HtmlTabName += " for $ASDBName"
 				}
 
@@ -3672,9 +3670,7 @@ finally {
 				Invoke-ClearVariables html, htmlTable
 
 				$HtmlTabName = "Aggregated Session Activity"
-				if (!([string]::IsNullOrEmpty($CheckDB))) {
-					$HtmlTabName += " for $CheckDB" 
-				} elseif ($IsAzureSQLDB) {
+				if ($IsAzureSQLDB) {
 					$HtmlTabName += " for $ASDBName"
 				}
 				Add-QueryName $BlitzWhoAggTbl "Query" "query_text" "RunningNow"
@@ -3722,7 +3718,7 @@ finally {
 	#####################################################################################
 	#						Delete unused sheets 										#
 	#####################################################################################
-	$StepStart = get-date
+	$StepStart = Get-Date
 	$StepEnd = Get-Date
 	Add-LogRow "Check end" "Finished"
 
@@ -3817,7 +3813,7 @@ finally {
 	#							Check end												#
 	#####################################################################################
 	###Record execution start and end times
-	$EndDate = get-date
+	$EndDate = Get-Date
 	if ($ToHTML -ne "Y") {
 		if ($IsIndepth -eq "Y") {
 			$ExcelSheet = $ExcelFile.Worksheets.Item("Intro")
@@ -4136,13 +4132,13 @@ finally {
 		}
 	}
 	Write-Host $("-" * 80)
-	Write-Host "Execution completed in: " -NoNewLine
+	Write-Host "Execution completed in: " -NoNewline
 	Write-Host $ExecTime -fore green
 	if ($OutDir.Length -gt 40) {
 		Write-Host "Generated files have been saved in: "
 		Write-Host " $OutDir"
 	} else {
-		Write-Host "Generated files have been saved in: " -NoNewLine
+		Write-Host "Generated files have been saved in: " -NoNewline
 		Write-Host "$OutDir"
 	}
 	
@@ -4154,7 +4150,7 @@ finally {
 			Write-Host "The following zip archive has also been created: "
 			Write-Host " $ZipFile"
 		} else {
-			Write-Host "The following zip archive has also been created: " -NoNewLine
+			Write-Host "The following zip archive has also been created: " -NoNewline
 			Write-Host " $ZipFile"
 		}
 	}
