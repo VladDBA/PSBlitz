@@ -302,8 +302,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.8.1"
-$VersDate = "2025-07-30"
+$Vers = "5.8.2"
+$VersDate = "2025-09-09"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -895,7 +895,15 @@ function Export-PlansAndDeadlocks {
 				} else {
 					$FileName = $FPrefix + '_' + $i + '.' + $OutputType
 				}
+				try {
 				$DataTable.Rows[$RowNum][$XMLColName] | Format-XML | Set-Content -Path "$FileDir\$FileName" -Force
+				} catch {
+					#still exporting the file, but no longer formatting the XML and also loggin the error
+					Write-Host "  ->Error formatting XML for $FileName" -ForegroundColor Red
+					Invoke-ErrMsg
+					$DataTable.Rows[$RowNum][$XMLColName] | Set-Content -Path "$FileDir\$FileName" -Force
+					Add-LogRow "->Potentially malformed XML - $FileName" "Failure"
+				}
 			}
 			if ($FileNameFromColumn -eq $false) {
 				$DataTable.Rows[$RowNum][$FNameColName] = $FileName
@@ -2828,7 +2836,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					#Handling CSS
 					$CacheHTMLPre = $HTMLPre
 					$CacheHTMLPre = $CacheHTMLPre -replace 'CacheTab1High', $HighlightCol
-					$htmlTable1 = $htmlTable1 -replace "<table class='CacheTabx'>", '<table class="CacheTable1">'
+					$htmlTable1 = $htmlTable1 -replace '<table class="CacheTabx">', '<table class="CacheTable1">'
 					
 					if ($SheetName -eq "Mem & Recent Comp") {
 						$HtmlTabName = "Queries by Memory Grants & Recent Compilations"
@@ -3176,11 +3184,11 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
 					$HtmlTabName += " for $ASDBName$CheckDB"
 					$ExclCols = @("Sample Query Plan", "Display Order", "Database Name", "Finding", "URL")
-					$Mode2SearchCol = 0
+					$Mode2SearchCol = 2
 					$Mode2CSS = "IndexUsageTableDB sortable"
 				} else {
 					$ExclCols = @("Sample Query Plan", "Display Order", "Finding", "URL")
-					$Mode2SearchCol = 1
+					$Mode2SearchCol = 3
 					$Mode2CSS = "IndexUsageTable sortable"
 				}						
 		
