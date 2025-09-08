@@ -303,7 +303,7 @@ param(
 ###Internal params
 #Version
 $Vers = "5.8.2"
-$VersDate = "2025-08-11"
+$VersDate = "2025-09-08"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -2836,7 +2836,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					#Handling CSS
 					$CacheHTMLPre = $HTMLPre
 					$CacheHTMLPre = $CacheHTMLPre -replace 'CacheTab1High', $HighlightCol
-					$htmlTable1 = $htmlTable1 -replace "<table class='CacheTabx'>", '<table class="CacheTable1">'
+					$htmlTable1 = $htmlTable1 -replace '<table class="CacheTabx">', '<table class="CacheTable1">'
 					
 					if ($SheetName -eq "Mem & Recent Comp") {
 						$HtmlTabName = "Queries by Memory Grants & Recent Compilations"
