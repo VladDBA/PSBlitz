@@ -302,8 +302,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.8.2"
-$VersDate = "2025-09-09"
+$Vers = "5.8.3"
+$VersDate = "2025-09-22"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -325,23 +325,24 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql", "spBlitzCache
 	"copy.js", "spQuickieStore_NonSPLatest.sql", "GetQSStatus.sql")
 
 ## we use these to make sure someone didn't modify the scripts in the Resources folder
-$storedHashes = @{"spBlitz_NonSPLatest.sql" = "F6A467C796EBF299BC67BBFD8B75E00FA4D4BC7EE4A70524C240D4843D89D11F"
-	"spBlitzCache_NonSPLatest.sql"             = "BBBB196DFCBBDA633D9567A660AE72B188D5838B9F736D5E420D8B423706EB3F"
-	"spBlitzFirst_NonSPLatest.sql"             = "9D5C5C16C5D12E5E77ABFF427678C259C5B030C89E2C95A6B32A13014BA7D0BB"
-	"spBlitzIndex_NonSPLatest.sql"             = "B43BE58493F2BCA53E6FBD59A0E4F03C876472E173961DA50D40FAD6C7D7A111"
-	"spBlitzLock_NonSPLatest.sql"              = "3486DC155F106CEC5C8FCE690D6491E3350EE253EB26D605282A3B203BC2402C"
-	"spBlitzWho_NonSPLatest.sql"               = "65C3B3B6BED5024D40C720517EB0869550C9FC61718FF4F7DAE9888D9547F263"
-	"GetBlitzWhoData.sql"                      = "1A23F1F9C4CB51252D088919500A7E472B56B98DD5096DBA79B5D96AEEB5F6FC"
-	"GetInstanceInfo.sql"                      = "0E84569B2E97D6F59B4CC6D4AB0F2D41637573970CF14A1F99F9961AF8F3175A"
-	"GetTempDBUsageInfo.sql"                   = "20620509996A6F7BB45410397D0CB5C7C0D044FEA15944950171DF14436AE9D1"
-	"GetOpenTransactions.sql"                  = "76EBCB1758CBC86DAC4FE8E5C02E88AB4B96FEDB2E21570B8C0D410FF8A69F7D"
-	"GetStatsInfoForWholeDB.sql"               = "CF3A8B06AD68880F5BF44DE45206778F1515FB7DD930E2D3CCCC71149AFF5544"
-	"GetIndexInfoForWholeDB.sql"               = "6C58B79C4EDF06ADBE4EE79373A522A7C538B331D74E9E4AF32C77C6ED951F9B"
-	"GetDbInfo.sql"                            = "103B639ED78B099A5C2D133E6555B7073CE23DF2DBE4CD7CAD24D44EDB261F7F"
-	"GetAzureSQLDBInfo.sql"                    = "8A18348F7B87C2F5DA047B103E3BF4FEBB455E7498F0C93644DC2CD7E7255506"
-	"GetObjectsWithDangerousOptions.sql"       = "AFE74F2FE6D6077AEBF169CC16DE036B08980846E6795DC342372AB8C2A132A9"
-	"spQuickieStore_NonSPLatest.sql"           = "4668D8B4B952687B2F3DC6FFA56C79A4BC85E22F3AA0D7A8C9DBDC06E8101683"
-	"GetQSStatus.sql"                          = "A0D6E7B1C6BC5B0ED5FDF6FD14C5927729F883CB491342F81DCD9BD48A4ACCFE"
+$storedHashes = @{
+	"spBlitz_NonSPLatest.sql"            = "F6A467C796EBF299BC67BBFD8B75E00FA4D4BC7EE4A70524C240D4843D89D11F"
+	"spBlitzCache_NonSPLatest.sql"       = "BBBB196DFCBBDA633D9567A660AE72B188D5838B9F736D5E420D8B423706EB3F"
+	"spBlitzFirst_NonSPLatest.sql"       = "9D5C5C16C5D12E5E77ABFF427678C259C5B030C89E2C95A6B32A13014BA7D0BB"
+	"spBlitzIndex_NonSPLatest.sql"       = "B43BE58493F2BCA53E6FBD59A0E4F03C876472E173961DA50D40FAD6C7D7A111"
+	"spBlitzLock_NonSPLatest.sql"        = "3486DC155F106CEC5C8FCE690D6491E3350EE253EB26D605282A3B203BC2402C"
+	"spBlitzWho_NonSPLatest.sql"         = "65C3B3B6BED5024D40C720517EB0869550C9FC61718FF4F7DAE9888D9547F263"
+	"GetBlitzWhoData.sql"                = "1A23F1F9C4CB51252D088919500A7E472B56B98DD5096DBA79B5D96AEEB5F6FC"
+	"GetInstanceInfo.sql"                = "3F8E836504B0A447D66FB7BD86B1431F858ED9C9EF6ACC1D969853614736A44E"
+	"GetTempDBUsageInfo.sql"             = "20620509996A6F7BB45410397D0CB5C7C0D044FEA15944950171DF14436AE9D1"
+	"GetOpenTransactions.sql"            = "76EBCB1758CBC86DAC4FE8E5C02E88AB4B96FEDB2E21570B8C0D410FF8A69F7D"
+	"GetStatsInfoForWholeDB.sql"         = "CF3A8B06AD68880F5BF44DE45206778F1515FB7DD930E2D3CCCC71149AFF5544"
+	"GetIndexInfoForWholeDB.sql"         = "6C58B79C4EDF06ADBE4EE79373A522A7C538B331D74E9E4AF32C77C6ED951F9B"
+	"GetDbInfo.sql"                      = "103B639ED78B099A5C2D133E6555B7073CE23DF2DBE4CD7CAD24D44EDB261F7F"
+	"GetAzureSQLDBInfo.sql"              = "8A18348F7B87C2F5DA047B103E3BF4FEBB455E7498F0C93644DC2CD7E7255506"
+	"GetObjectsWithDangerousOptions.sql" = "AFE74F2FE6D6077AEBF169CC16DE036B08980846E6795DC342372AB8C2A132A9"
+	"spQuickieStore_NonSPLatest.sql"     = "4668D8B4B952687B2F3DC6FFA56C79A4BC85E22F3AA0D7A8C9DBDC06E8101683"
+	"GetQSStatus.sql"                    = "A0D6E7B1C6BC5B0ED5FDF6FD14C5927729F883CB491342F81DCD9BD48A4ACCFE"
 }
 
 #Set path+name of the input Excel file
@@ -737,7 +738,7 @@ function Convert-TableToHtml {
 		if ($HyperlinkCol -ne 'x') {
 			# fix hyperlinks
 			$htmlTableOut = $htmlTableOut -replace "&lt;a href=&#39;", "<a href=`""
-			$htmlTableOut = $htmlTableOut -replace "&#39; target=&#39;_blank&#39;&gt;", "' target=`"_blank`">"
+			$htmlTableOut = $htmlTableOut -replace "&#39; target=&#39;_blank&#39;&gt;", "`" target=`"_blank`">"
 			$htmlTableOut = $htmlTableOut -replace "&lt;/a&gt;", "</a>"
 			#fix column name
 			$HyperlinkColClean = $HyperlinkCol -replace 'HL', ''
@@ -896,7 +897,7 @@ function Export-PlansAndDeadlocks {
 					$FileName = $FPrefix + '_' + $i + '.' + $OutputType
 				}
 				try {
-				$DataTable.Rows[$RowNum][$XMLColName] | Format-XML | Set-Content -Path "$FileDir\$FileName" -Force
+					$DataTable.Rows[$RowNum][$XMLColName] | Format-XML | Set-Content -Path "$FileDir\$FileName" -Force
 				} catch {
 					#still exporting the file, but no longer formatting the XML and also loggin the error
 					Write-Host "  ->Error formatting XML for $FileName" -ForegroundColor Red
