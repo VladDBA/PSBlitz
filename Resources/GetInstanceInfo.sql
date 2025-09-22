@@ -274,17 +274,17 @@ OPTION(RECOMPILE);
 SELECT '_Total_'                                                                    AS [cache_type],
        COUNT_BIG(*)                                                                 AS [total_plans],
        SUM(CAST(CAST([size_in_bytes] AS BIGINT) / 1024. / 1024. AS DECIMAL(23, 3))) AS [plan_cache_used_mb],
-       AVG([usecounts])                                                             AS [avg_use_count],
+       AVG(CAST([usecounts] AS BIGINT))                                                             AS [avg_use_count],
        SUM(CAST(CAST(
                 (
                   CASE
-                    WHEN [usecounts] = 1 THEN [size_in_bytes]
+                    WHEN [usecounts] = 1 THEN CAST([size_in_bytes] AS BIGINT)
                     ELSE 0
                   END
                 )
                 AS BIGINT) / 1024. / 1024. AS DECIMAL(23, 3)))                      AS [single_use_plans_total_mb],
        SUM(CASE
-             WHEN [usecounts] = 1 THEN 1
+             WHEN CAST([usecounts] AS BIGINT) = 1 THEN 1
              ELSE 0
            END)                                                                     AS [total_single_use_plans]
 FROM   sys.[dm_exec_cached_plans]
@@ -292,17 +292,17 @@ UNION
 SELECT [objtype]                                                                    AS [cache_type],
        COUNT_BIG(*)                                                                 AS [total_plans],
        SUM(CAST(CAST([size_in_bytes] AS BIGINT) / 1024. / 1024. AS DECIMAL(23, 3))) AS [plan_cache_used_mb],
-       AVG([usecounts])                                                             AS [avg_use_count],
+       AVG(CAST([usecounts] AS BIGINT))                                                             AS [avg_use_count],
        SUM(CAST(CAST(
                 (
                   CASE
-                    WHEN [usecounts] = 1 THEN [size_in_bytes]
+                    WHEN [usecounts] = 1 THEN CAST([size_in_bytes] AS BIGINT)
                     ELSE 0
                   END
                 )
                 AS BIGINT) / 1024. / 1024. AS DECIMAL(23, 3)))                      AS [single_use_plans_total_mb],
        SUM(CASE
-             WHEN [usecounts] = 1 THEN 1
+             WHEN CAST([usecounts] AS BIGINT) = 1 THEN 1
              ELSE 0
            END)                                                                     AS [total_single_use_plans]
 FROM   sys.[dm_exec_cached_plans]
