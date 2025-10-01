@@ -302,8 +302,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.8.3"
-$VersDate = "2025-09-22"
+$Vers = "5.8.4"
+$VersDate = "2025-10-02"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -444,13 +444,26 @@ function Format-XML {
 	param ([
 		Parameter(ValueFromPipeline = $true, Mandatory = $true)]
 		[string]$XMLContent)
+
+	try {
+        # Skip empty content
+        if ([string]::IsNullOrWhiteSpace($XMLContent)) {
+            Write-PSBlitzDebug "  Empty XML content provided to Format-XML" -Color "Yellow"
+			Add-LogRow "->Format XML" "Empty XML content provided to Format-XML" "Warning"
+            return $XMLContent
+        }	
 	$XMLDoc = New-Object -TypeName System.Xml.XmlDocument
 	$XMLDoc.LoadXml($XMLContent)
 	$SW = New-Object System.IO.StringWriter
 	$Writer = New-Object System.Xml.XmlTextwriter($SW)
 	$Writer.Formatting = [System.XML.Formatting]::Indented
 	$XMLDoc.WriteContentTo($Writer)
-	$SW.ToString()
+	return $SW.ToString()
+	} catch [System.Xml.XmlException] {
+        Write-Warning "  Invalid XML encountered. Returning unformatted content."
+		Add-LogRow "->Format XML" "Invalid XML encountered. Returning unformatted content" "Failure"
+        return $XMLContent
+    }
 }
 
 #Function to format exception messages
@@ -896,13 +909,14 @@ function Export-PlansAndDeadlocks {
 				} else {
 					$FileName = $FPrefix + '_' + $i + '.' + $OutputType
 				}
+				$XMLFilePath = Join-Path -Path $FileDir -ChildPath $FileName
 				try {
-					$DataTable.Rows[$RowNum][$XMLColName] | Format-XML | Set-Content -Path "$FileDir\$FileName" -Force
+					$DataTable.Rows[$RowNum][$XMLColName] | Format-XML | Set-Content -Path "$XMLFilePath" -Force -ErrorAction Stop
 				} catch {
 					#still exporting the file, but no longer formatting the XML and also loggin the error
 					Write-Host "  ->Error formatting XML for $FileName" -ForegroundColor Red
 					Invoke-ErrMsg
-					$DataTable.Rows[$RowNum][$XMLColName] | Set-Content -Path "$FileDir\$FileName" -Force
+					$DataTable.Rows[$RowNum][$XMLColName] | Set-Content -Path "$XMLFilePath" -Force
 					Add-LogRow "->Potentially malformed XML - $FileName" "Failure"
 				}
 			}
