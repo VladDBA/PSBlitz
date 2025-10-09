@@ -117,7 +117,7 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-SELECT @Version = '8.25', @VersionDate = '20250704';
+SELECT @Version = '8.26', @VersionDate = '20251002';
 SET @OutputType = UPPER(@OutputType);
 
 IF(@VersionCheckMode = 1)
@@ -3906,12 +3906,12 @@ SELECT @@SPID AS SPID,
                  AND ci.comma_paren_charindex > 0 
 			THEN SUBSTRING(ci.expression, ci.paren_charindex, ci.comma_paren_charindex)
        END AS converted_to,
-       CASE WHEN ci.at_charindex = 0
+       LEFT(CASE WHEN ci.at_charindex = 0
                  AND ci.convert_implicit_charindex = 0
                  AND ci.proc_name = 'Statement' 
 			THEN SUBSTRING(ci.expression, ci.equal_charindex, 4000)
             ELSE '**idk_man**'
-       END AS compile_time_value
+       END, 258) AS compile_time_value
 FROM   #conversion_info AS ci
 OPTION (RECOMPILE);
 
@@ -6261,6 +6261,7 @@ BEGIN
 	
 		END;            
     
+	
 	/*Vlad - column changes for PSBlitz*/
     SELECT  [Priority],
             FindingsGroup,

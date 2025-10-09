@@ -104,7 +104,7 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-SELECT @Version = '8.25', @VersionDate = '20250704';
+SELECT @Version = '8.26', @VersionDate = '20251002';
 
 IF(@VersionCheckMode = 1)
 BEGIN
@@ -1695,7 +1695,11 @@ BEGIN
                 'Maintenance Tasks Running' AS FindingGroup,
                 'Restore Running' AS Finding,
                 'https://www.brentozar.com/askbrent/backups/' AS URL,
-                'Restore of ' + COALESCE(DB_NAME(db.resource_database_id), 'Unknown Database') + ' database (' + COALESCE((SELECT CAST(CAST(SUM(size * 8.0 / 1024 / 1024) AS BIGINT) AS NVARCHAR) FROM #MasterFiles WHERE database_id = db.resource_database_id), 'Unknown') + 'GB) is ' + CAST(r.percent_complete AS NVARCHAR(100)) + '% complete, has been running since ' + CAST(r.start_time AS NVARCHAR(100)) + '. ' AS Details,
+                'Restore of ' + COALESCE(DB_NAME(db.resource_database_id),
+					(SELECT db1.name FROM sys.databases db1
+					LEFT OUTER JOIN sys.databases db2 ON db1.name <> db2.name AND db1.state_desc = db2.state_desc
+					WHERE db1.state_desc = 'RESTORING' AND db2.name IS NULL),
+					'Unknown Database') + ' database (' + COALESCE((SELECT CAST(CAST(SUM(size * 8.0 / 1024 / 1024) AS BIGINT) AS NVARCHAR) FROM #MasterFiles WHERE database_id = db.resource_database_id), 'Unknown ') + 'GB) is ' + CAST(r.percent_complete AS NVARCHAR(100)) + '% complete, has been running since ' + CAST(r.start_time AS NVARCHAR(100)) + '.' AS Details,
                 'KILL ' + CAST(r.session_id AS NVARCHAR(100)) + ';' AS HowToStopIt,
                 pl.query_plan AS QueryPlan,
                 r.start_time AS StartTime,
@@ -2645,6 +2649,27 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
 
 	END
 
+    /* Server Performance - Azure Operation Ongoing  - CheckID 53 */
+	IF (@Debug = 1)
+	BEGIN
+		RAISERROR('Running CheckID 53',10,1) WITH NOWAIT;
+	END
+	IF EXISTS (SELECT * FROM sys.all_objects WHERE name = 'dm_operation_status')
+		BEGIN
+			INSERT INTO #BlitzFirstResults (CheckID, Priority, FindingsGroup, Finding, URL, Details)
+			SELECT 53 AS CheckID,
+				50 AS Priority,
+				'Server Performance' AS FindingGroup,
+				'Azure Operation ' + CASE WHEN state IN (2, 3, 5) THEN 'Ended Recently' ELSE 'Ongoing' END AS Finding,
+				'https://learn.microsoft.com/en-us/sql/relational-databases/system-dynamic-management-views/sys-dm-operation-status-azure-sql-database' AS URL,
+				N'Operation: ' + operation + N' State: ' + state_desc + N' Percent Complete: ' + CAST(percent_complete AS NVARCHAR(10)) + @LineFeed
+                    + N' On: ' + CAST(resource_type_desc AS NVARCHAR(100)) + N':' + CAST(major_resource_id AS NVARCHAR(100)) + @LineFeed
+                    + N' Started: ' + CAST(start_time AS NVARCHAR(100)) + N' Last Modified Time: ' + CAST(last_modify_time AS NVARCHAR(100)) + @LineFeed
+                    + N' For more information, query SELECT * FROM sys.dm_operation_status; ' AS Details
+			FROM sys.dm_operation_status
+		END
+
+
     /* Potential Upcoming Problems - High Number of Connections - CheckID 49 */
 	IF (@Debug = 1)
 	BEGIN
@@ -2673,6 +2698,27 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
 			HAVING SUM(1) > @max_worker_threads;
 			END
 		END
+
+
+
+    /* Server Performance - Memory Dangerously Low Recently - CheckID 52 */
+	IF (@Debug = 1)
+	BEGIN
+		RAISERROR('Running CheckID 52',10,1) WITH NOWAIT;
+	END
+	IF EXISTS (SELECT * FROM sys.all_objects WHERE name = 'dm_os_memory_health_history')
+		BEGIN
+			INSERT INTO #BlitzFirstResults (CheckID, Priority, FindingsGroup, Finding, URL, Details)
+			SELECT TOP 1 52 AS CheckID,
+				10 AS Priority,
+				'Server Performance' AS FindingGroup,
+				'Memory Dangerously Low Recently' AS Finding,
+				'https://www.brentozar.com/go/memhist' AS URL,
+				N'As recently as ' + CONVERT(NVARCHAR(19), snapshot_time, 120) + N', memory health issues are being reported in sys.dm_os_memory_health_history, indicating extreme memory pressure.' AS Details
+			FROM sys.dm_os_memory_health_history
+			WHERE severity_level > 1;
+		END
+
 
 	RAISERROR('Finished running investigatory queries',10,1) WITH NOWAIT;
 
@@ -4848,7 +4894,6 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                     CAST([QueryPlan] AS NVARCHAR(MAX)) AS QueryPlan*/
             FROM    #BlitzFirstResults
             WHERE (@Seconds > 0 OR (Priority IN (0, 250, 251, 255))) /* For @Seconds = 0, filter out broken checks for now */
-			AND [Priority] NOT IN (0,255)
             ORDER BY Priority ,
                     FindingsGroup ,
                     CASE
@@ -4948,11 +4993,13 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                      THEN CAST(100.*(c.[Signal Wait Time (Seconds)]/c.[Wait Time (Seconds)]) AS NUMERIC(4,1))
                     ELSE 0 END AS [Percent Signal Waits],
                     (wd2.waiting_tasks_count - wd1.waiting_tasks_count) AS [Number of Waits],
+					/*Vlad - moved for PSBlitz - start*/
 					CASE WHEN (wd2.waiting_tasks_count - wd1.waiting_tasks_count) > 0
                     THEN
                         CAST((wd2.wait_time_ms-wd1.wait_time_ms)/
                             (1.0*(wd2.waiting_tasks_count - wd1.waiting_tasks_count)) AS NUMERIC(12,1))
                     ELSE 0 END AS [Avg ms Per Wait],
+					/*Vlad - moved for PSBlitz - end*/
                     N'https://www.sqlskills.com/help/waits/' + LOWER(wd1.wait_type) + '/' AS URL
                 FROM  max_batch b
                 JOIN #WaitStats wd2 ON
@@ -4988,7 +5035,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
 					+ '/'' target=''_blank''>'+wd1.wait_type+'</a>' AS [wait_typeHL], /*changes for PSBlitz */ 
 					COALESCE(wcat.WaitCategory, 'Other') AS wait_category,
                     c.[Wait Time (Seconds)],
-                    /*CASE WHEN (wd2.waiting_tasks_count - wd1.waiting_tasks_count) > 0
+					/*CASE WHEN (wd2.waiting_tasks_count - wd1.waiting_tasks_count) > 0
                     THEN
                         CAST((wd2.wait_time_ms-wd1.wait_time_ms)/
                             (1.0*(wd2.waiting_tasks_count - wd1.waiting_tasks_count)) AS NUMERIC(12,1))
@@ -4999,11 +5046,13 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                      THEN CAST(100.*(c.[Signal Wait Time (Seconds)]/c.[Wait Time (Seconds)]) AS NUMERIC(4,1))
                     ELSE 0 END AS [Percent Signal Waits],
                     (wd2.waiting_tasks_count - wd1.waiting_tasks_count) AS [Number of Waits],
+					/*Vlad - moved for PSBlitz - start*/
 					CASE WHEN (wd2.waiting_tasks_count - wd1.waiting_tasks_count) > 0
                     THEN
                         CAST((wd2.wait_time_ms-wd1.wait_time_ms)/
                             (1.0*(wd2.waiting_tasks_count - wd1.waiting_tasks_count)) AS NUMERIC(12,1))
                     ELSE 0 END AS [Avg ms Per Wait],
+					/*Vlad - moved for PSBlitz - end*/
                     N'https://www.sqlskills.com/help/waits/' + LOWER(wd1.wait_type) + '/' AS URL
                 FROM  max_batch b
                 JOIN #WaitStats wd2 ON
@@ -5071,15 +5120,14 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                   AND wd1.FileID = wd2.FileID
             )
             SELECT
-                Pattern,
+                Pattern, 
 				CONVERT(VARCHAR(25),CAST([Sample Time] AS DATETIME),120) AS [Sample Time], /*changes for PSBlitz */ 
-				[Sample (seconds)],
-				[File Name], [Drive],  [# Reads/Writes],[MB Read/Written],[Avg Stall (ms)], [file physical name], [DatabaseName], [StallRank]
+				[Sample (seconds)], [File Name], [Drive],  [# Reads/Writes],[MB Read/Written],[Avg Stall (ms)], [file physical name], [DatabaseName], [StallRank]
             FROM readstats
             WHERE StallRank <=20 AND [MB Read/Written] > 0
             UNION ALL
             SELECT Pattern, CONVERT(VARCHAR(25),CAST([Sample Time] AS DATETIME),120) AS [Sample Time], /*changes for PSBlitz */ 
-            [Sample (seconds)], [File Name], [Drive],  [# Reads/Writes],[MB Read/Written],[Avg Stall (ms)], [file physical name], [DatabaseName], [StallRank]
+			[Sample (seconds)], [File Name], [Drive],  [# Reads/Writes],[MB Read/Written],[Avg Stall (ms)], [file physical name], [DatabaseName], [StallRank]
             FROM writestats
             WHERE StallRank <=20 AND [MB Read/Written] > 0
             ORDER BY Pattern, StallRank;
@@ -5093,9 +5141,9 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                 SELECT /*'PERFMON' AS Pattern, -- Vlad - column changes for PSBlitz */
 				pLast.[object_name], pLast.counter_name, pLast.instance_name,
                 CONVERT(VARCHAR(30),pFirst.SampleTime,120) AS FirstSampleTime, /*Vlad - the original version of this column doesn't contain the TZ offset, 
-				so it ends up looking wrong eitherway - changes for PSBlitz */
+				so it ends up looking wrong eitherway - changes for PSBlitz */ 
 				pFirst.cntr_value AS FirstSampleValue,
-                CONVERT(VARCHAR(30),pLast.SampleTime,120) AS LastSampleTime, /* changes for PSBlitz */
+                CONVERT(VARCHAR(30),pLast.SampleTime,120) AS LastSampleTime, /* changes for PSBlitz */ 
 				pLast.cntr_value AS LastSampleValue,
                 pLast.cntr_value - pFirst.cntr_value AS ValueDelta,
                 ((1.0 * pLast.cntr_value - pFirst.cntr_value) / DATEDIFF(ss, pFirst.SampleTime, pLast.SampleTime)) AS ValuePerSecond
@@ -5103,7 +5151,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                     INNER JOIN #PerfmonStats pFirst ON pFirst.[object_name] = pLast.[object_name] AND pFirst.counter_name = pLast.counter_name AND (pFirst.instance_name = pLast.instance_name OR (pFirst.instance_name IS NULL AND pLast.instance_name IS NULL))
                     AND pLast.ID > pFirst.ID
 				WHERE pLast.cntr_value <> pFirst.cntr_value
-                ORDER BY /*Pattern, -- Vlad - column changes for PSBlitz */
+                ORDER BY /*Pattern, -- Vlad - column changes for PSBlitz */ 
 				pLast.[object_name], pLast.counter_name, pLast.instance_name;
 
 

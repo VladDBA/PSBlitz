@@ -2890,7 +2890,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'") -or ($SortOrder -eq "'Query Hash'")) {
 					$HtmlTabName2 = $SortOrder -replace "'", ""
 					#Handling CSS
-					$htmlTable1 = $htmlTable1 -replace "<table class='CacheTabx'>", '<table class="CacheTable2">'
+					$htmlTable1 = $htmlTable1 -replace '<table class="CacheTabx">', '<table class="CacheTable2">'
 					
 					#Add heading if first half of the table failed
 					if ($PreviousOutcome -eq "Failure") {
