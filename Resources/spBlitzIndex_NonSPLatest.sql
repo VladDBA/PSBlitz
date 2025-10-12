@@ -6591,7 +6591,7 @@ BEGIN
 		BEGIN
 		/*Vlad - changes for PSBlitz*/
 			SELECT  i.[database_name] AS [Database Name], 
-					i.[schema_name] AS [Schema Name], 
+					i.[schema_name] + N'.'+
 					i.[object_name] AS [Object Name], 
 					ISNULL(i.index_name, '') AS [Index Name],
 					CAST(i.index_id AS NVARCHAR(10))AS [Index ID],

@@ -1,10 +1,15 @@
 /* 
  # General 
 */
+html {
+    font-size: 100%;
+}
 body {
-	background-color: #FFFFFF;
-	font-family: Tahoma;
-	font-size: 11pt;
+    background: #ffffff;
+    font-family: Tahoma, sans-serif;
+    font-size: 0.875rem; 
+    line-height: 1.5;
+    margin: 0;
 }
 
 table.sortable thead {
@@ -12,9 +17,6 @@ table.sortable thead {
 	color: white;
 	font-weight: bold;
 	text-align: center;
-}
-
-.sortable th {
 	cursor: pointer;
 }
 
@@ -41,7 +43,8 @@ th {
 	text-align: center;
 	position: sticky;
 	top: 0;
-	z-index: 1;
+	z-index: 2;
+	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);
 }
 
 th:first-child {
@@ -72,25 +75,18 @@ td:first-child {
 	vertical-align: top;
 }*/
 
+tr:nth-child(even) {
+  background-color: rgba(0, 0, 0, 0.05);
+}
+
 tr:hover {
-	background-color: rgba(255, 255, 0, 0.35);
+  background-color: rgba(255, 255, 0, 0.35);
 }
 
-h1 {
+h1,h2,h3,p,div {
 	text-align: center;
 }
 
-h2 {
-	text-align: center;
-}
-
-h3 {
-	text-align: center;
-}
-
-p {
-	text-align: center;
-}
 
 footer {
 	text-align: center;
@@ -258,12 +254,10 @@ footer {
 	td {
 		vertical-align: top;
 	}
-	td:nth-child(4) {
+	td:nth-child(3) {
 		position: sticky;
 		left: 0;
 		background-color: rgba(255, 255, 255, 0.7);
-	}
-	td:nth-child(4) {
 		text-align: right;
 	}
 	td:nth-child(8) {
@@ -294,12 +288,10 @@ footer {
 	td {
 		vertical-align: top;
 	}
-	td:nth-child(3) {
+	td:nth-child(2) {
 		position: sticky;
 		left: 0;
 		background-color: rgba(255, 255, 255, 0.7);
-	}
-	td:nth-child(3) {
 		text-align: right;
 	}
 	td:nth-child(7) {
@@ -834,9 +826,6 @@ footer {
 /*
  ## Table filtering/search related
 */
-div {
-	text-align: center;
-}
 
 input.SearchBox {
 	font-size: 16px;

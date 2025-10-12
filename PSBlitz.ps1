@@ -302,8 +302,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.8.4"
-$VersDate = "2025-10-02"
+$Vers = "5.9.0"
+$VersDate = "2025-10-13"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -326,22 +326,22 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql", "spBlitzCache
 
 ## we use these to make sure someone didn't modify the scripts in the Resources folder
 $storedHashes = @{
-	"spBlitz_NonSPLatest.sql"            = "F6A467C796EBF299BC67BBFD8B75E00FA4D4BC7EE4A70524C240D4843D89D11F"
-	"spBlitzCache_NonSPLatest.sql"       = "BBBB196DFCBBDA633D9567A660AE72B188D5838B9F736D5E420D8B423706EB3F"
-	"spBlitzFirst_NonSPLatest.sql"       = "9D5C5C16C5D12E5E77ABFF427678C259C5B030C89E2C95A6B32A13014BA7D0BB"
-	"spBlitzIndex_NonSPLatest.sql"       = "B43BE58493F2BCA53E6FBD59A0E4F03C876472E173961DA50D40FAD6C7D7A111"
-	"spBlitzLock_NonSPLatest.sql"        = "3486DC155F106CEC5C8FCE690D6491E3350EE253EB26D605282A3B203BC2402C"
-	"spBlitzWho_NonSPLatest.sql"         = "65C3B3B6BED5024D40C720517EB0869550C9FC61718FF4F7DAE9888D9547F263"
+	"spBlitz_NonSPLatest.sql"            = "6F403D76832611A2986852CCE08DE6AC63D55AE2BB2241C2E1274CD9E2252D60"
+	"spBlitzCache_NonSPLatest.sql"       = "823327F64BE6E67ECDA5E541DC0311D0C04E2E2D540CC76FD7306933BB7763D2"
+	"spBlitzFirst_NonSPLatest.sql"       = "3AE1F4B5B2337E7B36B25B30999543E2C2DE1C46BDF6D647394EFF7BF2944263"
+	"spBlitzIndex_NonSPLatest.sql"       = "5C014BDBA44F7CC3595D851F85BA8C65A6DB44FB9872DC288BE413CA8BC3C726"
+	"spBlitzLock_NonSPLatest.sql"        = "9B999A5E28ACBA871FD0545C1305B1BD6F1532F9CFACB3C910A3830CAA5FB672"
+	"spBlitzWho_NonSPLatest.sql"         = "B83BD8CBD59295DD0DFE0D25204AC6C81DEED746659844DABBED5FB4CA8D3ABA"
 	"GetBlitzWhoData.sql"                = "1A23F1F9C4CB51252D088919500A7E472B56B98DD5096DBA79B5D96AEEB5F6FC"
 	"GetInstanceInfo.sql"                = "3F8E836504B0A447D66FB7BD86B1431F858ED9C9EF6ACC1D969853614736A44E"
 	"GetTempDBUsageInfo.sql"             = "20620509996A6F7BB45410397D0CB5C7C0D044FEA15944950171DF14436AE9D1"
 	"GetOpenTransactions.sql"            = "76EBCB1758CBC86DAC4FE8E5C02E88AB4B96FEDB2E21570B8C0D410FF8A69F7D"
-	"GetStatsInfoForWholeDB.sql"         = "CF3A8B06AD68880F5BF44DE45206778F1515FB7DD930E2D3CCCC71149AFF5544"
+	"GetStatsInfoForWholeDB.sql"         = "E39F52DFD9BD070F7B233880D02401AF3B72D4111FE87AEDAF1B06C45AFB730B"
 	"GetIndexInfoForWholeDB.sql"         = "6C58B79C4EDF06ADBE4EE79373A522A7C538B331D74E9E4AF32C77C6ED951F9B"
 	"GetDbInfo.sql"                      = "103B639ED78B099A5C2D133E6555B7073CE23DF2DBE4CD7CAD24D44EDB261F7F"
 	"GetAzureSQLDBInfo.sql"              = "8A18348F7B87C2F5DA047B103E3BF4FEBB455E7498F0C93644DC2CD7E7255506"
 	"GetObjectsWithDangerousOptions.sql" = "AFE74F2FE6D6077AEBF169CC16DE036B08980846E6795DC342372AB8C2A132A9"
-	"spQuickieStore_NonSPLatest.sql"     = "4668D8B4B952687B2F3DC6FFA56C79A4BC85E22F3AA0D7A8C9DBDC06E8101683"
+	"spQuickieStore_NonSPLatest.sql"     = "BDF27337599AA6B41228505BCF3AEF0FFAF1A1379601CEBF84E992F8C7363D44"
 	"GetQSStatus.sql"                    = "A0D6E7B1C6BC5B0ED5FDF6FD14C5927729F883CB491342F81DCD9BD48A4ACCFE"
 }
 
@@ -446,24 +446,24 @@ function Format-XML {
 		[string]$XMLContent)
 
 	try {
-        # Skip empty content
-        if ([string]::IsNullOrWhiteSpace($XMLContent)) {
-            Write-PSBlitzDebug "  Empty XML content provided to Format-XML" -Color "Yellow"
+		# Skip empty content
+		if ([string]::IsNullOrWhiteSpace($XMLContent)) {
+			Write-PSBlitzDebug "  Empty XML content provided to Format-XML" -Color "Yellow"
 			Add-LogRow "->Format XML" "Empty XML content provided to Format-XML" "Warning"
-            return $XMLContent
-        }	
-	$XMLDoc = New-Object -TypeName System.Xml.XmlDocument
-	$XMLDoc.LoadXml($XMLContent)
-	$SW = New-Object System.IO.StringWriter
-	$Writer = New-Object System.Xml.XmlTextwriter($SW)
-	$Writer.Formatting = [System.XML.Formatting]::Indented
-	$XMLDoc.WriteContentTo($Writer)
-	return $SW.ToString()
+			return $XMLContent
+		}	
+		$XMLDoc = New-Object -TypeName System.Xml.XmlDocument
+		$XMLDoc.LoadXml($XMLContent)
+		$SW = New-Object System.IO.StringWriter
+		$Writer = New-Object System.Xml.XmlTextwriter($SW)
+		$Writer.Formatting = [System.XML.Formatting]::Indented
+		$XMLDoc.WriteContentTo($Writer)
+		return $SW.ToString()
 	} catch [System.Xml.XmlException] {
-        Write-Warning "  Invalid XML encountered. Returning unformatted content."
+		Write-Warning "  Invalid XML encountered. Returning unformatted content."
 		Add-LogRow "->Format XML" "Invalid XML encountered. Returning unformatted content" "Failure"
-        return $XMLContent
-    }
+		return $XMLContent
+	}
 }
 
 #Function to format exception messages
@@ -954,8 +954,8 @@ function Add-QueryName {
 		$RowNum = 0
 		$i = 0
 		foreach ($row in $DataTable) {
-			if ($DataTable.Rows[$RowNum][$QueryTextColName] -ne [System.DBNull]::Value) {
-				$i += 1
+			$i += 1
+			if ($DataTable.Rows[$RowNum][$QueryTextColName] -ne [System.DBNull]::Value) {				
 				$QueryName = $QPrefix + "_" + $i + ".query"					
 			} elseif ($QPrefix -eq "TempDB") {
 				$QueryName = "N/A*"
@@ -3199,11 +3199,11 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
 					$HtmlTabName += " for $ASDBName$CheckDB"
 					$ExclCols = @("Sample Query Plan", "Display Order", "Database Name", "Finding", "URL")
-					$Mode2SearchCol = 2
+					$Mode2SearchCol = 1
 					$Mode2CSS = "IndexUsageTableDB sortable"
 				} else {
 					$ExclCols = @("Sample Query Plan", "Display Order", "Finding", "URL")
-					$Mode2SearchCol = 3
+					$Mode2SearchCol = 2
 					$Mode2CSS = "IndexUsageTable sortable"
 				}						
 		
@@ -3430,10 +3430,10 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 						#add tooltips
 						$htmlTable = $htmlTable -replace '<th>Update ', '<th class="sorttable_nosort tooltip" title="The commented options are suggestions based on record counts.">Update '
 						#add buttons
-						$htmlTable = $htmlTable -replace '<th>Get Details', '<th class="sorttable_nosort"><div class="header-content">Get Details<div class="button-tooltip" title="Click to copy the commands from this column"><button class="copyButton" data-table-id="StatsOrIxFragTable" data-column-index="20">Copy commands</button></div></div>'
-						$htmlTable = $htmlTable -replace 'counts.">Update Table Stats', 'counts.">Update Table Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="21">Copy commands</button>'
-						$htmlTable = $htmlTable -replace 'counts.">Update Individual Stats', 'counts.">Update Individual Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="22">Copy commands</button>'
-						$htmlTable = $htmlTable -replace 'counts.">Update Partition Stats', 'counts.">Update Partition Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="23">Copy commands</button>'
+						$htmlTable = $htmlTable -replace '<th>Get Details', '<th class="sorttable_nosort"><div class="header-content">Get Details<div class="button-tooltip" title="Click to copy the commands from this column"><button class="copyButton" data-table-id="StatsOrIxFragTable" data-column-index="19">Copy commands</button></div></div>'
+						$htmlTable = $htmlTable -replace 'counts.">Update Table Stats', 'counts.">Update Table Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="20">Copy commands</button>'
+						$htmlTable = $htmlTable -replace 'counts.">Update Individual Stats', 'counts.">Update Individual Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="21">Copy commands</button>'
+						$htmlTable = $htmlTable -replace 'counts.">Update Partition Stats', 'counts.">Update Partition Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="22">Copy commands</button>'
 						$HtmlTabName = "Statistics info for $databaseName"
 						$HtmlFileName = "StatsInfo_$databaseName.html"
 						$html = $HTMLPre + @"
@@ -3606,8 +3606,8 @@ finally {
 				$StepEnd = Get-Date
 				$JobOutcome = Stop-Job $JobName
 				Write-Host $JobOutcome 
-				$LogtxtFilePath = Join-Path -Path $OutDir -ChildPath "sp_BlitzWhoBackgroundJobLog.txt"
-				$JobOutcome | Out-File utf8 -FilePath "$LogtxtFilePath" -Append
+				#$LogtxtFilePath = Join-Path -Path $OutDir -ChildPath "sp_BlitzWhoBackgroundJobLog.txt"
+				#$JobOutcome | Out-File utf8 -FilePath "$LogtxtFilePath" -Append
 				if ($DebugInfo) {
 					Write-Host ""
 					Write-Host " ->Failed to create " -NoNewline -Fore Yellow
@@ -3636,8 +3636,8 @@ finally {
 	
 				$JobOutcome = Receive-Job -Name $JobName
 				Write-Host $JobOutcome
-				$LogtxtFilePath = Join-Path -Path $OutDir -ChildPath "sp_BlitzWhoBackgroundJobLog.txt"
-				$JobOutcome | Out-File utf8 -FilePath "$LogtxtFilePath" -Append
+				#$LogtxtFilePath = Join-Path -Path $OutDir -ChildPath "sp_BlitzWhoBackgroundJobLog.txt"
+				#$JobOutcome | Out-File utf8 -FilePath "$LogtxtFilePath" -Append
 				Add-LogRow "sp_BlitzWho background process" $JobStatus $JobOutcome
 				#temp lines(2)
 				#Write-Host $JobName.JobStateInfo.Reason.Message

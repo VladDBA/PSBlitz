@@ -50,7 +50,6 @@ CREATE TABLE ##PSBlitzStatsInfo
      [persisted_sample]         NVARCHAR(3) NOT NULL,
      [persisted_sample_percent] FLOAT NULL,
      [steps]                    INT NOT NULL,
-     [partitioned]              NVARCHAR(40) NOT NULL,
      [partition_number]         INT NULL,
      [get_details]              NVARCHAR(1000) NULL,
      [update_table_stats]       NVARCHAR(1000) NULL,
@@ -64,7 +63,7 @@ SELECT @SQL = CAST(N'INSERT INTO ##PSBlitzStatsInfo ([database], [object_schema]
 + @LineFeed + N'[rows], [unfiltered_rows], [rows_sampled], [sample_percent], [modification_counter],'
 + @LineFeed + N'[modified_percent], [incremental], [temporary], [no_recompute], '
 + @LineFeed + N'[persisted_sample], [persisted_sample_percent], [steps], '
-+ @LineFeed + N'[partitioned], [partition_number], [get_details])'
++ @LineFeed + N'[partition_number], [get_details])'
 + @LineFeed + N'SELECT DB_NAME() AS [database],'
 + @LineFeed + N'SCHEMA_NAME([obj].[schema_id]) AS [object_schema],'
 + @LineFeed + N'[obj].[name] AS [object_name],'
@@ -108,7 +107,7 @@ THEN  @LineFeed + N'[sp].[persisted_sample_percent],'
   ELSE @LineFeed + N'0 AS [persisted_sample_percent],'
 END
 + @LineFeed + N'ISNULL([sp].[steps],0) AS [steps],'
-+ @LineFeed + N'''No'' AS [partitioned], 1 AS [partition_number]'
++ @LineFeed + N'NULL AS [partition_number]'
 + @LineFeed + N',N''DBCC SHOW_STATISTICS ("''+SCHEMA_NAME([obj].[schema_id])+N''.'''
 + N'+[obj].[name]+N''", ''+[stat].[name]+N'');'' AS [get_details]'
 + @LineFeed + N'FROM   [sys].[stats] AS [stat]'
@@ -165,7 +164,6 @@ END
 		END
 + @LineFeed + N'0 AS [persisted_sample_percent],'
 + @LineFeed + N'ISNULL([sip].[steps],0) AS [steps],'
-+ @LineFeed + N'''Yes'' AS [partitioned],'
 + @LineFeed + N'[sip].[partition_number]'
 + @LineFeed + N',N''DBCC SHOW_STATISTICS ("''+SCHEMA_NAME([obj].[schema_id])+N''.'''
 + N'+[obj].[name]+N''", ''+[stat].[name]+N'');'' AS [get_details]'
@@ -254,7 +252,7 @@ SELECT TOP(10000) /*[id], */
        [modification_counter], [modified_percent],
        [incremental], [temporary], [no_recompute],
        [persisted_sample], [persisted_sample_percent],
-       [steps], [partitioned], [partition_number],
+       [steps], [partition_number],
        [get_details], [update_table_stats],
        [update_individual_stats], [update_partition_stats]
 FROM   ##PSBlitzStatsInfo

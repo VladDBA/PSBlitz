@@ -4035,7 +4035,7 @@ BEGIN
                 ' + CASE @ExportToExcel
                          WHEN 1
                          THEN N'
-                query = dr.query_string,
+                query_text = dr.query_string,
                 object_names =
                     REPLACE(
                     REPLACE(
@@ -4046,7 +4046,7 @@ BEGIN
                         ) COLLATE Latin1_General_BIN2,
                     ''<object>'', ''''),
                     ''</object>'', ''''),'
-                         ELSE N'query = dr.query_xml,
+                         ELSE N'query_text = dr.query_xml,
                 dr.object_names,'
                     END + N'
                 dr.isolation_level,
