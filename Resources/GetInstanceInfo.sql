@@ -48,8 +48,19 @@ SELECT ISNULL(SERVERPROPERTY('MachineName'),'N/A')                              
          WHEN SERVERPROPERTY('IsFullTextInstalled') = 0 THEN 'No'
          ELSE 'N/A'
        END                                                                                 AS [fulltext_installed],
+       CASE
+         WHEN SERVERPROPERTY('IsXTPSupported') = 1 THEN 'Yes'
+         WHEN SERVERPROPERTY('IsXTPSupported') = 0 THEN 'No'
+         ELSE 'N/A'
+       END                                                                                 AS [in-memory_oltp_supported],
+       CASE
+         WHEN SERVERPROPERTY('IsServerSuspendedForSnapshotBackup') = 1 THEN 'Yes'
+         WHEN SERVERPROPERTY('IsServerSuspendedForSnapshotBackup') = 0 THEN 'No'
+         ELSE 'N/A'
+       END                                                                                 AS [server_suspended_for_snapshot],
        SERVERPROPERTY('Collation')                                                         AS [instance_collation],
 	   (SELECT COUNT([database_id]) FROM [sys].[databases] WHERE [database_id] > 4)        AS [user_db_count],
+       ISNULL(CAST(SERVERPROPERTY('SuspendedDatabaseCount') AS NVARCHAR(10)),'N/A')        AS [suspended_db_count],
        CONVERT(VARCHAR(22),[sqlserver_start_time],120)                                     AS [instance_last_startup],
        SERVERPROPERTY('ProcessID')                                                         AS [process_id],
        CAST(DATEDIFF(HH, [sqlserver_start_time], GETDATE()) / 24.00 AS NUMERIC(23, 2))     AS [uptime_days],
@@ -70,8 +81,9 @@ SET @LineFeed = CHAR(13) + CHAR(10);
 SELECT @SQL = CASE
               /*Skipping this query on Azure SQL DB*/
                 WHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure'
-                     AND SERVERPROPERTY('EngineEdition') IN ( 5, 6 ) THEN CAST(N'SELECT ''Not available'' AS [logical_cpu_cores], '' in Azure '' AS [physical_CPU_cores], ''SQL DB'' ' AS NVARCHAR(MAX))
-                                                                          + N'[AS physical_memory_GB], NULL AS [max_server_memory_GB], NULL AS [target_server_memory_GB], '
+                     AND SERVERPROPERTY('EngineEdition') IN ( 5, 6 ) THEN /*This fake result set is only used in the Excel version of the report*/
+                                                                          CAST(N'SELECT ''Not available'' AS [logical_cpu_cores], '' in Azure '' AS [physical_CPU_cores], ''SQL DB'' ' AS NVARCHAR(MAX))
+                                                                          + N'AS [physical_memory_GB], NULL AS [max_server_memory_GB], NULL AS [target_server_memory_GB], '
                                                                           + N'NULL AS [total_memory_used_GB], NULL AS [proc_physical_memory_low], NULL AS [proc_virtual_memory_low], '
                                                                           + N'NULL AS [available_physical_memory_GB], NULL AS [os_memory_state], NULL AS [CTP], NULL AS [MAXDOP]'
                 ELSE CAST(N'SELECT [cpu_count] AS [logical_cpu_cores],' AS NVARCHAR(MAX))
@@ -113,6 +125,14 @@ SELECT @SQL = CASE
                      + @LineFeed
 					 + N' FROM sys.dm_os_buffer_descriptors WHERE database_id <> 32767)   AS [buffer_pool_usage_GB],'
 					 + @LineFeed
+                     + N'(SELECT CAST(([locked_page_allocations_kb] / 1024.00/1024.00) AS DECIMAL(15, 2)) '
+                     + @LineFeed
+                     + N' FROM sys.dm_os_process_memory) AS [locked_pages_allocated_GB],'
+                     + @LineFeed
+                     + N'(SELECT CAST(([large_page_allocations_kb] / 1024.00/1024.00) AS DECIMAL(15, 2)) '
+                     + @LineFeed
+                     + N' FROM sys.dm_os_process_memory) AS [large_pages_allocated_GB],'
+                     + @LineFeed
                      + N'(SELECT CASE WHEN [process_physical_memory_low] = 1 THEN ''Yes'''
                      + @LineFeed
                      + N'ELSE ''No'' END FROM sys.dm_os_process_memory) AS [process_physical_memory_low],'

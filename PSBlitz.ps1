@@ -302,8 +302,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.8.4"
-$VersDate = "2025-10-02"
+$Vers = "5.9.0"
+$VersDate = "2025-10-13"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -326,22 +326,22 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql", "spBlitzCache
 
 ## we use these to make sure someone didn't modify the scripts in the Resources folder
 $storedHashes = @{
-	"spBlitz_NonSPLatest.sql"            = "F6A467C796EBF299BC67BBFD8B75E00FA4D4BC7EE4A70524C240D4843D89D11F"
-	"spBlitzCache_NonSPLatest.sql"       = "BBBB196DFCBBDA633D9567A660AE72B188D5838B9F736D5E420D8B423706EB3F"
-	"spBlitzFirst_NonSPLatest.sql"       = "9D5C5C16C5D12E5E77ABFF427678C259C5B030C89E2C95A6B32A13014BA7D0BB"
-	"spBlitzIndex_NonSPLatest.sql"       = "B43BE58493F2BCA53E6FBD59A0E4F03C876472E173961DA50D40FAD6C7D7A111"
-	"spBlitzLock_NonSPLatest.sql"        = "3486DC155F106CEC5C8FCE690D6491E3350EE253EB26D605282A3B203BC2402C"
-	"spBlitzWho_NonSPLatest.sql"         = "65C3B3B6BED5024D40C720517EB0869550C9FC61718FF4F7DAE9888D9547F263"
+	"spBlitz_NonSPLatest.sql"            = "6F403D76832611A2986852CCE08DE6AC63D55AE2BB2241C2E1274CD9E2252D60"
+	"spBlitzCache_NonSPLatest.sql"       = "823327F64BE6E67ECDA5E541DC0311D0C04E2E2D540CC76FD7306933BB7763D2"
+	"spBlitzFirst_NonSPLatest.sql"       = "3AE1F4B5B2337E7B36B25B30999543E2C2DE1C46BDF6D647394EFF7BF2944263"
+	"spBlitzIndex_NonSPLatest.sql"       = "88FB8C452B2E2A5F5D378F045CAAA2B2E37F6B5C7C532BEF37D110D6DE59B7AA"
+	"spBlitzLock_NonSPLatest.sql"        = "9B999A5E28ACBA871FD0545C1305B1BD6F1532F9CFACB3C910A3830CAA5FB672"
+	"spBlitzWho_NonSPLatest.sql"         = "B83BD8CBD59295DD0DFE0D25204AC6C81DEED746659844DABBED5FB4CA8D3ABA"
 	"GetBlitzWhoData.sql"                = "1A23F1F9C4CB51252D088919500A7E472B56B98DD5096DBA79B5D96AEEB5F6FC"
-	"GetInstanceInfo.sql"                = "3F8E836504B0A447D66FB7BD86B1431F858ED9C9EF6ACC1D969853614736A44E"
+	"GetInstanceInfo.sql"                = "29AA65809886BB2FC870B0DF49256850C4347562ABDDAD29E5BEC6D76C86036F"
 	"GetTempDBUsageInfo.sql"             = "20620509996A6F7BB45410397D0CB5C7C0D044FEA15944950171DF14436AE9D1"
 	"GetOpenTransactions.sql"            = "76EBCB1758CBC86DAC4FE8E5C02E88AB4B96FEDB2E21570B8C0D410FF8A69F7D"
-	"GetStatsInfoForWholeDB.sql"         = "CF3A8B06AD68880F5BF44DE45206778F1515FB7DD930E2D3CCCC71149AFF5544"
+	"GetStatsInfoForWholeDB.sql"         = "E39F52DFD9BD070F7B233880D02401AF3B72D4111FE87AEDAF1B06C45AFB730B"
 	"GetIndexInfoForWholeDB.sql"         = "6C58B79C4EDF06ADBE4EE79373A522A7C538B331D74E9E4AF32C77C6ED951F9B"
 	"GetDbInfo.sql"                      = "103B639ED78B099A5C2D133E6555B7073CE23DF2DBE4CD7CAD24D44EDB261F7F"
 	"GetAzureSQLDBInfo.sql"              = "8A18348F7B87C2F5DA047B103E3BF4FEBB455E7498F0C93644DC2CD7E7255506"
 	"GetObjectsWithDangerousOptions.sql" = "AFE74F2FE6D6077AEBF169CC16DE036B08980846E6795DC342372AB8C2A132A9"
-	"spQuickieStore_NonSPLatest.sql"     = "4668D8B4B952687B2F3DC6FFA56C79A4BC85E22F3AA0D7A8C9DBDC06E8101683"
+	"spQuickieStore_NonSPLatest.sql"     = "BDF27337599AA6B41228505BCF3AEF0FFAF1A1379601CEBF84E992F8C7363D44"
 	"GetQSStatus.sql"                    = "A0D6E7B1C6BC5B0ED5FDF6FD14C5927729F883CB491342F81DCD9BD48A4ACCFE"
 }
 
@@ -446,24 +446,24 @@ function Format-XML {
 		[string]$XMLContent)
 
 	try {
-        # Skip empty content
-        if ([string]::IsNullOrWhiteSpace($XMLContent)) {
-            Write-PSBlitzDebug "  Empty XML content provided to Format-XML" -Color "Yellow"
+		# Skip empty content
+		if ([string]::IsNullOrWhiteSpace($XMLContent)) {
+			Write-PSBlitzDebug "  Empty XML content provided to Format-XML" -Color "Yellow"
 			Add-LogRow "->Format XML" "Empty XML content provided to Format-XML" "Warning"
-            return $XMLContent
-        }	
-	$XMLDoc = New-Object -TypeName System.Xml.XmlDocument
-	$XMLDoc.LoadXml($XMLContent)
-	$SW = New-Object System.IO.StringWriter
-	$Writer = New-Object System.Xml.XmlTextwriter($SW)
-	$Writer.Formatting = [System.XML.Formatting]::Indented
-	$XMLDoc.WriteContentTo($Writer)
-	return $SW.ToString()
+			return $XMLContent
+		}	
+		$XMLDoc = New-Object -TypeName System.Xml.XmlDocument
+		$XMLDoc.LoadXml($XMLContent)
+		$SW = New-Object System.IO.StringWriter
+		$Writer = New-Object System.Xml.XmlTextwriter($SW)
+		$Writer.Formatting = [System.XML.Formatting]::Indented
+		$XMLDoc.WriteContentTo($Writer)
+		return $SW.ToString()
 	} catch [System.Xml.XmlException] {
-        Write-Warning "  Invalid XML encountered. Returning unformatted content."
+		Write-Warning "  Invalid XML encountered. Returning unformatted content."
 		Add-LogRow "->Format XML" "Invalid XML encountered. Returning unformatted content" "Failure"
-        return $XMLContent
-    }
+		return $XMLContent
+	}
 }
 
 #Function to format exception messages
@@ -615,14 +615,14 @@ function Invoke-PSBlitzQuery {
 		$RunTime = [Math]::Round($StepRunTime, 2)
 		Write-PSBlitzDebug " - $RunTime seconds"
 		$global:StepOutcome = "Success"
-		if (($StepNameIn -like "sp_BlitzCache*") -or ($StepNameIn -like "sp_BlitzQueryStore*") -or 
-			($StepNameIn -eq "sp_BlitzIndex mode 1") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info") -or 
-			($StepNameIn -eq "Deadlock Info") -or ($StepNameIn -eq "Return sp_BlitzWho") -or ($StepNameIn -eq "Open Transacion Info") -or 
+		if (($StepNameIn -like "Plan Cache*") -or 
+			($StepNameIn -eq "Index info mode 1") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info") -or 
+			($StepNameIn -eq "Deadlock Info") -or ($StepNameIn -eq "Return session activity") -or ($StepNameIn -eq "Open Transacion Info") -or 
 			($StepNameIn -eq "Objects with dangerous SET options") -or ($StepNameIn -eq "Instance Health") -or 
-			($StepNameIn -eq "sp_BlitzFirst 30 seconds") -or ($StepNameIn -like "Query Store check *")) {
+			($StepNameIn -eq "Happening now for 30 seconds") -or ($StepNameIn -like "Query Store check *")) {
 			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
 			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
-		} elseif ('Stats Info', 'sp_BlitzIndex mode 0', 'sp_BlitzIndex mode 2', 'sp_BlitzIndex mode 4' -contains $StepNameIn) {
+		} elseif ('Stats Info', 'Index info mode 0', 'Index info mode 2', 'Index info mode 4' -contains $StepNameIn) {
 			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
 			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
 			$TotalRecords = $global:PSBlitzSet.Tables[1].Rows[0]["RecordCount"]
@@ -722,6 +722,9 @@ function Convert-TableToHtml {
         
 		if (($CSSClass) -and ($TblID)) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id=`"$TblID`" class=`"$CSSClass`">"
+			if ($CSSClass -like "*sortable*"){
+				$htmlTableOut = $htmlTableOut -replace "<th>", "<th class=`"sortable`">"
+			}
 			if ($CSSClass -eq "InstHealthTbl") {
 				#Split Instance Health details after each dot to avoid wide table
 				$htmlTableOut = $htmlTableOut -replace '\.\s', ". `n"
@@ -734,7 +737,9 @@ function Convert-TableToHtml {
 		} elseif ($CSSClass) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class=`"$CSSClass`">"
 			#clean up XML noise and extra charcters in specific tables
-			if ($CSSClass -eq "CacheTabx") {
+			if ($CSSClass -like "*sortable"){
+				$htmlTableOut = $htmlTableOut -replace "<th>", "<th class=`"sortable`">"
+			} elseif ($CSSClass -eq "CacheTabx") {
 				$htmlTableOut = $htmlTableOut -replace "<td>&lt;\?ClickMe ", "<td>"
 				$htmlTableOut = $htmlTableOut -replace "\?&gt;</td>", "</td>"
 				$htmlTableOut = $htmlTableOut -replace "<td>&lt;MissingIndexes&gt;", "<td>"
@@ -837,10 +842,10 @@ function Convert-QueryTableToHtml {
 		if ($AnchorToHere) {
 			if ($AnchorID -eq "DeadlockDtlTable") {
 				$AnchorRegex = "<td>DL(\d+)Q(\d+)(V{0,})$AnchorExt"
-				$AnchorURL = '<td id=' + "DL" + '$1' + "Q" + '$2' + '$3' + "$AnchorExt>" + "DL" + '$1' + "Q" + '$2' + '$3' + "$AnchorExt"
+				$AnchorURL = '<td class="anchor-target" id=' + "DL" + '$1' + "Q" + '$2' + '$3' + "$AnchorExt>" + "DL" + '$1' + "Q" + '$2' + '$3' + "$AnchorExt"
 			} else {
 				$AnchorRegex = "<td>$AnchorID(_\d+)$AnchorExt"
-				$AnchorURL = '<td id=' + "$AnchorID" + '$1' + "$AnchorExt>" + "$AnchorID" + '$1' + "$AnchorExt"
+				$AnchorURL = '<td class="anchor-target" id=' + "$AnchorID" + '$1' + "$AnchorExt>" + "$AnchorID" + '$1' + "$AnchorExt"
 			}
 
 			$htmlTableOut = $htmlTableOut -replace $AnchorRegex, $AnchorURL
@@ -954,8 +959,8 @@ function Add-QueryName {
 		$RowNum = 0
 		$i = 0
 		foreach ($row in $DataTable) {
-			if ($DataTable.Rows[$RowNum][$QueryTextColName] -ne [System.DBNull]::Value) {
-				$i += 1
+			$i += 1
+			if ($DataTable.Rows[$RowNum][$QueryTextColName] -ne [System.DBNull]::Value) {				
 				$QueryName = $QPrefix + "_" + $i + ".query"					
 			} elseif ($QPrefix -eq "TempDB") {
 				$QueryName = "N/A*"
@@ -2034,14 +2039,14 @@ try {
 			Write-Host ""
 		}
 		$JobError = $Job | Select-Object -ExpandProperty Error
-		Add-LogRow "Start sp_BlitzWho background process" $JobStatus $JobError
+		Add-LogRow "Start session activity collection background process" $JobStatus $JobError
 		Write-Host " ->Session activity will not be captured."
 	} else {
 		Write-Host @GreenCheck
 		if ($DebugInfo) {
 			Write-Host ""
 		}
-		Add-LogRow "Start sp_BlitzWho background process" $JobStatus
+		Add-LogRow "Start session activity collection background process" $JobStatus
 		Write-Host " ->Active session data will be captured every $BlitzWhoDelay seconds."
 	}
 
@@ -2158,7 +2163,7 @@ $htmlTable6 `n<br>`n<h2>Session level SET options</h2> `n $htmlTable4 `n $HTMLBo
 				$htmlTable3 = Convert-TableToHtml $TempDBSessTbl -ExclCols "query_text" -CSSClass "TempdbSessionTbl" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs "TempDB"
 				$htmlTable3 += "`n<p>*This usually means that the session isn't doing anything now, but is still holding on to one or more temp tables</p>"
 			
-				$htmlTable4 = Convert-QueryTableToHtml $TempDBSessTbl -DebugInfo:$DebugInfo -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "TempDB"
+				$htmlTable4 = Convert-QueryTableToHtml $TempDBSessTbl -DebugInfo:$DebugInfo -Cols "query", "query_text" -CSSClass "query-table" -AnchorToHere -AnchorID "TempDB"
 				$htmlTable4 = "<br>`n<h3>Query text</h3>`n" + $htmlTable4
 			} else {
 				$htmlTable3 = "<p>No sessions were using tempdb at this time.</p>`n<br>"
@@ -2235,9 +2240,9 @@ $htmlTable4 `n $HTMLBodyEnd
 				
 				$htmlTable1 = Convert-TableToHtml $AcTranTbl -ExclCols "current_sql", "current_plan", "most_recent_sql", "most_recent_plan" -DebugInfo:$DebugInfo -CSSClass "OpenTransTbl" -AnchorFromHere -AnchorIDs "Current", "MostRecent"
 
-				$htmlTable2 = Convert-QueryTableToHtml $AcTranTbl -Cols "current_query", "current_sql" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "Current" -DebugInfo:$DebugInfo
+				$htmlTable2 = Convert-QueryTableToHtml $AcTranTbl -Cols "current_query", "current_sql" -CSSClass "query-table" -AnchorToHere -AnchorID "Current" -DebugInfo:$DebugInfo
 	
-				$htmlTable3 = Convert-QueryTableToHtml $AcTranTbl -Cols "most_recent_query", "most_recent_sql" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "MostRecent" -DebugInfo:$DebugInfo
+				$htmlTable3 = Convert-QueryTableToHtml $AcTranTbl -Cols "most_recent_query", "most_recent_sql" -CSSClass "query-table" -AnchorToHere -AnchorID "MostRecent" -DebugInfo:$DebugInfo
 
 				$html = $HTMLPre + @"
 <title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1>
@@ -2579,7 +2584,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	Write-Host " What's happening in a 30 seconds time-frame... " -NoNewline
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzFirst_NonSPLatest.sql"
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzFirst 30 seconds" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
+	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Happening now for 30 seconds" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 	if ($global:StepOutcome -eq "Success") {
 		$BlitzFirstTbl = $global:PSBlitzSet.Tables[0]
 
@@ -2612,7 +2617,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzFirst_NonSPLatest.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		[string]$Query = $Query -replace ";SET @SinceStartup = 0;", ";SET @SinceStartup = 1;"
-		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzFirst since startup" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Waits since startup" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		if ($global:StepOutcome -eq "Success") {
 			$WaitsTbl = $global:PSBlitzSet.Tables[0]
 			$StorageTbl = $global:PSBlitzSet.Tables[1]
@@ -2778,7 +2783,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			$AdditionalInfo = ""
 		}
 		$PreviousOutcome = $global:StepOutcome
-		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzCache $SortOrder  $AdditionalInfo" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Plan Cache $SortOrder  $AdditionalInfo" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
 
 		$SheetName = "Top Queries - "
 		if ($SortOrder -like '*CPU*') {
@@ -2843,7 +2848,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				
 				$htmlTable2 = Convert-TableToHtml $BlitzCacheWarnTbl -NoCaseChange -HyperlinkCol "FindingHL" -ExclCols "Finding", "URL" -DebugInfo:$DebugInfo
 
-				$htmlTable3 = Convert-QueryTableToHtml $BlitzCacheTbl -DebugInfo:$DebugInfo -Cols "Query", "Query Text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID $FileSOrder
+				$htmlTable3 = Convert-QueryTableToHtml $BlitzCacheTbl -DebugInfo:$DebugInfo -Cols "Query", "Query Text" -CSSClass "query-table" -AnchorToHere -AnchorID $FileSOrder
 		
 				#pairing up related tables in the same HTML file
 				if ("'CPU'", "'Reads'", "'Duration'", "'Executions'", "'Writes'",
@@ -2890,7 +2895,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'") -or ($SortOrder -eq "'Query Hash'")) {
 					$HtmlTabName2 = $SortOrder -replace "'", ""
 					#Handling CSS
-					$htmlTable1 = $htmlTable1 -replace "<table class='CacheTabx'>", '<table class="CacheTable2">'
+					$htmlTable1 = $htmlTable1 -replace '<table class="CacheTabx">', '<table class="CacheTable2">'
 					
 					#Add heading if first half of the table failed
 					if ($PreviousOutcome -eq "Failure") {
@@ -3079,7 +3084,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 
 						$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan", "database_name", "n" -CSSClass "QueryStoreTab$SortOrder sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
 
-						$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
+						$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -CSSClass "query-table" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
 
 						$HtmlTabName = "Query Store results for $databaseName - Average $SortOrder"
 
@@ -3159,7 +3164,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		Write-Host " Retrieving index info for $($TopDBinCache.Name)"
 		[string]$Query = $Query -replace ';SET @DatabaseName = NULL;', $TopCacheReplace
 		[string]$Query = $Query -replace ';SET @GetAllDatabases = 1;', ';SET @GetAllDatabases = 0;'
-		Add-LogRow "sp_BlitzIndex" "User database count>= $MaxUsrDBs" "Limiting index info to $TopCacheDB which accounts for $TopCacheDBCount records in the plan cache results"
+		Add-LogRow "Index info" "User database count>= $MaxUsrDBs" "Limiting index info to $TopCacheDB which accounts for $TopCacheDBCount records in the plan cache results"
 	}
  
 	else {
@@ -3171,7 +3176,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		Write-Host $modeMessages[$Mode] -NoNewline
 		$NewMode = ";SET @Mode = " + $Mode + ";"
 		[string]$Query = $Query -replace $OldMode, $NewMode
-		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "sp_BlitzIndex mode $Mode" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Index info mode $Mode" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
 		
 		if ($global:StepOutcome -eq "Success") {
 			$BlitzIxTbl = $global:PSBlitzSet.Tables[0]
@@ -3199,11 +3204,11 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
 					$HtmlTabName += " for $ASDBName$CheckDB"
 					$ExclCols = @("Sample Query Plan", "Display Order", "Database Name", "Finding", "URL")
-					$Mode2SearchCol = 2
+					$Mode2SearchCol = 1
 					$Mode2CSS = "IndexUsageTableDB sortable"
 				} else {
 					$ExclCols = @("Sample Query Plan", "Display Order", "Finding", "URL")
-					$Mode2SearchCol = 3
+					$Mode2SearchCol = 2
 					$Mode2CSS = "IndexUsageTable sortable"
 				}						
 		
@@ -3314,7 +3319,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			
 					$htmlTable2 = Convert-TableToHtml $TblLockDtl -TblID "DeadlockDtlTable" -CSSClass "DeadlockDetailsTable" -AnchorFromHere -AnchorIDs "DL" -ExclCols "query_text", "deadlock_graph" -DebugInfo:$DebugInfo
 
-					$htmlTable3 = Convert-QueryTableToHtml $TblLockDtl -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "DeadlockDtlTable" -DebugInfo:$DebugInfo
+					$htmlTable3 = Convert-QueryTableToHtml $TblLockDtl -Cols "query", "query_text" -CSSClass "query-table" -AnchorToHere -AnchorID "DeadlockDtlTable" -DebugInfo:$DebugInfo
 
 					if ($TblLockPlans.Rows.Count -gt 0) {
 						Add-QueryName $TblLockPlans "query" "query_text" "DeadlockPlan"
@@ -3324,7 +3329,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 						$htmlTable4 = Convert-TableToHtml $TblLockPlans -AnchorFromHere -ExclCols "query_text", "query_plan" -CSSClass "DeadlockPlansTable" -AnchorIDs "DeadlockPlan" -DebugInfo:$DebugInfo
 						$htmlTable4 = "<br>`n<h2 id=`"Deadlocks2`">Execution Plans Involved in Deadlocks</h2>`n $htmlTable4 `n $JumpToTop"
 
-						$htmlTable5 = Convert-QueryTableToHtml $TblLockPlans -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "DeadlockPlan" -DebugInfo:$DebugInfo
+						$htmlTable5 = Convert-QueryTableToHtml $TblLockPlans -Cols "query", "query_text" -CSSClass "query-table" -AnchorToHere -AnchorID "DeadlockPlan" -DebugInfo:$DebugInfo
 						$htmlTable5 = "<br>`n<h2>Query Text For Execution Plans Involved in Deadlocks</h2>`n $htmlTable5 `n $JumpToTop"
 					} else {
 						$htmlTable4 = "<p>No deadlock-related execution plans were found in the plan cache.</p>"
@@ -3428,19 +3433,19 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 
 						$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -CSSClass "StatsInfoTbl sortable" -ExclCols "database" -DebugInfo:$DebugInfo
 						#add tooltips
-						$htmlTable = $htmlTable -replace '<th>Update ', '<th class="sorttable_nosort tooltip" title="The commented options are suggestions based on record counts.">Update '
+						$htmlTable = $htmlTable -replace '<th class="sortable">Update ', '<th class="sorttable_nosort tooltip" title="The commented options are suggestions based on record counts.">Update '
 						#add buttons
-						$htmlTable = $htmlTable -replace '<th>Get Details', '<th class="sorttable_nosort"><div class="header-content">Get Details<div class="button-tooltip" title="Click to copy the commands from this column"><button class="copyButton" data-table-id="StatsOrIxFragTable" data-column-index="20">Copy commands</button></div></div>'
-						$htmlTable = $htmlTable -replace 'counts.">Update Table Stats', 'counts.">Update Table Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="21">Copy commands</button>'
-						$htmlTable = $htmlTable -replace 'counts.">Update Individual Stats', 'counts.">Update Individual Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="22">Copy commands</button>'
-						$htmlTable = $htmlTable -replace 'counts.">Update Partition Stats', 'counts.">Update Partition Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="23">Copy commands</button>'
+						$htmlTable = $htmlTable -replace '<th class="sortable">Get Details', '<th class="sorttable_nosort"><div class="header-content">Get Details<div class="button-tooltip" title="Click to copy the commands from this column"><button class="copyButton" data-table-id="StatsOrIxFragTable" data-column-index="19">Copy commands</button></div></div>'
+						$htmlTable = $htmlTable -replace 'counts.">Update Table Stats', 'counts.">Update Table Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="20">Copy commands</button>'
+						$htmlTable = $htmlTable -replace 'counts.">Update Individual Stats', 'counts.">Update Individual Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="21">Copy commands</button>'
+						$htmlTable = $htmlTable -replace 'counts.">Update Partition Stats', 'counts.">Update Partition Stats<button class="copyButton" title="Click to copy the commands from this column" data-table-id="StatsOrIxFragTable" data-column-index="22">Copy commands</button>'
 						$HtmlTabName = "Statistics info for $databaseName"
 						$HtmlFileName = "StatsInfo_$databaseName.html"
 						$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n $HTMLBodyStart `n	<h1>$HtmlTabName</h1>
 				$($SearchTableDiv -replace $STDivReplace, "'StatsOrIxFragTable', 0")
-				<!-- Message container -->`n<div id="message">Copied to clipboard!</div>`n<br>
-				$htmlTable `n $JumpToTop `n $HTMLBodyEnd
+				<!-- Message container -->`n<div id="message">Copied to clipboard!</div>`n<br>`n
+				$SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 "@
 						Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
 						Invoke-ClearVariables html, htmlTable			
@@ -3606,8 +3611,8 @@ finally {
 				$StepEnd = Get-Date
 				$JobOutcome = Stop-Job $JobName
 				Write-Host $JobOutcome 
-				$LogtxtFilePath = Join-Path -Path $OutDir -ChildPath "sp_BlitzWhoBackgroundJobLog.txt"
-				$JobOutcome | Out-File utf8 -FilePath "$LogtxtFilePath" -Append
+				#$LogtxtFilePath = Join-Path -Path $OutDir -ChildPath "sp_BlitzWhoBackgroundJobLog.txt"
+				#$JobOutcome | Out-File utf8 -FilePath "$LogtxtFilePath" -Append
 				if ($DebugInfo) {
 					Write-Host ""
 					Write-Host " ->Failed to create " -NoNewline -Fore Yellow
@@ -3636,9 +3641,9 @@ finally {
 	
 				$JobOutcome = Receive-Job -Name $JobName
 				Write-Host $JobOutcome
-				$LogtxtFilePath = Join-Path -Path $OutDir -ChildPath "sp_BlitzWhoBackgroundJobLog.txt"
-				$JobOutcome | Out-File utf8 -FilePath "$LogtxtFilePath" -Append
-				Add-LogRow "sp_BlitzWho background process" $JobStatus $JobOutcome
+				#$LogtxtFilePath = Join-Path -Path $OutDir -ChildPath "sp_BlitzWhoBackgroundJobLog.txt"
+				#$JobOutcome | Out-File utf8 -FilePath "$LogtxtFilePath" -Append
+				Add-LogRow "Session activity collection background process" $JobStatus $JobOutcome
 				#temp lines(2)
 				#Write-Host $JobName.JobStateInfo.Reason.Message
 				#Write-Host $JobName.Error
@@ -3659,7 +3664,7 @@ finally {
 		[string]$Query = $Query.replace('[tempdb].[dbo].', '')
 		[string]$Query = $Query.replace('tempdb.dbo.', '')
 	}
-	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Return sp_BlitzWho" -ConnStringIn $ConnString -CmdTimeoutIn 800
+	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Return session activity" -ConnStringIn $ConnString -CmdTimeoutIn 800
 	
 	if ($global:StepOutcome -eq "Success") {
 		$BlitzWhoTbl = $global:PSBlitzSet.Tables[0]

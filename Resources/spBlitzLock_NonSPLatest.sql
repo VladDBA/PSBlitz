@@ -113,7 +113,7 @@ BEGIN
     SET XACT_ABORT OFF;
     SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-    SELECT @Version = '8.25', @VersionDate = '20250704';
+    SELECT @Version = '8.26', @VersionDate = '20251002';
 
     IF @VersionCheckMode = 1
     BEGIN
@@ -660,19 +660,17 @@ BEGIN
                 @StringToExecute =
                     N'SELECT @r = o.name FROM ' +
                     @OutputDatabaseName +
-                    N'.sys.objects AS o WHERE o.type_desc = N''USER_TABLE'' AND o.name = ' +
+                    N'.sys.objects AS o inner join ' +
+                    @OutputDatabaseName +
+                    N'.sys.schemas as s on o.schema_id = s.schema_id WHERE o.type_desc = N''USER_TABLE'' AND o.name = ' +
                     QUOTENAME
                     (
                         @OutputTableName,
                         N''''
                     ) +
-                    N' AND o.schema_id = SCHEMA_ID(' +
-                    QUOTENAME
-                    (
-                        @OutputSchemaName,
-                        N''''
-                    ) +
-                    N');',
+                    N' AND s.name =''' +
+                    @OutputSchemaName +
+                    N''';',
                 @StringToExecuteParams =
                     N'@r sysname OUTPUT';
 
@@ -914,12 +912,12 @@ BEGIN
             )
             BEGIN
                 RAISERROR('Found synonym DeadlockFindings, dropping', 0, 1) WITH NOWAIT;
-                DROP SYNONYM DeadlockFindings;
+                DROP SYNONYM dbo.DeadlockFindings;
             END;
 
             RAISERROR('Creating synonym DeadlockFindings', 0, 1) WITH NOWAIT;
             SET @StringToExecute =
-                    N'CREATE SYNONYM DeadlockFindings FOR ' +
+                    N'CREATE SYNONYM dbo.DeadlockFindings FOR ' +
                     @OutputDatabaseName +
                     N'.' +
                     @OutputSchemaName +
@@ -941,12 +939,12 @@ BEGIN
             )
             BEGIN
                 RAISERROR('Found synonym DeadLockTbl, dropping', 0, 1) WITH NOWAIT;
-                DROP SYNONYM DeadLockTbl;
+                DROP SYNONYM dbo.DeadLockTbl;
             END;
 
             RAISERROR('Creating synonym DeadLockTbl', 0, 1) WITH NOWAIT;
             SET @StringToExecute =
-                    N'CREATE SYNONYM DeadLockTbl FOR ' +
+                    N'CREATE SYNONYM dbo.DeadLockTbl FOR ' +
                     @OutputDatabaseName +
                     N'.' +
                     @OutputSchemaName +
@@ -4014,7 +4012,7 @@ BEGIN
             BEGIN
                 SET @ExportToExcel = 0;
             END;
-			/*Vlad - result set changes for PSBlitz*/
+            /*Vlad - result set changes for PSBlitz*/
             SET @deadlock_result += N'
             SELECT
                 /*server_name =
@@ -4034,7 +4032,7 @@ BEGIN
                 CASE WHEN dr.deadlock_group LIKE ''% - VICTIM'' THEN REPLACE(LEFT(dr.deadlock_group, CHARINDEX('','', dr.deadlock_group) - 1),'' #'',''_'') + ''.xdl''
 				ELSE '''' END AS deadlock_graph_file,
 				REPLACE(REPLACE(REPLACE(dr.deadlock_group,''Deadlock #'',''DL''),'', Query #'',''Q''),'' - VICTIM'',''V'')+''.query'' AS query,
-				' + CASE @ExportToExcel
+                ' + CASE @ExportToExcel
                          WHEN 1
                          THEN N'
                 query_text = dr.query_string,
@@ -4048,7 +4046,7 @@ BEGIN
                         ) COLLATE Latin1_General_BIN2,
                     ''<object>'', ''''),
                     ''</object>'', ''''),'
-                         ELSE N'query = dr.query_xml,
+                         ELSE N'query_text = dr.query_xml,
                 dr.object_names,'
                     END + N'
                 dr.isolation_level,
@@ -4056,12 +4054,12 @@ BEGIN
                 dr.waiter_mode,
                 dr.lock_mode,
                 dr.transaction_count,
-                /*dr.client_option_1,
-                dr.client_option_2,*/
+                dr.client_option_1,
+                dr.client_option_2,
                 dr.login_name,
                 dr.host_name,
                 dr.client_app,
-                dr.wait_time as wait_time_ms,
+                dr.wait_time,
                 dr.wait_resource,
                 dr.priority,
                 dr.log_used,
@@ -4093,7 +4091,7 @@ BEGIN
                         @ExportToExcel
                         WHEN 1
                         THEN N'
-						dr.deadlock_graph' /*Vlad - returning dr.deadlock_graph anyway*/
+                        dr.deadlock_graph' /*Vlad - returning dr.deadlock_graph anyway*/
                         ELSE N'
                 dr.deadlock_graph'
                    END + N'
@@ -4172,7 +4170,7 @@ BEGIN
 
             RAISERROR('Finished at %s', 0, 1, @d) WITH NOWAIT;
 
-            DROP SYNONYM DeadLockTbl;
+            DROP SYNONYM dbo.DeadLockTbl;
 
             SET @d = CONVERT(varchar(40), GETDATE(), 109);
             RAISERROR('Findings to table %s', 0, 1, @d) WITH NOWAIT;
@@ -4202,7 +4200,7 @@ BEGIN
 
             RAISERROR('Finished at %s', 0, 1, @d) WITH NOWAIT;
 
-            DROP SYNONYM DeadlockFindings; /*done with inserting.*/
+            DROP SYNONYM dbo.DeadlockFindings; /*done with inserting.*/
         END;
         ELSE /*Output to database is not set output to client app*/
         BEGIN
@@ -4319,11 +4317,12 @@ BEGIN
                     sql_handle,
                     plan_handle
                 );
-              /*Vlad - column changes for PSBlitz*/  
+              
+               /*Vlad - column changes for PSBlitz*/  
                 SELECT
                     /*ap.available_plans,*/
                     ap.database_name,
-					CAST('' AS VARCHAR(30)) AS query,
+                    CAST('' AS VARCHAR(30)) AS query,
                     query_text = REPLACE(REPLACE(ap.query_xml, N'<?query '+CAST(CHAR(10) AS NVARCHAR(1)),N''),CAST(CHAR(10) AS NVARCHAR(1))+N'   ?>',N''),
 					CAST('' AS VARCHAR(30)) AS sqlplan_file,
                     ap.query_plan,
@@ -4354,7 +4353,7 @@ BEGIN
                     ap.statement_end_offset*/
                 FROM
                 (
-              
+             
                     SELECT
                         ap.*,
                         c.statement_start_offset,
