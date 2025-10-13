@@ -5985,7 +5985,7 @@ BEGIN
 							+ br.finding+'</a>' AS  [FindingHL], /*Column added for PSBlitz*/
 						br.[database_name] AS [Database Name],
 						br.details AS [Details: schema.table.index(indexid)], 
-						br.index_definition AS [Definition: [Property]] ColumnName {datatype maxbytes}], 
+						br.index_definition AS [Index Definition], /*column name change for PSBlitz*/ 
 						ISNULL(br.secret_columns,'') AS [Secret Columns],          
 						br.index_usage_summary AS [Usage], 
 						br.index_size_summary AS [Size],
@@ -6599,7 +6599,7 @@ BEGIN
 					CASE    WHEN index_id IN ( 1, 0 ) THEN 'TABLE'
 						ELSE 'NonClustered'
 						END AS [Object Type], 
-					index_definition AS [Definition: [Property]] ColumnName {datatype maxbytes}],
+					index_definition AS [Index Definition], /*column name change for PSBlitz*/
 					ISNULL(LTRIM(key_column_names_with_sort_order), '') AS [Key Column Names With Sort],
 					ISNULL(count_key_columns, 0) AS [Count Key Columns],
 					ISNULL(include_column_names, '') AS [Include Column Names], 
