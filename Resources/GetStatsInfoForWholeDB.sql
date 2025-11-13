@@ -19,7 +19,7 @@ DECLARE @LineFeed NVARCHAR(5);
 DECLARE @MinRecords INT;
 DECLARE @Comment NVARCHAR(3);
 SET @LineFeed = CHAR(13) + CHAR(10);
-SET @Comment = N';--';
+SET @Comment = N''/*N';--'*/;
 
 SET @MinRecords = 10000;
 /*Make sure temp table doesn't exist*/
@@ -185,7 +185,9 @@ END;
 
 UPDATE ##PSBlitzStatsInfo
 SET    [update_table_stats] = CASE
-                                WHEN [modified_percent] >= 30.00 OR [sample_percent] < 5.00 THEN N'UPDATE STATISTICS '
+                                WHEN [modified_percent] >= 30.00 OR [sample_percent] < 5.00
+                                       /*OR [last_updated] <= CONVERT(DATETIME, GETDATE() - 90)*/
+                                                                     THEN N'UPDATE STATISTICS '
                                                                       + QUOTENAME([database]) + N'.'
                                                                       + QUOTENAME([object_schema]) + N'.'
                                                                       + QUOTENAME([object_name])
@@ -204,7 +206,7 @@ SET    [update_table_stats] = CASE
                                                                           ELSE N';'
                                                                         END
 																		ELSE N';'
-																		END 
+																		END + CHAR(13) + CHAR(10) + N'GO'
                                 ELSE NULL
                               END
 
@@ -212,7 +214,9 @@ WHERE  [id] IN(SELECT MIN([id])
              FROM   ##PSBlitzStatsInfo
              GROUP  BY [object_name]);
 UPDATE ##PSBlitzStatsInfo SET [update_individual_stats] = CASE
-                                WHEN [modified_percent] >= 30.00 OR [sample_percent] < 5.00 THEN N'UPDATE STATISTICS '
+                                WHEN [modified_percent] >= 30.00 OR [sample_percent] < 5.00
+                                       /*OR [last_updated] <= CONVERT(DATETIME, GETDATE() - 90)*/
+                                                                     THEN N'UPDATE STATISTICS '
 								                                      + QUOTENAME([database]) + N'.'
                                                                       + QUOTENAME([object_schema]) + N'.'
                                                                       + QUOTENAME([object_name]) + N'('+QUOTENAME([stats_name])+N')'
@@ -231,15 +235,17 @@ UPDATE ##PSBlitzStatsInfo SET [update_individual_stats] = CASE
                                                                           ELSE N';'
                                                                         END
 																		ELSE N';'
-																		END 
+																		END + CHAR(13) + CHAR(10) + N'GO'
                                 ELSE NULL
                               END;
 UPDATE ##PSBlitzStatsInfo SET [update_partition_stats] = CASE
-                                WHEN [modified_percent] >= 30.00 OR [sample_percent] < 5.00 THEN N'UPDATE STATISTICS '
+                                WHEN [modified_percent] >= 30.00 OR [sample_percent] < 5.00
+                                       /*OR [last_updated] <= CONVERT(DATETIME, GETDATE() - 90)*/
+                                                                     THEN N'UPDATE STATISTICS '
 								                                      + QUOTENAME([database]) + N'.'
                                                                       + QUOTENAME([object_schema]) + N'.'
                                                                       + QUOTENAME([object_name])
-																	  + N' WITH RESAMPLE ON PARTITIONS ('+CAST([partition_number] AS NVARCHAR(20)) +N');'
+																	  + N' WITH RESAMPLE ON PARTITIONS ('+CAST([partition_number] AS NVARCHAR(20)) +N');' + CHAR(13) + CHAR(10) + N'GO'
                                 ELSE NULL
                               END
 WHERE incremental = N'Yes';
@@ -256,6 +262,8 @@ SELECT TOP(10000) /*[id], */
        [get_details], [update_table_stats],
        [update_individual_stats], [update_partition_stats]
 FROM   ##PSBlitzStatsInfo
+WHERE [modified_percent] >= 30.00
+OR [sample_percent] < 5.00
 ORDER BY [modified_percent] DESC, [object_name] ASC;
 
 SELECT COUNT(1) AS RecordCount FROM ##PSBlitzStatsInfo;

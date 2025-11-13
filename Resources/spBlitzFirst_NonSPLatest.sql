@@ -4879,7 +4879,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
             SELECT  [Priority] ,
                     [FindingsGroup] ,
                     [Finding] ,
-					CASE WHEN [URL] IS NOT NULL 
+					CASE WHEN [URL] IS NOT NULL AND [URL] <> ''
 						 THEN '<a href='''+[URL]+''' target=''_blank''>'+[Finding]+'</a>'
 						 ELSE [Finding] 
 					END AS [FindingHL],		
@@ -4894,6 +4894,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                     CAST([QueryPlan] AS NVARCHAR(MAX)) AS QueryPlan*/
             FROM    #BlitzFirstResults
             WHERE (@Seconds > 0 OR (Priority IN (0, 250, 251, 255))) /* For @Seconds = 0, filter out broken checks for now */
+            AND CheckID <> -1
             ORDER BY Priority ,
                     FindingsGroup ,
                     CASE

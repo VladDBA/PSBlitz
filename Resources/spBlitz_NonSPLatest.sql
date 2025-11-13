@@ -10525,7 +10525,7 @@ IF @ProductVersionMajor >= 10 AND  NOT EXISTS ( SELECT  1
 									  -replace "&#39; target=&#39;_blank&#39;&gt;", "' target=`"_blank`">"
 									  -replace "&lt;/a&gt;","</a>"									
 									*/
-									CASE WHEN [URL] IS NOT NULL 
+									CASE WHEN [URL] IS NOT NULL AND [URL] <> ''
 									THEN 
 									'<a href='''+[URL]+''' target=''_blank''>'+[Finding]+'</a>'
 									ELSE [Finding] END AS [FindingHL],									

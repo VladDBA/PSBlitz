@@ -302,8 +302,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.9.0"
-$VersDate = "2025-10-13"
+$Vers = "5.9.1"
+$VersDate = "2025-11-13"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -326,18 +326,18 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql", "spBlitzCache
 
 ## we use these to make sure someone didn't modify the scripts in the Resources folder
 $storedHashes = @{
-	"spBlitz_NonSPLatest.sql"            = "6F403D76832611A2986852CCE08DE6AC63D55AE2BB2241C2E1274CD9E2252D60"
-	"spBlitzCache_NonSPLatest.sql"       = "823327F64BE6E67ECDA5E541DC0311D0C04E2E2D540CC76FD7306933BB7763D2"
-	"spBlitzFirst_NonSPLatest.sql"       = "3AE1F4B5B2337E7B36B25B30999543E2C2DE1C46BDF6D647394EFF7BF2944263"
-	"spBlitzIndex_NonSPLatest.sql"       = "88FB8C452B2E2A5F5D378F045CAAA2B2E37F6B5C7C532BEF37D110D6DE59B7AA"
+	"spBlitz_NonSPLatest.sql"            = "1612EFEEC666112A5EFAAD147804B7AF48FC522E11B63CBBD00E9D9EF529F235"
+	"spBlitzCache_NonSPLatest.sql"       = "098346EB1E816C8BFA59778BCE1186031549F69C068924164717D40680B5884E"
+	"spBlitzFirst_NonSPLatest.sql"       = "65B2BEBAB1BD3F3BB6262B6EB67D159A5B799C512A6F2A7A512672D7E0501D92"
+	"spBlitzIndex_NonSPLatest.sql"       = "21F326BCD6BCFB57A89BBEBD34063FFC6FEFE8376BF4836650E46715134DB41D"
 	"spBlitzLock_NonSPLatest.sql"        = "9B999A5E28ACBA871FD0545C1305B1BD6F1532F9CFACB3C910A3830CAA5FB672"
 	"spBlitzWho_NonSPLatest.sql"         = "B83BD8CBD59295DD0DFE0D25204AC6C81DEED746659844DABBED5FB4CA8D3ABA"
 	"GetBlitzWhoData.sql"                = "1A23F1F9C4CB51252D088919500A7E472B56B98DD5096DBA79B5D96AEEB5F6FC"
 	"GetInstanceInfo.sql"                = "29AA65809886BB2FC870B0DF49256850C4347562ABDDAD29E5BEC6D76C86036F"
 	"GetTempDBUsageInfo.sql"             = "20620509996A6F7BB45410397D0CB5C7C0D044FEA15944950171DF14436AE9D1"
 	"GetOpenTransactions.sql"            = "76EBCB1758CBC86DAC4FE8E5C02E88AB4B96FEDB2E21570B8C0D410FF8A69F7D"
-	"GetStatsInfoForWholeDB.sql"         = "E39F52DFD9BD070F7B233880D02401AF3B72D4111FE87AEDAF1B06C45AFB730B"
-	"GetIndexInfoForWholeDB.sql"         = "6C58B79C4EDF06ADBE4EE79373A522A7C538B331D74E9E4AF32C77C6ED951F9B"
+	"GetStatsInfoForWholeDB.sql"         = "DAA08282A7FF87FDBA7604903F948F59CD0CAE09F08664F1A3CA9177121EE17B"
+	"GetIndexInfoForWholeDB.sql"         = "B8FBF199DF4E054A1700F0E27081841257BF1BA99A09E95E83EB991B2FB52D43"
 	"GetDbInfo.sql"                      = "103B639ED78B099A5C2D133E6555B7073CE23DF2DBE4CD7CAD24D44EDB261F7F"
 	"GetAzureSQLDBInfo.sql"              = "8A18348F7B87C2F5DA047B103E3BF4FEBB455E7498F0C93644DC2CD7E7255506"
 	"GetObjectsWithDangerousOptions.sql" = "AFE74F2FE6D6077AEBF169CC16DE036B08980846E6795DC342372AB8C2A132A9"
@@ -722,7 +722,7 @@ function Convert-TableToHtml {
         
 		if (($CSSClass) -and ($TblID)) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id=`"$TblID`" class=`"$CSSClass`">"
-			if ($CSSClass -like "*sortable*"){
+			if ($CSSClass -like "*sortable*") {
 				$htmlTableOut = $htmlTableOut -replace "<th>", "<th class=`"sortable`">"
 			}
 			if ($CSSClass -eq "InstHealthTbl") {
@@ -737,7 +737,7 @@ function Convert-TableToHtml {
 		} elseif ($CSSClass) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class=`"$CSSClass`">"
 			#clean up XML noise and extra charcters in specific tables
-			if ($CSSClass -like "*sortable"){
+			if ($CSSClass -like "*sortable") {
 				$htmlTableOut = $htmlTableOut -replace "<th>", "<th class=`"sortable`">"
 			} elseif ($CSSClass -eq "CacheTabx") {
 				$htmlTableOut = $htmlTableOut -replace "<td>&lt;\?ClickMe ", "<td>"
@@ -3486,55 +3486,61 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Index Frag Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout	
 			if ($global:StepOutcome -eq "Success") {
 				$IndexTbl = $global:PSBlitzSet.Tables[0]
-				$IndexLckTbl = $global:PSBlitzSet.Tables[1]
-				$RecordsReturned = $IndexTbl.Rows.Count
-				if ($RecordsReturned -le 0) {
-					Write-Host " ->No rows returned."
+				$ColumnCount = $IndexTbl.Columns.Count
+				if ($ColumnCount -eq 1) {
+					Write-Host " ->Skipped due to database size."
+					Add-LogRow "Index Frag Info" "Skipped" "Skipped due to database size."
 				} else {
-					if ($IndexLckTbl.Rows.Count -gt 0) {
-						$RowNum = 0
-						Write-Host " ->Exclusive lock detected on table(s):"
-						$LockedTabList = ""
-						$LockedTabLogMsg = "Exclusive locks on table(s):"
-						foreach ($row in $IndexLckTbl) {
-							$LockedTab = $IndexLckTbl.Rows[$RowNum]["object_name"]
-							Write-Host "  - $LockedTab"
-							if ($RowNum -eq 0) { 
-								$LockedTabList += "$LockedTab" 
-							} else {
-								$LockedTabList += ", $LockedTab"
+					$IndexLckTbl = $global:PSBlitzSet.Tables[1]
+					$RecordsReturned = $IndexTbl.Rows.Count
+					if ($RecordsReturned -le 0) {
+						Write-Host " ->No rows returned."
+					} else {
+						if ($IndexLckTbl.Rows.Count -gt 0) {
+							$RowNum = 0
+							Write-Host " ->Exclusive lock detected on table(s):"
+							$LockedTabList = ""
+							$LockedTabLogMsg = "Exclusive locks on table(s):"
+							foreach ($row in $IndexLckTbl) {
+								$LockedTab = $IndexLckTbl.Rows[$RowNum]["object_name"]
+								Write-Host "  - $LockedTab"
+								if ($RowNum -eq 0) { 
+									$LockedTabList += "$LockedTab" 
+								} else {
+									$LockedTabList += ", $LockedTab"
+								}
+								$RowNum += 1
 							}
-							$RowNum += 1
+				
+							Add-LogRow "->Index Frag Info" "Skipped XLocked Tables" "$LockedTabLogMsg $LockedTabList"
 						}
+						if ($ToHTML -eq "Y") {
 				
-						Add-LogRow "->Index Frag Info" "Skipped XLocked Tables" "$LockedTabLogMsg $LockedTabList"
-					}
-					if ($ToHTML -eq "Y") {
-				
-						Write-PSBlitzDebug " ->Converting index info to HTML"
+							Write-PSBlitzDebug " ->Converting index info to HTML"
 
-						$htmlTable = Convert-TableToHtml $IndexTbl -TblID "StatsOrIxFragTable" -ExclCols "database" -CSSClass "sortable" -DebugInfo:$DebugInfo
-						$HtmlTabName = "Index fragmentation info for $databaseName"
-						$HtmlFileName = "IndexFragInfo_$databaseName.html"
+							$htmlTable = Convert-TableToHtml $IndexTbl -TblID "StatsOrIxFragTable" -ExclCols "database" -CSSClass "sortable" -DebugInfo:$DebugInfo
+							$HtmlTabName = "Index fragmentation info for $databaseName"
+							$HtmlFileName = "IndexFragInfo_$databaseName.html"
 			
-						$html = $HTMLPre + @"
+							$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1>$HtmlTabName</h1>
 				$($SearchTableDiv -replace $STDivReplace, "'StatsOrIxFragTable', 0")
 				$SortableTable `n $htmlTable `n	$JumpToTop `n $HTMLBodyEnd
 "@
 
-						Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
-						Invoke-ClearVariables html, htmlTable
-					} else {
-						$ExcelSheet = $ExcelFile.Worksheets.Item("Index Fragmentation")
-						Convert-TableToExcel $IndexTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
-						##Saving file
-						Save-ExcelFile $ExcelFile
+							Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
+							Invoke-ClearVariables html, htmlTable
+						} else {
+							$ExcelSheet = $ExcelFile.Worksheets.Item("Index Fragmentation")
+							Convert-TableToExcel $IndexTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
+							##Saving file
+							Save-ExcelFile $ExcelFile
+						}
+						##Cleaning up variables
+						Invoke-ClearVariables IndexTbl, PSBlitzSet
 					}
-					##Cleaning up variables
-					Invoke-ClearVariables IndexTbl, PSBlitzSet
-				}
-			} 
+				} 
+			}
 		} else {
 			Write-Host " ->Skipping index fragmentation check as requested."
 			Add-LogRow "Index Fragmentation" "Skipped" "Index fragmentation check skipped as requested."
