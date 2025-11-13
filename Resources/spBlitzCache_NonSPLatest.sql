@@ -6266,7 +6266,7 @@ BEGIN
     SELECT  [Priority],
             FindingsGroup,
             Finding,
-			CASE WHEN [URL] IS NOT NULL 
+			CASE WHEN [URL] IS NOT NULL AND [URL] <> ''
 					THEN 
 						'<a href='''+[URL]+''' target=''_blank''>'+[Finding]+'</a>'
 					ELSE [Finding] 

@@ -15,6 +15,20 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
+DECLARE @SkipCheck BIT = 0;
+
+SELECT @SkipCheck = CASE WHEN (SELECT CAST(SUM(CAST([size] AS BIGINT) * 8 / 1024. / 1024.) AS NUMERIC(23, 3))
+         FROM   sys.[database_files] WHERE [type]= 0)> 500 THEN 1
+         WHEN (SELECT COUNT(1) FROM sys.[partitions] WHERE [partition_number] > 1) >100 THEN 1
+         WHEN (SELECT COUNT(1) FROM sys.[indexes] i INNER JOIN sys.[tables] t ON i.[object_id] = t.[object_id])>1000
+         THEN 1 ELSE 0 END;
+IF @SkipCheck = 1
+  BEGIN
+  SELECT 'Check skipped due to database size' AS Skipped;
+  RETURN;
+  END;
+  ELSE
+  BEGIN
 IF OBJECT_ID('tempdb.dbo.#PSBlitzIXFrag', 'U') IS NOT NULL
     DROP TABLE #PSBlitzIXFrag;
 SELECT [l].[resource_associated_entity_id]
@@ -78,3 +92,4 @@ FROM   #PSBlitzIXFrag;
 
 IF OBJECT_ID('tempdb.dbo.#test', 'U') IS NOT NULL
     DROP TABLE #PSBlitzIXFrag;
+END;
