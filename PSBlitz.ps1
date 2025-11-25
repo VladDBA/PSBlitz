@@ -846,6 +846,7 @@ function Convert-QueryTableToHtml {
 			} else {
 				$AnchorRegex = "<td>$AnchorID(_\d+)$AnchorExt"
 				$AnchorURL = '<td class="anchor-target" id=' + "$AnchorID" + '$1' + "$AnchorExt>" + "$AnchorID" + '$1' + "$AnchorExt"
+				$AnchorURL += "<br>`n<button class=`"copyBtnRow`">Copy</button>"
 			}
 
 			$htmlTableOut = $htmlTableOut -replace $AnchorRegex, $AnchorURL

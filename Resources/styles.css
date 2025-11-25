@@ -363,6 +363,8 @@ th.sortable:hover {
 .StatsInfoTbl {
 	td {
 		vertical-align: top;
+		white-space: pre-wrap;
+		word-wrap: normal;
 	}
 	td:nth-child(n+6):nth-child(-n+12) {
 		text-align: right;
@@ -880,7 +882,8 @@ input.SearchBox {
 .copyButton {
 	background-color: #F28500;
     border: none;
-    color: black;
+    color:#fff;
+	font-size:0.9rem;
     padding: 5px 10px;
     text-align: center;
     text-decoration: none;
@@ -906,4 +909,21 @@ input.SearchBox {
 .button-tooltip {
     position: relative;
     display: inline-block;
+}
+
+/* query copy button */
+.copyBtnRow {
+    margin-top:0px;
+    cursor:pointer;
+    background:#007bff;
+    color:#fff;
+    border:none;
+    padding:4px 8px;
+    border-radius:4px;
+    font-size:0.9rem;
+  }
+.copyBtnRow:hover {
+    background-color: #fc9517;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
