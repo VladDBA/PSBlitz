@@ -843,6 +843,7 @@ function Convert-QueryTableToHtml {
 			if ($AnchorID -eq "DeadlockDtlTable") {
 				$AnchorRegex = "<td>DL(\d+)Q(\d+)(V{0,})$AnchorExt"
 				$AnchorURL = '<td class="anchor-target" id=' + "DL" + '$1' + "Q" + '$2' + '$3' + "$AnchorExt>" + "DL" + '$1' + "Q" + '$2' + '$3' + "$AnchorExt"
+				$AnchorURL += "<br>`n<button class=`"copyBtnRow`">Copy</button>"
 			} else {
 				$AnchorRegex = "<td>$AnchorID(_\d+)$AnchorExt"
 				$AnchorURL = '<td class="anchor-target" id=' + "$AnchorID" + '$1' + "$AnchorExt>" + "$AnchorID" + '$1' + "$AnchorExt"
@@ -3205,11 +3206,11 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
 					$HtmlTabName += " for $ASDBName$CheckDB"
 					$ExclCols = @("Sample Query Plan", "Display Order", "Database Name", "Finding", "URL")
-					$Mode2SearchCol = 1
+					$Mode2SearchCol = 0
 					$Mode2CSS = "IndexUsageTableDB sortable"
 				} else {
 					$ExclCols = @("Sample Query Plan", "Display Order", "Finding", "URL")
-					$Mode2SearchCol = 2
+					$Mode2SearchCol = 1
 					$Mode2CSS = "IndexUsageTable sortable"
 				}						
 		
@@ -4042,7 +4043,7 @@ finally {
 				if ($IsQueryStoreInterval) {
 					$Description += ", between $QueryStoreIntervalStart and $QueryStoreIntervalEnd"
 				} else {
-					$Description += "in the last 7 days"
+					$Description += " in the last 7 days"
 				}
 				if ($DBSwitched -eq "Y") {
 					$Description += " for $DBName"
