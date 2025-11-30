@@ -6066,14 +6066,20 @@ BEGIN
 					/*Vlad - column changes and record count limit for PSBlitz*/
 					SELECT TOP(10000) Priority, ISNULL(br.findings_group,N'') + 
 							CASE WHEN ISNULL(br.finding,N'') <> N'' THEN N': ' ELSE N'' END
-							+ br.finding AS [Finding],
+							+ ISNULL(br.finding, N'') AS [Finding],
                             CASE WHEN [URL] IS NOT NULL AND [URL] <> ''
-                            THEN
-							'<a href='''+[URL]+''' target=''_blank''>'+ISNULL(br.findings_group,N'') + 
-							CASE WHEN ISNULL(br.finding,N'') <> N'' 
-                            THEN N': ' ELSE N'' END
-							+ br.finding+'</a>' 
-                            ELSE N'' END AS  [FindingHL], /*Column added for PSBlitz*/
+                                THEN
+							       '<a href='''+[URL]+''' target=''_blank''>'+ISNULL(br.findings_group,N'') + 
+							    CASE WHEN ISNULL(br.finding,N'') <> N'' 
+                                     THEN N': ' 
+                                     ELSE N'' 
+                                END  + ISNULL(br.finding, N'')+'</a>' 
+                              ELSE ISNULL(br.findings_group,N'') +
+                                   CASE WHEN ISNULL(br.finding,N'') <> N'' 
+                                        THEN N': ' 
+                                        ELSE N'' 
+                                   END    + ISNULL(br.finding, N'')
+                             END AS  [FindingHL], /*Column added for PSBlitz*/
 						br.[database_name] AS [Database Name],
 						br.details AS [Details: schema.table.index(indexid)], 
 						br.index_definition AS [Index Definition], /*column name change for PSBlitz*/ 
