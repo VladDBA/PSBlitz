@@ -788,6 +788,15 @@ th.sortable:hover {
 	}
 }
 
+.warnings-desc {
+	color: red;
+	background-color: rgb(252, 252, 117);
+}
+
+.additional-desc {
+	background-color: rgb(252, 252, 117);
+}
+
 /*
  ## Execution log
 */

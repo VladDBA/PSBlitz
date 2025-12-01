@@ -332,9 +332,9 @@ $storedHashes = @{
 	"spBlitzIndex_NonSPLatest.sql"       = "1A1663B6B867FD4BFCF0969271E7447567BF4C4846EE27530CEB6F5AFDCB5322"
 	"spBlitzLock_NonSPLatest.sql"        = "E8AF3BD150A94054CD0543F12FEA719531654461BE73B253AE00EA2B6B969B51"
 	"spBlitzWho_NonSPLatest.sql"         = "3BA70668E0F47940AACF73B930D09A848704E82063479C228F3F7CDECF14C4DE"
-	"GetBlitzWhoData.sql"                = "1A23F1F9C4CB51252D088919500A7E472B56B98DD5096DBA79B5D96AEEB5F6FC"
+	"GetBlitzWhoData.sql"                = "4CDB3FBA91EF31B017DC5888BB694587ECC83A37FBEF6FE33AA0BC791F5B02B6"
 	"GetInstanceInfo.sql"                = "29AA65809886BB2FC870B0DF49256850C4347562ABDDAD29E5BEC6D76C86036F"
-	"GetTempDBUsageInfo.sql"             = "20620509996A6F7BB45410397D0CB5C7C0D044FEA15944950171DF14436AE9D1"
+	"GetTempDBUsageInfo.sql"             = "F65305AD51321D885458C5898D69657E90EB8A1EEC97922AABC406C494D0BE8B"
 	"GetOpenTransactions.sql"            = "76EBCB1758CBC86DAC4FE8E5C02E88AB4B96FEDB2E21570B8C0D410FF8A69F7D"
 	"GetStatsInfoForWholeDB.sql"         = "DAA08282A7FF87FDBA7604903F948F59CD0CAE09F08664F1A3CA9177121EE17B"
 	"GetIndexInfoForWholeDB.sql"         = "B8FBF199DF4E054A1700F0E27081841257BF1BA99A09E95E83EB991B2FB52D43"
@@ -2501,6 +2501,7 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 			if ($ToHTML -eq "Y") {
 				$tableName = "Instance Health"
 				$htmlTable = Convert-TableToHtml $BlitzTbl -NoCaseChange -TblID "InstanceHealthTable" -CSSClass "InstHealthTbl" -HyperlinkCol "FindingHL" -ExclCols Finding, URL -DebugInfo:$DebugInfo
+				$HighPriorityHealthCount = ($BlitzTbl | Where-Object { $_."Priority" -le 50 }).Rows.Count
 				$html = $HTMLPre + @"
 <title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1>
 $($SearchTableDiv -replace $STDivReplace, "'InstanceHealthTable', 3" -replace 'object' , 'database')
@@ -2630,7 +2631,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				$HtmlTabName = "Wait Stats Since Last Startup"
 
 				$htmlTable = Convert-TableToHtml $WaitsTbl -NoCaseChange -HyperlinkCol "wait_typeHL" -ExclCols "wait_type", "URL" -CSSClass "WaitStats" -DebugInfo:$DebugInfo
-			 
+				$Top3Waits = ($WaitsTbl | Select-Object -ExpandProperty wait_type -First 3) -join ', '
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title> `n $HTMLBodyStart `n<h1>$HtmlTabName</h1>
 $htmlTable `n $JumpToTop `n $HTMLBodyEnd
@@ -2642,6 +2643,7 @@ $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				#Storage
 				$HtmlTabName = "Storage Throughput Since Instance Startup"
 				$htmlTable = Convert-TableToHtml $StorageTbl -NoCaseChange -TblID "StorageStatsTable" -CSSClass "Storage sortable" -ExclCols "StallRank" -DebugInfo:$DebugInfo
+				$TopAvgStall = ($StorageTbl | Sort-Object -Property "Avg Stall (ms)" -Descending | Select-Object -ExpandProperty "Avg Stall (ms)" -First 1)	
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>`n $HTMLBodyStart `n <h1>$HtmlTabName</h1>
@@ -2860,6 +2862,13 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					$CacheHTMLPre = $CacheHTMLPre -replace 'CacheTab1High', $HighlightCol
 					$htmlTable1 = $htmlTable1 -replace '<table class="CacheTabx">', '<table class="CacheTable1">'
 					
+					#highest CPU and Duration times
+					if ($SortOrder -eq "'CPU'") {
+						$HighestTotalCPU = ($BlitzCacheTbl | Select-Object -ExpandProperty "Total CPU (ms)" -First 1)
+					} elseif ($SortOrder -eq "'Duration'") {
+						$HighestTotalDuration = ($BlitzCacheTbl | Select-Object -ExpandProperty "Total Duration (ms)" -First 1)
+					}
+
 					if ($SheetName -eq "Mem & Recent Comp") {
 						$HtmlTabName = "Queries by Memory Grants & Recent Compilations"
 					} elseif ($SheetName -eq "Dupl & Single Use") {
@@ -2899,7 +2908,14 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					#Handling CSS
 					$htmlTable1 = $htmlTable1 -replace '<table class="CacheTabx">', '<table class="CacheTable2">'
 					
-					#Add heading if first half of the table failed
+					#highest CPU and Duration times
+					if ($SortOrder -eq "'Average CPU'") {
+						$HighestAvgCPU = ($BlitzCacheTbl | Select-Object -ExpandProperty "Avg CPU (ms)" -First 1)
+					} elseif ($SortOrder -eq "'Average Duration'") {
+						$HighestAvgDuration = ($BlitzCacheTbl | Select-Object -ExpandProperty "Avg Duration (ms)" -First 1)
+					}
+
+					# Add heading if first half of the table failed
 					if ($PreviousOutcome -eq "Failure") {
 						$CacheHTMLPre = $HTMLPre
 						#$html = $CacheHTMLPre
@@ -3713,6 +3729,8 @@ finally {
 				$htmlTable = Convert-TableToHtml $BlitzWhoAggTbl -CSSClass "ActiveSessionsTab sortable" -AnchorFromHere -AnchorIDs "RunningNow" -ExclCols "query_text", "query_plan" -DebugInfo:$DebugInfo
 				$htmlTable1 = Convert-QueryTableToHtml $BlitzWhoAggTbl -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "RunningNow" -DebugInfo:$DebugInfo
 
+				$HighestElapsedTime = $BlitzWhoAggTbl | Select-Object -ExpandProperty "elapsed_time" -First 1
+
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n$HTMLBodyStart
 				<h1 id="top">$HtmlTabName</h1>
@@ -3883,6 +3901,7 @@ finally {
 		Write-PSBlitzDebug " ->Generating index and execution log pages." 
 		$HTMLChk = "&#10004;"
 		$HtmlTabName = "PSBlitz Execution Log"
+		$LogFailureCount = ($LogTbl | Where-Object { $_.Outcome -eq "Failure" }).Count
 		$htmlTable = Convert-TableToHtml $LogTbl -NoCaseChange -CSSClass LogTbl -DebugInfo:$DebugInfo
 		$html = $HTMLPre + @"
 						<title>$HtmlTabName</title>`n $HTMLBodyStart `n	<h1 id="top">$HtmlTabName</h1>
@@ -3952,6 +3971,9 @@ finally {
 				}	
 				$QuerySource += ";"
 				$Description += "."
+				if ($HighPriorityHealthCount -gt 0) {
+					$Description += "<br><span class=`"warnings-desc`">High priority findings: $HighPriorityHealthCount</span>"
+				}
 			} elseif ($File.Name -like "InstanceInfo*") {
 				$PageName = "Instance Information"
 				$QuerySource += "sys.dm_os_sys_info, sys.dm_os_performance_counters and SERVERPROPERTY()"
@@ -4031,6 +4053,11 @@ finally {
 						$Description += "$SortOrder per Minute."
 					} else {
 						$Description += "Average $SortOrder."
+						if ($SortOrder -eq "CPU") {
+							$Description += " <br><span class=`"additional-desc`">Highest Total CPU time: $HighestTotalCPU ms; Highest Avg CPU time: $HighestAvgCPU ms</span>"
+						} elseif ($SortOrder -eq "Duration") {
+							$Description += " <br><span class=`"additional-desc`">Highest Total Duration: $HighestTotalDuration ms; Highest Avg Duration: $HighestAvgDuration ms</span>"
+						}
 					}	
 				}
 			} elseif ($File.Name -like "BlitzQueryStore*") {
@@ -4070,9 +4097,11 @@ finally {
 				} elseif ($File.Name -like "BlitzFirst_Storage*") {
 					$PageName = "Storage Stats"
 					$Description = "Database file usage and throughput since the last instance restart."
+					$Description += "<br><span class=`"$(if($Top3Waits -ge 10){"warnings-desc"}else{"additional-desc"})`">Highest average storage stall: $TopAvgStall milliseconds</span>"
 				} elseif ($File.Name -like "BlitzFirst_Waits*") {
 					$PageName = "Wait Stats"
 					$Description = "Instance-wide wait stats since last instance restart."
+					$Description += "<br><span class=`"additional-desc`">Top 3 waits: $Top3Waits</span>"
 				}
 			} elseif ($File.Name -like "BlitzWho*") {
 				$QuerySource += "Similar to sp_BlitzWho @ExpertMode = 1"
@@ -4084,6 +4113,7 @@ finally {
 				if ($File.Name -like "BlitzWho_Agg*") {
 					$Plans = "<td>$HTMLChk</td>"
 					$Description = "Aggregatd session activity sorted by duration descending."
+					$Description += "<br><span class=`"additional-desc`">Highest elapsed time: $HighestElapsedTime</span>"
 					$PageName = "Session Activity - Aggregated"
 					#$AdditionalInfo = "Outputs execution plans as .sqlplan files."
 				} else {
@@ -4119,6 +4149,9 @@ finally {
 				$QuerySource = ""
 				$PageName = "Execution Log"
 				$Description = "Log for the current run of PSBlitz.<br>Contains step status and potential error messages."
+				if ( $LogFailureCount -gt 0) {
+					$Description += "<br><span class=`"warnings-desc`">Failed (sub)steps: $LogFailureCount</span>"
+				}
 				#$AdditionalInfo = "Contains step status and any error messages that might have been thrown"
 			} elseif ($File.Name -like "DatabaseInfo*") {
 				$PageName = "Database Information"
@@ -4147,7 +4180,7 @@ finally {
 				$Description = "A list of database objects created with dangerous SET options"
 				$QuerySource += "sys.sql_modules, sys.objects"
 			}
-			$IndexContent += "<tr><td><a href=`"$RelativePath`" target='_blank'>$PageName</a></td><td class=`"tooltip`" title=`"$QuerySource`">$Description</td>$Plans $DLGraphs $RLim</tr>"
+			$IndexContent += "`n<tr><td><a href=`"$RelativePath`" target='_blank'>$PageName</a></td><td class=`"tooltip`" title=`"$QuerySource`">$Description</td>$Plans $DLGraphs $RLim</tr>"
 		}
 
 		# Close the HTML tags.

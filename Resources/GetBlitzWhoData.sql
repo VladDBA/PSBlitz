@@ -17,9 +17,12 @@ CREATE NONCLUSTERED INDEX [IX_AGG]
 
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-DECLARE @DatabaseName NVARCHAR(128);
+DECLARE @DatabaseName NVARCHAR(128),
+        @IsAzureSQLDB BIT;
 
 SET @DatabaseName = N'';
+
+SELECT @IsAzureSQLDB = CASE WHEN SERVERPROPERTY('EngineEdition') = 5 THEN 1 ELSE 0 END;
 
 /*Standard RAW output*/
 SELECT CONVERT(VARCHAR(25),CAST([CheckDate] AS DATETIME),120) AS [CheckDate],
@@ -75,7 +78,12 @@ WHERE  [database_name] = CASE
                            WHEN @DatabaseName = N'' THEN [database_name]
                            ELSE @DatabaseName
                          END
-AND [program_name] NOT LIKE N'PSBlitz%';
+AND [program_name] NOT LIKE N'PSBlitz%'
+/*ignore the session running on master on Azure SQL DB*/
+AND [database_name] <> CASE 
+                         WHEN @IsAzureSQLDB = 1 THEN N'master' 
+                         ELSE N''
+                       END;
 
 /*Aggregate output*/
 ;WITH agg ( ID, [session_id], [query_hash], start_time, [TotalExecTime],[first_seen],[last_seen])
@@ -92,6 +100,10 @@ AND [program_name] NOT LIKE N'PSBlitz%';
                                     ELSE @DatabaseName
                                   END
 		AND [program_name] NOT LIKE N'PSBlitz%'
+        AND [database_name] <> CASE 
+                         WHEN @IsAzureSQLDB = 1 THEN N'master' 
+                         ELSE N''
+                       END
          GROUP  BY [session_id],
                    [query_hash],
                    [start_time])
