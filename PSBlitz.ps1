@@ -302,8 +302,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.9.2"
-$VersDate = "2025-11-30"
+$Vers = "5.10.0"
+$VersDate = "2025-12-01"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -703,6 +703,11 @@ function Convert-TableToHtml {
 				$pattern = "(?-i)Ms"
 				$formattedName = $formattedName -replace $pattern , "ms"
 			}
+
+			#Shorten Average to Avg, Maximum to Max, Minimum to Min
+			$formattedName = $formattedName -replace "Average", "Avg"
+			$formattedName = $formattedName -replace "Maximum", "Max"
+			$formattedName = $formattedName -replace "Minimum", "Min"
 
 			$property = if ($DateTimeCols -contains $currentColumn) {
 				@{
@@ -2418,6 +2423,8 @@ $SortableTable `n $htmlTable6 `n $JumpToTop `n $HTMLBodyEnd
 				$tableName = "Database Info"
 
 				$htmlTable = Convert-TableToHtml $DBInfoTbl -TblID "DBInfoTable" -CSSClass "DatabaseInfoTable sortable" -DebugInfo:$DebugInfo
+
+				$HighestVLF = $DBInfoTbl | Sort-Object -Property "virtual_log_files" -Descending | Select-Object -ExpandProperty "virtual_log_files" -First 1
 				
 				$htmlTable1 = Convert-TableToHtml $DBFileInfoTbl -TblID "DBFileInfoTable" -CSSClass "DatabaseFileInfoTable sortable" -DebugInfo:$DebugInfo
 
@@ -2867,6 +2874,14 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 						$HighestTotalCPU = ($BlitzCacheTbl | Select-Object -ExpandProperty "Total CPU (ms)" -First 1)
 					} elseif ($SortOrder -eq "'Duration'") {
 						$HighestTotalDuration = ($BlitzCacheTbl | Select-Object -ExpandProperty "Total Duration (ms)" -First 1)
+					} elseif ($SortOrder -eq "'Reads'") {
+						$HighestTotalReads = ($BlitzCacheTbl | Select-Object -ExpandProperty "Total Reads" -First 1)
+					} elseif ($SortOrder -eq "'Executions'") {
+						$HighestTotalExecutions = ($BlitzCacheTbl | Select-Object -ExpandProperty '# Executions' -First 1)
+					} elseif ($SortOrder -eq "'Writes'") {
+						$HighestTotalWrites = ($BlitzCacheTbl | Select-Object -ExpandProperty "Total Writes" -First 1)
+					} elseif ($SortOrder -eq "'Spills'") {
+						$HighestTotalSpills = ($BlitzCacheTbl | Select-Object -ExpandProperty "Total Spills" -First 1)
 					}
 
 					if ($SheetName -eq "Mem & Recent Comp") {
@@ -2913,6 +2928,14 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 						$HighestAvgCPU = ($BlitzCacheTbl | Select-Object -ExpandProperty "Avg CPU (ms)" -First 1)
 					} elseif ($SortOrder -eq "'Average Duration'") {
 						$HighestAvgDuration = ($BlitzCacheTbl | Select-Object -ExpandProperty "Avg Duration (ms)" -First 1)
+					} elseif ($SortOrder -eq "'Average Reads'") {
+						$HighestAvgReads = ($BlitzCacheTbl | Select-Object -ExpandProperty "Average Reads" -First 1)
+					} elseif ($SortOrder -eq "'Executions per Minute'") {
+						$HighestExecsPerMin = ($BlitzCacheTbl | Select-Object -ExpandProperty 'Executions / Minute' -First 1)
+					} elseif ($SortOrder -eq "'Average Writes'") {
+						$HighestAvgWrites = ($BlitzCacheTbl | Select-Object -ExpandProperty "Average Writes" -First 1)
+					} elseif ($SortOrder -eq "'Average Spills'") {
+						$HighestAvgSpills = ($BlitzCacheTbl | Select-Object -ExpandProperty "Avg Spills" -First 1)
 					}
 
 					# Add heading if first half of the table failed
@@ -3234,6 +3257,10 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
 						$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexUsgTable', 2" -replace 'object', 'database'
 						$htmlTabSearch += "<br>"
+						$HVMissingIxCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*High Value Missing Index" }).Count
+						$HeapWithForwardedFetchesCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*Heap with Forwarded Fetches" }).Count
+						$ActiveHeapsCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*Active Heap" }).Count
+						$DupeIndexCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*Duplicate Keys" }).Count
 					}							
 					$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols $ExclCols -NoCaseChange -CSSClass "IxDiagTbl" -HyperlinkCol "FindingHL" -TblID "IndexUsgTable" -DebugInfo:$DebugInfo
 					$htmlTable += "`n<br>`n $JumpToTop`n"
@@ -4005,6 +4032,35 @@ finally {
 						$PageName = "Extended $PageName"
 					}
 					$Description = "Index-related diagnosis outlining high-value missing indexes,<br> duplicate or almost duplicate indexes, indexes with more writes than reads, etc."
+					if (($HVMissingIxCount -gt 0) -or ($HeapWithForwardedFetchesCount -gt 0) -or ($ActiveHeapsCount -gt 0) -or ($DupeIndexCount -gt 0)) {
+						$Description += "<br><span class=`"warnings-desc`">"
+						$IxDiagNewLine = ""
+						if ($HVMissingIxCount -gt 0) {
+							$Description += "High-value missing indexes: $HVMissingIxCount"
+							$IxDiagNewLine = ";"
+						}
+						if ($HeapWithForwardedFetchesCount -gt 0) {
+							$Description += "$IxDiagNewLine Heaps with forwarded fetches: $HeapWithForwardedFetchesCount"
+							if($IxDiagNewLine -eq ";") {
+							$IxDiagNewLine = "<br>"
+							} else{
+								$IxDiagNewLine = ";"
+							}
+						}
+						if ($ActiveHeapsCount -gt 0) {
+							$Description += "$IxDiagNewLine Active heaps: $ActiveHeapsCount"
+							if($IxDiagNewLine -eq ";") {
+							$IxDiagNewLine = "<br>"
+							} else{
+								$IxDiagNewLine = ";"
+							}
+						}
+						if ($DupeIndexCount -gt 0) {
+							$Description += "$IxDiagNewLine Duplicate or almost duplicate indexes: $DupeIndexCount"
+						}
+						$Description += "</span>"
+					}
+					
 					$RLim = "<td>10k</td>"
 					$Plans = "<td class=`"tooltip`" title=`"Only for SQL Server 2019 and above`">$HTMLChk*</td>"
 				} elseif ($File.Name -like "BlitzIndex_1*") {
@@ -4051,12 +4107,19 @@ finally {
 					$Description = "Top $CacheTop queries found in the plan cache, sorted by Total $SortOrder and "
 					if ($SortOrder -eq "Executions") {
 						$Description += "$SortOrder per Minute."
+						$Description += "<br><span class=`"additional-desc`">Highest Total Executions: $HighestTotalExecutions; Highest Execs/Min: $HighestExecsPerMin</span>"
 					} else {
 						$Description += "Average $SortOrder."
 						if ($SortOrder -eq "CPU") {
 							$Description += " <br><span class=`"additional-desc`">Highest Total CPU time: $HighestTotalCPU ms; Highest Avg CPU time: $HighestAvgCPU ms</span>"
 						} elseif ($SortOrder -eq "Duration") {
 							$Description += " <br><span class=`"additional-desc`">Highest Total Duration: $HighestTotalDuration ms; Highest Avg Duration: $HighestAvgDuration ms</span>"
+						} elseif ($SortOrder -eq "Reads") {
+							$Description += " <br><span class=`"additional-desc`">Highest Total Reads: $HighestTotalReads; Highest Avg Reads: $HighestAvgReads</span>"
+						} elseif ($SortOrder -eq "Writes") {
+							$Description += " <br><span class=`"additional-desc`">Highest Total Writes: $HighestTotalWrites; Highest Avg Writes: $HighestAvgWrites</span>"
+						} elseif ($SortOrder -eq "Spills") {
+							$Description += " <br><span class=`"additional-desc`">Highest Total Spills: $HighestTotalSpills; Highest Avg Spills: $HighestAvgSpills</span>"
 						}
 					}	
 				}
@@ -4164,6 +4227,9 @@ finally {
 					$Description += "$CheckDB and system databases."
 				} else {
 					$Description += "all databases on the instance."
+				}
+				if ($HighestVLF -ge 300) {
+					$Description += "<br><span class=`"warning-desc`">High VLF count detected: $HighestVLF</span>"
 				}
 			
 				$AdditionalInfo = ""
