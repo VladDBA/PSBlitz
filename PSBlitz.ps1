@@ -2247,6 +2247,8 @@ $htmlTable4 `n $HTMLBodyEnd
 				
 				$htmlTable1 = Convert-TableToHtml $AcTranTbl -ExclCols "current_sql", "current_plan", "most_recent_sql", "most_recent_plan" -DebugInfo:$DebugInfo -CSSClass "OpenTransTbl" -AnchorFromHere -AnchorIDs "Current", "MostRecent"
 
+				$OpenTranCount = ($AcTranTbl | Where-Object { $_.session_status -eq "sleeping" }).Count
+
 				$htmlTable2 = Convert-QueryTableToHtml $AcTranTbl -Cols "current_query", "current_sql" -CSSClass "query-table" -AnchorToHere -AnchorID "Current" -DebugInfo:$DebugInfo
 	
 				$htmlTable3 = Convert-QueryTableToHtml $AcTranTbl -Cols "most_recent_query", "most_recent_sql" -CSSClass "query-table" -AnchorToHere -AnchorID "MostRecent" -DebugInfo:$DebugInfo
@@ -4014,6 +4016,9 @@ finally {
 				$Plans = "<td>$HTMLChk</td>"
 				$QuerySource += "sys.dm_tran_session_transactions, sys.dm_tran_active_transactions, sys.dm_exec_sessions, sys.dm_exec_connections, and sys.dm_exec_requests"
 				$Description = "Information about currently open transactions."
+				if ($OpenTranCount -gt 0) {
+					$Description += "<br><span class=`"warnings-desc`">Found $OpenTranCount sleeping session(s) with open transaction(s).</span>"
+				}
 			} elseif ($File.Name -like "BlitzIndex*") {
 				$Mode = $File.Name.Replace('BlitzIndex_', '')
 				$Mode = $Mode.Replace('.html', '')
@@ -4041,17 +4046,17 @@ finally {
 						}
 						if ($HeapWithForwardedFetchesCount -gt 0) {
 							$Description += "$IxDiagNewLine Heaps with forwarded fetches: $HeapWithForwardedFetchesCount"
-							if($IxDiagNewLine -eq ";") {
-							$IxDiagNewLine = "<br>"
-							} else{
+							if ($IxDiagNewLine -eq ";") {
+								$IxDiagNewLine = "<br>"
+							} else {
 								$IxDiagNewLine = ";"
 							}
 						}
 						if ($ActiveHeapsCount -gt 0) {
 							$Description += "$IxDiagNewLine Active heaps: $ActiveHeapsCount"
-							if($IxDiagNewLine -eq ";") {
-							$IxDiagNewLine = "<br>"
-							} else{
+							if ($IxDiagNewLine -eq ";") {
+								$IxDiagNewLine = "<br>"
+							} else {
 								$IxDiagNewLine = ";"
 							}
 						}
