@@ -303,7 +303,7 @@ param(
 ###Internal params
 #Version
 $Vers = "5.10.0"
-$VersDate = "2025-12-01"
+$VersDate = "2025-12-03"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -433,7 +433,7 @@ YourDatabase only, via integrated security"
 PSBlitz.ps1 uses slightly modified, non-stored procedure versions, of the following components 
 from Brent Ozar's FirstResponderKit (https://www.brentozar.com/first-aid/):
    sp_Blitz`n   sp_BlitzCache`n   sp_BlitzFirst`n   sp_BlitzIndex
-   sp_BlitzLock`n   sp_BlitzWho`n   sp_BlitzQueryStore
+   sp_BlitzLock`n   sp_BlitzWho`n   sp_QuickieStore (from Darling Data)
 `n You can find the scripts in the '$ResourcesPath' directory
 "
 }
@@ -2086,6 +2086,11 @@ try {
 			} else {
 
 				$htmlTable2 = Convert-TableToHtml $ResourceInfoTbl -CSSClass RsrcInfoTbl -DebugInfo:$DebugInfo
+				[int]$CTP = $ResourceInfoTbl.Rows[0]["CTP"]
+				[int]$PhysCores = $ResourceInfoTbl.Rows[0]["physical_cpu_cores"]
+				[int]$MAXDOP = $ResourceInfoTbl.Rows[0]["MAXDOP"]
+				#This is a very basic check for MAXDOP misconfiguration
+				$MAXDOPWrong = if ((($MAXDOP -lt 8) -and ($PhysCores -ge 8)) -or (($MAXDOP -ne $PhysCores) -and ($PhysCores -le 8))) { $true } else { $false }
 			}
 
 			$htmlTable3 = Convert-TableToHtml $ConnectionsInfoTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
@@ -2158,6 +2163,12 @@ $htmlTable6 `n<br>`n<h2>Session level SET options</h2> `n $htmlTable4 `n $HTMLBo
 		if ($ToHTML -eq "Y") {
 
 			$htmlTable1 = Convert-TableToHtml $TempDBTbl -CSSClass "TempdbInfoTbl" -DebugInfo:$DebugInfo
+			[int]$TempDBFiles = $TempDBTbl.Rows[0]["data_files"]
+			if ($IsAzureSQLDB -eq $false) {
+				#This is a very basic check for tempdb files misconfiguration
+				$TempDBFilesWrong = if (($TempDBFiles -gt $PhysCores) -or (($PhysCores -ge 8) -and ($TempDBFiles -ne 8)) -or
+					(($PhysCores -lt 8) -and ($PhysCores -ne $TempDBFiles))  ) { $true } else { $false }
+			}
 
 			if ($TempTabTbl.Rows.Count -gt 0) {
 				$htmlTable2 = Convert-TableToHtml $TempTabTbl -CSSClass "InstCacheTbl" -DebugInfo:$DebugInfo
@@ -3127,6 +3138,12 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 
 						$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan", "database_name", "n" -CSSClass "QueryStoreTab$SortOrder sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
 
+						if ($SortOrder -eq "CPU") {
+							$HighestQSCPU = $BlitzQSTbl.Rows[0]["avg_cpu_time_ms"]
+						} elseif ($SortOrder -eq "Duration") { 
+							$HighestQSDuration = $BlitzQSTbl.Rows[0]["avg_duration_ms"]
+						}
+
 						$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -CSSClass "query-table" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
 
 						$HtmlTabName = "Query Store results for $databaseName - Average $SortOrder"
@@ -4007,10 +4024,25 @@ finally {
 				$PageName = "Instance Information"
 				$QuerySource += "sys.dm_os_sys_info, sys.dm_os_performance_counters and SERVERPROPERTY()"
 				$Description = "Summary information about the instance and its resources."
+				if (($CTP -lt 50) -or ($MAXDOPWrong)) {
+					$Description += "<br><span class=`"warnings-desc`">"
+					$AddDescSeparator = ""
+					if ($CTP -lt 50) {
+						$Description += "CTP is too low: $CTP"
+						$AddDescSeparator = "<br>"
+					}
+					if ($MAXDOPWrong) {
+						$Description += "$AddDescSeparator MAXDOP might be misconfigured: $MAXDOP"
+					}
+					$Description += "</span>"
+				}
 			} elseif ($File.Name -like "TempDBInfo*") {
 				$PageName = "TempDB Information"
 				$QuerySource += "dm_db_file_space_usage, dm_db_partition_stats, dm_exec_requests"
 				$Description = "Information pertaining to TempDB usage, size and configuration."
+				if ($TempDBFilesWrong) {
+					$Description += "<br><span class=`"warnings-desc`">Tempdb data file count misconfigured: $TempDBFiles</span>"
+				}
 			} elseif ($File.Name -like "OpenTransactions*") {
 				$PageName = "Open Transactions"
 				$Plans = "<td>$HTMLChk</td>"
@@ -4039,29 +4071,29 @@ finally {
 					$Description = "Index-related diagnosis outlining high-value missing indexes,<br> duplicate or almost duplicate indexes, indexes with more writes than reads, etc."
 					if (($HVMissingIxCount -gt 0) -or ($HeapWithForwardedFetchesCount -gt 0) -or ($ActiveHeapsCount -gt 0) -or ($DupeIndexCount -gt 0)) {
 						$Description += "<br><span class=`"warnings-desc`">"
-						$IxDiagNewLine = ""
+						$AddDescSeparator = ""
 						if ($HVMissingIxCount -gt 0) {
 							$Description += "High-value missing indexes: $HVMissingIxCount"
-							$IxDiagNewLine = ";"
+							$AddDescSeparator = ";"
 						}
 						if ($HeapWithForwardedFetchesCount -gt 0) {
-							$Description += "$IxDiagNewLine Heaps with forwarded fetches: $HeapWithForwardedFetchesCount"
-							if ($IxDiagNewLine -eq ";") {
-								$IxDiagNewLine = "<br>"
+							$Description += "$AddDescSeparator Heaps with forwarded fetches: $HeapWithForwardedFetchesCount"
+							if ($AddDescSeparator -eq ";") {
+								$AddDescSeparator = "<br>"
 							} else {
-								$IxDiagNewLine = ";"
+								$AddDescSeparator = ";"
 							}
 						}
 						if ($ActiveHeapsCount -gt 0) {
-							$Description += "$IxDiagNewLine Active heaps: $ActiveHeapsCount"
-							if ($IxDiagNewLine -eq ";") {
-								$IxDiagNewLine = "<br>"
+							$Description += "$AddDescSeparator Active heaps: $ActiveHeapsCount"
+							if ($AddDescSeparator -eq ";") {
+								$AddDescSeparator = "<br>"
 							} else {
-								$IxDiagNewLine = ";"
+								$AddDescSeparator = ";"
 							}
 						}
 						if ($DupeIndexCount -gt 0) {
-							$Description += "$IxDiagNewLine Duplicate or almost duplicate indexes: $DupeIndexCount"
+							$Description += "$AddDescSeparator Duplicate or almost duplicate indexes: $DupeIndexCount"
 						}
 						$Description += "</span>"
 					}
@@ -4144,6 +4176,11 @@ finally {
 					$Description += " for $DBName"
 				}
 				$Description += ",<br>sorted by average $SortOrder."
+				if ($SortOrder -eq "CPU") {
+					$Description += "<br><span class=`"additional-desc`">Highest Avg CPU time: $HighestQSCPU ms</span>"
+				} elseif ($SortOrder -eq "Duration") {
+					$Description += "<br><span class=`"additional-desc`">Highest Avg Duration: $HighestQSDuration ms</span>"
+				} 
 				$QuerySource += "Similar to sp_QuickieStore @top = 20, @sort_order='$SortOrder'"
 				if ($IsQueryStoreInterval) {
 					$QuerySource += ", @start_time = '$QueryStoreIntervalStart', @end_time = '$QueryStoreIntervalEnd'"
