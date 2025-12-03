@@ -104,7 +104,7 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-SELECT @Version = '8.26', @VersionDate = '20251002';
+SELECT @Version = '8.28', @VersionDate = '20251124';
 
 IF(@VersionCheckMode = 1)
 BEGIN
@@ -202,7 +202,18 @@ DECLARE @StringToExecute NVARCHAR(MAX),
 	@get_thread_time_ms NVARCHAR(MAX) = N'',
 	@thread_time_ms FLOAT = 0,
 	@logical_processors INT = 0,
-	@max_worker_threads INT = 0;
+	@max_worker_threads INT = 0,
+    @is_windows_operating_system BIT = 1;
+
+IF EXISTS
+(
+    SELECT  1
+    FROM    sys.all_objects
+    WHERE   name = 'dm_os_host_info'
+)
+BEGIN
+    SELECT @is_windows_operating_system = CASE WHEN host_platform = 'Windows' THEN 1 ELSE 0 END FROM sys.dm_os_host_info;
+END;
 
 /* Sanitize our inputs */
 SELECT
@@ -2456,19 +2467,28 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
 			RAISERROR('Running CheckID 24',10,1) WITH NOWAIT;
 		END
 
+        /* Traditionally, we use 100 - SystemIdle here.
+        However, SystemIdle is always 0 on Linux.
+        So if we are on Linux, we use ProcessUtilization instead.
+		This is the approach found in
+		https://techcommunity.microsoft.com/blog/sqlserver/sql-server-cpu-usage-available-in-sys-dm-os-ring-buffers-dmv-starting-sql-server/825361 */
         INSERT INTO #BlitzFirstResults (CheckID, Priority, FindingsGroup, Finding, Details, DetailsInt, URL)
-        SELECT 24, 50, 'Server Performance', 'High CPU Utilization', CAST(100 - SystemIdle AS NVARCHAR(20)) + N'%.', 100 - SystemIdle, 'https://www.brentozar.com/go/cpu'
+        SELECT 24, 50, 'Server Performance', 'High CPU Utilization', CAST(CpuUsage AS NVARCHAR(20)) + N'%.', CpuUsage, 'https://www.brentozar.com/go/cpu'
+        FROM (
+            SELECT CASE WHEN @is_windows_operating_system = 1 THEN 100 - SystemIdle ELSE ProcessUtilization END AS CpuUsage
             FROM (
                 SELECT record,
-                    record.value('(./Record/SchedulerMonitorEvent/SystemHealth/SystemIdle)[1]', 'int') AS SystemIdle
+                    record.value('(./Record/SchedulerMonitorEvent/SystemHealth/SystemIdle)[1]', 'int') AS SystemIdle,
+                    record.value('(./Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int') AS ProcessUtilization
                 FROM (
                     SELECT TOP 1 CONVERT(XML, record) AS record
                     FROM sys.dm_os_ring_buffers
                     WHERE ring_buffer_type = N'RING_BUFFER_SCHEDULER_MONITOR'
                     AND record LIKE '%<SystemHealth>%'
                     ORDER BY timestamp DESC) AS rb
-            ) AS y
-            WHERE 100 - SystemIdle >= 50;
+            ) AS ShreddedCpuXml
+        ) AS OsCpu
+        WHERE CpuUsage >= 50;
 
         /* CPU Utilization - CheckID 23 */
 		IF (@Debug = 1)
@@ -2480,7 +2500,8 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
 			WITH y
 				AS
 				 (
-					 SELECT      CONVERT(VARCHAR(5), 100 - ca.c.value('.', 'INT')) AS system_idle,
+                     /* See earlier comments about SystemIdle on Linux. */
+					 SELECT      CONVERT(VARCHAR(5), CASE WHEN @is_windows_operating_system = 1 THEN 100 - ca.c.value('.', 'INT') ELSE ca2.p.value('.', 'INT') END) AS cpu_usage,
 								 CONVERT(VARCHAR(30), rb.event_date) AS event_date,
 								 CONVERT(VARCHAR(8000), rb.record) AS record,
 								 event_date as event_date_raw
@@ -2493,6 +2514,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
 									 WHERE  dorb.ring_buffer_type = N'RING_BUFFER_SCHEDULER_MONITOR'
 									 AND    record LIKE '%<SystemHealth>%' ) AS rb
 					 CROSS APPLY rb.record.nodes('/Record/SchedulerMonitorEvent/SystemHealth/SystemIdle') AS ca(c)
+                     CROSS APPLY rb.record.nodes('/Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization') AS ca2(p)
 				 )
 			INSERT INTO #BlitzFirstResults (CheckID, Priority, FindingsGroup, Finding, Details, DetailsInt, URL, HowToStopIt)
 			SELECT TOP 1 
@@ -2500,12 +2522,12 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
 					250, 
 					'Server Info', 
 					'CPU Utilization', 
-					y.system_idle + N'%. Ring buffer details: ' + CAST(y.record AS NVARCHAR(4000)), 
-					y.system_idle	, 
+					y.cpu_usage + N'%. Ring buffer details: ' + CAST(y.record AS NVARCHAR(4000)), 
+					y.cpu_usage	, 
 					'https://www.brentozar.com/go/cpu',
 					STUFF(( SELECT TOP 2147483647
 							  CHAR(10) + CHAR(13)
-							+ y2.system_idle 
+							+ y2.cpu_usage
 							+ '% ON ' 
 							+ y2.event_date 
 							+ ' Ring buffer details:  '
@@ -2536,7 +2558,12 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                     AND record LIKE '%<SystemHealth>%'
                     ORDER BY timestamp DESC) AS rb
             ) AS y
-            WHERE 100 - (y.SQLUsage + y.SystemIdle) >= 25;
+            WHERE 100 - (y.SQLUsage + y.SystemIdle) >= 25
+            /* SystemIdle is always 0 on Linux, as described earlier.
+            We therefore cannot distinguish between a totally idle Linux server and
+            a Linux server where SQL Server is being crushed by other CPU-heavy processes.
+            We therefore disable this check on Linux. */
+            AND @is_windows_operating_system = 1;
 		
         END; /* IF @Seconds < 30 */
 
@@ -2617,7 +2644,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
 											 N' this is likely due to an Index operation in Progress', -1;
 					END
 					ELSE
-					BEGIN
+					BEGIN;
 						THROW;
 					END
 				END CATCH
@@ -3650,18 +3677,24 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
 		END
 
         INSERT INTO #BlitzFirstResults (CheckID, Priority, FindingsGroup, Finding, Details, DetailsInt, URL)
-        SELECT 24, 50, 'Server Performance', 'High CPU Utilization', CAST(100 - SystemIdle AS NVARCHAR(20)) + N'%. Ring buffer details: ' + CAST(record AS NVARCHAR(4000)), 100 - SystemIdle, 'https://www.brentozar.com/go/cpu'
+        SELECT 24, 50, 'Server Performance', 'High CPU Utilization', CAST(CpuUsage AS NVARCHAR(20)) + N'%. Ring buffer details: ' + CAST(record AS NVARCHAR(4000)), CpuUsage, 'https://www.brentozar.com/go/cpu'
+        FROM (
+            SELECT record,
+                CASE WHEN @is_windows_operating_system = 1 THEN 100 - SystemIdle ELSE ProcessUtilization END AS CpuUsage
             FROM (
                 SELECT record,
-                    record.value('(./Record/SchedulerMonitorEvent/SystemHealth/SystemIdle)[1]', 'int') AS SystemIdle
+                    record.value('(./Record/SchedulerMonitorEvent/SystemHealth/SystemIdle)[1]', 'int') AS SystemIdle,
+                    /* See earlier comments about SystemIdle on Linux. */
+                    record.value('(./Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int') AS ProcessUtilization
                 FROM (
                     SELECT TOP 1 CONVERT(XML, record) AS record
                     FROM sys.dm_os_ring_buffers
                     WHERE ring_buffer_type = N'RING_BUFFER_SCHEDULER_MONITOR'
                     AND record LIKE '%<SystemHealth>%'
                     ORDER BY timestamp DESC) AS rb
-            ) AS y
-            WHERE 100 - SystemIdle >= 50;
+            ) AS ShreddedCpuXml
+        ) AS OsCpu
+        WHERE CpuUsage >= 50;
 
         /* Server Performance - CPU Utilization CheckID 23 */
 		IF (@Debug = 1)
@@ -3670,17 +3703,23 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
 		END
 
         INSERT INTO #BlitzFirstResults (CheckID, Priority, FindingsGroup, Finding, Details, DetailsInt, URL)
-        SELECT 23, 250, 'Server Info', 'CPU Utilization', CAST(100 - SystemIdle AS NVARCHAR(20)) + N'%. Ring buffer details: ' + CAST(record AS NVARCHAR(4000)), 100 - SystemIdle, 'https://www.brentozar.com/go/cpu'
+        SELECT 23, 250, 'Server Info', 'CPU Utilization', CAST(CpuUsage AS NVARCHAR(20)) + N'%. Ring buffer details: ' + CAST(record AS NVARCHAR(4000)), CpuUsage, 'https://www.brentozar.com/go/cpu'
+        FROM (
+            SELECT record,
+                CASE WHEN @is_windows_operating_system = 1 THEN 100 - SystemIdle ELSE ProcessUtilization END AS CpuUsage
             FROM (
                 SELECT record,
-                    record.value('(./Record/SchedulerMonitorEvent/SystemHealth/SystemIdle)[1]', 'int') AS SystemIdle
+                    record.value('(./Record/SchedulerMonitorEvent/SystemHealth/SystemIdle)[1]', 'int') AS SystemIdle,
+                    /* See earlier comments about SystemIdle on Linux. */
+                    record.value('(./Record/SchedulerMonitorEvent/SystemHealth/ProcessUtilization)[1]', 'int') AS ProcessUtilization
                 FROM (
                     SELECT TOP 1 CONVERT(XML, record) AS record
                     FROM sys.dm_os_ring_buffers
                     WHERE ring_buffer_type = N'RING_BUFFER_SCHEDULER_MONITOR'
                     AND record LIKE '%<SystemHealth>%'
                     ORDER BY timestamp DESC) AS rb
-            ) AS y;
+            ) AS ShreddedCpuXml
+        ) AS OsCpu;
 
 	END; /* IF @Seconds >= 30 */
 
@@ -4875,7 +4914,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
         END;
         ELSE IF @OutputType <> 'NONE' AND @OutputXMLasNVARCHAR = 1 AND @SinceStartup = 0 AND @OutputResultSets LIKE N'%Findings%'
         BEGIN
-        /*Vlad - column changes for PSBlitz*/
+         /*Vlad - column changes for PSBlitz*/
             SELECT  [Priority] ,
                     [FindingsGroup] ,
                     [Finding] ,
@@ -4975,21 +5014,22 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                     FROM #WaitStats
                 )
                 SELECT
-                    /*'WAIT STATS' AS Pattern,-- Vlad - column changes for PSBlitz */
-                    CONVERT(VARCHAR(25),CAST(b.SampleTime AS DATETIME),120) AS [Sample Ended], /*Changes for PSBlitz*/
-                    CAST(DATEDIFF(mi,wd1.SampleTime, wd2.SampleTime) / 60. AS DECIMAL(18,1)) AS [Hours Sample],
-					CAST(c.[Total Thread Time (Seconds)] / 60. / 60. AS DECIMAL(18,1)) AS [Thread Time (Hours)],
+                    /* 'WAIT STATS' AS Pattern,-- Vlad - column changes for PSBlitz */
+                    CONVERT(VARCHAR(25),CAST(b.SampleTime AS DATETIME),120) AS [Sample Ended],/*changes for PSBlitz */ 
+                    DATEDIFF(ss,wd1.SampleTime, wd2.SampleTime) AS [Seconds Sample],
+					c.[Total Thread Time (Seconds)],
                     wd1.wait_type,
-					'<a href=''https://www.sqlskills.com/help/waits/' + LOWER(wd1.wait_type) + '/'' target=''_blank''>'+wd1.wait_type+'</a>' AS [wait_typeHL], /*Changes for PSBlitz*/
+					'<a href=''https://www.sqlskills.com/help/waits/' + LOWER(wd1.wait_type)
+					+ '/'' target=''_blank''>'+wd1.wait_type+'</a>' AS [wait_typeHL], /*changes for PSBlitz */ 
 					COALESCE(wcat.WaitCategory, 'Other') AS wait_category,
-                    CAST(c.[Wait Time (Seconds)] / 60. / 60. AS DECIMAL(18,1)) AS [Wait Time (Hours)],
-                    /*CASE WHEN (wd2.waiting_tasks_count - wd1.waiting_tasks_count) > 0
+                    c.[Wait Time (Seconds)],
+					/*CASE WHEN (wd2.waiting_tasks_count - wd1.waiting_tasks_count) > 0
                     THEN
                         CAST((wd2.wait_time_ms-wd1.wait_time_ms)/
                             (1.0*(wd2.waiting_tasks_count - wd1.waiting_tasks_count)) AS NUMERIC(12,1))
-                    ELSE 0 END AS [Avg ms Per Wait], -- Vlad moved lower - changes for PSBlitz*/
-                    CAST((wd2.wait_time_ms - wd1.wait_time_ms) / 1000.0 / cores.cpu_count / DATEDIFF(ss, wd1.SampleTime, wd2.SampleTime) AS DECIMAL(18,1)) AS [Per Core Per Hour],
-                    CAST(c.[Signal Wait Time (Seconds)] / 60.0 / 60 AS DECIMAL(18,1)) AS [Signal Wait Time (Hours)],
+                    ELSE 0 END AS [Avg ms Per Wait],  -- Vlad moved lower - changes for PSBlitz*/
+                    CAST((CAST(wd2.wait_time_ms - wd1.wait_time_ms AS MONEY)) / 1000.0 / cores.cpu_count / DATEDIFF(ss, wd1.SampleTime, wd2.SampleTime) AS DECIMAL(18,1)) AS [Per Core Per Second],
+                    c.[Signal Wait Time (Seconds)],
                     CASE WHEN c.[Wait Time (Seconds)] > 0
                      THEN CAST(100.*(c.[Signal Wait Time (Seconds)]/c.[Wait Time (Seconds)]) AS NUMERIC(4,1))
                     ELSE 0 END AS [Percent Signal Waits],
@@ -5080,7 +5120,8 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
             WITH readstats AS (
                 SELECT 'PHYSICAL READS' AS Pattern,
                 ROW_NUMBER() OVER (ORDER BY wd2.avg_stall_read_ms DESC) AS StallRank,
-                wd2.SampleTime AS [Sample Time],
+				CONVERT(VARCHAR(25),CAST(wd2.SampleTime AS DATETIME),120) AS [Sample Time],/*changes for PSBlitz 
+                wd2.SampleTime AS [Sample Time], */
                 DATEDIFF(ss,wd1.SampleTime, wd2.SampleTime) AS [Sample (seconds)],
                 wd1.DatabaseName ,
                 wd1.FileLogicalName AS [File Name],
@@ -5102,7 +5143,8 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                 SELECT
                 'PHYSICAL WRITES' AS Pattern,
                 ROW_NUMBER() OVER (ORDER BY wd2.avg_stall_write_ms DESC) AS StallRank,
-                wd2.SampleTime AS [Sample Time],
+                CONVERT(VARCHAR(25),CAST(wd2.SampleTime AS DATETIME),120) AS [Sample Time],/*changes for PSBlitz 
+                wd2.SampleTime AS [Sample Time], */
                 DATEDIFF(ss,wd1.SampleTime, wd2.SampleTime) AS [Sample (seconds)],
                 wd1.DatabaseName ,
                 wd1.FileLogicalName AS [File Name],
@@ -5121,14 +5163,11 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                   AND wd1.FileID = wd2.FileID
             )
             SELECT
-                Pattern, 
-				CONVERT(VARCHAR(25),CAST([Sample Time] AS DATETIME),120) AS [Sample Time], /*changes for PSBlitz */ 
-				[Sample (seconds)], [File Name], [Drive],  [# Reads/Writes],[MB Read/Written],[Avg Stall (ms)], [file physical name], [DatabaseName], [StallRank]
+                Pattern, [Sample Time], [Sample (seconds)], [File Name], [Drive],  [# Reads/Writes],[MB Read/Written],[Avg Stall (ms)], [file physical name], [DatabaseName], [StallRank]
             FROM readstats
             WHERE StallRank <=20 AND [MB Read/Written] > 0
             UNION ALL
-            SELECT Pattern, CONVERT(VARCHAR(25),CAST([Sample Time] AS DATETIME),120) AS [Sample Time], /*changes for PSBlitz */ 
-			[Sample (seconds)], [File Name], [Drive],  [# Reads/Writes],[MB Read/Written],[Avg Stall (ms)], [file physical name], [DatabaseName], [StallRank]
+            SELECT Pattern, [Sample Time], [Sample (seconds)], [File Name], [Drive],  [# Reads/Writes],[MB Read/Written],[Avg Stall (ms)], [file physical name], [DatabaseName], [StallRank]
             FROM writestats
             WHERE StallRank <=20 AND [MB Read/Written] > 0
             ORDER BY Pattern, StallRank;
@@ -5190,5 +5229,3 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
 
 END; /* IF @LogMessage IS NULL */
 END; /* ELSE IF @OutputType = 'SCHEMA' */
-
-SET NOCOUNT OFF;

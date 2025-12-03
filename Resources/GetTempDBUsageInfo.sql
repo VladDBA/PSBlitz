@@ -65,4 +65,5 @@ FROM   [sys].[dm_db_task_space_usage] [tsu]
 WHERE  [tsu].[session_id] > 50
        AND ( [tsu].[user_objects_alloc_page_count] > 0
               OR [tsu].[internal_objects_alloc_page_count] > 0 )
-ORDER  BY [total_allocation_MB] DESC; 
+       AND [tsu].[session_id] <> @@SPID
+ORDER  BY [total_allocation_MB] DESC;

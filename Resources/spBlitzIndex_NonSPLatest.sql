@@ -93,7 +93,7 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-SELECT @Version = '8.26', @VersionDate = '20251002';
+SELECT @Version = '8.28', @VersionDate = '20251124';
 SET @OutputType  = UPPER(@OutputType);
 
 IF(@VersionCheckMode = 1)
@@ -177,12 +177,75 @@ DECLARE @PartitionCount INT;
 DECLARE @OptimizeForSequentialKey BIT = 0;
 DECLARE @ResumableIndexesDisappearAfter INT = 0;
 DECLARE @StringToExecute NVARCHAR(MAX);
+DECLARE @AzureSQLDB BIT = (SELECT CASE WHEN SERVERPROPERTY('EngineEdition') = 5 THEN 1 ELSE 0 END);
 
 /* If user was lazy and just used @ObjectName with a fully qualified table name, then lets parse out the various parts */
 SET @DatabaseName = COALESCE(@DatabaseName, PARSENAME(@ObjectName, 3)) /* 3 = Database name */
 SET @SchemaName   = COALESCE(@SchemaName,   PARSENAME(@ObjectName, 2)) /* 2 = Schema name */
 SET @TableName    = COALESCE(@TableName,    PARSENAME(@ObjectName, 1)) /* 1 = Table name */
 
+/* Handle already quoted input if it wasn't fully qualified - only if @ObjectName is null*/
+IF (@ObjectName IS NULL)
+   BEGIN
+        SELECT @DatabaseName = CASE WHEN @DatabaseName LIKE N'\[%\]' ESCAPE N'\' THEN PARSENAME(@DatabaseName,1) ELSE @DatabaseName 
+                               END,
+               @SchemaName   = ISNULL(
+                                     CASE /*only apply parsename if the schema is actually quoted*/
+                                      WHEN @SchemaName LIKE N'\[%\]' ESCAPE N'\' THEN  PARSENAME(@SchemaName,1) ELSE @SchemaName 
+                                     END,
+                                     CASE /*if we already have @TableName in the form of [some.schema].[some.table]*/
+                                      WHEN @TableName LIKE N'\[%\].\[%\]' ESCAPE N'\' THEN PARSENAME(@TableName,2)
+                                      /*I'm making an assumption here that people who use . in their naming conventions would have one in each object name*/
+                                      WHEN LEN(@TableName)- LEN(REPLACE(@TableName,'.','')) = 1 THEN PARSENAME(@TableName,2) ELSE NULL 
+                                     END),
+               @TableName    = CASE 
+                                 WHEN @TableName LIKE N'\[%\].\[%\]' ESCAPE N'\' OR @TableName LIKE N'\[%\]' ESCAPE N'\' THEN PARSENAME(@TableName,1)
+                                 WHEN LEN(@TableName)- LEN(REPLACE(@TableName,'.','')) = 1 THEN PARSENAME(@TableName,1) ELSE @TableName 
+                                END;
+END;
+
+/* If we're on Azure SQL DB let's cut people some slack */
+IF (@TableName IS NOT NULL AND @AzureSQLDB = 1 AND @DatabaseName IS NULL)
+   BEGIN
+        SET @DatabaseName = DB_NAME();
+   END;
+
+
+IF (@SchemaName IS NULL AND @TableName IS NOT NULL)
+   BEGIN
+       /* If the target is in the current database 
+  and there's just one table or view with this name, then we can grab the schema from sys.objects*/
+       IF ((SELECT COUNT(1) FROM [sys].[objects] 
+               WHERE [name] = @TableName AND [type] IN ('U','V'))=1 
+              AND @TableName IS NOT NULL  AND @DatabaseName = DB_NAME())
+          BEGIN
+              SELECT @SchemaName = SCHEMA_NAME([schema_id]) 
+               FROM [sys].[objects] 
+               WHERE [name] = @TableName AND [type] IN ('U','V');
+          END;
+        /* If the target isn't in the current database, then use dynamic T-SQL*/  
+        IF (@DatabaseName <> DB_NAME()) 
+          BEGIN
+               /*first make sure only one row is returned from sys.objects*/
+               SET @dsql = N'SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+                    SELECT @RowcountOUT = COUNT(1) FROM ' + QUOTENAME(@DatabaseName) + N'.[sys].[objects] 
+                    WHERE [name] = @TableName_IN AND [type] IN (''U'',''V'') OPTION  (RECOMPILE);';
+                SET @params = N'@TableName_IN NVARCHAR(128), @RowcountOUT BIGINT OUTPUT';
+                EXEC sp_executesql @dsql, @params, @TableName_IN = @TableName, @RowcountOUT = @Rowcount OUTPUT;
+
+                IF (@Rowcount = 1)
+                  BEGIN
+                      SET @dsql = N'SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
+                      SELECT @SchemaName_OUT = s.[name] 
+                       FROM ' + QUOTENAME(@DatabaseName) + N'.[sys].[objects] o
+                       INNER JOIN ' + QUOTENAME(@DatabaseName) + N'.[sys].[schemas] s
+                          ON o.[schema_id] = s.[schema_id]
+                       WHERE o.[name] = @TableName_IN AND o.[type] IN (''U'',''V'') OPTION  (RECOMPILE);';
+                      SET @params = N'@TableName_IN NVARCHAR(128), @SchemaName_OUT NVARCHAR(128) OUTPUT';
+                      EXEC sp_executesql @dsql, @params, @TableName_IN = @TableName, @SchemaName_OUT = @SchemaName OUTPUT;
+                   END;
+          END;  
+ END;
 
 /* Let's get @SortOrder set to lower case here for comparisons later */
 SET @SortOrder = REPLACE(LOWER(@SortOrder), N' ', N'_');
@@ -223,6 +286,26 @@ BEGIN
     RAISERROR('Invalid value for parameter @UsualStatisticsSamplingPercent. Expected: 1 to 100',12,1);
     RETURN;
 END;
+
+/* Some prep-work for output object names before checking if they're ok or not */
+IF (@OutputTableName IS NOT NULL)
+BEGIN
+     
+    /*Deal with potentially quoted object names*/
+    SET @OutputDatabaseName = PARSENAME(@OutputDatabaseName,1);
+    SET @OutputSchemaName = ISNULL(PARSENAME(@OutputSchemaName,1),PARSENAME(@OutputTableName,2));
+    SET @OutputTableName = PARSENAME(@OutputTableName,1);
+
+    /* Running on Azure SQL DB or outputting to current database? */
+    IF (@OutputDatabaseName IS NULL AND @AzureSQLDB = 1)
+    BEGIN
+        SET @OutputDatabaseName = DB_NAME();
+    END;
+    IF (@OutputSchemaName IS NULL AND @OutputDatabaseName = DB_NAME())
+      BEGIN
+          SET @OutputSchemaName = SCHEMA_NAME();
+      END;
+END; 
 
 IF(@OutputType = 'TABLE' AND NOT (@OutputTableName IS NULL AND @OutputSchemaName IS NULL AND @OutputDatabaseName IS NULL AND @OutputServerName IS NULL))
 BEGIN
@@ -372,6 +455,7 @@ IF OBJECT_ID('tempdb..#dm_db_index_operational_stats') IS NOT NULL
               is_spatial BIT NOT NULL,
               is_NC_columnstore BIT NOT NULL,
               is_CX_columnstore BIT NOT NULL,
+              is_JSON BIT NOT NULL,
               is_in_memory_oltp BIT NOT NULL ,
               is_disabled BIT NOT NULL ,
               is_hypothetical BIT NOT NULL ,
@@ -413,6 +497,7 @@ IF OBJECT_ID('tempdb..#dm_db_index_operational_stats') IS NOT NULL
                     ELSE N'' END + CASE WHEN is_XML = 1 THEN N'[XML] '
                     ELSE N'' END + CASE WHEN is_spatial = 1 THEN N'[SPATIAL] '
                     ELSE N'' END + CASE WHEN is_NC_columnstore = 1 THEN N'[COLUMNSTORE] '
+                    ELSE N'' END + CASE WHEN is_json = 1 THEN N'[JSON] '
                     ELSE N'' END + CASE WHEN is_in_memory_oltp = 1 THEN N'[IN-MEMORY] '
                     ELSE N'' END + CASE WHEN is_disabled = 1 THEN N'[DISABLED] '
                     ELSE N'' END + CASE WHEN is_hypothetical = 1 THEN N'[HYPOTHETICAL] '
@@ -1457,6 +1542,7 @@ BEGIN TRY
                         CASE when si.type = 4 THEN 1 ELSE 0 END AS is_spatial,
                         CASE when si.type = 6 THEN 1 ELSE 0 END AS is_NC_columnstore,
                         CASE when si.type = 5 then 1 else 0 end as is_CX_columnstore,
+                        CASE when si.type = 9 then 1 else 0 end as is_JSON,
                         CASE when si.data_space_id = 0 then 1 else 0 end as is_in_memory_oltp,
                         si.is_disabled,
                         si.is_hypothetical, 
@@ -1490,8 +1576,8 @@ BEGIN TRY
                         LEFT JOIN sys.dm_db_index_usage_stats AS us WITH (NOLOCK) ON si.[object_id] = us.[object_id]
                                                                        AND si.index_id = us.index_id
                                                                        AND us.database_id = ' + CAST(@DatabaseID AS NVARCHAR(10)) + N'
-                WHERE    si.[type] IN ( 0, 1, 2, 3, 4, 5, 6 ) 
-                /* Heaps, clustered, nonclustered, XML, spatial, Cluster Columnstore, NC Columnstore */ ' +
+                WHERE    si.[type] IN ( 0, 1, 2, 3, 4, 5, 6, 9 ) 
+                /* Heaps, clustered, nonclustered, XML, spatial, Cluster Columnstore, NC Columnstore, JSON */ ' +
                 CASE WHEN @TableName IS NOT NULL THEN N' and so.name=' + QUOTENAME(@TableName,N'''') + N' ' ELSE N'' END +
                 CASE WHEN ( @IncludeInactiveIndexes = 0
                             AND @Mode IN (0, 4)
@@ -1519,7 +1605,7 @@ BEGIN TRY
                 PRINT SUBSTRING(@dsql, 36000, 40000);
             END;
         INSERT    #IndexSanity ( [database_id], [object_id], [index_id], [index_type], [database_name], [schema_name], [object_name],
-                                index_name, is_indexed_view, is_unique, is_primary_key, is_unique_constraint, is_XML, is_spatial, is_NC_columnstore, is_CX_columnstore, is_in_memory_oltp,
+                                index_name, is_indexed_view, is_unique, is_primary_key, is_unique_constraint, is_XML, is_spatial, is_NC_columnstore, is_CX_columnstore, is_JSON, is_in_memory_oltp,
                                 is_disabled, is_hypothetical, is_padded, fill_factor, filter_definition,  [optimize_for_sequential_key], user_seeks, user_scans, 
                                 user_lookups, user_updates, last_user_seek, last_user_scan, last_user_lookup, last_user_update,
                                 create_date, modify_date )
@@ -1996,7 +2082,7 @@ WITH
                   ON ty.user_type_id = co.user_type_id 
                 WHERE id_inner.index_handle = id.index_handle
                 AND   id_inner.object_id = id.object_id
-				AND   id_inner.database_id = DB_ID(''' +  QUOTENAME(@DatabaseName) + N''')
+				AND   id_inner.database_id = DB_ID(@i_DatabaseName)
                 AND   cn_inner.IndexColumnType = cn.IndexColumnType
                 FOR XML PATH('''')
                 ),
@@ -2034,7 +2120,7 @@ WITH
                ) x (n)
                CROSS APPLY n.nodes(''x'') node(v)
            )AS cn
-		   WHERE id.database_id = DB_ID(''' +  QUOTENAME(@DatabaseName) + N''')
+		   WHERE id.database_id = DB_ID(@i_DatabaseName)
            GROUP BY    
                id.index_handle,
                id.object_id,
@@ -2180,48 +2266,48 @@ OPTION (RECOMPILE);';
 		END;
 
         SET @dsql = N'
-            SELECT DB_ID(N' + QUOTENAME(@DatabaseName,'''') + N') AS [database_id], 
-			    @i_DatabaseName AS database_name,
+			SELECT DB_ID(@i_DatabaseName) AS [database_id], 
+				@i_DatabaseName AS database_name,
 				s.name,
-                fk_object.name AS foreign_key_name,
-                parent_object.[object_id] AS parent_object_id,
-                parent_object.name AS parent_object_name,
-                referenced_object.[object_id] AS referenced_object_id,
-                referenced_object.name AS referenced_object_name,
-                fk.is_disabled,
-                fk.is_not_trusted,
-                fk.is_not_for_replication,
-                parent.fk_columns,
-                referenced.fk_columns,
-                [update_referential_action_desc],
-                [delete_referential_action_desc]
-            FROM ' + QUOTENAME(@DatabaseName) + N'.sys.foreign_keys fk
-            JOIN ' + QUOTENAME(@DatabaseName) + N'.sys.objects fk_object ON fk.object_id=fk_object.object_id
-            JOIN ' + QUOTENAME(@DatabaseName) + N'.sys.objects parent_object ON fk.parent_object_id=parent_object.object_id
-            JOIN ' + QUOTENAME(@DatabaseName) + N'.sys.objects referenced_object ON fk.referenced_object_id=referenced_object.object_id
+				fk_object.name AS foreign_key_name,
+				parent_object.[object_id] AS parent_object_id,
+				parent_object.name AS parent_object_name,
+				referenced_object.[object_id] AS referenced_object_id,
+				referenced_object.name AS referenced_object_name,
+				fk.is_disabled,
+				fk.is_not_trusted,
+				fk.is_not_for_replication,
+				parent.fk_columns,
+				referenced.fk_columns,
+				[update_referential_action_desc],
+				[delete_referential_action_desc]
+			FROM ' + QUOTENAME(@DatabaseName) + N'.sys.foreign_keys fk
+			JOIN ' + QUOTENAME(@DatabaseName) + N'.sys.objects fk_object ON fk.object_id=fk_object.object_id
+			JOIN ' + QUOTENAME(@DatabaseName) + N'.sys.objects parent_object ON fk.parent_object_id=parent_object.object_id
+			JOIN ' + QUOTENAME(@DatabaseName) + N'.sys.objects referenced_object ON fk.referenced_object_id=referenced_object.object_id
 			JOIN ' + QUOTENAME(@DatabaseName) + N'.sys.schemas AS s ON fk.schema_id=s.schema_id
-            CROSS APPLY ( SELECT  STUFF( (SELECT  N'', '' + c_parent.name AS fk_columns
-                                            FROM    ' + QUOTENAME(@DatabaseName) + N'.sys.foreign_key_columns fkc 
-                                            JOIN ' + QUOTENAME(@DatabaseName) + N'.sys.columns c_parent ON fkc.parent_object_id=c_parent.[object_id]
-                                                AND fkc.parent_column_id=c_parent.column_id
-                                            WHERE    fk.parent_object_id=fkc.parent_object_id
-                                                AND fk.[object_id]=fkc.constraint_object_id
-                                            ORDER BY fkc.constraint_column_id 
-                                    FOR      XML PATH('''') ,
-                                              TYPE).value(''.'', ''nvarchar(max)''), 1, 1, '''')/*This is how we remove the first comma*/ ) parent ( fk_columns )
-            CROSS APPLY ( SELECT  STUFF( (SELECT  N'', '' + c_referenced.name AS fk_columns
-                                            FROM    ' + QUOTENAME(@DatabaseName) + N'.sys.    foreign_key_columns fkc 
-                                            JOIN ' + QUOTENAME(@DatabaseName) + N'.sys.columns c_referenced ON fkc.referenced_object_id=c_referenced.[object_id]
-                                                AND fkc.referenced_column_id=c_referenced.column_id
-                                            WHERE    fk.referenced_object_id=fkc.referenced_object_id
-                                                and fk.[object_id]=fkc.constraint_object_id
-                                            ORDER BY fkc.constraint_column_id  /*order by col name, we don''t have anything better*/
-                                    FOR      XML PATH('''') ,
-                                              TYPE).value(''.'', ''nvarchar(max)''), 1, 1, '''') ) referenced ( fk_columns )
-            ' + CASE WHEN @ObjectID IS NOT NULL THEN 
-                    'WHERE fk.parent_object_id=' + CAST(@ObjectID AS NVARCHAR(30)) + N' OR fk.referenced_object_id=' + CAST(@ObjectID AS NVARCHAR(30)) + N' ' 
-                    ELSE N' ' END + '
-            ORDER BY parent_object_name, foreign_key_name
+			CROSS APPLY ( SELECT  STUFF( (SELECT  N'', '' + c_parent.name AS fk_columns
+											FROM	' + QUOTENAME(@DatabaseName) + N'.sys.foreign_key_columns fkc 
+											JOIN ' + QUOTENAME(@DatabaseName) + N'.sys.columns c_parent ON fkc.parent_object_id=c_parent.[object_id]
+												AND fkc.parent_column_id=c_parent.column_id
+											WHERE	fk.parent_object_id=fkc.parent_object_id
+												AND fk.[object_id]=fkc.constraint_object_id
+											ORDER BY fkc.constraint_column_id 
+									FOR	  XML PATH('''') ,
+											  TYPE).value(''.'', ''nvarchar(max)''), 1, 1, '''')/*This is how we remove the first comma*/ ) parent ( fk_columns )
+			CROSS APPLY ( SELECT  STUFF( (SELECT  N'', '' + c_referenced.name AS fk_columns
+											FROM	' + QUOTENAME(@DatabaseName) + N'.sys.foreign_key_columns fkc 
+											JOIN ' + QUOTENAME(@DatabaseName) + N'.sys.columns c_referenced ON fkc.referenced_object_id=c_referenced.[object_id]
+												AND fkc.referenced_column_id=c_referenced.column_id
+											WHERE	fk.referenced_object_id=fkc.referenced_object_id
+												and fk.[object_id]=fkc.constraint_object_id
+											ORDER BY fkc.constraint_column_id  /*order by col name, we don''t have anything better*/
+									FOR	  XML PATH('''') ,
+											  TYPE).value(''.'', ''nvarchar(max)''), 1, 1, '''') ) referenced ( fk_columns )
+			' + CASE WHEN @ObjectID IS NOT NULL THEN 
+					'WHERE fk.parent_object_id=' + CAST(@ObjectID AS NVARCHAR(30)) + N' OR fk.referenced_object_id=' + CAST(@ObjectID AS NVARCHAR(30)) + N' ' 
+					ELSE N' ' END + '
+			ORDER BY parent_object_name, foreign_key_name
 			OPTION (RECOMPILE);';
         IF @dsql IS NULL 
             RAISERROR('@dsql is null',16,1);
@@ -2249,17 +2335,17 @@ OPTION (RECOMPILE);';
 		BEGIN
         SET @dsql = N'
                 SELECT 
-                    DB_ID(N' + QUOTENAME(@DatabaseName,'''') + N') AS [database_id], 
+                    DB_ID(@i_DatabaseName) AS [database_id], 
 			        @i_DatabaseName AS database_name,
                     foreign_key_schema = 
                         s.name,
                     foreign_key_name = 
                         fk.name,
                     foreign_key_table = 
-                        OBJECT_NAME(fk.parent_object_id, DB_ID(N' + QUOTENAME(@DatabaseName,'''') + N')),
+                        OBJECT_NAME(fk.parent_object_id, DB_ID(@i_DatabaseName)),
 					fk.parent_object_id,
 					foreign_key_referenced_table = 
-                        OBJECT_NAME(fk.referenced_object_id, DB_ID(N' + QUOTENAME(@DatabaseName,'''') + N')),
+                        OBJECT_NAME(fk.referenced_object_id, DB_ID(@i_DatabaseName)),
 					fk.referenced_object_id
                 FROM ' + QUOTENAME(@DatabaseName) + N'.sys.foreign_keys fk
                 JOIN ' + QUOTENAME(@DatabaseName) + N'.sys.schemas AS s
@@ -2333,7 +2419,7 @@ OPTION (RECOMPILE);';
 								days_since_last_stats_update, rows, rows_sampled, percent_sampled, histogram_steps, modification_counter, 
 								percent_modifications, modifications_before_auto_update, index_type_desc, table_create_date, table_modify_date,
 								no_recompute, has_filter, filter_definition, persisted_sample_percent, is_incremental)
-				SELECT DB_ID(N' + QUOTENAME(@DatabaseName,'''') + N') AS [database_id], 
+				SELECT DB_ID(@i_DatabaseName) AS [database_id], 
 			        @i_DatabaseName AS database_name,
 			        obj.object_id,
 			        obj.name AS table_name,
@@ -2428,7 +2514,7 @@ OPTION (RECOMPILE);';
 								last_statistics_update, days_since_last_stats_update, rows, modification_counter, 
 								percent_modifications, modifications_before_auto_update, index_type_desc, table_create_date, table_modify_date,
 								no_recompute, has_filter, filter_definition, persisted_sample_percent, is_incremental)
-							SELECT DB_ID(N' + QUOTENAME(@DatabaseName,'''') + N') AS [database_id], 
+							SELECT DB_ID(@i_DatabaseName) AS [database_id], 
 							    @i_DatabaseName AS database_name,
 								obj.object_id,
 								obj.name AS table_name,
@@ -2561,7 +2647,7 @@ OPTION (RECOMPILE);';
 			BEGIN
 			RAISERROR (N'Gathering Temporal Table Info',0,1) WITH NOWAIT;
 			SET @dsql=N'SELECT ' + QUOTENAME(@DatabaseName,'''') + N' AS database_name,
-								   DB_ID(N' + QUOTENAME(@DatabaseName,'''') + N') AS [database_id], 
+								   DB_ID(@i_DatabaseName) AS [database_id], 
 								   s.name AS schema_name,
 								   t.name AS table_name, 
 								   oa.hsn as history_schema_name,
@@ -2597,7 +2683,7 @@ OPTION (RECOMPILE);';
 			INSERT #TemporalTables ( database_name, database_id, schema_name, table_name, history_schema_name, 
 									 history_table_name, start_column_name, end_column_name, period_name, history_table_object_id )
 					
-			EXEC sp_executesql @dsql;
+			EXEC sp_executesql @dsql, @params = N'@i_DatabaseName NVARCHAR(128)', @i_DatabaseName = @DatabaseName;
         END;
 
              SET @dsql=N'SELECT DB_ID(@i_DatabaseName) AS [database_id], 
@@ -5693,6 +5779,7 @@ BEGIN
 				'N/A' AS index_usage_summary,
 				'N/A' AS index_size_summary
 		FROM #TemporalTables AS t
+		ORDER BY t.database_name, t.schema_name, t.table_name
 		OPTION    ( RECOMPILE );
 
 		RAISERROR(N'check_id 121: Optimized For Sequential Keys.', 0,1) WITH NOWAIT;
@@ -5979,14 +6066,20 @@ BEGIN
 					/*Vlad - column changes and record count limit for PSBlitz*/
 					SELECT TOP(10000) Priority, ISNULL(br.findings_group,N'') + 
 							CASE WHEN ISNULL(br.finding,N'') <> N'' THEN N': ' ELSE N'' END
-							+ br.finding AS [Finding],
+							+ ISNULL(br.finding, N'') AS [Finding],
                             CASE WHEN [URL] IS NOT NULL AND [URL] <> ''
-                            THEN
-							'<a href='''+[URL]+''' target=''_blank''>'+ISNULL(br.findings_group,N'') + 
-							CASE WHEN ISNULL(br.finding,N'') <> N'' 
-                            THEN N': ' ELSE N'' END
-							+ br.finding+'</a>' 
-                            ELSE N'' END AS  [FindingHL], /*Column added for PSBlitz*/
+                                THEN
+							       '<a href='''+[URL]+''' target=''_blank''>'+ISNULL(br.findings_group,N'') + 
+							    CASE WHEN ISNULL(br.finding,N'') <> N'' 
+                                     THEN N': ' 
+                                     ELSE N'' 
+                                END  + ISNULL(br.finding, N'')+'</a>' 
+                              ELSE ISNULL(br.findings_group,N'') +
+                                   CASE WHEN ISNULL(br.finding,N'') <> N'' 
+                                        THEN N': ' 
+                                        ELSE N'' 
+                                   END    + ISNULL(br.finding, N'')
+                             END AS  [FindingHL], /*Column added for PSBlitz*/
 						br.[database_name] AS [Database Name],
 						br.details AS [Details: schema.table.index(indexid)], 
 						br.index_definition AS [Index Definition], /*column name change for PSBlitz*/ 
@@ -6593,10 +6686,10 @@ BEGIN
 	
 		IF(@OutputType <> 'NONE')
 		BEGIN
-		/*Vlad - changes for PSBlitz*/
+			/*Vlad - changes for PSBlitz*/
 			SELECT  i.[database_name] AS [Database Name], 
 					i.[schema_name] + N'.'+
-					i.[object_name] AS [Object Name], 
+					i.[object_name] AS [Object Name], /*column changed for PSBlitz*/
 					ISNULL(i.index_name, '') AS [Index Name],
 					CAST(i.index_id AS NVARCHAR(10))AS [Index ID],
 					/*db_schema_object_indexid AS [Details: schema.table.index(indexid)], Changes for PSBlitz*/
@@ -6686,7 +6779,6 @@ BEGIN
 			LEFT JOIN #IndexSanitySize AS sz ON i.index_sanity_id = sz.index_sanity_id
             LEFT JOIN #IndexCreateTsql AS ict ON i.index_sanity_id = ict.index_sanity_id
 			OPTION(RECOMPILE);
-			/*Vlad - changes made for PSBlitz - end*/
 
 			IF @@ROWCOUNT > 0
             BEGIN
@@ -6740,6 +6832,7 @@ BEGIN
 					SELECT COUNT(1) AS RecordCount FROM #Mode2Temp
 					OPTION (RECOMPILE);
 				/*Vlad - additional result set to get total count for warning - end*/
+				
 			END
 			ELSE
 			BEGIN
@@ -6981,6 +7074,9 @@ BEGIN
 				END;
 
 			END;
+
+
+
 
 
     END; /* End @Mode=3 (index detail)*/

@@ -302,8 +302,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.9.1"
-$VersDate = "2025-11-13"
+$Vers = "5.10.0"
+$VersDate = "2025-12-04"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -326,15 +326,15 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql", "spBlitzCache
 
 ## we use these to make sure someone didn't modify the scripts in the Resources folder
 $storedHashes = @{
-	"spBlitz_NonSPLatest.sql"            = "1612EFEEC666112A5EFAAD147804B7AF48FC522E11B63CBBD00E9D9EF529F235"
-	"spBlitzCache_NonSPLatest.sql"       = "098346EB1E816C8BFA59778BCE1186031549F69C068924164717D40680B5884E"
-	"spBlitzFirst_NonSPLatest.sql"       = "65B2BEBAB1BD3F3BB6262B6EB67D159A5B799C512A6F2A7A512672D7E0501D92"
-	"spBlitzIndex_NonSPLatest.sql"       = "21F326BCD6BCFB57A89BBEBD34063FFC6FEFE8376BF4836650E46715134DB41D"
-	"spBlitzLock_NonSPLatest.sql"        = "9B999A5E28ACBA871FD0545C1305B1BD6F1532F9CFACB3C910A3830CAA5FB672"
-	"spBlitzWho_NonSPLatest.sql"         = "B83BD8CBD59295DD0DFE0D25204AC6C81DEED746659844DABBED5FB4CA8D3ABA"
-	"GetBlitzWhoData.sql"                = "1A23F1F9C4CB51252D088919500A7E472B56B98DD5096DBA79B5D96AEEB5F6FC"
+	"spBlitz_NonSPLatest.sql"            = "1D69DE400C77A1F9F8860EAA9F72FEC39F79518E51A8E717E2A886ADD88B564A"
+	"spBlitzCache_NonSPLatest.sql"       = "8E5374A22F7221517323552C3FDE61148AF42C39615A16CB08CD77DCF42713D2"
+	"spBlitzFirst_NonSPLatest.sql"       = "BE5EA2BE8E6104EB81B5EDAD2271577506993A93468A08C1A94BD9FB875FBB48"
+	"spBlitzIndex_NonSPLatest.sql"       = "1A1663B6B867FD4BFCF0969271E7447567BF4C4846EE27530CEB6F5AFDCB5322"
+	"spBlitzLock_NonSPLatest.sql"        = "E8AF3BD150A94054CD0543F12FEA719531654461BE73B253AE00EA2B6B969B51"
+	"spBlitzWho_NonSPLatest.sql"         = "3BA70668E0F47940AACF73B930D09A848704E82063479C228F3F7CDECF14C4DE"
+	"GetBlitzWhoData.sql"                = "4CDB3FBA91EF31B017DC5888BB694587ECC83A37FBEF6FE33AA0BC791F5B02B6"
 	"GetInstanceInfo.sql"                = "29AA65809886BB2FC870B0DF49256850C4347562ABDDAD29E5BEC6D76C86036F"
-	"GetTempDBUsageInfo.sql"             = "20620509996A6F7BB45410397D0CB5C7C0D044FEA15944950171DF14436AE9D1"
+	"GetTempDBUsageInfo.sql"             = "F65305AD51321D885458C5898D69657E90EB8A1EEC97922AABC406C494D0BE8B"
 	"GetOpenTransactions.sql"            = "76EBCB1758CBC86DAC4FE8E5C02E88AB4B96FEDB2E21570B8C0D410FF8A69F7D"
 	"GetStatsInfoForWholeDB.sql"         = "DAA08282A7FF87FDBA7604903F948F59CD0CAE09F08664F1A3CA9177121EE17B"
 	"GetIndexInfoForWholeDB.sql"         = "B8FBF199DF4E054A1700F0E27081841257BF1BA99A09E95E83EB991B2FB52D43"
@@ -433,7 +433,7 @@ YourDatabase only, via integrated security"
 PSBlitz.ps1 uses slightly modified, non-stored procedure versions, of the following components 
 from Brent Ozar's FirstResponderKit (https://www.brentozar.com/first-aid/):
    sp_Blitz`n   sp_BlitzCache`n   sp_BlitzFirst`n   sp_BlitzIndex
-   sp_BlitzLock`n   sp_BlitzWho`n   sp_BlitzQueryStore
+   sp_BlitzLock`n   sp_BlitzWho`n   sp_QuickieStore (from Darling Data)
 `n You can find the scripts in the '$ResourcesPath' directory
 "
 }
@@ -704,6 +704,11 @@ function Convert-TableToHtml {
 				$formattedName = $formattedName -replace $pattern , "ms"
 			}
 
+			#Shorten Average to Avg, Maximum to Max, Minimum to Min
+			$formattedName = $formattedName -replace "Average", "Avg"
+			$formattedName = $formattedName -replace "Maximum", "Max"
+			$formattedName = $formattedName -replace "Minimum", "Min"
+
 			$property = if ($DateTimeCols -contains $currentColumn) {
 				@{
 					Name       = $formattedName
@@ -843,9 +848,11 @@ function Convert-QueryTableToHtml {
 			if ($AnchorID -eq "DeadlockDtlTable") {
 				$AnchorRegex = "<td>DL(\d+)Q(\d+)(V{0,})$AnchorExt"
 				$AnchorURL = '<td class="anchor-target" id=' + "DL" + '$1' + "Q" + '$2' + '$3' + "$AnchorExt>" + "DL" + '$1' + "Q" + '$2' + '$3' + "$AnchorExt"
+				$AnchorURL += "<br>`n<button class=`"copyBtnRow`">Copy</button>"
 			} else {
 				$AnchorRegex = "<td>$AnchorID(_\d+)$AnchorExt"
 				$AnchorURL = '<td class="anchor-target" id=' + "$AnchorID" + '$1' + "$AnchorExt>" + "$AnchorID" + '$1' + "$AnchorExt"
+				$AnchorURL += "<br>`n<button class=`"copyBtnRow`">Copy</button>"
 			}
 
 			$htmlTableOut = $htmlTableOut -replace $AnchorRegex, $AnchorURL
@@ -2079,6 +2086,17 @@ try {
 			} else {
 
 				$htmlTable2 = Convert-TableToHtml $ResourceInfoTbl -CSSClass RsrcInfoTbl -DebugInfo:$DebugInfo
+				[int]$CTP = $ResourceInfoTbl.Rows[0]["CTP"]
+				[int]$PhysCores = $ResourceInfoTbl.Rows[0]["physical_cpu_cores"]
+				[int]$MAXDOP = $ResourceInfoTbl.Rows[0]["MAXDOP"]
+				#This is a very basic check for MAXDOP misconfiguration
+				$MAXDOPWrong = if ((($MAXDOP -lt 8) -and ($PhysCores -ge 8)) -or (($MAXDOP -ne $PhysCores) -and ($PhysCores -le 8))) { $true } else { $false }
+				$PhysMemGB = $ResourceInfoTbl.Rows[0]["physical_memory_GB"]
+				$MaxMemGB = $ResourceInfoTbl.Rows[0]["max_server_memory_GB"]
+				<# based on 
+				https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/server-memory-server-configuration-options?view=sql-server-ver17#recommendations
+				#>
+				$ThresholdGB = [math]::Round($PhysMemGB * 0.75, 2)
 			}
 
 			$htmlTable3 = Convert-TableToHtml $ConnectionsInfoTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
@@ -2151,6 +2169,12 @@ $htmlTable6 `n<br>`n<h2>Session level SET options</h2> `n $htmlTable4 `n $HTMLBo
 		if ($ToHTML -eq "Y") {
 
 			$htmlTable1 = Convert-TableToHtml $TempDBTbl -CSSClass "TempdbInfoTbl" -DebugInfo:$DebugInfo
+			[int]$TempDBFiles = $TempDBTbl.Rows[0]["data_files"]
+			if ($IsAzureSQLDB -eq $false) {
+				#This is a very basic check for tempdb files misconfiguration
+				$TempDBFilesWrong = if (($TempDBFiles -gt $PhysCores) -or (($PhysCores -ge 8) -and ($TempDBFiles -ne 8)) -or
+					(($PhysCores -lt 8) -and ($PhysCores -ne $TempDBFiles))  ) { $true } else { $false }
+			}
 
 			if ($TempTabTbl.Rows.Count -gt 0) {
 				$htmlTable2 = Convert-TableToHtml $TempTabTbl -CSSClass "InstCacheTbl" -DebugInfo:$DebugInfo
@@ -2239,6 +2263,8 @@ $htmlTable4 `n $HTMLBodyEnd
 				}
 				
 				$htmlTable1 = Convert-TableToHtml $AcTranTbl -ExclCols "current_sql", "current_plan", "most_recent_sql", "most_recent_plan" -DebugInfo:$DebugInfo -CSSClass "OpenTransTbl" -AnchorFromHere -AnchorIDs "Current", "MostRecent"
+
+				$OpenTranCount = ($AcTranTbl | Where-Object { $_.session_status -eq "sleeping" }).Count
 
 				$htmlTable2 = Convert-QueryTableToHtml $AcTranTbl -Cols "current_query", "current_sql" -CSSClass "query-table" -AnchorToHere -AnchorID "Current" -DebugInfo:$DebugInfo
 	
@@ -2416,6 +2442,8 @@ $SortableTable `n $htmlTable6 `n $JumpToTop `n $HTMLBodyEnd
 				$tableName = "Database Info"
 
 				$htmlTable = Convert-TableToHtml $DBInfoTbl -TblID "DBInfoTable" -CSSClass "DatabaseInfoTable sortable" -DebugInfo:$DebugInfo
+
+				$HighestVLF = $DBInfoTbl | Sort-Object -Property "virtual_log_files" -Descending | Select-Object -ExpandProperty "virtual_log_files" -First 1
 				
 				$htmlTable1 = Convert-TableToHtml $DBFileInfoTbl -TblID "DBFileInfoTable" -CSSClass "DatabaseFileInfoTable sortable" -DebugInfo:$DebugInfo
 
@@ -2499,6 +2527,7 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 			if ($ToHTML -eq "Y") {
 				$tableName = "Instance Health"
 				$htmlTable = Convert-TableToHtml $BlitzTbl -NoCaseChange -TblID "InstanceHealthTable" -CSSClass "InstHealthTbl" -HyperlinkCol "FindingHL" -ExclCols Finding, URL -DebugInfo:$DebugInfo
+				$HighPriorityHealthCount = ($BlitzTbl | Where-Object { $_."Priority" -le 50 }).Rows.Count
 				$html = $HTMLPre + @"
 <title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1>
 $($SearchTableDiv -replace $STDivReplace, "'InstanceHealthTable', 3" -replace 'object' , 'database')
@@ -2628,7 +2657,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				$HtmlTabName = "Wait Stats Since Last Startup"
 
 				$htmlTable = Convert-TableToHtml $WaitsTbl -NoCaseChange -HyperlinkCol "wait_typeHL" -ExclCols "wait_type", "URL" -CSSClass "WaitStats" -DebugInfo:$DebugInfo
-			 
+				$Top3Waits = ($WaitsTbl | Select-Object -ExpandProperty wait_type -First 3) -join ', '
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title> `n $HTMLBodyStart `n<h1>$HtmlTabName</h1>
 $htmlTable `n $JumpToTop `n $HTMLBodyEnd
@@ -2640,6 +2669,7 @@ $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				#Storage
 				$HtmlTabName = "Storage Throughput Since Instance Startup"
 				$htmlTable = Convert-TableToHtml $StorageTbl -NoCaseChange -TblID "StorageStatsTable" -CSSClass "Storage sortable" -ExclCols "StallRank" -DebugInfo:$DebugInfo
+				$TopAvgStall = ($StorageTbl | Sort-Object -Property "Avg Stall (ms)" -Descending | Select-Object -ExpandProperty "Avg Stall (ms)" -First 1)	
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>`n $HTMLBodyStart `n <h1>$HtmlTabName</h1>
@@ -2815,7 +2845,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			$HighlightCol = 0
 		} elseif ($SortOrder -like '*Memory*') {
 			$SheetName = $SheetName + "Mem & Recent Comp"
-			$HighlightCol = 40
+			$HighlightCol = 37
 			$ExcelWarnInitCol = 31
 		} elseif ($SortOrder -eq "'Recent compilations'") {
 			$SheetName = $SheetName + "Mem & Recent Comp"
@@ -2858,6 +2888,23 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					$CacheHTMLPre = $CacheHTMLPre -replace 'CacheTab1High', $HighlightCol
 					$htmlTable1 = $htmlTable1 -replace '<table class="CacheTabx">', '<table class="CacheTable1">'
 					
+					#highest CPU and Duration times
+					if (($SortOrder -eq "'CPU'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestTotalCPU = $BlitzCacheTbl.Rows[0]["Total CPU (ms)"]
+					} elseif (($SortOrder -eq "'Duration'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestTotalDuration = $BlitzCacheTbl.Rows[0]["Total Duration (ms)"]
+					} elseif (($SortOrder -eq "'Reads'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestTotalReads = $BlitzCacheTbl.Rows[0]["Total Reads"]
+					} elseif (($SortOrder -eq "'Executions'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestTotalExecutions = $BlitzCacheTbl.Rows[0]['# Executions']
+					} elseif (($SortOrder -eq "'Writes'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestTotalWrites = $BlitzCacheTbl.Rows[0]["Total Writes"]
+					} elseif (($SortOrder -eq "'Spills'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestTotalSpills = $BlitzCacheTbl.Rows[0]["Total Spills"]
+					} elseif (($SortOrder -eq "'Memory Grant'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestMaxMemoryGrant = $BlitzCacheTbl.Rows[0]["Maximum Memory Grant KB"]
+					}
+
 					if ($SheetName -eq "Mem & Recent Comp") {
 						$HtmlTabName = "Queries by Memory Grants & Recent Compilations"
 					} elseif ($SheetName -eq "Dupl & Single Use") {
@@ -2897,7 +2944,22 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					#Handling CSS
 					$htmlTable1 = $htmlTable1 -replace '<table class="CacheTabx">', '<table class="CacheTable2">'
 					
-					#Add heading if first half of the table failed
+					#highest CPU and Duration times
+					if (($SortOrder -eq "'Average CPU'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestAvgCPU = $BlitzCacheTbl.Rows[0]["Avg CPU (ms)"]
+					} elseif (($SortOrder -eq "'Average Duration'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestAvgDuration = $BlitzCacheTbl.Rows[0]["Avg Duration (ms)"]
+					} elseif (($SortOrder -eq "'Average Reads'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestAvgReads = $BlitzCacheTbl.Rows[0]["Average Reads"]
+					} elseif (($SortOrder -eq "'Executions per Minute'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestExecsPerMin = $BlitzCacheTbl.Rows[0]['Executions / Minute']
+					} elseif (($SortOrder -eq "'Average Writes'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestAvgWrites = $BlitzCacheTbl.Rows[0]["Average Writes"]
+					} elseif (($SortOrder -eq "'Average Spills'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestAvgSpills = $BlitzCacheTbl.Rows[0]["Avg Spills"]
+					}
+
+					# Add heading if first half of the table failed
 					if ($PreviousOutcome -eq "Failure") {
 						$CacheHTMLPre = $HTMLPre
 						#$html = $CacheHTMLPre
@@ -3084,6 +3146,12 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 
 						$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan", "database_name", "n" -CSSClass "QueryStoreTab$SortOrder sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
 
+						if ($SortOrder -eq "CPU") {
+							$HighestQSCPU = $BlitzQSTbl.Rows[0]["avg_cpu_time_ms"]
+						} elseif ($SortOrder -eq "Duration") { 
+							$HighestQSDuration = $BlitzQSTbl.Rows[0]["avg_duration_ms"]
+						}
+
 						$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -CSSClass "query-table" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
 
 						$HtmlTabName = "Query Store results for $databaseName - Average $SortOrder"
@@ -3204,11 +3272,11 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
 					$HtmlTabName += " for $ASDBName$CheckDB"
 					$ExclCols = @("Sample Query Plan", "Display Order", "Database Name", "Finding", "URL")
-					$Mode2SearchCol = 1
+					$Mode2SearchCol = 0
 					$Mode2CSS = "IndexUsageTableDB sortable"
 				} else {
 					$ExclCols = @("Sample Query Plan", "Display Order", "Finding", "URL")
-					$Mode2SearchCol = 2
+					$Mode2SearchCol = 1
 					$Mode2CSS = "IndexUsageTable sortable"
 				}						
 		
@@ -3216,7 +3284,13 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
 						$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexUsgTable', 2" -replace 'object', 'database'
 						$htmlTabSearch += "<br>"
-					}							
+						
+
+					}
+					$HVMissingIxCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*High Value Missing Index" }).Count
+					$HeapWithForwardedFetchesCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*Heap with Forwarded Fetches" }).Count
+					$ActiveHeapsCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*Active Heap" }).Count
+					$DupeIndexCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*Duplicate Keys" }).Count							
 					$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols $ExclCols -NoCaseChange -CSSClass "IxDiagTbl" -HyperlinkCol "FindingHL" -TblID "IndexUsgTable" -DebugInfo:$DebugInfo
 					$htmlTable += "`n<br>`n $JumpToTop`n"
 				} elseif ($Mode -eq "1") {
@@ -3432,6 +3506,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					if ($ToHTML -eq "Y") {
 
 						$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -CSSClass "StatsInfoTbl sortable" -ExclCols "database" -DebugInfo:$DebugInfo
+						$StatsWithIssuesCount = $RowsReturned
 						#add tooltips
 						$htmlTable = $htmlTable -replace '<th class="sortable">Update ', '<th class="sorttable_nosort tooltip" title="The commented options are suggestions based on record counts.">Update '
 						#add buttons
@@ -3711,6 +3786,8 @@ finally {
 				$htmlTable = Convert-TableToHtml $BlitzWhoAggTbl -CSSClass "ActiveSessionsTab sortable" -AnchorFromHere -AnchorIDs "RunningNow" -ExclCols "query_text", "query_plan" -DebugInfo:$DebugInfo
 				$htmlTable1 = Convert-QueryTableToHtml $BlitzWhoAggTbl -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "RunningNow" -DebugInfo:$DebugInfo
 
+				$HighestElapsedTime = $BlitzWhoAggTbl | Select-Object -ExpandProperty "elapsed_time" -First 1
+
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n$HTMLBodyStart
 				<h1 id="top">$HtmlTabName</h1>
@@ -3881,6 +3958,7 @@ finally {
 		Write-PSBlitzDebug " ->Generating index and execution log pages." 
 		$HTMLChk = "&#10004;"
 		$HtmlTabName = "PSBlitz Execution Log"
+		$LogFailureCount = ($LogTbl | Where-Object { $_.Outcome -eq "Failure" }).Count
 		$htmlTable = Convert-TableToHtml $LogTbl -NoCaseChange -CSSClass LogTbl -DebugInfo:$DebugInfo
 		$html = $HTMLPre + @"
 						<title>$HtmlTabName</title>`n $HTMLBodyStart `n	<h1 id="top">$HtmlTabName</h1>
@@ -3950,19 +4028,44 @@ finally {
 				}	
 				$QuerySource += ";"
 				$Description += "."
+				if ($HighPriorityHealthCount -gt 0) {
+					$Description += "<br><span class=`"warnings-desc`">High priority findings: $HighPriorityHealthCount</span>"
+				}
 			} elseif ($File.Name -like "InstanceInfo*") {
 				$PageName = "Instance Information"
 				$QuerySource += "sys.dm_os_sys_info, sys.dm_os_performance_counters and SERVERPROPERTY()"
 				$Description = "Summary information about the instance and its resources."
+				if (($IsAzureSQLDB -eq $false) -and (($CTP -lt 50) -or ($MAXDOPWrong) -or ($MaxMemGB -ge $PhysMemGB))) {
+					$Description += "<br><span class=`"warnings-desc`">"
+					$AddDescSeparator = ""
+					if ($CTP -lt 50) {
+						$Description += "CTP is too low: $CTP"
+						$AddDescSeparator = "<br>"
+					}
+					if ($MAXDOPWrong) {
+						$Description += "$AddDescSeparator MAXDOP might be misconfigured: $MAXDOP"
+						$AddDescSeparator = "<br>"
+					}
+					if ($MaxMemGB -gt $ThresholdGB) {
+						$Description += "$AddDescSeparator Max Memory is set too high: $MaxMemGB GB"
+					}
+					$Description += "</span>"
+				}
 			} elseif ($File.Name -like "TempDBInfo*") {
 				$PageName = "TempDB Information"
 				$QuerySource += "dm_db_file_space_usage, dm_db_partition_stats, dm_exec_requests"
 				$Description = "Information pertaining to TempDB usage, size and configuration."
+				if ($TempDBFilesWrong) {
+					$Description += "<br><span class=`"warnings-desc`">Tempdb data file count misconfigured: $TempDBFiles</span>"
+				}
 			} elseif ($File.Name -like "OpenTransactions*") {
 				$PageName = "Open Transactions"
 				$Plans = "<td>$HTMLChk</td>"
 				$QuerySource += "sys.dm_tran_session_transactions, sys.dm_tran_active_transactions, sys.dm_exec_sessions, sys.dm_exec_connections, and sys.dm_exec_requests"
 				$Description = "Information about currently open transactions."
+				if ($OpenTranCount -gt 0) {
+					$Description += "<br><span class=`"warnings-desc`">Found $OpenTranCount sleeping session(s) with open transaction(s).</span>"
+				}
 			} elseif ($File.Name -like "BlitzIndex*") {
 				$Mode = $File.Name.Replace('BlitzIndex_', '')
 				$Mode = $Mode.Replace('.html', '')
@@ -3981,6 +4084,35 @@ finally {
 						$PageName = "Extended $PageName"
 					}
 					$Description = "Index-related diagnosis outlining high-value missing indexes,<br> duplicate or almost duplicate indexes, indexes with more writes than reads, etc."
+					if (($HVMissingIxCount -gt 0) -or ($HeapWithForwardedFetchesCount -gt 0) -or ($ActiveHeapsCount -gt 0) -or ($DupeIndexCount -gt 0)) {
+						$Description += "<br><span class=`"warnings-desc`">"
+						$AddDescSeparator = ""
+						if ($HVMissingIxCount -gt 0) {
+							$Description += "High-value missing indexes: $HVMissingIxCount"
+							$AddDescSeparator = ";"
+						}
+						if ($HeapWithForwardedFetchesCount -gt 0) {
+							$Description += "$AddDescSeparator Heaps with forwarded fetches: $HeapWithForwardedFetchesCount"
+							if ($AddDescSeparator -eq ";") {
+								$AddDescSeparator = "<br>"
+							} else {
+								$AddDescSeparator = ";"
+							}
+						}
+						if ($ActiveHeapsCount -gt 0) {
+							$Description += "$AddDescSeparator Active heaps: $ActiveHeapsCount"
+							if ($AddDescSeparator -eq ";") {
+								$AddDescSeparator = "<br>"
+							} else {
+								$AddDescSeparator = ";"
+							}
+						}
+						if ($DupeIndexCount -gt 0) {
+							$Description += "$AddDescSeparator Duplicate or almost duplicate indexes: $DupeIndexCount"
+						}
+						$Description += "</span>"
+					}
+					
 					$RLim = "<td>10k</td>"
 					$Plans = "<td class=`"tooltip`" title=`"Only for SQL Server 2019 and above`">$HTMLChk*</td>"
 				} elseif ($File.Name -like "BlitzIndex_1*") {
@@ -4006,6 +4138,9 @@ finally {
 						$QuerySource += "; "
 					}
 					$Description = "Top $CacheTop queries found in the plan cache, sorted by memory grant size,<br>and the top 50 most recently compiled queries."
+					if($HighestMaxMemoryGrant -gt 0) {
+						$Description += "<br><span class=`"additional-desc`">Highest Max Memory Grant: $HighestMaxMemoryGrant KB</span>"
+					}
 				} elseif ($SortOrder -eq "Dupl_Single_Use") {
 					$PageName = "Top $CacheTop Queries - Duplicates &amp; Single Use"
 					$QuerySource += "Similar to sp_BlitzCache @Top = $CacheTop, @SortOrder = 'Duplicate'/'Query Hash'"
@@ -4027,8 +4162,20 @@ finally {
 					$Description = "Top $CacheTop queries found in the plan cache, sorted by Total $SortOrder and "
 					if ($SortOrder -eq "Executions") {
 						$Description += "$SortOrder per Minute."
+						$Description += "<br><span class=`"additional-desc`">Highest Total Executions: $HighestTotalExecutions; Highest Execs/Min: $HighestExecsPerMin</span>"
 					} else {
 						$Description += "Average $SortOrder."
+						if ($SortOrder -eq "CPU") {
+							$Description += " <br><span class=`"additional-desc`">Highest Total CPU time: $HighestTotalCPU ms; Highest Avg CPU time: $HighestAvgCPU ms</span>"
+						} elseif ($SortOrder -eq "Duration") {
+							$Description += " <br><span class=`"additional-desc`">Highest Total Duration: $HighestTotalDuration ms; Highest Avg Duration: $HighestAvgDuration ms</span>"
+						} elseif ($SortOrder -eq "Reads") {
+							$Description += " <br><span class=`"additional-desc`">Highest Total Reads: $HighestTotalReads; Highest Avg Reads: $HighestAvgReads</span>"
+						} elseif ($SortOrder -eq "Writes") {
+							$Description += " <br><span class=`"additional-desc`">Highest Total Writes: $HighestTotalWrites; Highest Avg Writes: $HighestAvgWrites</span>"
+						} elseif (($SortOrder -eq "Spills") -and ($HighestTotalSpills -gt 0)) {
+							$Description += " <br><span class=`"additional-desc`">Highest Total Spills: $HighestTotalSpills; Highest Avg Spills: $HighestAvgSpills</span>"
+						}
 					}	
 				}
 			} elseif ($File.Name -like "BlitzQueryStore*") {
@@ -4041,12 +4188,17 @@ finally {
 				if ($IsQueryStoreInterval) {
 					$Description += ", between $QueryStoreIntervalStart and $QueryStoreIntervalEnd"
 				} else {
-					$Description += "in the last 7 days"
+					$Description += " in the last 7 days"
 				}
 				if ($DBSwitched -eq "Y") {
 					$Description += " for $DBName"
 				}
 				$Description += ",<br>sorted by average $SortOrder."
+				if ($SortOrder -eq "CPU") {
+					$Description += "<br><span class=`"additional-desc`">Highest Avg CPU time: $HighestQSCPU ms</span>"
+				} elseif ($SortOrder -eq "Duration") {
+					$Description += "<br><span class=`"additional-desc`">Highest Avg Duration: $HighestQSDuration ms</span>"
+				} 
 				$QuerySource += "Similar to sp_QuickieStore @top = 20, @sort_order='$SortOrder'"
 				if ($IsQueryStoreInterval) {
 					$QuerySource += ", @start_time = '$QueryStoreIntervalStart', @end_time = '$QueryStoreIntervalEnd'"
@@ -4068,9 +4220,11 @@ finally {
 				} elseif ($File.Name -like "BlitzFirst_Storage*") {
 					$PageName = "Storage Stats"
 					$Description = "Database file usage and throughput since the last instance restart."
+					$Description += "<br><span class=`"$(if($Top3Waits -ge 10){"warnings-desc"}else{"additional-desc"})`">Highest average storage stall: $TopAvgStall milliseconds</span>"
 				} elseif ($File.Name -like "BlitzFirst_Waits*") {
 					$PageName = "Wait Stats"
 					$Description = "Instance-wide wait stats since last instance restart."
+					$Description += "<br><span class=`"additional-desc`">Top 3 waits: $Top3Waits</span>"
 				}
 			} elseif ($File.Name -like "BlitzWho*") {
 				$QuerySource += "Similar to sp_BlitzWho @ExpertMode = 1"
@@ -4082,6 +4236,7 @@ finally {
 				if ($File.Name -like "BlitzWho_Agg*") {
 					$Plans = "<td>$HTMLChk</td>"
 					$Description = "Aggregatd session activity sorted by duration descending."
+					$Description += "<br><span class=`"additional-desc`">Highest elapsed time: $HighestElapsedTime</span>"
 					$PageName = "Session Activity - Aggregated"
 					#$AdditionalInfo = "Outputs execution plans as .sqlplan files."
 				} else {
@@ -4096,7 +4251,8 @@ finally {
 				if ($DBSwitched -eq "Y") {
 					$Description += " for $DBName"
 				}
-				$Description += ".<br>Tables with at least 10k records ordered by modified% descending." 
+				$Description += ".<br>Tables with at least 10k records ordered by modified% descending."
+				$Description += "<br><span class=`"warnings-desc`">Stats that require attention: $StatsWithIssuesCount</span>" 
 			} elseif ($File.Name -like "IndexFragInfo*") {
 				$QuerySource += "dm_db_index_physical_stats"
 				$PageName = "Index Fragmentation"
@@ -4117,6 +4273,9 @@ finally {
 				$QuerySource = ""
 				$PageName = "Execution Log"
 				$Description = "Log for the current run of PSBlitz.<br>Contains step status and potential error messages."
+				if ( $LogFailureCount -gt 0) {
+					$Description += "<br><span class=`"warnings-desc`">Failed (sub)steps: $LogFailureCount</span>"
+				}
 				#$AdditionalInfo = "Contains step status and any error messages that might have been thrown"
 			} elseif ($File.Name -like "DatabaseInfo*") {
 				$PageName = "Database Information"
@@ -4129,6 +4288,9 @@ finally {
 					$Description += "$CheckDB and system databases."
 				} else {
 					$Description += "all databases on the instance."
+				}
+				if ($HighestVLF -ge 300) {
+					$Description += "<br><span class=`"warning-desc`">High VLF count detected: $HighestVLF</span>"
 				}
 			
 				$AdditionalInfo = ""
@@ -4145,7 +4307,7 @@ finally {
 				$Description = "A list of database objects created with dangerous SET options"
 				$QuerySource += "sys.sql_modules, sys.objects"
 			}
-			$IndexContent += "<tr><td><a href=`"$RelativePath`" target='_blank'>$PageName</a></td><td class=`"tooltip`" title=`"$QuerySource`">$Description</td>$Plans $DLGraphs $RLim</tr>"
+			$IndexContent += "`n<tr><td><a href=`"$RelativePath`" target='_blank'>$PageName</a></td><td class=`"tooltip`" title=`"$QuerySource`">$Description</td>$Plans $DLGraphs $RLim</tr>"
 		}
 
 		# Close the HTML tags.

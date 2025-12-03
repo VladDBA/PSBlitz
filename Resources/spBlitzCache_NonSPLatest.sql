@@ -117,7 +117,7 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-SELECT @Version = '8.26', @VersionDate = '20251002';
+SELECT @Version = '8.28', @VersionDate = '20251124';
 SET @OutputType = UPPER(@OutputType);
 
 IF(@VersionCheckMode = 1)
@@ -5023,6 +5023,7 @@ BEGIN
 				  CASE WHEN select_with_writes > 0 THEN '', 66'' ELSE '''' END
 				  , 3, 200000) AS opserver_warning , ' + @nl ;
     END;
+    
     /*Vlad - column list, datetime and varbinary to varchar conversions changes for PSBlitz*/
     SET @columns += N'        
         CONVERT(NVARCHAR(30), CAST((ExecutionCount) AS BIGINT), 1) AS [# Executions],
@@ -6262,7 +6263,7 @@ BEGIN
 		END;            
     
 	
-	/*Vlad - column changes for PSBlitz*/
+    /*Vlad - column changes for PSBlitz*/
     SELECT  [Priority],
             FindingsGroup,
             Finding,
