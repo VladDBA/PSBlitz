@@ -2091,6 +2091,12 @@ try {
 				[int]$MAXDOP = $ResourceInfoTbl.Rows[0]["MAXDOP"]
 				#This is a very basic check for MAXDOP misconfiguration
 				$MAXDOPWrong = if ((($MAXDOP -lt 8) -and ($PhysCores -ge 8)) -or (($MAXDOP -ne $PhysCores) -and ($PhysCores -le 8))) { $true } else { $false }
+				$PhysMemGB = $ResourceInfoTbl.Rows[0]["physical_memory_GB"]
+				$MaxMemGB = $ResourceInfoTbl.Rows[0]["max_server_memory_GB"]
+				<# based on 
+				https://learn.microsoft.com/en-us/sql/database-engine/configure-windows/server-memory-server-configuration-options?view=sql-server-ver17#recommendations
+				#>
+				$ThresholdGB = [math]::Round($PhysMemGB * 0.75, 2)
 			}
 
 			$htmlTable3 = Convert-TableToHtml $ConnectionsInfoTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
@@ -2839,7 +2845,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			$HighlightCol = 0
 		} elseif ($SortOrder -like '*Memory*') {
 			$SheetName = $SheetName + "Mem & Recent Comp"
-			$HighlightCol = 40
+			$HighlightCol = 37
 			$ExcelWarnInitCol = 31
 		} elseif ($SortOrder -eq "'Recent compilations'") {
 			$SheetName = $SheetName + "Mem & Recent Comp"
@@ -2883,18 +2889,20 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					$htmlTable1 = $htmlTable1 -replace '<table class="CacheTabx">', '<table class="CacheTable1">'
 					
 					#highest CPU and Duration times
-					if ($SortOrder -eq "'CPU'") {
-						$HighestTotalCPU = ($BlitzCacheTbl | Select-Object -ExpandProperty "Total CPU (ms)" -First 1)
-					} elseif ($SortOrder -eq "'Duration'") {
-						$HighestTotalDuration = ($BlitzCacheTbl | Select-Object -ExpandProperty "Total Duration (ms)" -First 1)
-					} elseif ($SortOrder -eq "'Reads'") {
-						$HighestTotalReads = ($BlitzCacheTbl | Select-Object -ExpandProperty "Total Reads" -First 1)
-					} elseif ($SortOrder -eq "'Executions'") {
-						$HighestTotalExecutions = ($BlitzCacheTbl | Select-Object -ExpandProperty '# Executions' -First 1)
-					} elseif ($SortOrder -eq "'Writes'") {
-						$HighestTotalWrites = ($BlitzCacheTbl | Select-Object -ExpandProperty "Total Writes" -First 1)
-					} elseif ($SortOrder -eq "'Spills'") {
-						$HighestTotalSpills = ($BlitzCacheTbl | Select-Object -ExpandProperty "Total Spills" -First 1)
+					if (($SortOrder -eq "'CPU'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestTotalCPU = $BlitzCacheTbl.Rows[0]["Total CPU (ms)"]
+					} elseif (($SortOrder -eq "'Duration'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestTotalDuration = $BlitzCacheTbl.Rows[0]["Total Duration (ms)"]
+					} elseif (($SortOrder -eq "'Reads'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestTotalReads = $BlitzCacheTbl.Rows[0]["Total Reads"]
+					} elseif (($SortOrder -eq "'Executions'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestTotalExecutions = $BlitzCacheTbl.Rows[0]['# Executions']
+					} elseif (($SortOrder -eq "'Writes'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestTotalWrites = $BlitzCacheTbl.Rows[0]["Total Writes"]
+					} elseif (($SortOrder -eq "'Spills'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestTotalSpills = $BlitzCacheTbl.Rows[0]["Total Spills"]
+					} elseif (($SortOrder -eq "'Memory Grant'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestMaxMemoryGrant = $BlitzCacheTbl.Rows[0]["Maximum Memory Grant KB"]
 					}
 
 					if ($SheetName -eq "Mem & Recent Comp") {
@@ -2937,18 +2945,18 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					$htmlTable1 = $htmlTable1 -replace '<table class="CacheTabx">', '<table class="CacheTable2">'
 					
 					#highest CPU and Duration times
-					if ($SortOrder -eq "'Average CPU'") {
-						$HighestAvgCPU = ($BlitzCacheTbl | Select-Object -ExpandProperty "Avg CPU (ms)" -First 1)
-					} elseif ($SortOrder -eq "'Average Duration'") {
-						$HighestAvgDuration = ($BlitzCacheTbl | Select-Object -ExpandProperty "Avg Duration (ms)" -First 1)
-					} elseif ($SortOrder -eq "'Average Reads'") {
-						$HighestAvgReads = ($BlitzCacheTbl | Select-Object -ExpandProperty "Average Reads" -First 1)
-					} elseif ($SortOrder -eq "'Executions per Minute'") {
-						$HighestExecsPerMin = ($BlitzCacheTbl | Select-Object -ExpandProperty 'Executions / Minute' -First 1)
-					} elseif ($SortOrder -eq "'Average Writes'") {
-						$HighestAvgWrites = ($BlitzCacheTbl | Select-Object -ExpandProperty "Average Writes" -First 1)
-					} elseif ($SortOrder -eq "'Average Spills'") {
-						$HighestAvgSpills = ($BlitzCacheTbl | Select-Object -ExpandProperty "Avg Spills" -First 1)
+					if (($SortOrder -eq "'Average CPU'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestAvgCPU = $BlitzCacheTbl.Rows[0]["Avg CPU (ms)"]
+					} elseif (($SortOrder -eq "'Average Duration'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestAvgDuration = $BlitzCacheTbl.Rows[0]["Avg Duration (ms)"]
+					} elseif (($SortOrder -eq "'Average Reads'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestAvgReads = $BlitzCacheTbl.Rows[0]["Average Reads"]
+					} elseif (($SortOrder -eq "'Executions per Minute'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestExecsPerMin = $BlitzCacheTbl.Rows[0]['Executions / Minute']
+					} elseif (($SortOrder -eq "'Average Writes'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestAvgWrites = $BlitzCacheTbl.Rows[0]["Average Writes"]
+					} elseif (($SortOrder -eq "'Average Spills'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+						$HighestAvgSpills = $BlitzCacheTbl.Rows[0]["Avg Spills"]
 					}
 
 					# Add heading if first half of the table failed
@@ -3498,6 +3506,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					if ($ToHTML -eq "Y") {
 
 						$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -CSSClass "StatsInfoTbl sortable" -ExclCols "database" -DebugInfo:$DebugInfo
+						$StatsWithIssuesCount = $RowsReturned
 						#add tooltips
 						$htmlTable = $htmlTable -replace '<th class="sortable">Update ', '<th class="sorttable_nosort tooltip" title="The commented options are suggestions based on record counts.">Update '
 						#add buttons
@@ -4026,7 +4035,7 @@ finally {
 				$PageName = "Instance Information"
 				$QuerySource += "sys.dm_os_sys_info, sys.dm_os_performance_counters and SERVERPROPERTY()"
 				$Description = "Summary information about the instance and its resources."
-				if (($CTP -lt 50) -or ($MAXDOPWrong)) {
+				if (($IsAzureSQLDB -eq $false) -and (($CTP -lt 50) -or ($MAXDOPWrong) -or ($MaxMemGB -ge $PhysMemGB))) {
 					$Description += "<br><span class=`"warnings-desc`">"
 					$AddDescSeparator = ""
 					if ($CTP -lt 50) {
@@ -4035,6 +4044,10 @@ finally {
 					}
 					if ($MAXDOPWrong) {
 						$Description += "$AddDescSeparator MAXDOP might be misconfigured: $MAXDOP"
+						$AddDescSeparator = "<br>"
+					}
+					if ($MaxMemGB -gt $ThresholdGB) {
+						$Description += "$AddDescSeparator Max Memory is set too high: $MaxMemGB GB"
 					}
 					$Description += "</span>"
 				}
@@ -4125,6 +4138,9 @@ finally {
 						$QuerySource += "; "
 					}
 					$Description = "Top $CacheTop queries found in the plan cache, sorted by memory grant size,<br>and the top 50 most recently compiled queries."
+					if($HighestMaxMemoryGrant -gt 0) {
+						$Description += "<br><span class=`"additional-desc`">Highest Max Memory Grant: $HighestMaxMemoryGrant KB</span>"
+					}
 				} elseif ($SortOrder -eq "Dupl_Single_Use") {
 					$PageName = "Top $CacheTop Queries - Duplicates &amp; Single Use"
 					$QuerySource += "Similar to sp_BlitzCache @Top = $CacheTop, @SortOrder = 'Duplicate'/'Query Hash'"
@@ -4157,7 +4173,7 @@ finally {
 							$Description += " <br><span class=`"additional-desc`">Highest Total Reads: $HighestTotalReads; Highest Avg Reads: $HighestAvgReads</span>"
 						} elseif ($SortOrder -eq "Writes") {
 							$Description += " <br><span class=`"additional-desc`">Highest Total Writes: $HighestTotalWrites; Highest Avg Writes: $HighestAvgWrites</span>"
-						} elseif ($SortOrder -eq "Spills") {
+						} elseif (($SortOrder -eq "Spills") -and ($HighestTotalSpills -gt 0)) {
 							$Description += " <br><span class=`"additional-desc`">Highest Total Spills: $HighestTotalSpills; Highest Avg Spills: $HighestAvgSpills</span>"
 						}
 					}	
@@ -4235,7 +4251,8 @@ finally {
 				if ($DBSwitched -eq "Y") {
 					$Description += " for $DBName"
 				}
-				$Description += ".<br>Tables with at least 10k records ordered by modified% descending." 
+				$Description += ".<br>Tables with at least 10k records ordered by modified% descending."
+				$Description += "<br><span class=`"warnings-desc`">Stats that require attention: $StatsWithIssuesCount</span>" 
 			} elseif ($File.Name -like "IndexFragInfo*") {
 				$QuerySource += "dm_db_index_physical_stats"
 				$PageName = "Index Fragmentation"
