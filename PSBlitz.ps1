@@ -3276,11 +3276,13 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
 						$htmlTabSearch = $SearchTableDiv -replace $STDivReplace, "'IndexUsgTable', 2" -replace 'object', 'database'
 						$htmlTabSearch += "<br>"
-						$HVMissingIxCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*High Value Missing Index" }).Count
-						$HeapWithForwardedFetchesCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*Heap with Forwarded Fetches" }).Count
-						$ActiveHeapsCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*Active Heap" }).Count
-						$DupeIndexCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*Duplicate Keys" }).Count
-					}							
+						
+
+					}
+					$HVMissingIxCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*High Value Missing Index" }).Count
+					$HeapWithForwardedFetchesCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*Heap with Forwarded Fetches" }).Count
+					$ActiveHeapsCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*Active Heap" }).Count
+					$DupeIndexCount = ($BlitzIxTbl | Where-Object { $_."Finding" -like "*Duplicate Keys" }).Count							
 					$htmlTable = Convert-TableToHtml $BlitzIxTbl -ExclCols $ExclCols -NoCaseChange -CSSClass "IxDiagTbl" -HyperlinkCol "FindingHL" -TblID "IndexUsgTable" -DebugInfo:$DebugInfo
 					$htmlTable += "`n<br>`n $JumpToTop`n"
 				} elseif ($Mode -eq "1") {
