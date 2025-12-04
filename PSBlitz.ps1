@@ -302,7 +302,7 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.10.0"
+$Vers = "5.10.1"
 $VersDate = "2025-12-04"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
@@ -3784,7 +3784,7 @@ finally {
 				}
 				Add-QueryName $BlitzWhoAggTbl "Query" "query_text" "RunningNow"
 				$htmlTable = Convert-TableToHtml $BlitzWhoAggTbl -CSSClass "ActiveSessionsTab sortable" -AnchorFromHere -AnchorIDs "RunningNow" -ExclCols "query_text", "query_plan" -DebugInfo:$DebugInfo
-				$htmlTable1 = Convert-QueryTableToHtml $BlitzWhoAggTbl -Cols "query", "query_text" -CSSClass "QueryTbl" -AnchorToHere -AnchorID "RunningNow" -DebugInfo:$DebugInfo
+				$htmlTable1 = Convert-QueryTableToHtml $BlitzWhoAggTbl -Cols "query", "query_text" -CSSClass "query-table" -AnchorToHere -AnchorID "RunningNow" -DebugInfo:$DebugInfo
 
 				$HighestElapsedTime = $BlitzWhoAggTbl | Select-Object -ExpandProperty "elapsed_time" -First 1
 
