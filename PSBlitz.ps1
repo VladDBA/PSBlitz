@@ -137,6 +137,7 @@
 .PARAMETER CacheTop
  Used to specify if more/less than the default top 10 queries should be returned for the 
  sp_BlitzCache step. Only works for HTML output (-ToHTM Y).
+ Setting this parameter to 0 will skip the plan cache analysis step altogether.
 
 .PARAMETER CacheMinutesBack
  Used to specify how many minutes back to begin plan cache analysis. 
@@ -183,7 +184,7 @@
 .PARAMETER SkipChecks
  Used to specify one or more (comma-separated) checks to skip. 
  Currently supports IndexFrag (skips index fragmentation check), StatsInfo (skips statistics info check), 
- and Deadlock (skips deadlock check).
+ Deadlock (skips deadlock check), and PlanCache (skips plan cache check).
 
 .PARAMETER DebugInfo
  Switch used to get more information for debugging and troubleshooting purposes.
@@ -302,8 +303,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.10.2"
-$VersDate = "2025-12-05"
+$Vers = "5.10.3"
+$VersDate = "2025-12-08"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -329,7 +330,7 @@ $storedHashes = @{
 	"spBlitz_NonSPLatest.sql"            = "1D69DE400C77A1F9F8860EAA9F72FEC39F79518E51A8E717E2A886ADD88B564A"
 	"spBlitzCache_NonSPLatest.sql"       = "8E5374A22F7221517323552C3FDE61148AF42C39615A16CB08CD77DCF42713D2"
 	"spBlitzFirst_NonSPLatest.sql"       = "BE5EA2BE8E6104EB81B5EDAD2271577506993A93468A08C1A94BD9FB875FBB48"
-	"spBlitzIndex_NonSPLatest.sql"       = "1A1663B6B867FD4BFCF0969271E7447567BF4C4846EE27530CEB6F5AFDCB5322"
+	"spBlitzIndex_NonSPLatest.sql"       = "5CC87A863DE2784F82A99A892CBE5C1F9903F4354D487EC0E77B391ACF751D78"
 	"spBlitzLock_NonSPLatest.sql"        = "E8AF3BD150A94054CD0543F12FEA719531654461BE73B253AE00EA2B6B969B51"
 	"spBlitzWho_NonSPLatest.sql"         = "3BA70668E0F47940AACF73B930D09A848704E82063479C228F3F7CDECF14C4DE"
 	"GetBlitzWhoData.sql"                = "4CDB3FBA91EF31B017DC5888BB694587ECC83A37FBEF6FE33AA0BC791F5B02B6"
@@ -2729,201 +2730,206 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	Ony run through the other sort orders if $IsIndepth = "Y"
 	otherwise just do duration and avg duration
 	#>
-	if ($IsIndepth -eq "Y") {
-		$SortOrders = @("'CPU'", "'Average CPU'", "'Reads'", "'Average Reads'",
-			"'Duration'", "'Average Duration'", "'Executions'", "'Executions per Minute'",
-			"'Writes'", "'Average Writes'", "'Spills'", "'Average Spills'",
-			"'Duplicate'", "'Query Hash'", "'Memory Grant'", "'Recent Compilations'")
-	} else {
-		$SortOrders = @("'CPU'", "'Average CPU'", "'Duration'",
-			"'Average Duration'")
-	}
-	##progress
-	$TotalSortOrders = $SortOrders.Count
-	$CurrentSortOrder = 0
-	#Set initial SortOrder value
-	$OldSortOrder = "'CPU'"
-	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzCache_NonSPLatest.sql"
-	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-	#Set specific database to check if a name was provided
-	if (!([string]::IsNullOrEmpty($CheckDB))) {
-		[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
-		Write-Host " Retrieving plan cache info for $CheckDB" -NoNewline
-	} elseif ($IsAzureSQLDB) {
-		Write-Host " Retrieving plan cache info for $ASDBName" -NoNewline
-	} else {
-		Write-Host " Retrieving plan cache info for all user databases" -NoNewline
-		#Create array to store database names
-		$DBArray = New-Object System.Collections.ArrayList
-		[int]$BlitzCacheRecs = 0
-	}
-	$OrigCacheMinutesBack = $CacheMinutesBack
-	if ($CacheMinutesBack -gt 0) {
+	if (($SkipChecks -contains "PlanCache") -or ($CacheTop -eq 0)) {
 		
-		$OrigCacheMinutesBack = $CacheMinutesBack
-		$OldCacheMinutesBackStr = ";SET @MinutesBack = NULL;"
-		$NewCacheMinutesBackStr = ";SET @MinutesBack = " + $CacheMinutesBack + ";"
-		[string]$Query = $Query -replace $OldCacheMinutesBackStr, $NewCacheMinutesBackStr
-		Write-Host " for the past $CacheMinutesBack minutes + current execution time"
-	} else { 
-		Write-Host "" 
-	}
-	#Loop through sort orders
-	foreach ($SortOrder in $SortOrders) {
-		$CurrentSortOrder++
-		#Filename sort order portion
-		$FileSOrder = $SortOrder.Replace('Average', 'Avg')
-		$FileSOrder = $SortOrder.Replace('Executions per Minute', 'ExPM')
-		$FileSOrder = $SortOrder.Replace(' ', '_')
-		$FileSOrder = $FileSOrder.Replace("'", '')
-
-		#Replace old sort order with new one
-		$OldSortString = ";SELECT @SortOrder = " + $OldSortOrder
-		$NewSortString = ";SELECT @SortOrder = " + $SortOrder
-		#Replace number of records returned if sorting by recent compilations
-		if ($SortOrder -eq "'recent compilations'") {
-			$OldSortString = $OldSortString + ", @Top = $CacheTop;"
-			$NewSortString = $NewSortString + ", @Top = 50;"
-		} elseif (($CacheTop -ne 10) -and ($SortOrder -eq "'CPU'")) {
-			#Since we're only reading the script once and then using it from memory, 
-			#we only have to change @Top once if it's not the default
-			$OldSortString = $OldSortString + ", @Top = 10;"
-			$NewSortString = $NewSortString + ", @Top = $CacheTop;"
+		Write-Host " Skipping plan cache check as requested"
+		Add-LogRow "Plan cache Info" "Skipped" "Plan cache check skipped by user"
+	} else {
+		if ($IsIndepth -eq "Y") {
+			$SortOrders = @("'CPU'", "'Average CPU'", "'Reads'", "'Average Reads'",
+				"'Duration'", "'Average Duration'", "'Executions'", "'Executions per Minute'",
+				"'Writes'", "'Average Writes'", "'Spills'", "'Average Spills'",
+				"'Duplicate'", "'Query Hash'", "'Memory Grant'", "'Recent Compilations'")
+		} else {
+			$SortOrders = @("'CPU'", "'Average CPU'", "'Duration'",
+				"'Average Duration'")
 		}
-		#Adjust the value of -CacheMinutesBack/@MinutesBack to the current runtime
-		if ($OrigCacheMinutesBack -gt 0) {
-			$CurrTime = Get-Date
-			$CurrRunTime = (New-TimeSpan -Start $StartDate -End $CurrTime).TotalMinutes
-			$CurrMin = [Math]::Round($CurrRunTime)
-			
-			$CacheMinutesBack = $CurrMin + $OrigCacheMinutesBack
-			
-			Write-PSBlitzDebug " ->Adjusting the value of -CacheMinutesBack to the current runtime of $CurrMin minutes" 
-			Write-PSBlitzDebug "  ->The past $CacheMinutesBack minutes ($CurrMin + $OrigCacheMinutesBack) will now be analyzed"
-						
+		##progress
+		$TotalSortOrders = $SortOrders.Count
+		$CurrentSortOrder = 0
+		#Set initial SortOrder value
+		$OldSortOrder = "'CPU'"
+		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzCache_NonSPLatest.sql"
+		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
+		#Set specific database to check if a name was provided
+		if (!([string]::IsNullOrEmpty($CheckDB))) {
+			[string]$Query = $Query -replace $OldCheckDBStr, $NewCheckDBStr
+			Write-Host " Retrieving plan cache info for $CheckDB" -NoNewline
+		} elseif ($IsAzureSQLDB) {
+			Write-Host " Retrieving plan cache info for $ASDBName" -NoNewline
+		} else {
+			Write-Host " Retrieving plan cache info for all user databases" -NoNewline
+			#Create array to store database names
+			$DBArray = New-Object System.Collections.ArrayList
+			[int]$BlitzCacheRecs = 0
+		}
+		$OrigCacheMinutesBack = $CacheMinutesBack
+		if ($CacheMinutesBack -gt 0) {
+		
+			$OrigCacheMinutesBack = $CacheMinutesBack
+			$OldCacheMinutesBackStr = ";SET @MinutesBack = NULL;"
 			$NewCacheMinutesBackStr = ";SET @MinutesBack = " + $CacheMinutesBack + ";"
 			[string]$Query = $Query -replace $OldCacheMinutesBackStr, $NewCacheMinutesBackStr
+			Write-Host " for the past $CacheMinutesBack minutes + current execution time"
+		} else { 
+			Write-Host "" 
 		}
+		#Loop through sort orders
+		foreach ($SortOrder in $SortOrders) {
+			$CurrentSortOrder++
+			#Filename sort order portion
+			$FileSOrder = $SortOrder.Replace('Average', 'Avg')
+			$FileSOrder = $SortOrder.Replace('Executions per Minute', 'ExPM')
+			$FileSOrder = $SortOrder.Replace(' ', '_')
+			$FileSOrder = $FileSOrder.Replace("'", '')
 
-		[string]$Query = $Query -replace $OldSortString, $NewSortString
-		Write-Host " ->Top $(if($SortOrder -eq "'recent compilations'"){"50"}else{$CacheTop}) queries by $($SortOrder -replace "'",'') ($CurrentSortOrder of $TotalSortOrders)... " -NoNewline
-		if ($OrigCacheMinutesBack -ne 0) {
-			$AdditionalInfo = ", MinutesBack=$CacheMinutesBack"
-		} else {
-			$AdditionalInfo = ""
-		}
-		$PreviousOutcome = $global:StepOutcome
-		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Plan Cache $SortOrder  $AdditionalInfo" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
-
-		$SheetName = "Top Queries - "
-		if ($SortOrder -like '*CPU*') {
-			$SheetName = $SheetName + "CPU"
-			$HighlightCol = 16
-			$ExcelWarnInitCol = 1
-		} elseif ($SortOrder -like '*Reads*') {
-			$SheetName = $SheetName + "Reads"
-			$HighlightCol = 24
-			$ExcelWarnInitCol = 11
-		} elseif ($SortOrder -like '*Duration*') {
-			$SheetName = $SheetName + "Duration"
-			$HighlightCol = 20
-			$ExcelWarnInitCol = 6
-		} elseif ($SortOrder -like '*Executions*') {
-			$SheetName = $SheetName + "Executions"
-			$HighlightCol = 10
-			$ExcelWarnInitCol = 21
-		} elseif ($SortOrder -like '*Writes*') {
-			$SheetName = $SheetName + "Writes"
-			$HighlightCol = 28
-			$ExcelWarnInitCol = 16
-		} elseif ($SortOrder -like '*Spills*') {
-			$SheetName = $SheetName + "Spills"
-			$HighlightCol = 43
-			$ExcelWarnInitCol = 26
-		} elseif ("'Duplicate'", "'Query Hash'" -contains $SortOrder) {
-			$SheetName = $SheetName + "Dupl & Single Use"
-			$HighlightCol = 0
-		} elseif ($SortOrder -like '*Memory*') {
-			$SheetName = $SheetName + "Mem & Recent Comp"
-			$HighlightCol = 37
-			$ExcelWarnInitCol = 31
-		} elseif ($SortOrder -eq "'Recent compilations'") {
-			$SheetName = $SheetName + "Mem & Recent Comp"
-			$HighlightCol = 47
-			$ExcelWarnInitCol = 31
-		}
-	
-		if ($global:StepOutcome -eq "Success") {
-			$BlitzCacheTbl = $global:PSBlitzSet.Tables[0]
-			$BlitzCacheWarnTbl = $global:PSBlitzSet.Tables[1]
-
-			Export-PlansAndDeadlocks $BlitzCacheTbl $PlanOutDir "Query Plan" "SQLPlan File" -FPrefix $FileSOrder -DebugInfo:$DebugInfo
-
-			##Add database names to array
-			if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
-				foreach ($row in $BlitzCacheTbl."Database") {
-					if ($row -ne [System.DBNull]::Value) {
-						$DBArray.Add($row) | Out-Null
-						$BlitzCacheRecs += 1
-					}
-				}
+			#Replace old sort order with new one
+			$OldSortString = ";SELECT @SortOrder = " + $OldSortOrder
+			$NewSortString = ";SELECT @SortOrder = " + $SortOrder
+			#Replace number of records returned if sorting by recent compilations
+			if ($SortOrder -eq "'recent compilations'") {
+				$OldSortString = $OldSortString + ", @Top = $CacheTop;"
+				$NewSortString = $NewSortString + ", @Top = 50;"
+			} elseif (($CacheTop -ne 10) -and ($SortOrder -eq "'CPU'")) {
+				#Since we're only reading the script once and then using it from memory, 
+				#we only have to change @Top once if it's not the default
+				$OldSortString = $OldSortString + ", @Top = 10;"
+				$NewSortString = $NewSortString + ", @Top = $CacheTop;"
+			}
+			#Adjust the value of -CacheMinutesBack/@MinutesBack to the current runtime
+			if ($OrigCacheMinutesBack -gt 0) {
+				$CurrTime = Get-Date
+				$CurrRunTime = (New-TimeSpan -Start $StartDate -End $CurrTime).TotalMinutes
+				$CurrMin = [Math]::Round($CurrRunTime)
+			
+				$CacheMinutesBack = $CurrMin + $OrigCacheMinutesBack
+			
+				Write-PSBlitzDebug " ->Adjusting the value of -CacheMinutesBack to the current runtime of $CurrMin minutes" 
+				Write-PSBlitzDebug "  ->The past $CacheMinutesBack minutes ($CurrMin + $OrigCacheMinutesBack) will now be analyzed"
+						
+				$NewCacheMinutesBackStr = ";SET @MinutesBack = " + $CacheMinutesBack + ";"
+				[string]$Query = $Query -replace $OldCacheMinutesBackStr, $NewCacheMinutesBackStr
 			}
 
-			if ($ToHTML -eq "Y") {
-				$SheetName = $SheetName -replace "Top Queries - ", ""
+			[string]$Query = $Query -replace $OldSortString, $NewSortString
+			Write-Host " ->Top $(if($SortOrder -eq "'recent compilations'"){"50"}else{$CacheTop}) queries by $($SortOrder -replace "'",'') ($CurrentSortOrder of $TotalSortOrders)... " -NoNewline
+			if ($OrigCacheMinutesBack -ne 0) {
+				$AdditionalInfo = ", MinutesBack=$CacheMinutesBack"
+			} else {
+				$AdditionalInfo = ""
+			}
+			$PreviousOutcome = $global:StepOutcome
+			Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Plan Cache $SortOrder  $AdditionalInfo" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
 
-				Add-QueryName $BlitzCacheTbl "Query" "Query Text" $FileSOrder				
+			$SheetName = "Top Queries - "
+			if ($SortOrder -like '*CPU*') {
+				$SheetName = $SheetName + "CPU"
+				$HighlightCol = 16
+				$ExcelWarnInitCol = 1
+			} elseif ($SortOrder -like '*Reads*') {
+				$SheetName = $SheetName + "Reads"
+				$HighlightCol = 24
+				$ExcelWarnInitCol = 11
+			} elseif ($SortOrder -like '*Duration*') {
+				$SheetName = $SheetName + "Duration"
+				$HighlightCol = 20
+				$ExcelWarnInitCol = 6
+			} elseif ($SortOrder -like '*Executions*') {
+				$SheetName = $SheetName + "Executions"
+				$HighlightCol = 10
+				$ExcelWarnInitCol = 21
+			} elseif ($SortOrder -like '*Writes*') {
+				$SheetName = $SheetName + "Writes"
+				$HighlightCol = 28
+				$ExcelWarnInitCol = 16
+			} elseif ($SortOrder -like '*Spills*') {
+				$SheetName = $SheetName + "Spills"
+				$HighlightCol = 43
+				$ExcelWarnInitCol = 26
+			} elseif ("'Duplicate'", "'Query Hash'" -contains $SortOrder) {
+				$SheetName = $SheetName + "Dupl & Single Use"
+				$HighlightCol = 0
+			} elseif ($SortOrder -like '*Memory*') {
+				$SheetName = $SheetName + "Mem & Recent Comp"
+				$HighlightCol = 37
+				$ExcelWarnInitCol = 31
+			} elseif ($SortOrder -eq "'Recent compilations'") {
+				$SheetName = $SheetName + "Mem & Recent Comp"
+				$HighlightCol = 47
+				$ExcelWarnInitCol = 31
+			}
+	
+			if ($global:StepOutcome -eq "Success") {
+				$BlitzCacheTbl = $global:PSBlitzSet.Tables[0]
+				$BlitzCacheWarnTbl = $global:PSBlitzSet.Tables[1]
+
+				Export-PlansAndDeadlocks $BlitzCacheTbl $PlanOutDir "Query Plan" "SQLPlan File" -FPrefix $FileSOrder -DebugInfo:$DebugInfo
+
+				##Add database names to array
+				if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
+					foreach ($row in $BlitzCacheTbl."Database") {
+						if ($row -ne [System.DBNull]::Value) {
+							$DBArray.Add($row) | Out-Null
+							$BlitzCacheRecs += 1
+						}
+					}
+				}
+
+				if ($ToHTML -eq "Y") {
+					$SheetName = $SheetName -replace "Top Queries - ", ""
+
+					Add-QueryName $BlitzCacheTbl "Query" "Query Text" $FileSOrder				
 					
-				$htmlTable1 = Convert-TableToHtml $BlitzCacheTbl -NoCaseChange -ExclCols "Query Text", "Query Plan" -CSSClass "CacheTabx" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs $FileSOrder
+					$htmlTable1 = Convert-TableToHtml $BlitzCacheTbl -NoCaseChange -ExclCols "Query Text", "Query Plan" -CSSClass "CacheTabx" -DebugInfo:$DebugInfo -AnchorFromHere -AnchorIDs $FileSOrder
 				
-				$htmlTable2 = Convert-TableToHtml $BlitzCacheWarnTbl -NoCaseChange -HyperlinkCol "FindingHL" -ExclCols "Finding", "URL" -DebugInfo:$DebugInfo
+					$htmlTable2 = Convert-TableToHtml $BlitzCacheWarnTbl -NoCaseChange -HyperlinkCol "FindingHL" -ExclCols "Finding", "URL" -DebugInfo:$DebugInfo
 
-				$htmlTable3 = Convert-QueryTableToHtml $BlitzCacheTbl -DebugInfo:$DebugInfo -Cols "Query", "Query Text" -CSSClass "query-table" -AnchorToHere -AnchorID $FileSOrder
+					$htmlTable3 = Convert-QueryTableToHtml $BlitzCacheTbl -DebugInfo:$DebugInfo -Cols "Query", "Query Text" -CSSClass "query-table" -AnchorToHere -AnchorID $FileSOrder
 		
-				#pairing up related tables in the same HTML file
-				if ("'CPU'", "'Reads'", "'Duration'", "'Executions'", "'Writes'",
-					"'Spills'", "'Duplicate'", "'Memory Grant'" -contains $SortOrder) {
-					#Handling CSS
-					$CacheHTMLPre = $HTMLPre
-					$CacheHTMLPre = $CacheHTMLPre -replace 'CacheTab1High', $HighlightCol
-					$htmlTable1 = $htmlTable1 -replace '<table class="CacheTabx">', '<table class="CacheTable1">'
+					#pairing up related tables in the same HTML file
+					if ("'CPU'", "'Reads'", "'Duration'", "'Executions'", "'Writes'",
+						"'Spills'", "'Duplicate'", "'Memory Grant'" -contains $SortOrder) {
+						#Handling CSS
+						$CacheHTMLPre = $HTMLPre
+						$CacheHTMLPre = $CacheHTMLPre -replace 'CacheTab1High', $HighlightCol
+						$htmlTable1 = $htmlTable1 -replace '<table class="CacheTabx">', '<table class="CacheTable1">'
 					
-					#highest CPU and Duration times
-					if (($SortOrder -eq "'CPU'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
-						$HighestTotalCPU = $BlitzCacheTbl.Rows[0]["Total CPU (ms)"]
-					} elseif (($SortOrder -eq "'Duration'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
-						$HighestTotalDuration = $BlitzCacheTbl.Rows[0]["Total Duration (ms)"]
-					} elseif (($SortOrder -eq "'Reads'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
-						$HighestTotalReads = $BlitzCacheTbl.Rows[0]["Total Reads"]
-					} elseif (($SortOrder -eq "'Executions'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
-						$HighestTotalExecutions = $BlitzCacheTbl.Rows[0]['# Executions']
-					} elseif (($SortOrder -eq "'Writes'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
-						$HighestTotalWrites = $BlitzCacheTbl.Rows[0]["Total Writes"]
-					} elseif (($SortOrder -eq "'Spills'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
-						$HighestTotalSpills = $BlitzCacheTbl.Rows[0]["Total Spills"]
-					} elseif (($SortOrder -eq "'Memory Grant'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
-						$HighestMaxMemoryGrant = $BlitzCacheTbl.Rows[0]["Maximum Memory Grant KB"]
-					}
+						#highest CPU and Duration times
+						if (($SortOrder -eq "'CPU'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+							$HighestTotalCPU = $BlitzCacheTbl.Rows[0]["Total CPU (ms)"]
+						} elseif (($SortOrder -eq "'Duration'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+							$HighestTotalDuration = $BlitzCacheTbl.Rows[0]["Total Duration (ms)"]
+						} elseif (($SortOrder -eq "'Reads'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+							$HighestTotalReads = $BlitzCacheTbl.Rows[0]["Total Reads"]
+						} elseif (($SortOrder -eq "'Executions'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+							$HighestTotalExecutions = $BlitzCacheTbl.Rows[0]['# Executions']
+						} elseif (($SortOrder -eq "'Writes'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+							$HighestTotalWrites = $BlitzCacheTbl.Rows[0]["Total Writes"]
+						} elseif (($SortOrder -eq "'Spills'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+							$HighestTotalSpills = $BlitzCacheTbl.Rows[0]["Total Spills"]
+						} elseif (($SortOrder -eq "'Memory Grant'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+							$HighestMaxMemoryGrant = $BlitzCacheTbl.Rows[0]["Maximum Memory Grant KB"]
+						}
 
-					if ($SheetName -eq "Mem & Recent Comp") {
-						$HtmlTabName = "Queries by Memory Grants & Recent Compilations"
-					} elseif ($SheetName -eq "Dupl & Single Use") {
-						$HtmlTabName = "Queries by Duplicate Plans & Query Hash"
-					} else {
-						$HtmlTabName = "Queries by $SheetName"
-					}
-					if (!([string]::IsNullOrEmpty($CheckDB))) {
-						$HtmlTabName += " for $CheckDB" 
-					} elseif ($IsAzureSQLDB) {
-						$HtmlTabName += " for $ASDBName"
-					}
+						if ($SheetName -eq "Mem & Recent Comp") {
+							$HtmlTabName = "Queries by Memory Grants & Recent Compilations"
+						} elseif ($SheetName -eq "Dupl & Single Use") {
+							$HtmlTabName = "Queries by Duplicate Plans & Query Hash"
+						} else {
+							$HtmlTabName = "Queries by $SheetName"
+						}
+						if (!([string]::IsNullOrEmpty($CheckDB))) {
+							$HtmlTabName += " for $CheckDB" 
+						} elseif ($IsAzureSQLDB) {
+							$HtmlTabName += " for $ASDBName"
+						}
 					
-					$HtmlFileName = $SheetName -replace " & ", "_"
-					$HtmlFileName = $HtmlFileName -replace " ", "_"
-					$HtmlFileName = "BlitzCache_$HtmlFileName.html"
-					$HtmlTabName2 = $SortOrder -replace "'", ""
+						$HtmlFileName = $SheetName -replace " & ", "_"
+						$HtmlFileName = $HtmlFileName -replace " ", "_"
+						$HtmlFileName = "BlitzCache_$HtmlFileName.html"
+						$HtmlTabName2 = $SortOrder -replace "'", ""
 					
-					$html = @"
+						$html = @"
 					<title>$HtmlTabName</title>
 					$HTMLBodyStart`n<h1 id="top">$HtmlTabName</h1>`n<br>
 					<h2>Top $CacheTop Queries by $HtmlTabName2</h2>
@@ -2932,121 +2938,124 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					$htmlTable2 `n $JumpToTop `n
 "@
 
-					$html2 = "`n<h2 id=`"Queries1`">Query text for $HtmlTabName2</h2>`n $htmlTable3 `n $JumpToTop"					
-					$FirstHalf = "Done"
-					$SecondHalf = "NotDone"
+						$html2 = "`n<h2 id=`"Queries1`">Query text for $HtmlTabName2</h2>`n $htmlTable3 `n $JumpToTop"					
+						$FirstHalf = "Done"
+						$SecondHalf = "NotDone"
 
-				}
+					}
 		
-				#adding the second half of each html page and writing to file
-				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'") -or ($SortOrder -eq "'Query Hash'")) {
-					$HtmlTabName2 = $SortOrder -replace "'", ""
-					#Handling CSS
-					$htmlTable1 = $htmlTable1 -replace '<table class="CacheTabx">', '<table class="CacheTable2">'
+					#adding the second half of each html page and writing to file
+					if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'") -or ($SortOrder -eq "'Query Hash'")) {
+						$HtmlTabName2 = $SortOrder -replace "'", ""
+						#Handling CSS
+						$htmlTable1 = $htmlTable1 -replace '<table class="CacheTabx">', '<table class="CacheTable2">'
 					
-					#highest CPU and Duration times
-					if (($SortOrder -eq "'Average CPU'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
-						$HighestAvgCPU = $BlitzCacheTbl.Rows[0]["Avg CPU (ms)"]
-					} elseif (($SortOrder -eq "'Average Duration'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
-						$HighestAvgDuration = $BlitzCacheTbl.Rows[0]["Avg Duration (ms)"]
-					} elseif (($SortOrder -eq "'Average Reads'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
-						$HighestAvgReads = $BlitzCacheTbl.Rows[0]["Average Reads"]
-					} elseif (($SortOrder -eq "'Executions per Minute'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
-						$HighestExecsPerMin = $BlitzCacheTbl.Rows[0]['Executions / Minute']
-					} elseif (($SortOrder -eq "'Average Writes'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
-						$HighestAvgWrites = $BlitzCacheTbl.Rows[0]["Average Writes"]
-					} elseif (($SortOrder -eq "'Average Spills'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
-						$HighestAvgSpills = $BlitzCacheTbl.Rows[0]["Avg Spills"]
-					}
+						#highest CPU and Duration times
+						if (($SortOrder -eq "'Average CPU'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+							$HighestAvgCPU = $BlitzCacheTbl.Rows[0]["Avg CPU (ms)"]
+						} elseif (($SortOrder -eq "'Average Duration'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+							$HighestAvgDuration = $BlitzCacheTbl.Rows[0]["Avg Duration (ms)"]
+						} elseif (($SortOrder -eq "'Average Reads'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+							$HighestAvgReads = $BlitzCacheTbl.Rows[0]["Average Reads"]
+						} elseif (($SortOrder -eq "'Executions per Minute'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+							$HighestExecsPerMin = $BlitzCacheTbl.Rows[0]['Executions / Minute']
+						} elseif (($SortOrder -eq "'Average Writes'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+							$HighestAvgWrites = $BlitzCacheTbl.Rows[0]["Average Writes"]
+						} elseif (($SortOrder -eq "'Average Spills'") -and ($BlitzCacheTbl.Rows.Count -gt 0)) {
+							$HighestAvgSpills = $BlitzCacheTbl.Rows[0]["Avg Spills"]
+						}
 
-					# Add heading if first half of the table failed
-					if ($PreviousOutcome -eq "Failure") {
-						$CacheHTMLPre = $HTMLPre
-						#$html = $CacheHTMLPre
-						$html2 = "`n<br>"
-					} 					
-					if ($SortOrder -eq "'Recent Compilations'") {
-						$TopCount = "50"						
-					} else {
-						$TopCount = "$CacheTop"
-						$HighlightCol += 1
-					}
-					$CacheHTMLPre = $CacheHTMLPre -replace 'CacheTab2High', $HighlightCol
-					$html += @"
+						# Add heading if first half of the table failed
+						if ($PreviousOutcome -eq "Failure") {
+							$CacheHTMLPre = $HTMLPre
+							#$html = $CacheHTMLPre
+							$html2 = "`n<br>"
+						} 					
+						if ($SortOrder -eq "'Recent Compilations'") {
+							$TopCount = "50"						
+						} else {
+							$TopCount = "$CacheTop"
+							$HighlightCol += 1
+						}
+						$CacheHTMLPre = $CacheHTMLPre -replace 'CacheTab2High', $HighlightCol
+						$html += @"
 				<h2>Top $TopCount Queries by $HtmlTabName2</h2>
 				<p><a href="#Queries2">Jump to query text</a></p>
 				$htmlTable1 `n<br>`n<h2>Warnings Explained</h2>`n $htmlTable2 `n $JumpToTop
 "@
 
-					$html2 += "`n<h2 id=`"Queries2`">Query text for $HtmlTabName2</h2>`n $htmlTable3 `n $JumpToTop"
-					#putting it all together
-					$html3 = $CacheHTMLPre + $html + $html2 + "`n $HTMLBodyEnd"
-					$SecondHalf = "Done"					
-					#Save the HTML file containing both pairs
-					try {
-						Save-HtmlFile $html3 $HtmlFileName $HTMLOutDir $DebugInfo "Complete "
-					} catch {
-						Invoke-ErrMsg
-						Add-LogRow "->Write Complete HTML file" "Failure"
-					}
+						$html2 += "`n<h2 id=`"Queries2`">Query text for $HtmlTabName2</h2>`n $htmlTable3 `n $JumpToTop"
+						#putting it all together
+						$html3 = $CacheHTMLPre + $html + $html2 + "`n $HTMLBodyEnd"
+						$SecondHalf = "Done"					
+						#Save the HTML file containing both pairs
+						try {
+							Save-HtmlFile $html3 $HtmlFileName $HTMLOutDir $DebugInfo "Complete "
+						} catch {
+							Invoke-ErrMsg
+							Add-LogRow "->Write Complete HTML file" "Failure"
+						}
 				
-				}
+					}
 
-				#Only writing the file here if this is the first half
-				if (($FirstHalf -eq "Done") -and ($SecondHalf -eq "NotDone")) {
-					$html3 = $CacheHTMLPre + $html + $html2 + @"
+					#Only writing the file here if this is the first half
+					if (($FirstHalf -eq "Done") -and ($SecondHalf -eq "NotDone")) {
+						$html3 = $CacheHTMLPre + $html + $html2 + @"
 					$HTMLBodyEnd
 "@
-					#Save the partial HTML file
-					try {
-						Save-HtmlFile $html3 $HtmlFileName $HTMLOutDir $DebugInfo "Partial "
-					} catch {
-						Invoke-ErrMsg
-						Add-LogRow "->Write Partial HTML file" "Failure"
+						#Save the partial HTML file
+						try {
+							Save-HtmlFile $html3 $HtmlFileName $HTMLOutDir $DebugInfo "Partial "
+						} catch {
+							Invoke-ErrMsg
+							Add-LogRow "->Write Partial HTML file" "Failure"
+						}
 					}
-				}
 
-			} else {
-				#Specify worksheet
-				$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
-				#Specify at which row in the sheet to start adding the data
-				$ExcelStartRow = 3
-				#$SortOrder containing avg or xpm will export data starting with row 16
-				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'") -or ($SortOrder -eq "'Query Hash'")) {
-					$ExcelStartRow = 17
+				} else {
+					#Specify worksheet
+					$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
+					#Specify at which row in the sheet to start adding the data
+					$ExcelStartRow = 3
+					#$SortOrder containing avg or xpm will export data starting with row 16
+					if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'") -or ($SortOrder -eq "'Query Hash'")) {
+						$ExcelStartRow = 17
+					}	
+					Convert-TableToExcel $BlitzCacheTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -ExclCols "Query", "Query Plan"
+
+					####Plan Cache warning
+					$SheetName = "Plan Cache Warnings"
+					#Specify worksheet
+					$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
+
+					#Specify at which row in the sheet to start adding the data
+					$ExcelStartRow = 3
+					#$SortOrder containing avg or xpm will export data starting with row 16
+					if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'")) {
+						$ExcelStartRow = 36
+					}
+
+					$ExcelURLCol = $ExcelWarnInitCol + 2
+					$ExcelColNum = $ExcelWarnInitCol
+
+					Convert-TableToExcel $BlitzCacheWarnTbl $ExcelSheet -StartRow $ExcelStartRow -StartCol $ExcelWarnInitCol -ExclCols "FindingHL" -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum $ExcelURLCol -URLTextCol "Finding"
+					##Saving file 
+					Save-ExcelFile $ExcelFile
 				}	
-				Convert-TableToExcel $BlitzCacheTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -ExclCols "Query", "Query Plan"
+				##Cleaning up variables 
+				Invoke-ClearVariables BlitzCacheWarnTbl, BlitzCacheTbl, PSBlitzSet
+			}
+			$OldSortOrder = $SortOrder
 
-				####Plan Cache warning
-				$SheetName = "Plan Cache Warnings"
-				#Specify worksheet
-				$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
-
-				#Specify at which row in the sheet to start adding the data
-				$ExcelStartRow = 3
-				#$SortOrder containing avg or xpm will export data starting with row 16
-				if (($SortOrder -like '*Average*') -or ($SortOrder -eq "'Executions per Minute'") -or ($SortOrder -eq "'Recent Compilations'")) {
-					$ExcelStartRow = 36
-				}
-
-				$ExcelURLCol = $ExcelWarnInitCol + 2
-				$ExcelColNum = $ExcelWarnInitCol
-
-				Convert-TableToExcel $BlitzCacheWarnTbl $ExcelSheet -StartRow $ExcelStartRow -StartCol $ExcelWarnInitCol -ExclCols "FindingHL" -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum $ExcelURLCol -URLTextCol "Finding"
-				##Saving file 
-				Save-ExcelFile $ExcelFile
-			}	
-			##Cleaning up variables 
-			Invoke-ClearVariables BlitzCacheWarnTbl, BlitzCacheTbl, PSBlitzSet
+			# Set @MinutesBack to NULL for the next sort order
+			if (($OrigCacheMinutesBack -gt 0) -and $SortOrder -ne "'Recent Compilations'") {
+				Write-PSBlitzDebug " ->Setting @MinutesBack to NULL for the next sort order"
+				[string]$Query = $Query -replace $NewCacheMinutesBackStr, $OldCacheMinutesBackStr
+			}
 		}
-		$OldSortOrder = $SortOrder
+ 	}
 
-		# Set @MinutesBack to NULL for the next sort order
-		if (($OrigCacheMinutesBack -gt 0) -and $SortOrder -ne "'Recent Compilations'") {
-			Write-PSBlitzDebug " ->Setting @MinutesBack to NULL for the next sort order"
-			[string]$Query = $Query -replace $NewCacheMinutesBackStr, $OldCacheMinutesBackStr
-		}
-	}
+	
 	
 	#####################################################################################
 	#						sp_BlitzQueryStore											#
@@ -4138,7 +4147,7 @@ finally {
 						$QuerySource += "; "
 					}
 					$Description = "Top $CacheTop queries found in the plan cache, sorted by memory grant size,<br>and the top 50 most recently compiled queries."
-					if($HighestMaxMemoryGrant -gt 0) {
+					if ($HighestMaxMemoryGrant -gt 0) {
 						$Description += "<br><span class=`"additional-desc`">Highest Max Memory Grant: $HighestMaxMemoryGrant KB</span>"
 					}
 				} elseif ($SortOrder -eq "Dupl_Single_Use") {
