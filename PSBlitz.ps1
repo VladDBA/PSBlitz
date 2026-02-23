@@ -92,9 +92,9 @@
 
  Copyright for PSBlitz.ps1, GetStatsInfoForWholeDB.sql, GetOpenTransactions.sql, 
  GetIndexInfoForWholeDB.sql, GetInstanceInfo.sql, and GetTempDBUsageInfo.sql 
- is held by Vlad Drumea, 2025 as described below.
+ is held by Vlad Drumea, 2026 as described below.
 
- Copyright (c) 2025 Vlad Drumea - https://vladdba.com/
+ Copyright (c) 2026 Vlad Drumea - https://vladdba.com/
 
  Permission is hereby granted, free of charge, to any person obtaining a copy
  of this software and associated documentation files (the "Software"), to deal
@@ -193,7 +193,7 @@
  Author: Vlad Drumea (VladDBA)
  Website: https://vladdba.com/
 
- Copyright: (c) 2025 by Vlad Drumea, licensed under MIT
+ Copyright: (c) 2026 by Vlad Drumea, licensed under MIT
  License: MIT https://opensource.org/licenses/MIT
 
 .LINK
@@ -268,7 +268,7 @@ param(
 	[Parameter(Mandatory = $False)]
 	[string]$SQLPass,
 	[Parameter(Mandatory = $False)]
-	[string]$IsIndepth,
+	[switch]$InDepth,
 	[Parameter(Mandatory = $False)]
 	[string]$CheckDB,
 	[Parameter(Mandatory = $False)]
@@ -284,9 +284,9 @@ param(
 	[Parameter(Mandatory = $False)]
 	[string]$OutputDir,
 	[Parameter(Mandatory = $False)]
-	[string]$ToHTML = "N",
+	[switch]$ToHTML,
 	[Parameter(Mandatory = $False)]
-	[string]$ZipOutput = "N",
+	[switch]$ZipOutput,
 	[Parameter(Mandatory = $False)]
 	[int]$CacheTop = 10,
 	[Parameter(Mandatory = $False)]
@@ -303,8 +303,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "5.10.3"
-$VersDate = "2025-12-08"
+$Vers = "6.0.0"
+$VersDate = "2026-02-28"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -1426,19 +1426,30 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 		$SecSQLPass = Read-Host -Prompt "Password" -AsSecureString
 	}
 	##Indepth check 
-	$IsIndepth = Read-Host -Prompt "Perform an in-depth check?(empty defaults to N)[Y/N]"
+	[string]$InDepthInput = Read-Host -Prompt "Perform an in-depth check?(empty defaults to N)[Y/N]"
+    if ($InDepthInput -match '^(?i:y|yes)') {
+        $InDepth = $true
+    } else {
+        $InDepth = $false
+    }
 	##sp_BlitzWho delay
 	if (!([int]$BlitzWhoDelay = Read-Host "Seconds of delay between session activity captures (empty defaults to 10)")) { 
 		$BlitzWhoDelay = 10 
 	}
 	##Output file type
-	if (!([string]$ToHTML = Read-Host -Prompt "Output the report as HTML instead of Excel?(empty defaults to N)[Y/N]")) {
-		$ToHTML = "N"
-	}
+	[string]$ToHTMLInput = Read-Host -Prompt "Output the report as HTML instead of Excel?(empty defaults to N)[Y/N]"
+    if ($ToHTMLInput -match '^(?i:y|yes)') {
+        $ToHTML = $true
+    } else {
+        $ToHTML = $false
+    }
 	##Zip output files
-	if (!([string]$ZipOutput = Read-Host -Prompt "Create a zip archive of the output files?(empty defaults to N)[Y/N]")) {
-		$ZipOutput = "N"
-	}
+	[string]$ZipOutputInput = Read-Host -Prompt "Create a zip archive of the output files?(empty defaults to N)[Y/N]"
+    if ($ZipOutputInput -match '^(?i:y|yes)') {
+        $ZipOutput = $true
+    } else {
+        $ZipOutput = $false
+    }
 	##Prompt for advanced options
 	if (!([string]$AdvOptions = Read-Host -Prompt "Show advanced options?(empty defaults to N)[Y/N]")) {
 		$AdvOptions = "N"
@@ -1774,7 +1785,7 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 		Write-Host " !" -Fore Yellow
 		Write-Host "->Instance has $UsrDBCount user databases" -Fore Yellow
 		Write-Host "->The following checks will be limited to the database that shows up the most in plan cache info:"
-		if ($IsIndepth -eq "Y") {
+		if ($InDepth) {
 			Write-Host "   - Index Summary`n   - Index Usage Details`n   - Extended Index Diagnosis"
 		} else {
 			Write-Host "   - Index Diagnosis"
@@ -1812,7 +1823,7 @@ $SubDir += $DirDate
 
 $OutDir = Join-Path -Path $OutDir -ChildPath $SubDir
 
-if ($ZipOutput -eq "Y") {
+if ($ZipOutput) {
 
 	$ZipFile = $SubDir + ".zip"
 }
@@ -1836,7 +1847,7 @@ if (!(Test-Path $XDLOutDir)) {
 }
 
 #Initiate Excel app here
-if ($ToHTML -ne "Y") {
+if (-not $ToHTML) {
 	###Open Excel
 	if ($DebugInfo) {
 		$ErrorActionPreference = "Continue"
@@ -1853,18 +1864,18 @@ if ($ToHTML -ne "Y") {
 	} catch {
 		Write-Host "Could not open Excel." -fore Red
 		Write-Host "->Switching to HTML output."
-		$ToHTML = "Y"
+		$ToHTML = $true
 		$ErrorActionPreference = "Continue"
 	}
 }
 
-if (($ToHTML -ne "Y") -and ($CacheTop -ne 10)) {
+if ((-not $ToHTML) -and ($CacheTop -ne 10)) {
 	Write-Host " Output type is Excel, but -CacheTop was specified with a value <> 10." -Fore Red
 	Write-Host " ->These two options aren't compatible.`n ->Switching -CacheTop back to 10"
 	$CacheTop = 10
 }
 
-if ($ToHTML -eq "Y") {
+if ($ToHTML) {
 	#Set HTML files output directory
 	$HTMLOutDir = Join-Path -Path $OutDir -ChildPath "HTMLFiles"
 	if (!(Test-Path $HTMLOutDir)) {
@@ -1955,7 +1966,7 @@ if ($ToHTML -eq "Y") {
 $OldBlitzWhoOut = "@OutputTableName = 'BlitzWho_..PSBlitzReplace..',"
 $NewBlitzWhoOut = "@OutputTableName = 'BlitzWho_$DirDate',"
 
-if ($ToHTML -ne "Y") {
+if (-not $ToHTML) {
 	###Open Excel FIle
 	if ($DebugInfo) {
 		$ExcelApp.visible = $True
@@ -1996,7 +2007,7 @@ if ($global:StepOutcome -eq "Success") {
 #####################################################################################
 $StepStart = Get-Date
 $StepEnd = Get-Date
-$ParametersUsed = "IsIndepth:$IsIndepth; CheckDB:$CheckDB;`n BlitzWhoDelay:$BlitzWhoDelay; MaxTimeout:$MaxTimeout"
+$ParametersUsed = "IsIndepth:$InDepth; CheckDB:$CheckDB;`n BlitzWhoDelay:$BlitzWhoDelay; MaxTimeout:$MaxTimeout"
 $ParametersUsed += ";`n ConnTimeout:$ConnTimeout; CacheTop:$CacheTop;`n ASDBName:$ASDBName; CacheMinutesBack:$CacheMinutesBack"
 $ParametersUsed += if ($IsQueryStoreInterval) { ";`n QueryStoreIntervalStart:$QueryStoreIntervalStart; QueryStoreIntervalEnd:$QueryStoreIntervalEnd" } else { "" }
 $ParametersUsed += ";`n Auth:$Auth; DebugInfo:$DebugInfo"
@@ -2007,7 +2018,7 @@ try {
 
 	Write-Host $("-" * 80)
 	Write-Host "       Starting" -NoNewline 
-	if ($IsIndepth -eq "Y") {
+	if ($InDepth) {
 		Write-Host " in-depth" -NoNewline
 	}
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
@@ -2076,7 +2087,7 @@ try {
 		$PlanCacheTypeTbl = $global:PSBlitzSet.Tables[4]
 		$PlanCacheByDBTbl = $global:PSBlitzSet.Tables[5]
 		
-		if ($ToHTML -eq "Y") {
+		if ($ToHTML) {
 
 			$InstanceInfoTbl.Rows[0]["estimated_response_latency(Sec)"] = $ConnTest
 
@@ -2167,7 +2178,7 @@ $htmlTable6 `n<br>`n<h2>Session level SET options</h2> `n $htmlTable4 `n $HTMLBo
 		$TempDBSessTbl = New-Object System.Data.DataTable
 		$TempDBSessTbl = $global:PSBlitzSet.Tables[2]
 
-		if ($ToHTML -eq "Y") {
+		if ($ToHTML) {
 
 			$htmlTable1 = Convert-TableToHtml $TempDBTbl -CSSClass "TempdbInfoTbl" -DebugInfo:$DebugInfo
 			[int]$TempDBFiles = $TempDBTbl.Rows[0]["data_files"]
@@ -2255,7 +2266,7 @@ $htmlTable4 `n $HTMLBodyEnd
 		} else {
 			Export-PlansAndDeadlocks $AcTranTbl $PlanOutDir "current_plan" "current_plan_file" -DebugInfo:$DebugInfo -FileNameFromColumn
 			Export-PlansAndDeadlocks $AcTranTbl $PlanOutDir "most_recent_plan" "most_recent_plan_file" -DebugInfo:$DebugInfo -FileNameFromColumn
-			if ($ToHTML -eq "Y") {
+			if ($ToHTML) {
 				$tableName = "Open transaction info"
 				if (!([string]::IsNullOrEmpty($CheckDB))) {
 					$tableName += " for $CheckDB" 
@@ -2311,7 +2322,7 @@ $HTMLBodyEnd
 			$ObjImpUpgrTbl = $global:PSBlitzSet.Tables[5]
 			$DBConfigTbl = $global:PSBlitzSet.Tables[6]
 
-			if ($ToHTML -eq "Y") {
+			if ($ToHTML) {
 				$tableName = "Azure SQL Database Info"
 
 				$htmlTable = Convert-TableToHtml $RsrcGovTbl -CSSClass "ASDBRsrcGovTbl" -DebugInfo:$DebugInfo -NoCaseChange
@@ -2439,7 +2450,7 @@ $SortableTable `n $htmlTable6 `n $JumpToTop `n $HTMLBodyEnd
 				Add-LogRow "->Database Scoped Config" "Skipped" "Major Version is $MajorVers"
 			}
 
-			if ($ToHTML -eq "Y") {
+			if ($ToHTML) {
 				$tableName = "Database Info"
 
 				$htmlTable = Convert-TableToHtml $DBInfoTbl -TblID "DBInfoTable" -CSSClass "DatabaseInfoTable sortable" -DebugInfo:$DebugInfo
@@ -2516,7 +2527,7 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 		Write-Host " Retrieving instance health data... " -NoNewline
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitz_NonSPLatest.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-		if (($IsIndepth -eq "Y") -and ([string]::IsNullOrEmpty($CheckDB))) {
+		if (($InDepth) -and ([string]::IsNullOrEmpty($CheckDB))) {
 			[string]$Query = $Query -replace ";SET @CheckUserDatabaseObjects = 0;", ";SET @CheckUserDatabaseObjects = 1;"
 			$GetUsrDBObj = $true
 		}
@@ -2525,7 +2536,7 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 			#$BlitzTbl = New-Object System.Data.DataTable
 			$BlitzTbl = $global:PSBlitzSet.Tables[0]
 
-			if ($ToHTML -eq "Y") {
+			if ($ToHTML) {
 				$tableName = "Instance Health"
 				$htmlTable = Convert-TableToHtml $BlitzTbl -NoCaseChange -TblID "InstanceHealthTable" -CSSClass "InstHealthTbl" -HyperlinkCol "FindingHL" -ExclCols Finding, URL -DebugInfo:$DebugInfo
 				$HighPriorityHealthCount = ($BlitzTbl | Where-Object { $_."Priority" -le 50 }).Rows.Count
@@ -2585,7 +2596,7 @@ $($SearchTableDiv -replace $STDivReplace, "'InstanceHealthTable', 3" -replace 'o
 			if ($RowsReturned -le 0) {
 				Write-Host " ->No rows returned."
 			} else {
-				if ($ToHTML -eq "Y") {
+				if ($ToHTML) {
 					$HtmlTabName = "Database objects with dangerous SET options"
 					$htmlTable = Convert-TableToHtml $DangerousSetTbl -TblID "setopt" -CSSClass "sortable SetOpt" -DebugInfo:$DebugInfo
 					$html = $HTMLPre + @"
@@ -2618,7 +2629,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	if ($global:StepOutcome -eq "Success") {
 		$BlitzFirstTbl = $global:PSBlitzSet.Tables[0]
 
-		if ($ToHTML -eq "Y") {			
+		if ($ToHTML) {			
 			$htmlTable = Convert-TableToHtml $BlitzFirstTbl -NoCaseChange -CSSClass "First30Tbl" -ExclCols "Finding", "URL" -HyperlinkCol "FindingHL" -DebugInfo:$DebugInfo
 			$HtmlTabName = "What's happening on the instance now?"
 			$html = $HTMLPre + @"
@@ -2642,7 +2653,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	#####################################################################################
 	#						sp_BlitzFirst since startup									#
 	#####################################################################################
-	if ($IsIndepth -eq "Y") {
+	if ($InDepth) {
 		Write-Host " Retrieving waits recorded since instance startup... " -NoNewline
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzFirst_NonSPLatest.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
@@ -2653,7 +2664,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			$StorageTbl = $global:PSBlitzSet.Tables[1]
 			$PerfmonTbl = $global:PSBlitzSet.Tables[2]
 
-			if ($ToHTML -eq "Y") {
+			if ($ToHTML) {
 				#Waits
 				$HtmlTabName = "Wait Stats Since Last Startup"
 
@@ -2727,7 +2738,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	#####################################################################################
 	#Building a list of values for @SortOrder 
 	<#
-	Ony run through the other sort orders if $IsIndepth = "Y"
+	Ony run through the other sort orders if $InDepth = "Y"
 	otherwise just do duration and avg duration
 	#>
 	if (($SkipChecks -contains "PlanCache") -or ($CacheTop -eq 0)) {
@@ -2735,7 +2746,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		Write-Host " Skipping plan cache check as requested"
 		Add-LogRow "Plan cache Info" "Skipped" "Plan cache check skipped by user"
 	} else {
-		if ($IsIndepth -eq "Y") {
+		if ($InDepth) {
 			$SortOrders = @("'CPU'", "'Average CPU'", "'Reads'", "'Average Reads'",
 				"'Duration'", "'Average Duration'", "'Executions'", "'Executions per Minute'",
 				"'Writes'", "'Average Writes'", "'Spills'", "'Average Spills'",
@@ -2875,7 +2886,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					}
 				}
 
-				if ($ToHTML -eq "Y") {
+				if ($ToHTML) {
 					$SheetName = $SheetName -replace "Top Queries - ", ""
 
 					Add-QueryName $BlitzCacheTbl "Query" "Query Text" $FileSOrder				
@@ -3149,7 +3160,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 
 					Export-PlansAndDeadlocks $BlitzQSTbl $PlanOutDir "query_plan" "sql_plan_file" -FPrefix "QueryStore_$SortOrder" -DebugInfo:$DebugInfo
 				
-					if ($ToHTML -eq "Y") {
+					if ($ToHTML) {
 					
 						Add-QueryName $BlitzQSTbl "query" "query_sql_text" "QueryStore"
 
@@ -3204,7 +3215,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	#						sp_BlitzIndex												#
 	#####################################################################################
 	#Building a list of values for $Modes
-	if ($IsIndepth -eq "Y") {
+	if ($InDepth) {
 		$Modes = @("1", "2", "4")
 	} else {
 		$Modes = @("0")
@@ -3262,7 +3273,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					
 				Export-PlansAndDeadlocks $BlitzIxTbl $PlanOutDir "Sample Query Plan" "Sample Plan File" -FPrefix "MissingIndex" -DebugInfo:$DebugInfo
 			}
-			if ($ToHTML -eq "Y") {
+			if ($ToHTML) {
 				$htmlTabSearch = ""
 				if ($Mode -eq "0") {
 					$HtmlTabName = "Index Diagnosis"
@@ -3392,7 +3403,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				##Exporting execution plans to file
 				Export-PlansAndDeadlocks $TblLockPlans $PlanOutDir "query_plan" "sqlplan_file" -FPrefix "DeadlockPlan" -DebugInfo:$DebugInfo
 		
-				if ($ToHTML -eq "Y") {
+				if ($ToHTML) {
 					$HtmlTabName = "Deadlocks"
 					if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
 						$HtmlTabName += " for $ASDBName$CheckDB" 
@@ -3512,7 +3523,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				if ($RowsReturned -le 0) {
 					Write-Host " ->No rows returned."
 				} else {
-					if ($ToHTML -eq "Y") {
+					if ($ToHTML) {
 
 						$htmlTable = Convert-TableToHtml $StatsTbl -TblID "StatsOrIxFragTable" -CSSClass "StatsInfoTbl sortable" -ExclCols "database" -DebugInfo:$DebugInfo
 						$StatsWithIssuesCount = $RowsReturned
@@ -3598,7 +3609,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				
 							Add-LogRow "->Index Frag Info" "Skipped XLocked Tables" "$LockedTabLogMsg $LockedTabList"
 						}
-						if ($ToHTML -eq "Y") {
+						if ($ToHTML) {
 				
 							Write-PSBlitzDebug " ->Converting index info to HTML"
 
@@ -3651,7 +3662,7 @@ finally {
 			Write-Host " $TerminatingErrorMessage" -Fore green
 		} else {
 			Write-Host " $TerminatingErrorMessage" -fore red
-			if ($ToHTML -ne "Y") {
+			if (-not $ToHTML) {
 				Write-Host "  Debug Column: $global:DebugCol"
 				Write-Host "  Debug Value: $global:DebugValue"
 			}
@@ -3771,7 +3782,7 @@ finally {
 			$BtilzWhoStartTime = $BlitzWhoTbl | Sort-Object -Property "CheckDate" | Select-Object -ExpandProperty "CheckDate" -First 1
 			$BtilzWhoEndTime = $BlitzWhoTbl | Sort-Object -Property "CheckDate" -Descending | Select-Object -ExpandProperty "CheckDate" -First 1
 
-			if ($ToHTML -eq "Y") {
+			if ($ToHTML) {
 				$HtmlTabName = "Session Activity"
 				if ($IsAzureSQLDB) {
 					$HtmlTabName += " for $ASDBName"
@@ -3842,8 +3853,8 @@ finally {
 	$StepEnd = Get-Date
 	Add-LogRow "Check end" "Finished"
 
-	if ($ToHTML -ne "Y") {
-		if ($IsIndepth -ne "Y") {
+	if (-not $ToHTML) {
+		if (-not $InDepth) {
 			$DeleteSheets = @("Wait Stats", "Storage Stats", "Perfmon Stats", "Index Summary",
 				"Index Usage", "Extended Index Diagnostics", "Top Queries - Reads", "Top Queries - Executions", 
 				"Top Queries - Writes",	"Top Queries - Spills", "Top Queries - Mem & Recent Comp", "Intro")
@@ -3934,8 +3945,8 @@ finally {
 	#####################################################################################
 	###Record execution start and end times
 	$EndDate = Get-Date
-	if ($ToHTML -ne "Y") {
-		if ($IsIndepth -eq "Y") {
+	if (-not $ToHTML) {
+		if ($InDepth) {
 			$ExcelSheet = $ExcelFile.Worksheets.Item("Intro")
 		} else {
 			$ExcelSheet = $ExcelFile.Worksheets.Item("Intro ")
@@ -3963,7 +3974,7 @@ finally {
 
 	$ExecTime = (New-TimeSpan -Start $StartDate -End $EndDate).ToString()
 	$ExecTime = $ExecTime.Substring(0, $ExecTime.IndexOf('.'))
-	if ($ToHTML -eq "Y") {
+	if ($ToHTML) {
 		Write-PSBlitzDebug " ->Generating index and execution log pages." 
 		$HTMLChk = "&#10004;"
 		$HtmlTabName = "PSBlitz Execution Log"
@@ -4347,7 +4358,7 @@ finally {
 		Write-Host "$OutDir"
 	}
 	
-	if ($ZipOutput -eq "Y") {
+	if ($ZipOutput) {
 		$ZipFilePath = Join-Path -Path $OutputDir -ChildPath $ZipFile
 		Compress-Archive -Path "$OutDir" -DestinationPath "$ZipFilePath"
 		
