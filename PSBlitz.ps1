@@ -327,7 +327,7 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql", "spBlitzCache
 
 ## we use these to make sure someone didn't modify the scripts in the Resources folder
 $storedHashes = @{
-	"spBlitz_NonSPLatest.sql"            = "8E5374A22F7221517323552C3FDE61148AF42C39615A16CB08CD77DCF42713D2"
+	"spBlitz_NonSPLatest.sql"            = "45B502D77B912C1B71EA70CBB8D3ADD0532B4D29C68E97C1EF731CC8E72D4F2E"
 	"spBlitzCache_NonSPLatest.sql"       = "8E5374A22F7221517323552C3FDE61148AF42C39615A16CB08CD77DCF42713D2"
 	"spBlitzFirst_NonSPLatest.sql"       = "BE5EA2BE8E6104EB81B5EDAD2271577506993A93468A08C1A94BD9FB875FBB48"
 	"spBlitzIndex_NonSPLatest.sql"       = "5CC87A863DE2784F82A99A892CBE5C1F9903F4354D487EC0E77B391ACF751D78"
