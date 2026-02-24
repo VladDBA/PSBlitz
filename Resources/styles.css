@@ -225,6 +225,17 @@ th.sortable:hover {
 	td:nth-child(n+51):nth-child(-n+57) {
 		text-align: right;
 	}
+	/*truncate wide/tall cells and only show additional text on hover */
+		td:nth-child(13) {
+           max-width: 22ch;
+           white-space: nowrap;
+           overflow: hidden;
+           text-overflow: ellipsis;
+        } 
+		td:nth-child(13):hover {
+             white-space: normal;
+              max-width: none;
+        }
 }
 
 .RawActiveSessionsTab {

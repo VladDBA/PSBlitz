@@ -1907,6 +1907,27 @@ if ($ToHTML) {
 		td:nth-child(n+53):nth-child(-n+56){
     		text-align: right;
 	    }
+		/*truncate wide/tall cells and only show additional text on hover */
+        td:nth-child(n+6):nth-child(-n+9) {
+           max-width: 22ch;
+           white-space: nowrap;
+           overflow: hidden;
+           text-overflow: ellipsis;
+        } 
+		td:nth-child(n+6):nth-child(-n+9):hover {
+             white-space: normal;
+              max-width: none;
+        }
+		td:nth-child(52) {
+           max-width: 22ch;
+           white-space: nowrap;
+           overflow: hidden;
+           text-overflow: ellipsis;
+        } 
+		td:nth-child(52):hover {
+             white-space: normal;
+              max-width: none;
+        }
 	}
 	.CacheTable2{
 	    td {
@@ -1930,6 +1951,27 @@ if ($ToHTML) {
 		td:nth-child(n+53):nth-child(-n+56){
     		text-align: right;
 	    }
+		/*truncate wide/tall cells and only show additional text on hover */
+        td:nth-child(n+6):nth-child(-n+9) {
+           max-width: 22ch;
+           white-space: nowrap;
+           overflow: hidden;
+           text-overflow: ellipsis;
+        } 
+		td:nth-child(n+6):nth-child(-n+9):hover {
+             white-space: normal;
+              max-width: none;
+        }
+		td:nth-child(52) {
+           max-width: 22ch;
+           white-space: nowrap;
+           overflow: hidden;
+           text-overflow: ellipsis;
+        } 
+		td:nth-child(52):hover {
+             white-space: normal;
+              max-width: none;
+        }
 	}`n</style>`n<script src="sorttable.js"></script>`n<script src="searchtable.js"></script>`n<script src="copy.js"></script>	
 "@
 	$URLRegex = '(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\".,<>?«»“”]))'
