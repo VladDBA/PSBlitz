@@ -760,13 +760,12 @@ function Convert-TableToHtml {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id=`"$TblID`">"
 		}
 		if ($HyperlinkCol -ne 'x') {
+			$HyperlinkColClean = $HyperlinkCol -replace '(?i)hl$',''
+			$htmlTableOut = $htmlTableOut -ireplace ">$HyperlinkCol</th>", ">$HyperlinkColClean</th>"
 			# fix hyperlinks
 			$htmlTableOut = $htmlTableOut -replace "&lt;a href=&#39;", "<a href=`""
 			$htmlTableOut = $htmlTableOut -replace "&#39; target=&#39;_blank&#39;&gt;", "`" target=`"_blank`">"
 			$htmlTableOut = $htmlTableOut -replace "&lt;/a&gt;", "</a>"
-			#fix column name
-			$HyperlinkColClean = $HyperlinkCol -replace 'HL', ''
-			$htmlTableOut = $htmlTableOut -replace "<th>$HyperlinkCol</th>", "<th>$HyperlinkColClean</th>"
 		}
 		if ($HasURLs) {
 			$URLRegex = '(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\".,<>?«»“”]))'
@@ -2110,7 +2109,7 @@ try {
 			}
 
 			$htmlTable3 = Convert-TableToHtml $ConnectionsInfoTbl -CSSClass Top10ClientConnTbl -DebugInfo:$DebugInfo
-			$htmlTable4 = Convert-TableToHtml $SessOptTbl -CSSClass 'SessOptTbl sortable' -ExclCols "Option", "URL" -HyperlinkCol "OptionHL" -DebugInfo:$DebugInfo
+			$htmlTable4 = Convert-TableToHtml $SessOptTbl -CSSClass 'SessOptTbl sortable' -ExclCols "Option", "URL" -HyperlinkCol "OptionHL" -NoCaseChange -DebugInfo:$DebugInfo
 
 			$htmlTable5 = Convert-TableToHtml $PlanCacheTypeTbl -CSSClass InstCacheTbl -DebugInfo:$DebugInfo
 			$htmlTable6 = Convert-TableToHtml $PlanCacheByDBTbl -CSSClass InstCacheTbl -DebugInfo:$DebugInfo
@@ -2283,7 +2282,7 @@ $htmlTable4 `n $HTMLBodyEnd
 
 				$html = $HTMLPre + @"
 <title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1>
-$DarkModeDiv
+$DarkModeDiv `n
 $htmlTable1 `n<br>`n<h2>Current Query text</h2>`n $htmlTable2
 <br>`n<h2>Most Recent Query Text</h2>`n $htmlTable3 `n $JumpToTop
 $HTMLBodyEnd
@@ -2472,7 +2471,7 @@ $SortableTable `n $htmlTable6 `n $JumpToTop `n $HTMLBodyEnd
 
 				$html = $HTMLPre + @"
 <title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1> $DarkModeDiv
-$(if($DBInfoTbl.Rows.Count -gt 10){"<br>" + $SearchTableDiv -replace $STDivReplace,"'DBInfoTable', 0" -replace 'object', 'database'})
+$(if($DBInfoTbl.Rows.Count -gt 10){ $SearchTableDiv -replace $STDivReplace,"'DBInfoTable', 0" -replace 'object', 'database'})
 $SortableTable `n $htmlTable `n $JumpToTop `n<h2>Database Files Info</h2>
 $($SearchTableDiv -replace $STDivReplace,"'DBFileInfoTable', 0" -replace 'object', 'database' -replace 'id="SearchBox"', 'id="SearchBox1"')
 $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
@@ -2541,7 +2540,7 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 				$htmlTable = Convert-TableToHtml $BlitzTbl -NoCaseChange -TblID "InstanceHealthTable" -CSSClass "instance-health-tbl" -HyperlinkCol "FindingHL" -ExclCols Finding, URL -DebugInfo:$DebugInfo
 				$HighPriorityHealthCount = ($BlitzTbl | Where-Object { $_."Priority" -le 50 }).Rows.Count
 				$html = $HTMLPre + @"
-<title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1> $DarkModeDiv `n<br>`n
+<title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1> $DarkModeDiv `n
 $($SearchTableDiv -replace $STDivReplace, "'InstanceHealthTable', 3" -replace 'object' , 'database')
 <br>`n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 "@
@@ -2671,7 +2670,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				$htmlTable = Convert-TableToHtml $WaitsTbl -NoCaseChange -HyperlinkCol "wait_typeHL" -ExclCols "wait_type", "URL" -CSSClass "WaitStats" -DebugInfo:$DebugInfo
 				$Top3Waits = ($WaitsTbl | Select-Object -ExpandProperty wait_type -First 3) -join ', '
 				$html = $HTMLPre + @"
-<title>$HtmlTabName</title> `n $HTMLBodyStart `n<h1>$HtmlTabName</h1> $DarkModeDiv
+<title>$HtmlTabName</title> `n $HTMLBodyStart `n<h1>$HtmlTabName</h1> $DarkModeDiv `n
 $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 "@
 				#Save HTML file
@@ -2684,7 +2683,7 @@ $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				$TopAvgStall = ($StorageTbl | Sort-Object -Property "Avg Stall (ms)" -Descending | Select-Object -ExpandProperty "Avg Stall (ms)" -First 1)	
 			 
 				$html = $HTMLPre + @"
-<title>$HtmlTabName</title>`n $HTMLBodyStart `n <h1>$HtmlTabName</h1> $DarkModeDiv `n<br>`n
+<title>$HtmlTabName</title>`n $HTMLBodyStart `n <h1>$HtmlTabName</h1> $DarkModeDiv `n
 $($SearchTableDiv -replace $STDivReplace, "'StorageStatsTable', 9" -replace 'object', 'database')
 $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 "@
@@ -2697,7 +2696,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				$htmlTable = Convert-TableToHtml $PerfmonTbl -NoCaseChange -TblID "PerfmonTable" -CSSClass "Perfmon sortable" -DebugInfo:$DebugInfo
 			 
 				$html = $HTMLPre + @"
-<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1>$HtmlTabName</h1> $DarkModeDiv `n<br>`n
+<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1>$HtmlTabName</h1> $DarkModeDiv `n
 $($SearchTableDiv -replace $STDivReplace, "'PerfmonTable', 1" -replace 'object', 'counter')
 $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 "@
@@ -2942,7 +2941,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					
 						$html = @"
 					<title>$HtmlTabName</title>
-					$HTMLBodyStart`n<h1 id="top">$HtmlTabName</h1> $DarkModeDiv`n<br>
+					$HTMLBodyStart`n<h1 id="top">$HtmlTabName</h1> $DarkModeDiv `n
 					<h2>Top $CacheTop Queries by $HtmlTabName2</h2>
 					<p><a href="#Queries1">Jump to query text</a></p>
 					$htmlTable1 `n<br>`n<h2>Warnings Explained</h2>
@@ -3177,7 +3176,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 						$HtmlTabName = "Query Store results for $databaseName - Average $SortOrder"
 
 						$html = $HTMLPre + @"
-				<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1 id="top">$HtmlTabName</h1> $DarkModeDiv`n<br>
+				<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1 id="top">$HtmlTabName</h1> $DarkModeDiv`n
 				$(if($IsQueryStoreInterval){"<p>Executed between $QueryStoreIntervalStart and $QueryStoreIntervalEnd</p>"})
 					<p><a href="#Queries">Jump to query text</a></p>`n $htmlTable1 `n<br>
 					<h2 id="Queries">Query text</h2>`n $htmlTable3 `n $JumpToTop `n $HTMLBodyEnd
@@ -3325,7 +3324,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n $HTMLBodyStart
-				<h1 id="top">$HtmlTabName</h1> $DarkModeDiv`n<br>`n $htmlTabSearch `n $htmlTable `n $HTMLBodyEnd
+				<h1 id="top">$HtmlTabName</h1> $DarkModeDiv`n $htmlTabSearch `n $htmlTable `n $HTMLBodyEnd
 "@
 
 				Save-HtmlFile $html "BlitzIndex_$Mode.html" $HTMLOutDir $DebugInfo
@@ -3537,7 +3536,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 						$HtmlTabName = "Statistics info for $databaseName"
 						$HtmlFileName = "StatsInfo_$databaseName.html"
 						$html = $HTMLPre + @"
-				<title>$HtmlTabName</title>`n $HTMLBodyStart `n	<h1>$HtmlTabName</h1> $DarkModeDiv `n<br>`n
+				<title>$HtmlTabName</title>`n $HTMLBodyStart `n	<h1>$HtmlTabName</h1> $DarkModeDiv `n
 				$($SearchTableDiv -replace $STDivReplace, "'StatsOrIxFragTable', 0")
 				<!-- Message container -->`n<div id="message">Copied to clipboard!</div>`n<br>`n
 				$SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
@@ -3618,7 +3617,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 							$HtmlFileName = "IndexFragInfo_$databaseName.html"
 			
 							$html = $HTMLPre + @"
-				<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1>$HtmlTabName</h1> $DarkModeDiv `n<br>`n
+				<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1>$HtmlTabName</h1> $DarkModeDiv `n
 				$($SearchTableDiv -replace $STDivReplace, "'StatsOrIxFragTable', 0")
 				$SortableTable `n $htmlTable `n	$JumpToTop `n $HTMLBodyEnd
 "@
@@ -3791,7 +3790,7 @@ finally {
 				$htmlTable = Convert-TableToHtml $BlitzWhoTbl -CSSClass "RawActiveSessionsTab sortable" -DebugInfo:$DebugInfo
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n $HTMLBodyStart
-				<h1>$HtmlTabName</h1> $DarkModeDiv`n	<br>`n	$SortableTable `n $htmlTable
+				<h1>$HtmlTabName</h1> $DarkModeDiv`n $SortableTable `n $htmlTable
 				$JumpToTop `n $HTMLBodyEnd
 "@ 
 

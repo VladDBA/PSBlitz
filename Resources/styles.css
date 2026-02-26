@@ -181,7 +181,8 @@ th.sortable:hover {
  ## Query store info tables
 */
 
-.QueryStoreTabDuration, .QueryStoreTabCPU {
+.QueryStoreTabDuration, 
+.QueryStoreTabCPU {
 	td {
 		vertical-align: top;
 	}
@@ -201,7 +202,7 @@ th.sortable:hover {
 		text-align: right;
 	}
 
-	td:nth-child(n+14):nth-child(-n+54) {
+	td:nth-child(n+20):nth-child(-n+60) {
 		text-align: right;
 	}
 	/*truncate wide/tall cells and only show additional text on hover */
@@ -346,7 +347,6 @@ th.sortable:hover {
 		position: sticky;
 		left: 0;
 		background-color: var(--sticky-bg);
-		text-align: right;
 	}
 	td:nth-child(8) {
 		text-align: right;
@@ -380,7 +380,6 @@ th.sortable:hover {
 		position: sticky;
 		left: 0;
 		background-color: var(--sticky-bg);
-		text-align: right;
 	}
 	td:nth-child(7) {
 		text-align: right;
@@ -451,9 +450,6 @@ th.sortable:hover {
 	}
 	td:nth-child(19) {
 		text-align: center;
-	}
-	td:nth-child(20) {
-		text-align: right;
 	}
 
 }
@@ -1027,6 +1023,7 @@ input.SearchBox {
 .toggle-wrapper {
     text-align: center;           /* centre anything inside */
     margin-top: 0.5rem;           /* optional spacing from heading */
+	margin-bottom: 0.7rem;
 }
 #dark-mode-toggle {
     border: none;
