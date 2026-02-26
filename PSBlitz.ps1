@@ -1980,7 +1980,7 @@ if ($ToHTML) {
 
 	$SearchTableDiv = @"
 	    <div>
-		<input type=`"text`" id=`"SearchBox`" class=`"SearchBox`" onkeyup=`"SearchTable('ReplaceTableID', ReplaceColIdx)`" placeholder=`" Filter by object name...`">
+		<input type=`"text`" id=`"SearchBox`" class=`"SearchBox`" onkeyup=`"SearchTable('ReplaceTableID', ReplaceColIdx, this.id)`" placeholder=`" Filter by object name...`">
 		</div>
 "@
 	$STDivReplace = "'ReplaceTableID', ReplaceColIdx"

@@ -1,45 +1,16 @@
-//new version of the function to replace all of the above
-function SearchTable(tableId, columnIndex) {
-  // Declare variables
-  var input, filter, table, tr, td, i, txtValue;
-  input = document.getElementById("SearchBox");
-  filter = input.value.toUpperCase();
-  table = document.getElementById(tableId);
-  tr = table.getElementsByTagName("tr");
-
-  // Loop through all table rows, and hide those who don't match the search query
-  for (i = 0; i < tr.length; i++) {
-    td = tr[i].getElementsByTagName("td")[columnIndex];
-    if (td) {
-      txtValue = td.textContent || td.innerText;
-      if (txtValue.toUpperCase().indexOf(filter) > -1) {
-        tr[i].style.display = "";
-      } else {
-        tr[i].style.display = "none";
-      }
+function SearchTable(tableId, colIndex, inputId) {
+    var input = inputId ? document.getElementById(inputId) : document.getElementById('SearchBox');
+    if (!input) return;
+    var filter = (input.value || '').trim().toLowerCase();
+    var table = document.getElementById(tableId);
+    if (!table) return;
+    var tbody = table.tBodies && table.tBodies.length ? table.tBodies[0] : table;
+    var rows = tbody.rows;
+    for (var i = 0; i < rows.length; i++) {
+        var row = rows[i];
+        if (row.querySelector('th')) { row.style.display = ''; continue; }
+        var cell = row.cells[colIndex];
+        var text = cell ? (cell.textContent || cell.innerText || '') : '';
+        row.style.display = text.toLowerCase().indexOf(filter) !== -1 ? '' : 'none';
     }
-  }
-}
-
-// for second search box
-function SearchTable(tableId, columnIndex) {
-  // Declare variables
-  var input, filter, table, tr, td, i, txtValue;
-  input = document.getElementById("SearchBox1");
-  filter = input.value.toUpperCase();
-  table = document.getElementById(tableId);
-  tr = table.getElementsByTagName("tr");
-
-  // Loop through all table rows, and hide those who don't match the search query
-  for (i = 0; i < tr.length; i++) {
-    td = tr[i].getElementsByTagName("td")[columnIndex];
-    if (td) {
-      txtValue = td.textContent || td.innerText;
-      if (txtValue.toUpperCase().indexOf(filter) > -1) {
-        tr[i].style.display = "";
-      } else {
-        tr[i].style.display = "none";
-      }
-    }
-  }
 }
