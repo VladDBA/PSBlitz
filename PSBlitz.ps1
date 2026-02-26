@@ -731,14 +731,14 @@ function Convert-TableToHtml {
 			if ($CSSClass -like "*sortable*") {
 				$htmlTableOut = $htmlTableOut -replace "<th>", "<th class=`"sortable`">"
 			}
-			if ($CSSClass -eq "InstHealthTbl") {
+			if ($CSSClass -eq "instance-health-tbl") {
 				#Split Instance Health details after each dot to avoid wide table
 				$htmlTableOut = $htmlTableOut -replace '\.\s', ". `n"
 				#change background for Priority 1-50
-				$htmlTableOut = $htmlTableOut -replace '>([1-9]|[1-4][0-9]|50)<', ' style="background-color: #FFB6C1;">$1<'
+				$htmlTableOut = $htmlTableOut -replace '>([1-9]|[1-4][0-9]|50)<', ' class="instance-health-tbl-p1">$1<'
 			} elseif ($TblID -eq "setopt") {
 				#Change background color for OFF options
-				$htmlTableOut = $htmlTableOut -replace '>(OFF)<', ' style="background-color: #FFB6C1;">$1<'
+				$htmlTableOut = $htmlTableOut -replace '>(OFF)<', ' class="instance-health-tbl-p1">$1<'
 			}
 		} elseif ($CSSClass) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class=`"$CSSClass`">"
@@ -1885,94 +1885,47 @@ if ($ToHTML) {
 	$HTMLPre = @"
 	<!DOCTYPE html>
 	<html>`n<head>`n<link rel="stylesheet" href="styles.css">`n<style>
-	.CacheTable1{
-	  td {
-		  vertical-align: top;
-		  padding-top: 8px;
-		}
-		td:nth-child(3) {
-			position: sticky; left: 0;
-			background-color: rgba(255, 255, 255, 0.7);
-		}
-		td:nth-child(CacheTab1High) {
-			font-weight: bold;
-			background-color: rgba(255, 255, 0, 0.4);
-		}
-		td:nth-child(2){
-		    text-align: right;
-	    }
-		td:nth-child(n+10):nth-child(-n+51){
-    		text-align: right;
-	    }
-		td:nth-child(n+53):nth-child(-n+56){
-    		text-align: right;
-	    }
-		/*truncate wide/tall cells and only show additional text on hover */
-        td:nth-child(n+6):nth-child(-n+9) {
-           max-width: 22ch;
-           white-space: nowrap;
-           overflow: hidden;
-           text-overflow: ellipsis;
-        } 
-		td:nth-child(n+6):nth-child(-n+9):hover {
-             white-space: normal;
-              max-width: none;
+	.CacheTable1,
+    .CacheTable2 {
+        td {
+            vertical-align: top;
+            padding-top: 8px;
         }
-		td:nth-child(52) {
-           max-width: 22ch;
-           white-space: nowrap;
-           overflow: hidden;
-           text-overflow: ellipsis;
-        } 
-		td:nth-child(52):hover {
-             white-space: normal;
-              max-width: none;
+    
+        td:nth-child(3) {
+            position: sticky;
+            left: 0;
+            background-color: var(--sticky-bg);
         }
-	}
-	.CacheTable2{
-	    td {
-		  vertical-align: top;
-		  padding-top: 8px;
-		}	
-		td:nth-child(3) {
-			position: sticky; left: 0;
-			background-color: rgba(255, 255, 255, 0.7);
-		}
-		td:nth-child(CacheTab2High) {
-			font-weight: bold;
-			background-color: rgba(255, 255, 0, 0.4);
-		}
-		td:nth-child(2){
-		    text-align: right;
-	    }
-		td:nth-child(n+10):nth-child(-n+51){
-    		text-align: right;
-	    }
-		td:nth-child(n+53):nth-child(-n+56){
-    		text-align: right;
-	    }
-		/*truncate wide/tall cells and only show additional text on hover */
-        td:nth-child(n+6):nth-child(-n+9) {
-           max-width: 22ch;
-           white-space: nowrap;
-           overflow: hidden;
-           text-overflow: ellipsis;
-        } 
-		td:nth-child(n+6):nth-child(-n+9):hover {
-             white-space: normal;
-              max-width: none;
+    
+        /* right-align a bunch of columns */
+        td:nth-child(2),
+        td:nth-child(n+10):nth-child(-n+51),
+        td:nth-child(n+53):nth-child(-n+56) {
+            text-align: right;
         }
-		td:nth-child(52) {
-           max-width: 22ch;
-           white-space: nowrap;
-           overflow: hidden;
-           text-overflow: ellipsis;
-        } 
-		td:nth-child(52):hover {
-             white-space: normal;
-              max-width: none;
+    
+        /* truncate wide/tall cells and show whole text on hover */
+        td:nth-child(n+6):nth-child(-n+9),
+        td:nth-child(52) {
+            max-width: 22ch;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
-	}`n</style>`n<script src="sorttable.js"></script>`n<script src="searchtable.js"></script>`n<script src="copy.js"></script>	
+        td:nth-child(n+6):nth-child(-n+9):hover,
+        td:nth-child(52):hover {
+            white-space: normal;
+            max-width: none;
+        }
+    }
+    
+    .CacheTable1 td:nth-child(CacheTab1High),
+    .CacheTable2 td:nth-child(CacheTab2High) {
+        font-weight: bold;
+        background-color: rgba(255, 255, 0, 0.4);
+    }`n</style>`n<script src="sorttable.js"></script>`n<script src="searchtable.js"></script>`n<script src="copy.js"></script>
+	<script src="dark-mode.js"></script>	
 "@
 	$URLRegex = '(?i)\b((?:https?://|www\d{0,3}[.]|[a-z0-9.\-]+[.][a-z]{2,4}/)(?:[^\s()<>]+|\(([^\s()<>]+|(\([^\s()<>]+\)))*\))+(?:\(([^\s()<>]+|(\([^\s()<>]+\)))*\)|[^\s`!()\[\]{};:\".,<>?«»“”]))'
 	$SortableTable = '<p>Click on the column headers to sort the results.</p>'
@@ -1983,6 +1936,9 @@ if ($ToHTML) {
 		<input type=`"text`" id=`"SearchBox`" class=`"SearchBox`" onkeyup=`"SearchTable('ReplaceTableID', ReplaceColIdx, this.id)`" placeholder=`" Filter by object name...`">
 		</div>
 "@
+    $DarkModeDiv = @"
+	`n<div class="toggle-wrapper">`n<button id="dark-mode-toggle" type="button" aria-pressed="false">Dark</button>`n</div>
+"@
 	$STDivReplace = "'ReplaceTableID', ReplaceColIdx"
 	$Footer = @"
 	<br>`n<br>`n<footer>
@@ -1991,7 +1947,7 @@ if ($ToHTML) {
 "@
 	$HTMLBodyStart = "`n</head>`n<body>`n"
 	$HTMLBodyEnd = "`n<br>`n </body>`n</html>"
-	$htmlResources = @("styles.css", "sorttable.js", "searchtable.js", "copy.js")
+	$htmlResources = @("styles.css", "sorttable.js", "searchtable.js", "copy.js", "dark-mode.js")
 } else {
 	###Set output Excel name and destination
 	if (!([string]::IsNullOrEmpty($CheckDB))) {
@@ -2162,6 +2118,7 @@ try {
 			$HtmlTabName = "Instance Overview"
 			$html = $HTMLPre + @"
     <title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1>$HtmlTabName</h1>
+	$DarkModeDiv
 <h2>Instance information</h2>`n $htmlTable1 `n<br>`n<h2>Resource information</h2>
 $htmlTable2 `n<br>`n<h2>Top 10 clients by connections</h2>
 $htmlTable3 `n<br>`n<h2>Plan cache usage by type</h2>
@@ -2251,7 +2208,7 @@ $htmlTable6 `n<br>`n<h2>Session level SET options</h2> `n $htmlTable4 `n $HTMLBo
 			$HtmlTabName = "TempDB Info"
 
 			$html = $HTMLPre + @"
-<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1>$HtmlTabName</h1>`n<h2>TempDB space usage</h2>
+<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1>$HtmlTabName</h1> $DarkModeDiv`n<h2>TempDB space usage</h2>
 $htmlTable1 `n<br>`n<h2>Top 30 temp tables by reserved space</h2>`n $htmlTable2
      <br>`n<h2>Top 30 sessions using TempDB by total allocation</h2>`n $htmlTable3
 $htmlTable4 `n $HTMLBodyEnd
@@ -2326,6 +2283,7 @@ $htmlTable4 `n $HTMLBodyEnd
 
 				$html = $HTMLPre + @"
 <title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1>
+$DarkModeDiv
 $htmlTable1 `n<br>`n<h2>Current Query text</h2>`n $htmlTable2
 <br>`n<h2>Most Recent Query Text</h2>`n $htmlTable3 `n $JumpToTop
 $HTMLBodyEnd
@@ -2386,7 +2344,7 @@ $HTMLBodyEnd
 				$htmlTable6 = Convert-TableToHtml $DBConfigTbl -CSSClass "ASDBScopedConfTbl sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
 				$html = $HTMLPre + @"
-<title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1>
+<title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1> $DarkModeDiv
 <h2>Azure SQL DB Resource Governance</h1>`n $htmlTable `n $JumpToTop
 <h2>Database Overview</h2>`n $htmlTable1 `n $JumpToTop `n<h2>Resource Usage</h2>
 $htmlTable2 `n $JumpToTop `n<h2>Top 10 Waits Since Last Startup</h2>
@@ -2513,8 +2471,8 @@ $SortableTable `n $htmlTable6 `n $JumpToTop `n $HTMLBodyEnd
 				}
 
 				$html = $HTMLPre + @"
-<title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1>
-$(if($DBInfoTbl.Rows.Count -gt 10){$SearchTableDiv -replace $STDivReplace,"'DBInfoTable', 0" -replace 'object', 'database'})
+<title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1> $DarkModeDiv
+$(if($DBInfoTbl.Rows.Count -gt 10){"<br>" + $SearchTableDiv -replace $STDivReplace,"'DBInfoTable', 0" -replace 'object', 'database'})
 $SortableTable `n $htmlTable `n $JumpToTop `n<h2>Database Files Info</h2>
 $($SearchTableDiv -replace $STDivReplace,"'DBFileInfoTable', 0" -replace 'object', 'database' -replace 'id="SearchBox"', 'id="SearchBox1"')
 $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
@@ -2580,10 +2538,10 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 
 			if ($ToHTML) {
 				$tableName = "Instance Health"
-				$htmlTable = Convert-TableToHtml $BlitzTbl -NoCaseChange -TblID "InstanceHealthTable" -CSSClass "InstHealthTbl" -HyperlinkCol "FindingHL" -ExclCols Finding, URL -DebugInfo:$DebugInfo
+				$htmlTable = Convert-TableToHtml $BlitzTbl -NoCaseChange -TblID "InstanceHealthTable" -CSSClass "instance-health-tbl" -HyperlinkCol "FindingHL" -ExclCols Finding, URL -DebugInfo:$DebugInfo
 				$HighPriorityHealthCount = ($BlitzTbl | Where-Object { $_."Priority" -le 50 }).Rows.Count
 				$html = $HTMLPre + @"
-<title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1>
+<title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1> $DarkModeDiv `n<br>`n
 $($SearchTableDiv -replace $STDivReplace, "'InstanceHealthTable', 3" -replace 'object' , 'database')
 <br>`n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 "@
@@ -2642,7 +2600,7 @@ $($SearchTableDiv -replace $STDivReplace, "'InstanceHealthTable', 3" -replace 'o
 					$HtmlTabName = "Database objects with dangerous SET options"
 					$htmlTable = Convert-TableToHtml $DangerousSetTbl -TblID "setopt" -CSSClass "sortable SetOpt" -DebugInfo:$DebugInfo
 					$html = $HTMLPre + @"
-	<title>$HtmlTabName</title>`n $HTMLBodyStart `n <h1 id="top">$HtmlTabName</h1>
+	<title>$HtmlTabName</title>`n $HTMLBodyStart `n <h1 id="top">$HtmlTabName</h1> $DarkModeDiv
 <p><a href='https://vladdba.com/2025/03/03/dangerous-set-options-stored-procedures/' target='_blank'>More information about SET options inheritance in stored procedures</a></p>
 $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 "@
@@ -2675,7 +2633,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			$htmlTable = Convert-TableToHtml $BlitzFirstTbl -NoCaseChange -CSSClass "First30Tbl" -ExclCols "Finding", "URL" -HyperlinkCol "FindingHL" -DebugInfo:$DebugInfo
 			$HtmlTabName = "What's happening on the instance now?"
 			$html = $HTMLPre + @"
-<title>$HtmlTabName</title>`n$HTMLBodyStart`n<h1>$HtmlTabName</h1>
+<title>$HtmlTabName</title>`n$HTMLBodyStart`n<h1>$HtmlTabName</h1> $DarkModeDiv
 <h2>30 seconds time-frame</h2>`n$htmlTable`n$HTMLBodyEnd
 "@
 
@@ -2713,7 +2671,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				$htmlTable = Convert-TableToHtml $WaitsTbl -NoCaseChange -HyperlinkCol "wait_typeHL" -ExclCols "wait_type", "URL" -CSSClass "WaitStats" -DebugInfo:$DebugInfo
 				$Top3Waits = ($WaitsTbl | Select-Object -ExpandProperty wait_type -First 3) -join ', '
 				$html = $HTMLPre + @"
-<title>$HtmlTabName</title> `n $HTMLBodyStart `n<h1>$HtmlTabName</h1>
+<title>$HtmlTabName</title> `n $HTMLBodyStart `n<h1>$HtmlTabName</h1> $DarkModeDiv
 $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 "@
 				#Save HTML file
@@ -2726,7 +2684,7 @@ $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				$TopAvgStall = ($StorageTbl | Sort-Object -Property "Avg Stall (ms)" -Descending | Select-Object -ExpandProperty "Avg Stall (ms)" -First 1)	
 			 
 				$html = $HTMLPre + @"
-<title>$HtmlTabName</title>`n $HTMLBodyStart `n <h1>$HtmlTabName</h1>
+<title>$HtmlTabName</title>`n $HTMLBodyStart `n <h1>$HtmlTabName</h1> $DarkModeDiv `n<br>`n
 $($SearchTableDiv -replace $STDivReplace, "'StorageStatsTable', 9" -replace 'object', 'database')
 $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 "@
@@ -2739,7 +2697,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				$htmlTable = Convert-TableToHtml $PerfmonTbl -NoCaseChange -TblID "PerfmonTable" -CSSClass "Perfmon sortable" -DebugInfo:$DebugInfo
 			 
 				$html = $HTMLPre + @"
-<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1>$HtmlTabName</h1>
+<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1>$HtmlTabName</h1> $DarkModeDiv `n<br>`n
 $($SearchTableDiv -replace $STDivReplace, "'PerfmonTable', 1" -replace 'object', 'counter')
 $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 "@
@@ -2984,7 +2942,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					
 						$html = @"
 					<title>$HtmlTabName</title>
-					$HTMLBodyStart`n<h1 id="top">$HtmlTabName</h1>`n<br>
+					$HTMLBodyStart`n<h1 id="top">$HtmlTabName</h1> $DarkModeDiv`n<br>
 					<h2>Top $CacheTop Queries by $HtmlTabName2</h2>
 					<p><a href="#Queries1">Jump to query text</a></p>
 					$htmlTable1 `n<br>`n<h2>Warnings Explained</h2>
@@ -3219,7 +3177,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 						$HtmlTabName = "Query Store results for $databaseName - Average $SortOrder"
 
 						$html = $HTMLPre + @"
-				<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1 id="top">$HtmlTabName</h1>`n<br>
+				<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1 id="top">$HtmlTabName</h1> $DarkModeDiv`n<br>
 				$(if($IsQueryStoreInterval){"<p>Executed between $QueryStoreIntervalStart and $QueryStoreIntervalEnd</p>"})
 					<p><a href="#Queries">Jump to query text</a></p>`n $htmlTable1 `n<br>
 					<h2 id="Queries">Query text</h2>`n $htmlTable3 `n $JumpToTop `n $HTMLBodyEnd
@@ -3367,7 +3325,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n $HTMLBodyStart
-				<h1 id="top">$HtmlTabName</h1>`n $htmlTabSearch `n $htmlTable `n $HTMLBodyEnd
+				<h1 id="top">$HtmlTabName</h1> $DarkModeDiv`n<br>`n $htmlTabSearch `n $htmlTable `n $HTMLBodyEnd
 "@
 
 				Save-HtmlFile $html "BlitzIndex_$Mode.html" $HTMLOutDir $DebugInfo
@@ -3473,7 +3431,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					}
 		
 					$html = $HTMLPre + @"
-		<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1 id="top">$HtmlTabName</h1>
+		<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1 id="top">$HtmlTabName</h1> $DarkModeDiv
 		<h2>Deadlock Overview</h2>`n<p><a href="#Deadlocks1">Jump to deadlock details</a></p>
 		$htmlTable1 `n $JumpToTop `n<br>`n<h2 id="Deadlocks1">Deadlock Details</h2>
 		$(if($TblLockDtl.Rows.Count -ge 10){
@@ -3579,7 +3537,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 						$HtmlTabName = "Statistics info for $databaseName"
 						$HtmlFileName = "StatsInfo_$databaseName.html"
 						$html = $HTMLPre + @"
-				<title>$HtmlTabName</title>`n $HTMLBodyStart `n	<h1>$HtmlTabName</h1>
+				<title>$HtmlTabName</title>`n $HTMLBodyStart `n	<h1>$HtmlTabName</h1> $DarkModeDiv `n<br>`n
 				$($SearchTableDiv -replace $STDivReplace, "'StatsOrIxFragTable', 0")
 				<!-- Message container -->`n<div id="message">Copied to clipboard!</div>`n<br>`n
 				$SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
@@ -3660,7 +3618,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 							$HtmlFileName = "IndexFragInfo_$databaseName.html"
 			
 							$html = $HTMLPre + @"
-				<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1>$HtmlTabName</h1>
+				<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1>$HtmlTabName</h1> $DarkModeDiv `n<br>`n
 				$($SearchTableDiv -replace $STDivReplace, "'StatsOrIxFragTable', 0")
 				$SortableTable `n $htmlTable `n	$JumpToTop `n $HTMLBodyEnd
 "@
@@ -3833,7 +3791,7 @@ finally {
 				$htmlTable = Convert-TableToHtml $BlitzWhoTbl -CSSClass "RawActiveSessionsTab sortable" -DebugInfo:$DebugInfo
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n $HTMLBodyStart
-				<h1>$HtmlTabName</h1>`n	<br>`n	$SortableTable `n $htmlTable
+				<h1>$HtmlTabName</h1> $DarkModeDiv`n	<br>`n	$SortableTable `n $htmlTable
 				$JumpToTop `n $HTMLBodyEnd
 "@ 
 
@@ -3852,7 +3810,7 @@ finally {
 
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n$HTMLBodyStart
-				<h1 id="top">$HtmlTabName</h1>
+				<h1 id="top">$HtmlTabName</h1> $DarkModeDiv
 				<h3>Based on session activity captured between $BtilzWhoStartTime and $BtilzWhoEndTime server time.</h3>
 				<p><a href="#Queries">Jump to query text</a></p>`n<br>`n $SortableTable `n $htmlTable 
 				$JumpToTop `n<h1 id="Queries">Query text</h1>`n<br>`n $htmlTable1
@@ -4023,7 +3981,7 @@ finally {
 		$LogFailureCount = ($LogTbl | Where-Object { $_.Outcome -eq "Failure" }).Count
 		$htmlTable = Convert-TableToHtml $LogTbl -NoCaseChange -CSSClass LogTbl -DebugInfo:$DebugInfo
 		$html = $HTMLPre + @"
-						<title>$HtmlTabName</title>`n $HTMLBodyStart `n	<h1 id="top">$HtmlTabName</h1>
+						<title>$HtmlTabName</title>`n $HTMLBodyStart `n	<h1 id="top">$HtmlTabName</h1> $DarkModeDiv
 						<p>To report an issue, plese use <a href='https://github.com/VladDBA/PSBlitz/issues' target='_blank'>GitHub</a>, but make sure to read <a href='https://github.com/VladDBA/PSBlitz/issues/216' target='_blank'>this</a> first.</p>
 						$htmlTable
 						$JumpToTop
@@ -4048,9 +4006,11 @@ finally {
 			$DbPortion = "Instance-wide check"
 		}
 		$IndexContent = @"
-				<!DOCTYPE html>`n<html>`n<head>`n<link rel="stylesheet" href="HTMLFiles\styles.css">
+				<!DOCTYPE html>`n<html>`n<head>`n<link rel="stylesheet" href="HTMLFiles\styles.css">`n
+				<script src="HTMLFiles\dark-mode.js"></script>
 				<title>PSBlitz Output For $InstName</title>`n</head>`n<body>
     <h1>PSBlitz Output For $($InstName.Replace(".database.windows.net", "")) $AzureEnv </h1>
+	$DarkModeDiv
 	<h2>$DbPortion</h2>`n<table class="IntroTbl">
 				<tr><th>Generated With</th>`n<th>Version</th>
 				<th>Execution start</th>`n<th>Execution end</th>
@@ -4369,7 +4329,7 @@ finally {
 				$Description = "A list of database objects created with dangerous SET options"
 				$QuerySource += "sys.sql_modules, sys.objects"
 			}
-			$IndexContent += "`n<tr><td><a href=`"$RelativePath`" target='_blank'>$PageName</a></td><td class=`"tooltip`" title=`"$QuerySource`">$Description</td>$Plans $DLGraphs $RLim</tr>"
+			$IndexContent += "`n<tr><td><a href=`"$RelativePath`">$PageName</a></td><td class=`"tooltip`" title=`"$QuerySource`">$Description</td>$Plans $DLGraphs $RLim</tr>"
 		}
 
 		# Close the HTML tags.

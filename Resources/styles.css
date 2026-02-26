@@ -6,6 +6,8 @@
 :root {
     --bg: #ffffff;
     --text: #111111;
+	--sticky-bg: rgba(255, 255, 255, 0.7);
+    --sticky-text: var(--text);
     --table-bg: #ffffff;
     --th-bg: dodgerblue;
     --th-text: #ffffff;
@@ -17,6 +19,7 @@
     --shadow: 0 0 20px rgba(0, 0, 0, 0.25);
 	--warning-bg: rgb(252, 252, 117);
     --warning-text: #b30000; /* light-mode warning text (red) */
+	--p1-bg: #FFB6C1;
     --warning-border: rgba(0,0,0,0.08);
 	--additional-text: #000000;
 	--additional-bg: rgb(252, 252, 117);
@@ -26,6 +29,7 @@
 .dark-mode {
     --bg: #0b1220;
     --text: #e6eef6;
+	--sticky-bg: rgba(11, 18, 32, 0.7);
     --table-bg: #071226;
     --th-bg: #084a8a;
     --th-text: #ffffff;
@@ -36,6 +40,7 @@
     --row-hover: rgba(255, 255, 0, 0.12);
     --shadow: 0 0 20px rgba(0, 0, 0, 0.6);
 	--warning-bg: #b30000; /*#5b4a08;     darker gold for dark mode */
+	--p1-bg: var(--warning-bg);
     --warning-text: #ffffff;  /* ensure high contrast on dark mode */
     --warning-border: rgba(255,255,255,0.06);
 	--additional-text: #d1d5db;
@@ -57,13 +62,12 @@ body {
 
 /* hyperlinks visible in both modes */
 a,
-a:link {
+a:link,
+a:visited {
     color: var(--link);
 	text-decoration: none;
 }
-a:visited {
-    color: var(--link-visited);
-}
+
 a:hover,
 a:focus {
     text-decoration: underline;
@@ -185,7 +189,7 @@ th.sortable:hover {
 	td:nth-child(7) {
 		position: sticky;
 		left: 0;
-		background-color: rgba(255, 255, 255, 0.7);
+		background-color: var(--sticky-bg);
 	}
 	
 
@@ -249,7 +253,7 @@ th.sortable:hover {
 	td:nth-child(6) {
 		position: sticky;
 		left: 0;
-		background-color: rgba(255, 255, 255, 0.7);
+		background-color: var(--sticky-bg);
 	}
 	td:nth-child(1) {
 		text-align: right;
@@ -341,7 +345,7 @@ th.sortable:hover {
 	td:nth-child(3) {
 		position: sticky;
 		left: 0;
-		background-color: rgba(255, 255, 255, 0.7);
+		background-color: var(--sticky-bg);
 		text-align: right;
 	}
 	td:nth-child(8) {
@@ -375,7 +379,7 @@ th.sortable:hover {
 	td:nth-child(2) {
 		position: sticky;
 		left: 0;
-		background-color: rgba(255, 255, 255, 0.7);
+		background-color: var(--sticky-bg);
 		text-align: right;
 	}
 	td:nth-child(7) {
@@ -462,7 +466,7 @@ th.sortable:hover {
 	td:nth-child(1) {
 		position: sticky;
 		left: 0;
-		background-color: rgba(255, 255, 255, 0.7);
+		background-color: var(--sticky-bg);
 	}
 	td:nth-child(2) {
 		text-align: right;
@@ -482,7 +486,7 @@ th.sortable:hover {
 	td:nth-child(3) {
 		position: sticky;
 		left: 0;
-		background-color: rgba(255, 255, 255, 0.7);
+		background-color: var(--sticky-bg);
 	}
 	td:nth-child(6) {
 		text-align: center;
@@ -583,7 +587,7 @@ th.sortable:hover {
 	td:nth-child(5) {
 		position: sticky;
 		left: 0;
-		background-color: rgba(255, 255, 255, 0.7);
+		background-color: var(--sticky-bg);
 	}
 	td {
 		vertical-align: top;
@@ -601,6 +605,9 @@ th.sortable:hover {
 	td:nth-child(4) {
 		text-align: right;
 	}
+	td:nth-child(5) {
+		white-space: nowrap;
+	}
 	td:nth-child(n+10):nth-child(-n+13) {
 		text-align: center;
 	}
@@ -610,6 +617,18 @@ th.sortable:hover {
 	td:nth-child(n+19):nth-child(-n+23) {
 		text-align: right;
 	}
+	/*truncate wide/tall cells and only show additional text on hover */
+	 /*Client Opt 1 and 2 */
+	td:nth-child(14),td:nth-child(15) {
+          max-width: 22ch;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+       } 
+	td:nth-child(14):hover,td:nth-child(15):hover {
+            white-space: normal;
+             max-width: none;
+       }
 
 }
 
@@ -627,7 +646,7 @@ th.sortable:hover {
 /*
  ## Instance health
 */
-.InstHealthTbl {
+.instance-health-tbl {
 	td:nth-child(5) {
 		white-space: pre-wrap;
 		word-wrap: normal;
@@ -638,6 +657,10 @@ th.sortable:hover {
 	}	
 }
 
+.instance-health-tbl-p1 {
+	background-color: var(--p1-bg);
+}
+
 /*
  ## Open transactions
 */
@@ -646,7 +669,7 @@ th.sortable:hover {
 	td:nth-child(3) {
 		position: sticky;
 		left: 0;
-		background-color: rgba(255, 255, 255, 0.7);
+		background-color: var(--sticky-bg);
 	}
 	td {
 		vertical-align: top;
@@ -799,15 +822,6 @@ th.sortable:hover {
 	}
 }
 
-/*
-.RsrcInfoTbl {
-	td {
-		font-weight: normal;
-		text-align: center;
-	}
-}
-	*/
-
 .Top10ClientConnTbl {
 	td:nth-child(2) {
 		text-align: center;
@@ -823,8 +837,6 @@ th.sortable:hover {
 		text-align: center;
 	}
 }
-
-
 
 /* 
  ## Index/Intro page
@@ -1012,3 +1024,15 @@ input.SearchBox {
     border: 1px solid rgba(0, 0, 0, 0.2);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
 }
+.toggle-wrapper {
+    text-align: center;           /* centre anything inside */
+    margin-top: 0.5rem;           /* optional spacing from heading */
+}
+#dark-mode-toggle {
+    border: none;
+    padding: 4px 8px;
+    cursor: pointer;
+	display: inline-block;
+	border-radius: 10px;
+}
+#dark-mode-toggle:focus { outline: 2px solid var(--link); }
