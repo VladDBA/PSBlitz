@@ -49,6 +49,7 @@
 
 html {
     font-size: 100%;
+	scroll-behavior: smooth;
 }
 body {
 	background: var(--bg);
@@ -100,7 +101,8 @@ th {
 	position: sticky;
 	top: 0;
 	z-index: 2;
-	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);
+	/*box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.4);*/
+	box-shadow: 0 2px 4px rgba(0,0,0,0.3);
 	transition: background-color 200ms ease, color 200ms ease;
 }
 
@@ -1014,7 +1016,9 @@ input.SearchBox {
     padding:4px 8px;
     border-radius:4px;
     font-size:0.9rem;
+	margin-top: 0.5rem;
   }
+  
 .copyBtnRow:hover {
     background-color: #fc9517;
     border: 1px solid rgba(0, 0, 0, 0.2);
@@ -1032,4 +1036,12 @@ input.SearchBox {
 	display: inline-block;
 	border-radius: 10px;
 }
-#dark-mode-toggle:focus { outline: 2px solid var(--link); }
+
+/* focus outlines for keyboard users */
+a:focus,
+button:focus,
+input:focus, 
+#dark-mode-toggle:focus {
+    outline: 3px solid var(--link);
+    outline-offset: 2px;
+}
