@@ -760,7 +760,7 @@ function Convert-TableToHtml {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id=`"$TblID`">"
 		}
 		if ($HyperlinkCol -ne 'x') {
-			$HyperlinkColClean = $HyperlinkCol -replace '(?i)hl$',''
+			$HyperlinkColClean = $HyperlinkCol -replace '(?i)hl$', ''
 			$htmlTableOut = $htmlTableOut -ireplace ">$HyperlinkCol</th>", ">$HyperlinkColClean</th>"
 			# fix hyperlinks
 			$htmlTableOut = $htmlTableOut -replace "&lt;a href=&#39;", "<a href=`""
@@ -773,10 +773,14 @@ function Convert-TableToHtml {
 		}
 		if ($AnchorFromHere) {
 			foreach ($AnchorID in $AnchorIDs) {
-				$AnchorRegex = if ($TblID -eq "DeadlockDtlTable") {
-					"DL(\d+)Q(\d+)V{0,}$AnchorExt"
-				} else { "$AnchorID(_\d+)$AnchorExt" }
-				$AnchorURL = '<a href="#$&">$&</a>'
+				if ($TblID -eq "DeadlockDtlTable") {
+					$AnchorRegex = "DL(\d+)Q(\d+)(V{0,})$AnchorExt"
+					$AnchorURL = '<a href="#$&">' + "DL" + '$1' + "Q" + '$2' + '$3' + "</a>"
+				} else {
+					$AnchorRegex = "$AnchorID(_\d+)$AnchorExt" 
+					$AnchorURL = '<a href="#$&">' + "$AnchorID" + '$1' + "</a>"
+				}
+				
 				$htmlTableOut = $htmlTableOut -replace $AnchorRegex, $AnchorURL
 			}
 		}
@@ -847,11 +851,11 @@ function Convert-QueryTableToHtml {
 		if ($AnchorToHere) {
 			if ($AnchorID -eq "DeadlockDtlTable") {
 				$AnchorRegex = "<td>DL(\d+)Q(\d+)(V{0,})$AnchorExt"
-				$AnchorURL = '<td class="anchor-target" id=' + "DL" + '$1' + "Q" + '$2' + '$3' + "$AnchorExt>" + "DL" + '$1' + "Q" + '$2' + '$3' + "$AnchorExt"
+				$AnchorURL = '<td class="anchor-target" id=' + "DL" + '$1' + "Q" + '$2' + '$3' + "$AnchorExt>" + "DL" + '$1' + "Q" + '$2' + '$3' #+ "$AnchorExt"
 				$AnchorURL += "<br>`n<button class=`"copyBtnRow`">Copy</button>"
 			} else {
 				$AnchorRegex = "<td>$AnchorID(_\d+)$AnchorExt"
-				$AnchorURL = '<td class="anchor-target" id=' + "$AnchorID" + '$1' + "$AnchorExt>" + "$AnchorID" + '$1' + "$AnchorExt"
+				$AnchorURL = '<td class="anchor-target" id=' + "$AnchorID" + '$1' + "$AnchorExt>" + "$AnchorID" + '$1' #+ "$AnchorExt"
 				$AnchorURL += "<br>`n<button class=`"copyBtnRow`">Copy</button>"
 			}
 
@@ -1426,29 +1430,29 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 	}
 	##Indepth check 
 	[string]$InDepthInput = Read-Host -Prompt "Perform an in-depth check?(empty defaults to N)[Y/N]"
-    if ($InDepthInput -match '^(?i:y|yes)') {
-        $InDepth = $true
-    } else {
-        $InDepth = $false
-    }
+	if ($InDepthInput -match '^(?i:y|yes)') {
+		$InDepth = $true
+	} else {
+		$InDepth = $false
+	}
 	##sp_BlitzWho delay
 	if (!([int]$BlitzWhoDelay = Read-Host "Seconds of delay between session activity captures (empty defaults to 10)")) { 
 		$BlitzWhoDelay = 10 
 	}
 	##Output file type
 	[string]$ToHTMLInput = Read-Host -Prompt "Output the report as HTML instead of Excel?(empty defaults to N)[Y/N]"
-    if ($ToHTMLInput -match '^(?i:y|yes)') {
-        $ToHTML = $true
-    } else {
-        $ToHTML = $false
-    }
+	if ($ToHTMLInput -match '^(?i:y|yes)') {
+		$ToHTML = $true
+	} else {
+		$ToHTML = $false
+	}
 	##Zip output files
 	[string]$ZipOutputInput = Read-Host -Prompt "Create a zip archive of the output files?(empty defaults to N)[Y/N]"
-    if ($ZipOutputInput -match '^(?i:y|yes)') {
-        $ZipOutput = $true
-    } else {
-        $ZipOutput = $false
-    }
+	if ($ZipOutputInput -match '^(?i:y|yes)') {
+		$ZipOutput = $true
+	} else {
+		$ZipOutput = $false
+	}
 	##Prompt for advanced options
 	if (!([string]$AdvOptions = Read-Host -Prompt "Show advanced options?(empty defaults to N)[Y/N]")) {
 		$AdvOptions = "N"
@@ -1935,7 +1939,7 @@ if ($ToHTML) {
 		<input type=`"text`" id=`"SearchBox`" class=`"SearchBox`" onkeyup=`"SearchTable('ReplaceTableID', ReplaceColIdx, this.id)`" placeholder=`" Filter by object name...`">
 		</div>
 "@
-    $DarkModeDiv = @"
+	$DarkModeDiv = @"
 	`n<div class="toggle-wrapper">`n<button id="dark-mode-toggle" type="button" aria-pressed="false">Dark</button>`n</div>
 "@
 	$STDivReplace = "'ReplaceTableID', ReplaceColIdx"
@@ -3063,7 +3067,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				[string]$Query = $Query -replace $NewCacheMinutesBackStr, $OldCacheMinutesBackStr
 			}
 		}
- 	}
+	}
 
 	
 	
