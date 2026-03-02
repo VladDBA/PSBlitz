@@ -209,13 +209,13 @@ th.sortable:hover {
 	}
 	/*truncate wide/tall cells and only show additional text on hover */
 	 /*Top Waits and Context Settings */
-	td:nth-child(19),td:nth-child(61) {
+	td:nth-child(19),td:nth-child(63) {
           max-width: 22ch;
           white-space: nowrap;
           overflow: hidden;
           text-overflow: ellipsis;
        } 
-	td:nth-child(19):hover,td:nth-child(61):hover {
+	td:nth-child(19):hover,td:nth-child(63):hover {
             white-space: normal;
              max-width: none;
        }
@@ -229,7 +229,7 @@ th.sortable:hover {
 }
 
 .QueryStoreTabCPU {
-  td:nth-child(29) {
+  td:nth-child(30) {
 			font-weight: bold;
 			background-color: rgba(255, 255, 0, 0.4);
 		}

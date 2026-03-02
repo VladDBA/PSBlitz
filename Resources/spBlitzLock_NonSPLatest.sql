@@ -113,7 +113,7 @@ BEGIN
     SET XACT_ABORT OFF;
     SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-    SELECT @Version = '8.28', @VersionDate = '20251124';
+    SELECT @Version = '8.29', @VersionDate = '20260203';
 
     IF @VersionCheckMode = 1
     BEGIN
@@ -855,50 +855,65 @@ BEGIN
                 IF @Debug = 1 BEGIN PRINT @StringToExecute; END;
                 EXECUTE sys.sp_executesql
                     @StringToExecute;
+            END;
 
-                /*table created.*/
+            /*
+            Check for BlitzLockFindings table - runs regardless of whether main table existed
+            This was moved outside the ELSE block to fix issue where pre-existing deadlocks
+            table would skip BlitzLockFindings creation, causing synonym errors
+            Must filter by schema to avoid finding table in wrong schema
+            Note: @OutputSchemaName is already QUOTENAMEd at this point, so use PARSENAME to get raw name
+            */
+            SET @r = NULL; /*Reset - SELECT with no rows doesn't overwrite variable*/
+
+			SELECT
+                @StringToExecute =
+                    N'SELECT @r = o.name FROM ' +
+                    @OutputDatabaseName +
+                    N'.sys.objects AS o
+                    INNER JOIN ' +
+                    @OutputDatabaseName +
+                    N'.sys.schemas AS s
+                      ON o.schema_id = s.schema_id
+                    WHERE o.type_desc = N''USER_TABLE''
+                    AND o.name = N''BlitzLockFindings''
+                    AND s.name = N''' +
+                    PARSENAME(@OutputSchemaName, 1) +
+                    N'''',
+                @StringToExecuteParams =
+                    N'@r sysname OUTPUT';
+
+            IF @Debug = 1 BEGIN PRINT @StringToExecute; END;
+            EXECUTE sys.sp_executesql
+                @StringToExecute,
+                @StringToExecuteParams,
+                @r OUTPUT;
+
+            IF (@r IS NULL) /*if table does not exist*/
+            BEGIN
                 SELECT
+                    @OutputTableFindings =
+                        QUOTENAME(N'BlitzLockFindings'),
                     @StringToExecute =
-                        N'SELECT @r = o.name FROM ' +
+                        N'USE ' +
                         @OutputDatabaseName +
-                        N'.sys.objects AS o
-                          WHERE o.type_desc = N''USER_TABLE''
-                          AND o.name = N''BlitzLockFindings''',
-                    @StringToExecuteParams =
-                        N'@r sysname OUTPUT';
+                        N';
+                        CREATE TABLE ' +
+                        @OutputSchemaName +
+                        N'.' +
+                        @OutputTableFindings +
+                        N' (
+                               ServerName nvarchar(256),
+                               check_id INT,
+                               database_name nvarchar(256),
+                               object_name nvarchar(1000),
+                               finding_group nvarchar(100),
+                               finding nvarchar(4000)
+                           );';
 
                 IF @Debug = 1 BEGIN PRINT @StringToExecute; END;
                 EXECUTE sys.sp_executesql
-                    @StringToExecute,
-                    @StringToExecuteParams,
-                    @r OUTPUT;
-
-                IF (@r IS NULL) /*if table does not exist*/
-                BEGIN
-                    SELECT
-                        @OutputTableFindings =
-                            QUOTENAME(N'BlitzLockFindings'),
-                        @StringToExecute =
-                            N'USE ' +
-                            @OutputDatabaseName +
-                            N';
-                            CREATE TABLE ' +
-                            @OutputSchemaName +
-                            N'.' +
-                            @OutputTableFindings +
-                            N' (
-                                   ServerName nvarchar(256),
-                                   check_id INT,
-                                   database_name nvarchar(256),
-                                   object_name nvarchar(1000),
-                                   finding_group nvarchar(100),
-                                   finding nvarchar(4000)
-                               );';
-
-                    IF @Debug = 1 BEGIN PRINT @StringToExecute; END;
-                    EXECUTE sys.sp_executesql
-                        @StringToExecute;
-                END;
+                    @StringToExecute;
             END;
 
             /*create synonym for deadlockfindings.*/
@@ -1369,6 +1384,21 @@ BEGIN
            @xe OUTPUT,
            @xd OUTPUT;
 
+		/*This is a reasonable question to ask.*/
+		IF  @xe IS NULL
+		AND @xd IS NULL
+		BEGIN
+		    RAISERROR
+			(
+			    'No rows found in %s.%s.%s. Try again later.',
+				11,
+				1,
+				@TargetDatabaseName,
+				@TargetSchemaName,
+				@TargetTableName
+		    ) WITH NOWAIT;
+			RETURN;
+		END;
 
         /* Build dynamic SQL to extract the XML  */  
         IF  @xe = 1
@@ -3992,7 +4022,7 @@ BEGIN
             END;
 
             /*Vlad - result set changes for PSBlitz*/
-            SET @deadlock_result += N'
+			SET @deadlock_result += N'
             SELECT
                 /*server_name =
                     @@SERVERNAME,*/
@@ -4014,7 +4044,7 @@ BEGIN
                 ' + CASE @ExportToExcel
                          WHEN 1
                          THEN N'
-                query_text = dr.query_string,
+                query = dr.query_string,
                 object_names =
                     REPLACE(
                     REPLACE(
@@ -4025,7 +4055,7 @@ BEGIN
                         ) COLLATE Latin1_General_BIN2,
                     ''<object>'', ''''),
                     ''</object>'', ''''),'
-                         ELSE N'query_text = dr.query_xml,
+                         ELSE N'query = dr.query_xml,
                 dr.object_names,'
                     END + N'
                 dr.isolation_level,
@@ -4066,14 +4096,9 @@ BEGIN
                         ELSE N'
                 dr.parallel_deadlock_details,'
                         END +
-                    CASE
-                        @ExportToExcel
-                        WHEN 1
-                        THEN N'
-                        dr.deadlock_graph' /*Vlad - returning dr.deadlock_graph anyway*/
-                        ELSE N'
-                dr.deadlock_graph'
-                   END + N'
+                    N'
+                dr.deadlock_graph' /*Vlad - returning dr.deadlock_graph anyway*/
+                   + N'
             FROM #deadlock_results AS dr
             ORDER BY
                 dr.event_date,
@@ -4297,11 +4322,11 @@ BEGIN
                     plan_handle
                 );
               
-                /*Vlad - column changes for PSBlitz*/  
-                SELECT
+                /*Vlad - column changes for PSBlitz*/
+				SELECT
                     /*ap.available_plans,*/
                     ap.database_name,
-                    CAST('' AS VARCHAR(30)) AS query,
+					CAST('' AS VARCHAR(30)) AS query,
                     query_text = REPLACE(REPLACE(ap.query_xml, N'<?query '+CAST(CHAR(10) AS NVARCHAR(1)),N''),CAST(CHAR(10) AS NVARCHAR(1))+N'   ?>',N''),
 					CAST('' AS VARCHAR(30)) AS sqlplan_file,
                     ap.query_plan,
