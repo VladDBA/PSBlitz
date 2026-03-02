@@ -104,7 +104,7 @@ SET NOCOUNT ON;
 SET STATISTICS XML OFF;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
-SELECT @Version = '8.28', @VersionDate = '20251124';
+SELECT @Version = '8.29', @VersionDate = '20260203';
 
 IF(@VersionCheckMode = 1)
 BEGIN
@@ -1848,6 +1848,19 @@ BEGIN
 		END
 
         IF EXISTS (SELECT * FROM sys.dm_exec_requests WHERE total_elapsed_time > 5000 AND request_id > 0)
+           
+            IF OBJECT_ID('tempdb..#BlitzFirstTmpSession', 'U') IS NOT NULL
+				DROP TABLE #BlitzFirstTmpSession;
+
+            SELECT DISTINCT  request_session_id, resource_database_id
+            INTO #BlitzFirstTmpSession
+            FROM    sys.dm_tran_locks
+            WHERE resource_type = N'DATABASE'
+            AND     request_mode = N'S'
+            AND     request_status = N'GRANT'
+            AND     request_owner_type = N'SHARED_TRANSACTION_WORKSPACE';
+
+           
             INSERT INTO #BlitzFirstResults (CheckID, Priority, FindingsGroup, Finding, URL, Details, HowToStopIt, StartTime, LoginName, NTUserName, ProgramName, HostName, DatabaseID, DatabaseName, QueryText, OpenTransactionCount)
             SELECT 8 AS CheckID,
                 50 AS Priority,
@@ -1867,13 +1880,7 @@ BEGIN
                 s.open_tran AS OpenTransactionCount
             FROM sys.sysprocesses s
             INNER JOIN sys.dm_exec_connections c ON s.spid = c.session_id
-            INNER JOIN (
-            SELECT DISTINCT request_session_id, resource_database_id
-            FROM    sys.dm_tran_locks
-            WHERE resource_type = N'DATABASE'
-            AND     request_mode = N'S'
-            AND     request_status = N'GRANT'
-            AND     request_owner_type = N'SHARED_TRANSACTION_WORKSPACE') AS db ON s.spid = db.request_session_id
+            INNER JOIN #BlitzFirstTmpSession AS db ON s.spid = db.request_session_id
             WHERE s.status = 'sleeping'
             AND s.open_tran > 0
             AND s.last_batch < DATEADD(ss, -10, SYSDATETIME())
@@ -4914,7 +4921,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
         END;
         ELSE IF @OutputType <> 'NONE' AND @OutputXMLasNVARCHAR = 1 AND @SinceStartup = 0 AND @OutputResultSets LIKE N'%Findings%'
         BEGIN
-         /*Vlad - column changes for PSBlitz*/
+            /*Vlad - column changes for PSBlitz*/
             SELECT  [Priority] ,
                     [FindingsGroup] ,
                     [Finding] ,
@@ -5016,20 +5023,20 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
                 SELECT
                     /* 'WAIT STATS' AS Pattern,-- Vlad - column changes for PSBlitz */
                     CONVERT(VARCHAR(25),CAST(b.SampleTime AS DATETIME),120) AS [Sample Ended],/*changes for PSBlitz */ 
-                    DATEDIFF(ss,wd1.SampleTime, wd2.SampleTime) AS [Seconds Sample],
-					c.[Total Thread Time (Seconds)],
+                    CAST(DATEDIFF(mi,wd1.SampleTime, wd2.SampleTime) / 60. AS DECIMAL(18,1)) AS [Hours Sample],
+					CAST(c.[Total Thread Time (Seconds)] / 60. / 60. AS DECIMAL(18,1)) AS [Thread Time (Hours)],
                     wd1.wait_type,
 					'<a href=''https://www.sqlskills.com/help/waits/' + LOWER(wd1.wait_type)
-					+ '/'' target=''_blank''>'+wd1.wait_type+'</a>' AS [wait_typeHL], /*changes for PSBlitz */ 
+					+ '/'' target=''_blank''>'+wd1.wait_type+'</a>' AS [wait_typeHL], /*changes for PSBlitz */
 					COALESCE(wcat.WaitCategory, 'Other') AS wait_category,
-                    c.[Wait Time (Seconds)],
-					/*CASE WHEN (wd2.waiting_tasks_count - wd1.waiting_tasks_count) > 0
+                    CAST(c.[Wait Time (Seconds)] / 60. / 60. AS DECIMAL(18,1)) AS [Wait Time (Hours)],
+                    /*CASE WHEN (wd2.waiting_tasks_count - wd1.waiting_tasks_count) > 0
                     THEN
                         CAST((wd2.wait_time_ms-wd1.wait_time_ms)/
                             (1.0*(wd2.waiting_tasks_count - wd1.waiting_tasks_count)) AS NUMERIC(12,1))
-                    ELSE 0 END AS [Avg ms Per Wait],  -- Vlad moved lower - changes for PSBlitz*/
-                    CAST((CAST(wd2.wait_time_ms - wd1.wait_time_ms AS MONEY)) / 1000.0 / cores.cpu_count / DATEDIFF(ss, wd1.SampleTime, wd2.SampleTime) AS DECIMAL(18,1)) AS [Per Core Per Second],
-                    c.[Signal Wait Time (Seconds)],
+                    ELSE 0 END AS [Avg ms Per Wait], -- Vlad moved lower - changes for PSBlitz*/
+                    CAST((wd2.wait_time_ms - wd1.wait_time_ms) / 1000.0 / cores.cpu_count / DATEDIFF(ss, wd1.SampleTime, wd2.SampleTime) AS DECIMAL(18,1)) AS [Per Core Per Hour],
+                    CAST(c.[Signal Wait Time (Seconds)] / 60.0 / 60 AS DECIMAL(18,1)) AS [Signal Wait Time (Hours)],
                     CASE WHEN c.[Wait Time (Seconds)] > 0
                      THEN CAST(100.*(c.[Signal Wait Time (Seconds)]/c.[Wait Time (Seconds)]) AS NUMERIC(4,1))
                     ELSE 0 END AS [Percent Signal Waits],
@@ -5120,7 +5127,7 @@ If one of them is a lead blocker, consider killing that query.'' AS HowToStopit,
             WITH readstats AS (
                 SELECT 'PHYSICAL READS' AS Pattern,
                 ROW_NUMBER() OVER (ORDER BY wd2.avg_stall_read_ms DESC) AS StallRank,
-				CONVERT(VARCHAR(25),CAST(wd2.SampleTime AS DATETIME),120) AS [Sample Time],/*changes for PSBlitz 
+                CONVERT(VARCHAR(25),CAST(wd2.SampleTime AS DATETIME),120) AS [Sample Time],/*changes for PSBlitz 
                 wd2.SampleTime AS [Sample Time], */
                 DATEDIFF(ss,wd1.SampleTime, wd2.SampleTime) AS [Sample (seconds)],
                 wd1.DatabaseName ,
