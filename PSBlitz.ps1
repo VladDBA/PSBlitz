@@ -1340,6 +1340,7 @@ Get-FileIntegrity -fileList $ResourceList -FilesPath $ResourcesPath -storedHashe
 $IsAzureSQLDB = $false
 $IsAzureSQLMI = $false
 $IsAzure = $false
+$IsGoogleCloudSQL = $false
 ###Switch to interactive mode if $ServerName is empty
 if ([string]::IsNullOrEmpty($ServerName)) {
 	Write-Host "Running in interactive mode"
@@ -1582,8 +1583,14 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 	[int]$CmdTimeout = 100
 	Write-Host "Detecting environment type... " -NoNewline
 	$AzCheckQuery = New-Object System.Data.SqlClient.SqlCommand
-	$Query = "SELECT CAST(SERVERPROPERTY('EngineEdition') AS INT) AS [EngineEdition],"
-	$Query += "`nCAST(SERVERPROPERTY('Edition') AS NVARCHAR(128)) AS [Edition];"
+	$Query = @"
+	    SELECT CAST(SERVERPROPERTY('EngineEdition') AS INT) AS [EngineEdition], 
+	    CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128)) AS [Edition], 
+	    CASE `nWHEN ISNULL(DB_ID('gcloud_cloudsqladmin'),-1) <> -1 THEN 'Google Cloud SQL' 
+		 WHEN ISNULL(SUSER_ID('sqlserver'),-1) <> -1 `nAND 
+		 ISNULL(SUSER_ID('CustomerDbRootRole'),-1) <> -1 THEN 'Google Cloud SQL' 
+		 ELSE 'N' END AS [IsGoogleCloudSQL];
+"@
 	$AzCheckQuery.CommandText = $Query
 	$AzCheckQuery.Connection = $SqlConnection
 	$AzCheckQuery.CommandTimeout = $CmdTimeout
@@ -1615,6 +1622,7 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 		$AzCheckTbl = $AzCheckSet.Tables[0]
 		[int]$EngineEdition = $AzCheckTbl.Rows[0]["EngineEdition"]
 		[string]$Edition = $AzCheckTbl.Rows[0]["Edition"]
+		[string]$GCSQL = $AzCheckTbl.Rows[0]["IsGoogleCloudSQL"]
 		Write-Host @GreenCheck
 		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
 		Write-PSBlitzDebug " Engine Edition - $EngineEdition"
@@ -1627,9 +1635,15 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 				Write-Host "->Azure SQL DB"
 			} 
 		} elseif ($EngineEdition -in 2, 3, 4) {
-			Write-Host "->SQL Server $Edition"
+			Write-Host "->SQL Server $Edition" -NoNewline
+			if ($GCSQL -eq "Google Cloud SQL") {
+				$IsGoogleCloudSQL = $true
+				Write-Host " on $GCSQL"
+			} else {
+				Write-Host ""
+			}
 		} else {
-			Write-Host "->Well this is awquard, use the following info to debug:"
+			Write-Host "->Well this is awkward, use the following info to debug:"
 			Write-Host " Edition - $Edition; EngineEdition - $EngineEdition"
 		}
 	}
@@ -1963,6 +1977,51 @@ if ($ToHTML) {
 	Copy-Item $OrigExcelF -Destination $OutExcelF
 }
 #Set output table for sp_BlitzWho
+if (($IsGoogleCloudSQL) -and ([string]::IsNullOrEmpty($CheckDB))) {
+	#if no database was specified on Google Cloud SQL we can't use tempdb so we query accessible databases and ask the user to pick one
+	Write-Host " Google Cloud SQL environment detected without a specified database." -Fore Yellow
+	Write-Host "  ->Google Cloud SQL doesn't allow access to tempdb, which the session collection process uses for its output." -Fore Yellow
+	Write-Host "  ->Please select a database from the list below to use as the session activity data:" -Fore Yellow
+	$Query = @"
+      SELECT d.name, COUNT(*) AS PermCount `nFROM sys.databases d
+      CROSS APPLY fn_my_permissions(d.name, N'DATABASE') AS fmp 
+      WHERE d.user_access_desc = 'MULTI_USER'
+        AND d.state_desc = 'ONLINE' AND d.database_id > 4
+        AND d.name <> 'gcloud_cloudsqladmin' AND fmp.[permission_name] IN (N'SELECT', 'CREATE TABLE','INSERT','CONNECT')
+      GROUP BY d.name HAVING COUNT(*) = 4;
+"@
+	$CheckDBQuery.CommandText = $Query
+	$CheckDBQuery.Connection = $SqlConnection
+	$CheckDBQuery.CommandTimeout = 100
+	$CheckDBAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+	$CheckDBAdapter.SelectCommand = $CheckDBQuery
+	$CheckDBSet = New-Object System.Data.DataSet
+	$CheckDBAdapter.Fill($CheckDBSet) | Out-Null
+	$SqlConnection.Close()
+	if ($CheckDBSet.Tables[0].Rows.Count -eq 0) {
+		Write-Host " No accessible user databases found on the instance. PSBlitz requires read/write access to at least one user database to collect session activity data." -Fore Red
+		Write-Host "  ->Session activity data collection will be skipped." -Fore Red
+		exit
+	} else {
+		Write-Host " Accessible databases:" -Fore Green
+		for ($i = 0; $i -lt $CheckDBSet.Tables[0].Rows.Count; $i++) {
+			Write-Host "$($i+1). $($CheckDBSet.Tables[0].Rows[$i]['name'])"
+		}
+		[int]$DBSelection = Read-Host -Prompt "Select a database by number to use for session activity data"
+		while (($DBSelection -lt 1) -or ($DBSelection -gt $CheckDBSet.Tables[0].Rows.Count)) {
+			Write-Host "  ->Invalid selection. Please enter a number between 1 and $($CheckDBSet.Tables[0].Rows.Count)." -Fore Red
+			$DBSelection = Read-Host -Prompt "Select a database by number to use for session activity data"
+		}
+		$GCPDB = $CheckDBSet.Tables[0].Rows[$DBSelection - 1]['name']
+		Write-Host "  ->You have selected database '$GCPDB' for session activity data." -Fore Green
+		$OldBlitzWhoOutDB = "BlitzWho_GCPDB_PSBlitzReplace"
+		$NewBlitzWhoOutDB = $GCPDB
+	}
+} elseif (($IsGoogleCloudSQL) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
+	#If database was specified on Google Cloud SQL we just replace the output database in the sp_BlitzWho script
+	$OldBlitzWhoOutDB = "BlitzWho_GCPDB_PSBlitzReplace"
+	$NewBlitzWhoOutDB = $CheckDB
+} 
 #Set replace strings
 $OldBlitzWhoOut = "@OutputTableName = 'BlitzWho_..PSBlitzReplace..',"
 $NewBlitzWhoOut = "@OutputTableName = 'BlitzWho_$DirDate',"
@@ -2044,6 +2103,10 @@ try {
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	#Replace output table name
 	[string]$BlitzWhoRepl = $Query -replace $OldBlitzWhoOut, $NewBlitzWhoOut
+	if ($IsGoogleCloudSQL) {
+		#If we're on Google Cloud SQL we also need to replace the output database name
+		[string]$BlitzWhoRepl = $BlitzWhoRepl -replace $OldBlitzWhoOutDB, $NewBlitzWhoOutDB
+	}
 
 	###Execution start time
 	$StartDate = Get-Date
@@ -3767,6 +3830,9 @@ finally {
 	if ($IsAzureSQLDB) {
 		[string]$Query = $Query.replace('[tempdb].[dbo].', '')
 		[string]$Query = $Query.replace('tempdb.dbo.', '')
+	} elseif ($IsGoogleCloudSQL) {
+		[string]$Query = $Query.replace('[tempdb].[dbo]', "[$GCPDB].[dbo]")
+		[string]$Query = $Query.replace('tempdb.dbo', "$GCPDB.dbo")
 	}
 	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Return session activity" -ConnStringIn $ConnString -CmdTimeoutIn 800
 	
