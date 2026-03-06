@@ -125,8 +125,8 @@
 .PARAMETER SQLPass
  The password for the SQL login provided via the -SQLLogin parameter, omit if -SQLLogin was not used.
 
-.PARAMETER IsIndepth
- Providing Y as a value will tell PSBlitz.ps1 to run a more in-depth check against the instance/database. 
+.PARAMETER InDepth
+ Switch which tells PSBlitz.ps1 to run a more in-depth check against the instance/database. 
  Omit for default check.
 
 .PARAMETER CheckDB
@@ -161,17 +161,17 @@
  if not specified or a non-existent path is provided.
 
 .PARAMETER ToHTML
- Providing Y as a value will tell PSBlitz.ps1 to output the report as HTML instead of an Excel file. 
+ Switch used to output the report as HTML instead of an Excel file. 
  This is perfect when running PSBlitz from a machine that doesn't have Office installed.
 
 .PARAMETER ZipOutput
- Providing Y as a value will tell PSBlitz.ps1 to also create a zip archive of the output files.
+ Switch used to tell PSBlitz.ps1 to also create a zip archive of the output files.
 
 .PARAMETER BlitzWhoDelay
- Used to sepcify the number of seconds between each sp_BlitzWho execution. Defaults to 10 if not specified.
+ Used to specify the number of seconds between each sp_BlitzWho execution. Defaults to 10 if not specified.
 
 .PARAMETER ConnTimeout
- Can be used to increased the timeout limit in seconds for connecting to SQL Server. Defaults to 45 seconds if not specified.
+ Can be used to increase the timeout limit in seconds for connecting to SQL Server. Defaults to 45 seconds if not specified.
 
 .PARAMETER MaxTimeout
  Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. Defaults to 1000 (16.6 minutes)
@@ -323,16 +323,16 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql", "spBlitzCache
 	"spBlitzWho_NonSPLatest.sql", "GetBlitzWhoData.sql", "GetInstanceInfo.sql", "GetTempDBUsageInfo.sql", 
 	"GetOpenTransactions.sql", "GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql", "GetDbInfo.sql", 
 	"GetAzureSQLDBInfo.sql", "GetObjectsWithDangerousOptions.sql", "searchtable.js", "sorttable.js", "styles.css", 
-	"copy.js", "spQuickieStore_NonSPLatest.sql", "GetQSStatus.sql")
+	"copy.js", "spQuickieStore_NonSPLatest.sql", "GetQSStatus.sql", "dark-mode.js")
 
 ## we use these to make sure someone didn't modify the scripts in the Resources folder
 $storedHashes = @{
 	"spBlitz_NonSPLatest.sql"            = "45B502D77B912C1B71EA70CBB8D3ADD0532B4D29C68E97C1EF731CC8E72D4F2E"
 	"spBlitzCache_NonSPLatest.sql"       = "4AABDCD8F4EF81D9592CF840A2C6C2983DB1B450CA067D93C61EA6AA487C1CC0"
 	"spBlitzFirst_NonSPLatest.sql"       = "0A9BDAC9D147264AADF85D70D5D3732864022BCE09B36C3C053AFB8244816919"
-	"spBlitzIndex_NonSPLatest.sql"       = "D7E54B72709D772F55A7A6910D1E2C75D94FB4120267DF6E6301E448CFCB87D7"
-	"spBlitzLock_NonSPLatest.sql"        = "6B32E7F310B6E862A2DBA80E0B37DB9314F9B2893632ADD64BD943EED92BE71B"
-	"spBlitzWho_NonSPLatest.sql"         = "F5399AC70DCA703D5F12ACD06D4D8DE719ACE06BC7FA1879985632C513AE9CB1"
+	"spBlitzIndex_NonSPLatest.sql"       = "BAF2C95CD1DB45547161BD685A23643C54DC88E11C9E400AF4BF93947D719AC7"
+	"spBlitzLock_NonSPLatest.sql"        = "66EB8FA7BFA597A822F622F4CB86B7ED3E41AA81AF52F351B35CF33910804DC4"
+	"spBlitzWho_NonSPLatest.sql"         = "1FF1EBAB9059D899BD015D8D3F047BA325A9753DA668A46C3E539F57A6EC597B"
 	"GetBlitzWhoData.sql"                = "4CDB3FBA91EF31B017DC5888BB694587ECC83A37FBEF6FE33AA0BC791F5B02B6"
 	"GetInstanceInfo.sql"                = "29AA65809886BB2FC870B0DF49256850C4347562ABDDAD29E5BEC6D76C86036F"
 	"GetTempDBUsageInfo.sql"             = "F65305AD51321D885458C5898D69657E90EB8A1EEC97922AABC406C494D0BE8B"
@@ -394,7 +394,7 @@ function Get-PSBlitzHelp {
 		Defaults to PSBlitz.ps1's directory if not specified or a non-existent path is provided.
 -ToHTML			- Y will output the report as HTML instead of an Excel file.
 -ZipOutput		- Y to also create a zip archive of the output files.
--BlitzWhoDelay	- used to sepcify the number of seconds between each sp_BlitzWho execution.
+-BlitzWhoDelay	- used to specify the number of seconds between each sp_BlitzWho execution.
 		Defaults to 10 if not specified
 -CacheTop       - used to specify if more/less than the default top 10 queries should be returned 
         for the sp_BlitzCache step. Only works for HTML output (-ToHTM Y).
@@ -1111,12 +1111,14 @@ function Save-HtmlFile {
 }
 
 function Invoke-ClearVariables {
+	param (
 	[Parameter(Position = 0, Mandatory = $true)]
 	[string[]]$VarNames
+	)
 
 	foreach ($Var in $VarNames) {
-		Clear-Variable -Name $Var #-ErrorAction SilentlyContinue
-		Remove-Variable -Name $Var #-ErrorAction SilentlyContinue
+		Clear-Variable -Name $Var -ErrorAction SilentlyContinue
+		Remove-Variable -Name $Var -ErrorAction SilentlyContinue
 	}
 }
 
@@ -1188,16 +1190,12 @@ $InitScriptBlock = {
 	}
 	function Invoke-FlagTableCheck {
 		param (
-			[string]$FlagTblDt
+			[string]$FlagTblCheckName
 		)
 		$CheckFlagTblQuery = New-Object System.Data.SqlClient.SqlCommand
-		$FlagTblQuery = "DECLARE @FlagTable NVARCHAR(300); `n SELECT @FlagTable = CASE "
-		$FlagTblQuery += "WHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128)) = N'SQL Azure' "
-		$FlagTblQuery += "`nAND SERVERPROPERTY('EngineEdition') IN (5, 6) "
-		$FlagTblQuery += "`nTHEN  N'BlitzWhoOutFlag_$FlagTblDt' ELSE "
-		$FlagTblQuery += "`nN'tempdb.dbo.BlitzWhoOutFlag_$FlagTblDt' END; "
-		$FlagTblQuery += "`nSELECT CASE WHEN OBJECT_ID(@FlagTable, N'U') IS NOT NULL "
-		$FlagTblQuery += "`nTHEN 'Y' ELSE 'N' END AS [FlagFound];"
+		$FlagTblQuery = "SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; `nSELECT  "
+		$FlagTblQuery += "CASE `nWHEN OBJECT_ID('$FlagTblCheckName', N'U') IS NOT NULL "
+		$FlagTblQuery += "`nTHEN 'Y' `nELSE 'N' END AS [FlagFound];"
 		$CheckFlagTblQuery.CommandText = $FlagTblQuery
 		$CheckFlagTblQuery.Connection = $SqlConnection
 		$CheckFlagTblQuery.CommandTimeout = 30
@@ -1214,10 +1212,7 @@ $InitScriptBlock = {
 		}
 		if ($IsFlagTbl -eq "Y") {
 			$CleanupCommand = New-Object System.Data.SqlClient.SqlCommand
-			$Cleanup = "DECLARE @SQL NVARCHAR(400);`nSELECT @SQL = N'DROP TABLE '+ CASE "
-			$Cleanup += "`nWHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure' "
-			$Cleanup += "`nAND SERVERPROPERTY('EngineEdition') IN (5, 6) `nTHEN N'[BlitzWhoOutFlag_$FlagTblDt];' "
-			$Cleanup += "`nELSE N'[tempdb].[dbo].[BlitzWhoOutFlag_$FlagTblDt];' `nEND; `nEXEC(@SQL);"
+			$Cleanup = "DROP TABLE $FlagTblCheckName;"
 			$CleanupCommand.CommandText = $Cleanup
 			$CleanupCommand.CommandTimeout = 20
 			$SqlConnection.Open()
@@ -1231,7 +1226,7 @@ $InitScriptBlock = {
 }
 
 $MainScriptblock = {
-	param([string]$ConnStringIn , [string]$BlitzWhoIn, [string]$DirDateIn, [int]$BlitzWhoDelayIn)
+	param([string]$ConnStringIn , [string]$BlitzWhoIn, [string]$FlagTblCheckNameIn, [int]$BlitzWhoDelayIn)
 	$SqlConnection = New-Object System.Data.SqlClient.SqlConnection
 	$SqlConnection.ConnectionString = $ConnStringIn
 	[int]$SuccessCount = 0
@@ -1247,7 +1242,7 @@ $MainScriptblock = {
 		} catch {
 			$FailedCount += 1
 		}
-		[string]$IsFlagTbl = Invoke-FlagTableCheck -FlagTblDt $DirDateIn
+		[string]$IsFlagTbl = Invoke-FlagTableCheck -FlagTblCheckName $FlagTblCheckNameIn
 		#Reset retry count if failures aren't consecutive
 		if (($FlagErrCheck -eq "X") -and ($IsFlagTbl -ne "X")) {
 			$FlagCheckRetry = 0
@@ -2026,6 +2021,15 @@ if (($IsGoogleCloudSQL) -and ([string]::IsNullOrEmpty($CheckDB))) {
 $OldBlitzWhoOut = "@OutputTableName = 'BlitzWho_..PSBlitzReplace..',"
 $NewBlitzWhoOut = "@OutputTableName = 'BlitzWho_$DirDate',"
 
+#Set BlitzWho flag table name for later use in the script
+if ($IsAzureSQLDB) {
+	$BlitzWhoFlagTblName = "[BlitzWhoOutFlag_$DirDate]"
+} elseif ($IsGoogleCloudSQL) {
+	$BlitzWhoFlagTblName = "[$NewBlitzWhoOutDB].[dbo].[BlitzWhoOutFlag_$DirDate]"
+} else {
+	$BlitzWhoFlagTblName = "[tempdb].[dbo].[BlitzWhoOutFlag_$DirDate]"
+}
+
 if (-not $ToHTML) {
 	###Open Excel FIle
 	if ($DebugInfo) {
@@ -2114,7 +2118,7 @@ try {
 	$JobName = "BlitzWho"
 	Write-Host " Starting session activity collection process... " -NoNewline
 	
-	$Job = Start-Job -Name $JobName -InitializationScript $InitScriptBlock -ScriptBlock $MainScriptblock -ArgumentList $ConnString, $BlitzWhoRepl, $DirDate, $BlitzWhoDelay
+	$Job = Start-Job -Name $JobName -InitializationScript $InitScriptBlock -ScriptBlock $MainScriptblock -ArgumentList $ConnString, $BlitzWhoRepl, $BlitzWhoFlagTblName, $BlitzWhoDelay
 	$JobStatus = $Job | Select-Object -ExpandProperty State
 	if ($JobStatus -ne "Running") {
 		Write-Host @RedX
@@ -3752,19 +3756,16 @@ finally {
 			} else {
 				Write-Host " Stopping session activity collection background process... " -NoNewline
 			}
-			$CreatFlagTbl = "DECLARE @SQL NVARCHAR(400);`nSELECT @SQL = N'CREATE TABLE '+ CASE "
-			$CreatFlagTbl += "`nWHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure' "
-			$CreatFlagTbl += "`nAND SERVERPROPERTY('EngineEdition') IN (5, 6) "
-			$CreatFlagTbl += "`nTHEN N'[BlitzWhoOutFlag_$DirDate](ID INT);' "
-			$CreatFlagTbl += "`nELSE N'[tempdb].[dbo].[BlitzWhoOutFlag_$DirDate](ID INT);' `nEND; `nEXEC(@SQL);"
-			$CreatFlagTblCommand = New-Object System.Data.SqlClient.SqlCommand
-			$CreatFlagTblCommand.CommandText = $CreatFlagTbl
-			$CreatFlagTblCommand.CommandTimeout = 30
+			$CreateFlagTbl = "CREATE TABLE $BlitzWhoFlagTblName (ID INT);"
+
+			$CreateFlagTblCommand = New-Object System.Data.SqlClient.SqlCommand
+			$CreateFlagTblCommand.CommandText = $CreateFlagTbl
+			$CreateFlagTblCommand.CommandTimeout = 30
 			try {
 				$StepStart = Get-Date
 				$SqlConnection.Open() | Out-Null -ErrorAction Stop
-				$CreatFlagTblCommand.Connection = $SqlConnection
-				$CreatFlagTblCommand.ExecuteNonQuery() | Out-Null -ErrorAction Stop
+				$CreateFlagTblCommand.Connection = $SqlConnection
+				$CreateFlagTblCommand.ExecuteNonQuery() | Out-Null -ErrorAction Stop
 				$SqlConnection.Close()
 				$FlagCreated = "Y"
 				if ($DebugInfo) {
@@ -3783,11 +3784,7 @@ finally {
 				if ($DebugInfo) {
 					Write-Host ""
 					Write-Host " ->Failed to create " -NoNewline -Fore Yellow
-					if ($IsAzureSQLDB) {
-						Write-Host "[BlitzWhoOutFlag_$DirDate]" -Fore Yellow
-					} else {
-						Write-Host "[tempdb].[dbo].[BlitzWhoOutFlag_$DirDate]" -Fore Yellow
-					}
+					Write-Host "$BlitzWhoFlagTblName" -Fore Yellow
 					Write-Host " ->Forcing background process stop." -Fore Yellow
 					
 				}
@@ -3819,9 +3816,9 @@ finally {
 		}
 	}
 	if ($TryCompleted -eq "N") {
-		Write-Host	" Attempting to retrieve session actvity data... " -NoNewline
+		Write-Host	" Attempting to retrieve session activity data... " -NoNewline
 	} else {
-		Write-Host " Retrieving session actvity data... " -NoNewline
+		Write-Host " Retrieving session activity data... " -NoNewline
 	}
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetBlitzWhoData.sql"
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
