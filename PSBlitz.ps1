@@ -2749,13 +2749,21 @@ $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				Invoke-ClearVariables html, htmlTable
 			 
 				#Storage
+				# if we're running on Google Cloud SQL the drive column is pointless
+				if($IsGoogleCloudSQL) {
+					$ExcludeColumns = @("StallRank", "Drive")
+					$DbColNum = 8
+				} else {
+					$ExcludeColumns = @("StallRank")
+					$DbColNum = 9
+				}
 				$HtmlTabName = "Storage Throughput Since Instance Startup"
-				$htmlTable = Convert-TableToHtml $StorageTbl -NoCaseChange -TblID "StorageStatsTable" -CSSClass "Storage sortable" -ExclCols "StallRank" -DebugInfo:$DebugInfo
+				$htmlTable = Convert-TableToHtml $StorageTbl -NoCaseChange -TblID "StorageStatsTable" -CSSClass "Storage sortable" -ExclCols $ExcludeColumns -DebugInfo:$DebugInfo
 				$TopAvgStall = ($StorageTbl | Sort-Object -Property "Avg Stall (ms)" -Descending | Select-Object -ExpandProperty "Avg Stall (ms)" -First 1)	
 			 
 				$html = $HTMLPre + @"
 <title>$HtmlTabName</title>`n $HTMLBodyStart `n <h1>$HtmlTabName</h1> $DarkModeDiv `n
-$($SearchTableDiv -replace $STDivReplace, "'StorageStatsTable', 9" -replace 'object', 'database')
+$($SearchTableDiv -replace $STDivReplace, "'StorageStatsTable', $DbColNum" -replace 'object', 'database')
 $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 "@
 				#Save HTML file
@@ -3215,7 +3223,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				[string]$Query = $Query -replace $OldQSIntervalEnd, $NewQSIntervalEnd
 				$AdditionalStepInfo = "between $QueryStoreIntervalStart and $QueryStoreIntervalEnd"
 			}
-			$SortOrders = @("CPU", "Duration")
+			$SortOrders = @("Avg CPU", "Avg Duration", "Total CPU", "Total Duration")
 			foreach ($SortOrder in $SortORders) { 
 				Write-Host " ->Top 20 queries by $SortOrder..." -NoNewline
 				#There are only 2 sort orders here and CPU is the default one, so I can be lazy for the time being
@@ -3227,24 +3235,29 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			
 					$BlitzQSTbl = $global:PSBlitzSet.Tables[0]
 					#$BlitzQSSumTbl = $global:PSBlitzSet.Tables[1]
+					$SortOrderFname = $SortOrder.Replace(" ", "_")
 
-					Export-PlansAndDeadlocks $BlitzQSTbl $PlanOutDir "query_plan" "sql_plan_file" -FPrefix "QueryStore_$SortOrder" -DebugInfo:$DebugInfo
+					Export-PlansAndDeadlocks $BlitzQSTbl $PlanOutDir "query_plan" "sql_plan_file" -FPrefix "QueryStore_$SortOrderFname" -DebugInfo:$DebugInfo
 				
 					if ($ToHTML) {
 					
 						Add-QueryName $BlitzQSTbl "query" "query_sql_text" "QueryStore"
 
-						$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan", "database_name", "n" -CSSClass "QueryStoreTab$SortOrder sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
+						$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan", "database_name", "n" -CSSClass "query-store-tab-$($SortOrder.Replace(" ", "-").ToLower()) sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
 
-						if ($SortOrder -eq "CPU") {
+						if ($SortOrder -eq "Avg CPU") {
 							$HighestQSCPU = $BlitzQSTbl.Rows[0]["avg_cpu_time_ms"]
-						} elseif ($SortOrder -eq "Duration") { 
+						} elseif ($SortOrder -eq "Avg Duration") { 
 							$HighestQSDuration = $BlitzQSTbl.Rows[0]["avg_duration_ms"]
+						} elseif ($SortOrder -eq "Total CPU") {
+							$HighestQSTotalCPU = $BlitzQSTbl.Rows[0]["total_cpu_time_ms"]
+						} elseif ($SortOrder -eq "Total Duration") {
+							$HighestQSTotalDuration = $BlitzQSTbl.Rows[0]["total_duration_ms"]
 						}
 
 						$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -CSSClass "query-table" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
 
-						$HtmlTabName = "Query Store results for $databaseName - Average $SortOrder"
+						$HtmlTabName = "Query Store results for $databaseName - $SortOrder"
 
 						$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1 id="top">$HtmlTabName</h1> $DarkModeDiv`n
@@ -3253,19 +3266,20 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					<h2 id="Queries">Query text</h2>`n $htmlTable3 `n $JumpToTop `n $HTMLBodyEnd
 "@
 
-						Save-HtmlFile $html "BlitzQueryStore_$SortOrder.html" $HTMLOutDir $DebugInfo
+						Save-HtmlFile $html "BlitzQueryStore_$SortOrderFname.html" $HTMLOutDir $DebugInfo
 						Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3
 
 					} else {
 						##export to excel
-						$ExcelSheet = $ExcelFile.Worksheets.Item("Query Store Info")
-						#Specify at which row in the sheet to start adding the data
-						if ($SortOrder -eq "duration") {
-							$ExcelStartRow = 27
-						} else {
-							$ExcelStartRow = 3
+						$QSSheetMap = @{
+							"Avg CPU"        = @{ Sheet = "Query Store CPU";      Row = 3  }
+							"Avg Duration"   = @{ Sheet = "Query Store Duration"; Row = 3  }
+							"Total CPU"      = @{ Sheet = "Query Store CPU";      Row = 27 }
+							"Total Duration" = @{ Sheet = "Query Store Duration"; Row = 27 }
 						}
-						
+						$ExcelSheet    = $ExcelFile.Worksheets.Item($QSSheetMap[$SortOrder].Sheet)
+						$ExcelStartRow = $QSSheetMap[$SortOrder].Row
+					
 						Convert-TableToExcel $BlitzQSTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -ExclCols "query", "query_plan", "n"
 						Save-ExcelFile $ExcelFile					
 					}
@@ -4062,6 +4076,8 @@ finally {
 		$AzureEnv = ""
 		if ($IsAzureSQLMI) {
 			$AzureEnv = "- Azure SQL MI"
+		} elseif($IsGoogleCloudSQL) {
+			$AzureEnv = "- Google Cloud SQL"
 		}
 		if ($IsAzureSQLDB) {
 			$AzureEnv = "- Azure SQL DB"
@@ -4269,6 +4285,7 @@ finally {
 			} elseif ($File.Name -like "BlitzQueryStore*") {
 				$SortOrder = $File.Name.Replace('BlitzQueryStore_', '')
 				$SortOrder = $SortOrder.Replace('.html', '')
+				$SortOrder = $SortOrder.Replace("_", " ")
 				$PageName = "Query Store Info - $SortOrder"
 				$Plans = "<td>$HTMLChk</td>"
 				#$AdditionalInfo = "Outputs execution plans as .sqlplan files."
@@ -4281,12 +4298,17 @@ finally {
 				if ($DBSwitched -eq "Y") {
 					$Description += " for $DBName"
 				}
-				$Description += ",<br>sorted by average $SortOrder."
-				if ($SortOrder -eq "CPU") {
+				$Description += ",<br>sorted by $SortOrder."
+				if ($SortOrder -eq "Avg CPU") {
 					$Description += "<br><span class=`"additional-desc`">Highest Avg CPU time: $HighestQSCPU ms</span>"
-				} elseif ($SortOrder -eq "Duration") {
+				} elseif ($SortOrder -eq "Avg Duration") {
 					$Description += "<br><span class=`"additional-desc`">Highest Avg Duration: $HighestQSDuration ms</span>"
-				} 
+				} elseif ($SortOrder -eq "Total CPU") {
+					$Description += "<br><span class=`"additional-desc`">Highest Total CPU time: $HighestQSTotalCPU ms</span>"
+				} elseif ($SortOrder -eq "Total Duration") {
+					$Description += "<br><span class=`"additional-desc`">Highest Total Duration: $HighestQSTotalDuration ms</span>"
+				}
+
 				$QuerySource += "Similar to sp_QuickieStore @top = 20, @sort_order='$SortOrder'"
 				if ($IsQueryStoreInterval) {
 					$QuerySource += ", @start_time = '$QueryStoreIntervalStart', @end_time = '$QueryStoreIntervalEnd'"

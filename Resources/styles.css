@@ -183,8 +183,10 @@ th.sortable:hover {
  ## Query store info tables
 */
 
-.QueryStoreTabDuration, 
-.QueryStoreTabCPU {
+.query-store-tab-avg-duration, 
+.query-store-tab-avg-cpu,
+.query-store-tab-total-duration,
+.query-store-tab-total-cpu {
 	td {
 		vertical-align: top;
 	}
@@ -221,15 +223,29 @@ th.sortable:hover {
        }
 }
 
-.QueryStoreTabDuration {
+.query-store-tab-avg-duration {
 	td:nth-child(26) {
 			font-weight: bold;
 			background-color: rgba(255, 255, 0, 0.4);
 		}
 }
 
-.QueryStoreTabCPU {
+.query-store-tab-total-duration {
+	td:nth-child(29) {
+			font-weight: bold;
+			background-color: rgba(255, 255, 0, 0.4);
+		}
+}
+
+.query-store-tab-avg-cpu {
   td:nth-child(30) {
+			font-weight: bold;
+			background-color: rgba(255, 255, 0, 0.4);
+		}
+}
+
+.query-store-tab-total-cpu {
+  td:nth-child(33) {
 			font-weight: bold;
 			background-color: rgba(255, 255, 0, 0.4);
 		}
