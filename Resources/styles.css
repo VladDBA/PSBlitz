@@ -83,7 +83,7 @@ th.tooltip, td.tooltip {
 
 table {
 	background-color: var(--table-bg);
-    box-shadow: 0 0 20px var(--shadow);
+    box-shadow: var(--shadow);
     transition: background-color 200ms ease, color 200ms ease;
 	margin-left: auto;
 	margin-right: auto;
@@ -154,7 +154,7 @@ footer {
 }
 
 .warning-cell {
-	background-color: #FFB6C1;
+	background-color: var(--p1-bg);
 	font-weight: bold;
 }
 
