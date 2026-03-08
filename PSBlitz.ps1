@@ -3918,7 +3918,7 @@ finally {
 				$htmlTable1 = Convert-QueryTableToHtml $BlitzWhoAggTbl -Cols "query", "query_text" -CSSClass "query-table" -AnchorToHere -AnchorID "RunningNow" -DebugInfo:$DebugInfo
 
 				$HighestElapsedTime = $BlitzWhoAggTbl | Select-Object -ExpandProperty "elapsed_time" -First 1
-				$BlockedSessionsCount = ($BlitzWhoAggTbl | Where-Object { $_.blocked_sessions -ne [System.DBNull]::Value }).Count
+				$BlockedSessionsCount = ($BlitzWhoAggTbl | Where-Object { $_.blocking_session_id -ne [System.DBNull]::Value }).Count
 
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n$HTMLBodyStart
