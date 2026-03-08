@@ -70,7 +70,7 @@ DECLARE
 
 /*PSBlitz specific parameters/options*/
 ;SET @database_name = NULL;
-;SET @sort_order = 'cpu';
+;SET @sort_order = 'Avg CPU';
 ;SET @top = 20;
 ;SET @start_date = NULL;
 ;SET @end_date = NULL;

@@ -43,9 +43,10 @@ DECLARE
 	@OutputDatabaseName = CASE WHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure' 
 								AND SERVERPROPERTY('EngineEdition') IN (5, 6)
 								THEN CAST(DB_NAME() AS NVARCHAR(256))
-								WHEN ISNULL(DB_ID('gcloud_cloudsqladmin'),-1) <> -1 OR (
-									   ISNULL(SUSER_ID('sqlserver'),-1) <> -1 
-									  AND ISNULL(SUSER_ID('CustomerDbRootRole'),-1) <> -1)
+								WHEN (ISNULL(DB_ID('gcloud_cloudsqladmin'),-1) <> -1 
+								       AND ISNULL(SUSER_ID('CustomerDbRootRole'),-1) <> -1)
+									  OR (ISNULL(SUSER_ID('sqlserver'),-1) <> -1 
+									   AND ISNULL(SUSER_ID('CustomerDbRootRole'),-1) <> -1)
 									  THEN N'BlitzWho_GCPDB_PSBlitzReplace'
 								ELSE N'tempdb'END,
 	@OutputSchemaName = CASE WHEN CAST(SERVERPROPERTY('Edition') AS NVARCHAR(100)) = N'SQL Azure'

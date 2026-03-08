@@ -6,6 +6,7 @@
 [![SQL Server](https://img.shields.io/badge/SQL%20Server-2014%2B-0078D4.svg)](https://learn.microsoft.com/en-us/sql/sql-server)
 [![Azure SQL DB](https://img.shields.io/badge/Azure%20SQL-Database-0078D4.svg)](https://learn.microsoft.com/en-us/azure/azure-sql/database/sql-database-paas-overview)
 [![Azure SQL MI](https://img.shields.io/badge/Azure%20SQL-Managed%20Instance-0078D4.svg)](https://learn.microsoft.com/en-us/azure/azure-sql/managed-instance/sql-managed-instance-paas-overview)
+[![Google Cloud SQL](https://img.shields.io/badge/Google%20Cloud-SQL-4285F4.svg)](https://cloud.google.com/sql)
 [![Code Signing](https://img.shields.io/badge/Code%20Signing-Verified-brightgreen.svg)](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -168,6 +169,8 @@ Open PSBlitzOutput.xlsx (found in PSBlitz's Resources folder) click on the first
 |`-InDepth` | Switch which tells PSBlitz.ps1 to run a more in-depth check against the instance/database. Omit for default check. |
 |`-CheckDB` | Used to provide the name of a specific database against which sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock will be ran. Omit to run against the whole instance.<br><br>__For Azure SQL DB__<br>Can also be used to provide the name of the Azure SQL DB database if you haven't provided it as part of the <br>`-ServerName` paramter.<br>If the database name is not provided here, nor as part of the `-ServerName`, and the environment is detected as Azure SQL DB, then you'll be prompted to provide the database name.|
 |`-CacheTop`| Used to specify if more/less than the default top 10 queries should be returned for the sp_BlitzCache step. Only works for HTML output (`-ToHTM Y`). Has no effect on the `recent compilations` sort order. <br>Setting this parameter to 0 will skip the plan cache analysis step altogether.<br>Defaults to 10. |
+|`-QueryStoreTop`|Used to specify if more/less than the default top 20 queries should be returned for the 
+ Query Store step.Setting this parameter to 0 will skip the Query Store analysis step altogether.<br>Defaults to 20. |
 |`-CacheMinutesBack`| Used to specify how many minutes back to begin plan cache analysis. <br>Defaults to entire contents of the plan cache since instance startup.<br> In order to avoid missing the desired timeframe, the value is dynamically adjusted based on the runtime of PSBlitz up until the plan cache analysis point.|
 |`-QueryStoreIntervalStart`| The start date and time (format __yyyy-mm-dd HH:mm__) for the Query Store interval. If provided, the script will validate the format and use it as the lower bound for the queries retrieved from the Query Store. |
 |`-QueryStoreIntervalEnd`|The end date and time (format __yyyy-mm-dd HH:mm__) for the Query Store interval. If `-QueryStoreIntervalStart` is provided and `-QueryStoreIntervalEnd` is not provided, it defaults to the current date and time. <br>If provided, the script will validate the format and use it as the upper bound for the queries retrieved from the Query Store.|

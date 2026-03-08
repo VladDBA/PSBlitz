@@ -145,6 +145,12 @@
  In order to avoid missing the desired timeframe, the value is dynamically adjusted based on 
  the runtime of PSBlitz up until the plan cache analysis point.
 
+.PARAMETER QueryStoreTop
+ Used to specify if more/less than the default top 20 queries should be returned for the 
+ Query Store step. Only works for HTML output (-ToHTML), and in the case of a database-specific check on an eligible database
+ or if a database is found to account for 2/3 of the plan cache findings.
+ Setting this parameter to 0 will skip the Query Store analysis step altogether.
+
 .PARAMETER QueryStoreIntervalStart
  Used to specify the start of the Query Store interval in the format 'yyyy-MM-dd HH:mm:ss'.
  If not specified, the script will get the top 20 queries from the past 7 days.
@@ -184,7 +190,7 @@
 .PARAMETER SkipChecks
  Used to specify one or more (comma-separated) checks to skip. 
  Currently supports IndexFrag (skips index fragmentation check), StatsInfo (skips statistics info check), 
- Deadlock (skips deadlock check), and PlanCache (skips plan cache check).
+ Deadlock (skips deadlock check), PlanCache (skips plan cache check), QueryStore (skips Query Store check).
 
 .PARAMETER DebugInfo
  Switch used to get more information for debugging and troubleshooting purposes.
@@ -298,13 +304,15 @@ param(
 	[Parameter(Mandatory = $False)]
 	[string]$QueryStoreIntervalStart,
 	[Parameter(Mandatory = $False)]
-	[string]$QueryStoreIntervalEnd
+	[string]$QueryStoreIntervalEnd,
+	[Parameter(Mandatory = $False)]
+	[int]$QueryStoreTop = 20
 )
 
 ###Internal params
 #Version
 $Vers = "6.0.0"
-$VersDate = "2026-03-02"
+$VersDate = "2026-03-08"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -332,7 +340,7 @@ $storedHashes = @{
 	"spBlitzFirst_NonSPLatest.sql"       = "0A9BDAC9D147264AADF85D70D5D3732864022BCE09B36C3C053AFB8244816919"
 	"spBlitzIndex_NonSPLatest.sql"       = "BAF2C95CD1DB45547161BD685A23643C54DC88E11C9E400AF4BF93947D719AC7"
 	"spBlitzLock_NonSPLatest.sql"        = "66EB8FA7BFA597A822F622F4CB86B7ED3E41AA81AF52F351B35CF33910804DC4"
-	"spBlitzWho_NonSPLatest.sql"         = "1FF1EBAB9059D899BD015D8D3F047BA325A9753DA668A46C3E539F57A6EC597B"
+	"spBlitzWho_NonSPLatest.sql"         = "AC4C3BBF2576039E489875E22E46E7F726B37000D5C3761A7BC84027762D790C"
 	"GetBlitzWhoData.sql"                = "4CDB3FBA91EF31B017DC5888BB694587ECC83A37FBEF6FE33AA0BC791F5B02B6"
 	"GetInstanceInfo.sql"                = "29AA65809886BB2FC870B0DF49256850C4347562ABDDAD29E5BEC6D76C86036F"
 	"GetTempDBUsageInfo.sql"             = "F65305AD51321D885458C5898D69657E90EB8A1EEC97922AABC406C494D0BE8B"
@@ -342,7 +350,7 @@ $storedHashes = @{
 	"GetDbInfo.sql"                      = "EE4BAD7941FDC25819294D8653148AB66CFD07FD3EE66E73D7D68D09EFA8BE37"
 	"GetAzureSQLDBInfo.sql"              = "8A18348F7B87C2F5DA047B103E3BF4FEBB455E7498F0C93644DC2CD7E7255506"
 	"GetObjectsWithDangerousOptions.sql" = "AFE74F2FE6D6077AEBF169CC16DE036B08980846E6795DC342372AB8C2A132A9"
-	"spQuickieStore_NonSPLatest.sql"     = "58BF4AC3E3D71E490E8C23C5BA464C1E439939EC1AAB44400469974BB8022F6F"
+	"spQuickieStore_NonSPLatest.sql"     = "3084C1C5E42AC3FBCBD4100403C9475F4518572A71516EA06D2871D480A04280"
 	"GetQSStatus.sql"                    = "A0D6E7B1C6BC5B0ED5FDF6FD14C5927729F883CB491342F81DCD9BD48A4ACCFE"
 }
 
@@ -350,8 +358,6 @@ $storedHashes = @{
 $OrigExcelF = Join-Path -Path $ResourcesPath -ChildPath $OrigExcelFName
 #Set default start row for Excel output
 $DefaultStartRow = 2
-#BlitzWho initial pass number
-#$BlitzWhoPass = 1
 
 #symbols
 # Success
@@ -360,7 +366,6 @@ $GreenCheck = @{
 	ForegroundColor = 'Green'
 	NoNewLine       = $DebugInfo
 }
-
 # Failure
 $RedX = @{
 	Object          = 'x (Failed)'
@@ -1112,8 +1117,8 @@ function Save-HtmlFile {
 
 function Invoke-ClearVariables {
 	param (
-	[Parameter(Position = 0, Mandatory = $true)]
-	[string[]]$VarNames
+		[Parameter(Position = 0, Mandatory = $true)]
+		[string[]]$VarNames
 	)
 
 	foreach ($Var in $VarNames) {
@@ -1460,6 +1465,9 @@ if ([string]::IsNullOrEmpty($ServerName)) {
 		##How many minutes back to check for cache
 		[int]$CacheMinutesBack = Read-Host -Prompt "How many minutes in the past to check the plan cache?(empty defaults to everything in the plan cache)"
 
+		##Query Store top N queries
+		[int]$QueryStoreTop = Read-Host -Prompt "Number of top resource intensive queries to return from Query Store?(empty defaults to 20)"
+
 		##Query Store interval start
 		[string]$QueryStoreIntervalStart = Read-Host -Prompt "Query Store interval start date and time in the format YYYY-MM-DD hh:mm (empty defaults 7 days ago)"
 
@@ -1581,7 +1589,8 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 	$Query = @"
 	    SELECT CAST(SERVERPROPERTY('EngineEdition') AS INT) AS [EngineEdition], 
 	    CAST(SERVERPROPERTY('Edition') AS NVARCHAR(128)) AS [Edition], 
-	    CASE `nWHEN ISNULL(DB_ID('gcloud_cloudsqladmin'),-1) <> -1 THEN 'Google Cloud SQL' 
+	    CASE `nWHEN ISNULL(DB_ID('gcloud_cloudsqladmin'),-1) <> -1 
+		 AND ISNULL(SUSER_ID('CustomerDbRootRole'),-1) <> -1 THEN 'Google Cloud SQL' 
 		 WHEN ISNULL(SUSER_ID('sqlserver'),-1) <> -1 `nAND 
 		 ISNULL(SUSER_ID('CustomerDbRootRole'),-1) <> -1 THEN 'Google Cloud SQL' 
 		 ELSE 'N' END AS [IsGoogleCloudSQL];
@@ -1881,10 +1890,17 @@ if (-not $ToHTML) {
 	}
 }
 
-if ((-not $ToHTML) -and ($CacheTop -ne 10)) {
-	Write-Host " Output type is Excel, but -CacheTop was specified with a value <> 10." -Fore Red
-	Write-Host " ->These two options aren't compatible.`n ->Switching -CacheTop back to 10"
-	$CacheTop = 10
+if (-not $ToHTML) {
+	if ($CacheTop -gt 10) {
+		Write-Host " Output type is Excel, but -CacheTop was specified with a value > 10." -Fore Red
+		Write-Host " ->These two options aren't compatible.`n ->Switching -CacheTop back to 10"
+		$CacheTop = 10
+	}
+	if ($QueryStoreTop -gt 20) {
+		Write-Host " Output type is Excel, but -QueryStoreTop was specified with a value > 20." -Fore Red
+		Write-Host " ->These two options aren't compatible.`n ->Switching -QueryStoreTop back to 20"
+		$QueryStoreTop = 20
+	}
 }
 
 if ($ToHTML) {
@@ -2074,6 +2090,8 @@ $StepEnd = Get-Date
 $ParametersUsed = "IsIndepth:$InDepth; CheckDB:$CheckDB;`n BlitzWhoDelay:$BlitzWhoDelay; MaxTimeout:$MaxTimeout"
 $ParametersUsed += ";`n ConnTimeout:$ConnTimeout; CacheTop:$CacheTop;`n ASDBName:$ASDBName; CacheMinutesBack:$CacheMinutesBack"
 $ParametersUsed += if ($IsQueryStoreInterval) { ";`n QueryStoreIntervalStart:$QueryStoreIntervalStart; QueryStoreIntervalEnd:$QueryStoreIntervalEnd" } else { "" }
+$ParametersUsed += ";`n QueryStoreTop:$QueryStoreTop"
+$ParametersUsed += if ($IsGoogleCloudSQL) { "; NewBlitzWhoOutDB: $NewBlitzWhoOutDB" }
 $ParametersUsed += ";`n Auth:$Auth; DebugInfo:$DebugInfo"
 Add-LogRow "Check start" "Started" $ParametersUsed
 try {
@@ -2750,7 +2768,7 @@ $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			 
 				#Storage
 				# if we're running on Google Cloud SQL the drive column is pointless
-				if($IsGoogleCloudSQL) {
+				if ($IsGoogleCloudSQL) {
 					$ExcludeColumns = @("StallRank", "Drive")
 					$DbColNum = 8
 				} else {
@@ -3154,144 +3172,157 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		if no specific database name has been provided, check BlitzCache results for any database that
 		might account for 2/3 of all the records returned by BlitzCache
 	#>
-	if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
-		[int]$TwoThirdsBlitzCache = [Math]::Floor([decimal]($BlitzCacheRecs / 1.5))
-		[string]$DBName = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Name | Select-Object -Last 1
-		[int]$DBCount = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Count | Select-Object -Last 1
-		if (($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --") -and ($DBName -ne "N/A") -and (!([string]::IsNullOrEmpty($DBName)))) {
-			Write-Host " $DBName accounts for 2/3 of the records returned from cache"
-			Write-Host " ->" -NoNewline
-			$StepStart = Get-Date
-			[string]$CheckDB = $DBName
-			$DBSwitched = "Y"
-			$StepEnd = Get-Date
-			Add-LogRow "CheckDB value" "Switched" "$DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
-		}
-	}
-
-	##Check if DB is eligible for sp_BlitzQueryStore first
-	if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
-		if ($DBSwitched -ne "Y") {
-			Write-Host " " -NoNewline
-		}
-		$databaseName = if ($IsAzureSQLDB) { $ASDBName } else { $CheckDB }
-		Write-Host "Checking if $databaseName is eligible for Query Store check... " -NoNewline
-		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetQSStatus.sql"
-		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-		if ((!([string]::IsNullOrEmpty($CheckDB))) -and (($IsAzureSQLDB -eq $false))) {
-			$NewCheckQSDBStr = ";SET @DatabaseName = N'$CheckDB';"
-			$OldCheckQSDBStr = ";SET @DatabaseName = NULL;"
-			[string]$Query = $Query -replace $OldCheckQSDBStr, $NewCheckQSDBStr
-		}
-
-		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Query Store pre-check for $databaseName" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout 
-		if ($global:StepOutcome -eq "Success") {
-			$BlitzQSTbl = $global:PSBlitzSet.Tables[0]
-		
-			if ($BlitzQSTbl.Rows[0]["EligibleForBlitzQueryStore"] -eq "Yes") {
-				Write-Host @GreenCheck				
-				$CheckQueryStore = 'Y'
-			} elseif ($BlitzQSTbl.Rows[0]["EligibleForBlitzQueryStore"] -eq "No") {
+	if (($SkipChecks -contains "QueryStore") -or ($QueryStoreTop -eq 0)) {
+		Write-Host " Skipping Query Store check as requested"
+		Add-LogRow "Query Store Info" "Skipped" "Query Store check skipped by user"
+	} else {
+		if (([string]::IsNullOrEmpty($CheckDB)) -and ($IsAzureSQLDB -eq $false)) {
+			[int]$TwoThirdsBlitzCache = [Math]::Floor([decimal]($BlitzCacheRecs / 1.5))
+			[string]$DBName = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Name | Select-Object -Last 1
+			[int]$DBCount = $DBArray | Group-Object -NoElement | Sort-Object Count | ForEach-Object Count | Select-Object -Last 1
+			if (($DBCount -ge $TwoThirdsBlitzCache) -and ($DBName -ne "-- N/A --") -and ($DBName -ne "N/A") -and (!([string]::IsNullOrEmpty($DBName)))) {
+				Write-Host " $DBName accounts for 2/3 of the records returned from cache"
+				Write-Host " ->" -NoNewline
+				$StepStart = Get-Date
+				[string]$CheckDB = $DBName
+				$DBSwitched = "Y"
 				$StepEnd = Get-Date
-				Write-Host "X (not eligible)" -Fore Yellow
-				Add-LogRow "sp_BlitzQueryStore" "Skipped" "$databaseName is not eligible"
-			} else {
-				$StepEnd = Get-Date
-				$QSCheckResult = $BlitzQSTbl.Rows[0]["EligibleForBlitzQueryStore"] 
-				Write-Host "X (not eligible)" -Fore Yellow
-				Add-LogRow "sp_BlitzQueryStore" "Skipped" $QSCheckResult
+				Add-LogRow "CheckDB value" "Switched" "$DBName accounts for at least 2/3 of the records returned by sp_BlitzCache"
 			}
-		} else {
-			$CheckQueryStore = 'N'
 		}
-		if ($CheckQueryStore -eq 'Y') {
-			$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spQuickieStore_NonSPLatest.sql"
-			[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
-			Write-Host " Retrieving Query Store info for $databaseName..."
 
-			if ($IsAzureSQLDB -eq $false) { 
-				$OldCheckQSDBStr = ";SET @database_name = NULL;"
-				$NewCheckQSDBStr = ";SET @database_name = N'" + $CheckDB + "';"
+		##Check if DB is eligible for sp_BlitzQueryStore first
+		if ((!([string]::IsNullOrEmpty($CheckDB))) -or ($IsAzureSQLDB)) {
+			if ($DBSwitched -ne "Y") {
+				Write-Host " " -NoNewline
+			}
+			$databaseName = if ($IsAzureSQLDB) { $ASDBName } else { $CheckDB }
+			Write-Host "Checking if $databaseName is eligible for Query Store check... " -NoNewline
+			$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetQSStatus.sql"
+			[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
+			if ((!([string]::IsNullOrEmpty($CheckDB))) -and (($IsAzureSQLDB -eq $false))) {
+				$NewCheckQSDBStr = ";SET @DatabaseName = N'$CheckDB';"
+				$OldCheckQSDBStr = ";SET @DatabaseName = NULL;"
 				[string]$Query = $Query -replace $OldCheckQSDBStr, $NewCheckQSDBStr
 			}
-			if ($IsQueryStoreInterval) {
-				$OldQSIntervalStart = ";SET @start_date = NULL;"
-				$NewQSIntervalStart = ";SET @start_date = '" + $QueryStoreIntervalStart + "';"
-				$OldQSIntervalEnd = ";SET @end_date = NULL;"
-				$NewQSIntervalEnd = ";SET @end_date = '" + $QueryStoreIntervalEnd + "';"
-				[string]$Query = $Query -replace $OldQSIntervalStart, $NewQSIntervalStart
-				[string]$Query = $Query -replace $OldQSIntervalEnd, $NewQSIntervalEnd
-				$AdditionalStepInfo = "between $QueryStoreIntervalStart and $QueryStoreIntervalEnd"
+
+			Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Query Store pre-check for $databaseName" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout 
+			if ($global:StepOutcome -eq "Success") {
+				$BlitzQSTbl = $global:PSBlitzSet.Tables[0]
+		
+				if ($BlitzQSTbl.Rows[0]["EligibleForBlitzQueryStore"] -eq "Yes") {
+					Write-Host @GreenCheck				
+					$CheckQueryStore = 'Y'
+				} elseif ($BlitzQSTbl.Rows[0]["EligibleForBlitzQueryStore"] -eq "No") {
+					$StepEnd = Get-Date
+					Write-Host "X (not eligible)" -Fore Yellow
+					Add-LogRow "sp_BlitzQueryStore" "Skipped" "$databaseName is not eligible"
+				} else {
+					$StepEnd = Get-Date
+					$QSCheckResult = $BlitzQSTbl.Rows[0]["EligibleForBlitzQueryStore"] 
+					Write-Host "X (not eligible)" -Fore Yellow
+					Add-LogRow "sp_BlitzQueryStore" "Skipped" $QSCheckResult
+				}
+			} else {
+				$CheckQueryStore = 'N'
 			}
-			$SortOrders = @("Avg CPU", "Avg Duration", "Total CPU", "Total Duration")
-			foreach ($SortOrder in $SortORders) { 
-				Write-Host " ->Top 20 queries by $SortOrder..." -NoNewline
-				#There are only 2 sort orders here and CPU is the default one, so I can be lazy for the time being
-				[string]$Query = $Query -replace ";SET @sort_order = 'cpu';", ";SET @sort_order = '$SortOrder';"
+			if ($CheckQueryStore -eq 'Y') {
+				$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spQuickieStore_NonSPLatest.sql"
+				[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
+				Write-Host " Retrieving Query Store info for $databaseName..."
 
-				Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Query Store check for $databaseName - $SortOrder $AdditionalStepInfo" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout 
-
-				if ($global:StepOutcome -eq "Success") {
-			
-					$BlitzQSTbl = $global:PSBlitzSet.Tables[0]
-					#$BlitzQSSumTbl = $global:PSBlitzSet.Tables[1]
-					$SortOrderFname = $SortOrder.Replace(" ", "_")
-
-					Export-PlansAndDeadlocks $BlitzQSTbl $PlanOutDir "query_plan" "sql_plan_file" -FPrefix "QueryStore_$SortOrderFname" -DebugInfo:$DebugInfo
+				if ($IsAzureSQLDB -eq $false) { 
+					$OldCheckQSDBStr = ";SET @database_name = NULL;"
+					$NewCheckQSDBStr = ";SET @database_name = N'" + $CheckDB + "';"
+					[string]$Query = $Query -replace $OldCheckQSDBStr, $NewCheckQSDBStr
+				}
+				if ($IsQueryStoreInterval) {
+					$OldQSIntervalStart = ";SET @start_date = NULL;"
+					$NewQSIntervalStart = ";SET @start_date = '" + $QueryStoreIntervalStart + "';"
+					$OldQSIntervalEnd = ";SET @end_date = NULL;"
+					$NewQSIntervalEnd = ";SET @end_date = '" + $QueryStoreIntervalEnd + "';"
+					[string]$Query = $Query -replace $OldQSIntervalStart, $NewQSIntervalStart
+					[string]$Query = $Query -replace $OldQSIntervalEnd, $NewQSIntervalEnd
+					$AdditionalStepInfo = "between $QueryStoreIntervalStart and $QueryStoreIntervalEnd"
+				}
+				if ($QueryStoreTop -ne 20) {
+					$OldQSTop = ";SET @top = 20;"
+					$NewQSTop = ";SET @top = " + $QueryStoreTop + ";"
+					[string]$Query = $Query -replace $OldQSTop, $NewQSTop
+					$AdditionalStepInfo = $AdditionalStepInfo + ", Top $QueryStoreTop"
+				}
+				$OldSortOrder = "Avg CPU"
+				$SortOrders = @("Avg CPU", "Avg Duration", "Total CPU", "Total Duration")
+				foreach ($SortOrder in $SortORders) { 
+					Write-Host " ->Top $QueryStoreTop queries by $SortOrder..." -NoNewline
 				
-					if ($ToHTML) {
+					[string]$Query = $Query -replace ";SET @sort_order = '$OldSortOrder';", ";SET @sort_order = '$SortOrder';"
+
+					Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Query Store check for $databaseName - $SortOrder $AdditionalStepInfo" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout 
+
+					if ($global:StepOutcome -eq "Success") {
+			
+						$BlitzQSTbl = $global:PSBlitzSet.Tables[0]
+						#$BlitzQSSumTbl = $global:PSBlitzSet.Tables[1]
+						$SortOrderFname = $SortOrder.Replace(" ", "_")
+
+						Export-PlansAndDeadlocks $BlitzQSTbl $PlanOutDir "query_plan" "sql_plan_file" -FPrefix "QueryStore_$SortOrderFname" -DebugInfo:$DebugInfo
+				
+						if ($ToHTML) {
 					
-						Add-QueryName $BlitzQSTbl "query" "query_sql_text" "QueryStore"
+							Add-QueryName $BlitzQSTbl "query" "query_sql_text" "QueryStore"
 
-						$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan", "database_name", "n" -CSSClass "query-store-tab-$($SortOrder.Replace(" ", "-").ToLower()) sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
+							$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan", "database_name", "n" -CSSClass "query-store-tab-$($SortOrder.Replace(" ", "-").ToLower()) sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
 
-						if ($SortOrder -eq "Avg CPU") {
-							$HighestQSCPU = $BlitzQSTbl.Rows[0]["avg_cpu_time_ms"]
-						} elseif ($SortOrder -eq "Avg Duration") { 
-							$HighestQSDuration = $BlitzQSTbl.Rows[0]["avg_duration_ms"]
-						} elseif ($SortOrder -eq "Total CPU") {
-							$HighestQSTotalCPU = $BlitzQSTbl.Rows[0]["total_cpu_time_ms"]
-						} elseif ($SortOrder -eq "Total Duration") {
-							$HighestQSTotalDuration = $BlitzQSTbl.Rows[0]["total_duration_ms"]
-						}
+							if ($SortOrder -eq "Avg CPU") {
+								$HighestQSCPU = $BlitzQSTbl.Rows[0]["avg_cpu_time_ms"]
+							} elseif ($SortOrder -eq "Avg Duration") { 
+								$HighestQSDuration = $BlitzQSTbl.Rows[0]["avg_duration_ms"]
+							} elseif ($SortOrder -eq "Total CPU") {
+								$HighestQSTotalCPU = $BlitzQSTbl.Rows[0]["total_cpu_time_ms"]
+							} elseif ($SortOrder -eq "Total Duration") {
+								$HighestQSTotalDuration = $BlitzQSTbl.Rows[0]["total_duration_ms"]
+							}
 
-						$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -CSSClass "query-table" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
+							$htmlTable3 = Convert-QueryTableToHtml $BlitzQSTbl -Cols "query", "query_sql_text" -CSSClass "query-table" -AnchorToHere -AnchorID "QueryStore" -DebugInfo:$DebugInfo
 
-						$HtmlTabName = "Query Store results for $databaseName - $SortOrder"
+							$HtmlTabName = "Query Store results for $databaseName - $SortOrder"
 
-						$html = $HTMLPre + @"
+							$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1 id="top">$HtmlTabName</h1> $DarkModeDiv`n
 				$(if($IsQueryStoreInterval){"<p>Executed between $QueryStoreIntervalStart and $QueryStoreIntervalEnd</p>"})
 					<p><a href="#Queries">Jump to query text</a></p>`n $htmlTable1 `n<br>
 					<h2 id="Queries">Query text</h2>`n $htmlTable3 `n $JumpToTop `n $HTMLBodyEnd
 "@
 
-						Save-HtmlFile $html "BlitzQueryStore_$SortOrderFname.html" $HTMLOutDir $DebugInfo
-						Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3
+							Save-HtmlFile $html "BlitzQueryStore_$SortOrderFname.html" $HTMLOutDir $DebugInfo
+							Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3
 
-					} else {
-						##export to excel
-						$QSSheetMap = @{
-							"Avg CPU"        = @{ Sheet = "Query Store CPU";      Row = 3  }
-							"Avg Duration"   = @{ Sheet = "Query Store Duration"; Row = 3  }
-							"Total CPU"      = @{ Sheet = "Query Store CPU";      Row = 27 }
-							"Total Duration" = @{ Sheet = "Query Store Duration"; Row = 27 }
-						}
-						$ExcelSheet    = $ExcelFile.Worksheets.Item($QSSheetMap[$SortOrder].Sheet)
-						$ExcelStartRow = $QSSheetMap[$SortOrder].Row
+						} else {
+							##export to excel
+							$QSSheetMap = @{
+								"Avg CPU"        = @{ Sheet = "Query Store CPU"; Row = 3 }
+								"Avg Duration"   = @{ Sheet = "Query Store Duration"; Row = 3 }
+								"Total CPU"      = @{ Sheet = "Query Store CPU"; Row = 27 }
+								"Total Duration" = @{ Sheet = "Query Store Duration"; Row = 27 }
+							}
+							$ExcelSheet = $ExcelFile.Worksheets.Item($QSSheetMap[$SortOrder].Sheet)
+							$ExcelStartRow = $QSSheetMap[$SortOrder].Row
 					
-						Convert-TableToExcel $BlitzQSTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -ExclCols "query", "query_plan", "n"
-						Save-ExcelFile $ExcelFile					
+							Convert-TableToExcel $BlitzQSTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -ExclCols "query", "query_plan", "n"
+							Save-ExcelFile $ExcelFile					
+						}
+						Invoke-ClearVariables BlitzQSTbl, BlitzQSSumTbl, PSBlitzSet
 					}
-					Invoke-ClearVariables BlitzQSTbl, BlitzQSSumTbl, PSBlitzSet
+					$OldSortOrder = $SortOrder
 				}
 			}
-		}
-		if ($DBSwitched -eq "Y") {
-			$StepStart = Get-Date
-			$CheckDB = ""
-			$StepEnd = Get-Date
-			Add-LogRow "CheckDB value" "Switched" "Switched back to empty from $DBName"
+			if ($DBSwitched -eq "Y") {
+				$StepStart = Get-Date
+				$CheckDB = ""
+				$StepEnd = Get-Date
+				Add-LogRow "CheckDB value" "Switched" "Switched back to empty from $DBName"
+			}
 		}
 	}
 
@@ -3887,6 +3918,7 @@ finally {
 				$htmlTable1 = Convert-QueryTableToHtml $BlitzWhoAggTbl -Cols "query", "query_text" -CSSClass "query-table" -AnchorToHere -AnchorID "RunningNow" -DebugInfo:$DebugInfo
 
 				$HighestElapsedTime = $BlitzWhoAggTbl | Select-Object -ExpandProperty "elapsed_time" -First 1
+				$BlockedSessionsCount = ($BlitzWhoAggTbl | Where-Object { $_.blocked_sessions -ne [System.DBNull]::Value }).Count
 
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n$HTMLBodyStart
@@ -4076,7 +4108,7 @@ finally {
 		$AzureEnv = ""
 		if ($IsAzureSQLMI) {
 			$AzureEnv = "- Azure SQL MI"
-		} elseif($IsGoogleCloudSQL) {
+		} elseif ($IsGoogleCloudSQL) {
 			$AzureEnv = "- Google Cloud SQL"
 		}
 		if ($IsAzureSQLDB) {
@@ -4347,6 +4379,9 @@ finally {
 					$Plans = "<td>$HTMLChk</td>"
 					$Description = "Aggregatd session activity sorted by duration descending."
 					$Description += "<br><span class=`"additional-desc`">Highest elapsed time: $HighestElapsedTime</span>"
+					if ($BlockedSessionsCount -gt 0) {
+						$Description += "<br><span class=`"warnings-desc`">Blocked sessions detected: $BlockedSessionsCount</span>"
+					}
 					$PageName = "Session Activity - Aggregated"
 					#$AdditionalInfo = "Outputs execution plans as .sqlplan files."
 				} else {
