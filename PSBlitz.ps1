@@ -312,7 +312,7 @@ param(
 ###Internal params
 #Version
 $Vers = "6.0.0"
-$VersDate = "2026-03-08"
+$VersDate = "2026-03-10"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -341,7 +341,7 @@ $storedHashes = @{
 	"spBlitzIndex_NonSPLatest.sql"       = "BAF2C95CD1DB45547161BD685A23643C54DC88E11C9E400AF4BF93947D719AC7"
 	"spBlitzLock_NonSPLatest.sql"        = "66EB8FA7BFA597A822F622F4CB86B7ED3E41AA81AF52F351B35CF33910804DC4"
 	"spBlitzWho_NonSPLatest.sql"         = "AC4C3BBF2576039E489875E22E46E7F726B37000D5C3761A7BC84027762D790C"
-	"GetBlitzWhoData.sql"                = "4CDB3FBA91EF31B017DC5888BB694587ECC83A37FBEF6FE33AA0BC791F5B02B6"
+	"GetBlitzWhoData.sql"                = "76C6BD414726E9DB911F83E9AB6442CF72DA18F0ADAD1A941AA816FFC4C3C0BD"
 	"GetInstanceInfo.sql"                = "29AA65809886BB2FC870B0DF49256850C4347562ABDDAD29E5BEC6D76C86036F"
 	"GetTempDBUsageInfo.sql"             = "F65305AD51321D885458C5898D69657E90EB8A1EEC97922AABC406C494D0BE8B"
 	"GetOpenTransactions.sql"            = "76EBCB1758CBC86DAC4FE8E5C02E88AB4B96FEDB2E21570B8C0D410FF8A69F7D"
@@ -684,9 +684,10 @@ function Convert-TableToHtml {
 			Write-Host " ->Converting data to HTML... " -ForegroundColor Yellow -NoNewline
 			$StepStart = Get-Date
 		}
+		
 		$properties = @()
 		$cultureInfo = [System.Globalization.CultureInfo]::CurrentCulture
-        
+		$ExpHoverToolTip = "Hover over cell for full text"
 		foreach ($column in $DataTable.Columns) {
 			if ($ExclCols -contains $column.ColumnName) { continue }
             
@@ -714,7 +715,12 @@ function Convert-TableToHtml {
 			$formattedName = $formattedName -replace "Average", "Avg"
 			$formattedName = $formattedName -replace "Maximum", "Max"
 			$formattedName = $formattedName -replace "Minimum", "Min"
-
+			if ((($CSSClass -eq "CacheTabx") -and ("Warnings", "Missing Indexes",
+						"Implicit Conversion Info", "Cached Execution Parameters", "SET Options" -contains $formattedName )) -or 
+			 (($CSSClass -like "query-store-tab*") -and ("Top Waits", "Context Settings" -contains $formattedName)) -or
+			 (($CSSClass -like "active-sessions-agg-tab*") -and ("Cached Parameter Info" -contains $formattedName))) {
+				$formattedName = "exphovertooltipxyz_" + $formattedName
+			}
 			$property = if ($DateTimeCols -contains $currentColumn) {
 				@{
 					Name       = $formattedName
@@ -748,18 +754,24 @@ function Convert-TableToHtml {
 		} elseif ($CSSClass) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class=`"$CSSClass`">"
 			#clean up XML noise and extra charcters in specific tables
-			if ($CSSClass -like "*sortable") {
+			if ($CSSClass -eq "active-sessions-agg-tab sortable") {
+				$htmlTableOut = $htmlTableOut -replace "<th>exphovertooltipxyz_", "<th class=`"tooltip sortable`" title=`"$ExpHoverToolTip`">"
+				$htmlTableOut = $htmlTableOut -replace "<th>", "<th class=`"sortable`">"
+			} elseif ($CSSClass -like "*sortable") {
 				$htmlTableOut = $htmlTableOut -replace "<th>", "<th class=`"sortable`">"
 			} elseif ($CSSClass -eq "CacheTabx") {
 				$htmlTableOut = $htmlTableOut -replace "<td>&lt;\?ClickMe ", "<td>"
 				$htmlTableOut = $htmlTableOut -replace "\?&gt;</td>", "</td>"
 				$htmlTableOut = $htmlTableOut -replace "<td>&lt;MissingIndexes&gt;", "<td>"
 				$htmlTableOut = $htmlTableOut -replace "&lt;/MissingIndexes&gt;</td>", "</td>"
+				## add tooltips for columns that fold long text
+				$htmlTableOut = $htmlTableOut -replace "<th>exphovertooltipxyz_", "<th class=`"tooltip`" title=`"$ExpHoverToolTip`">"
 			} elseif ($CSSClass -eq "Top10ClientConnTbl") {
 				$htmlTableOut = $htmlTableOut -replace "; </td>", "</td>"
-			} elseif ($CSSClass -like "QueryStoreTab*") {
+			} elseif ($CSSClass -like "query-store-tab*") {
 				$htmlTableOut = $htmlTableOut -replace " ms\)", "&nbsp;ms)"
 				$htmlTableOut = $htmlTableOut -replace " \(", "&nbsp;("
+				$htmlTableOut = $htmlTableOut -replace "<th>exphovertooltipxyz_", "<th class=`"tooltip`" title=`"$ExpHoverToolTip`">"
 			}
 		} elseif ($TblID) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table id=`"$TblID`">"
@@ -3272,7 +3284,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					
 							Add-QueryName $BlitzQSTbl "query" "query_sql_text" "QueryStore"
 
-							$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan", "database_name", "n" -CSSClass "query-store-tab-$($SortOrder.Replace(" ", "-").ToLower()) sortable" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
+							$htmlTable1 = Convert-TableToHtml $BlitzQSTbl -ExclCols "query_sql_text", "query_plan", "database_name", "n" -CSSClass "query-store-tab-$($SortOrder.Replace(" ", "-").ToLower())" -AnchorFromHere -AnchorIDs "QueryStore" -DebugInfo:$DebugInfo
 
 							if ($SortOrder -eq "Avg CPU") {
 								$HighestQSCPU = $BlitzQSTbl.Rows[0]["avg_cpu_time_ms"]
@@ -3899,7 +3911,7 @@ finally {
 					$HtmlTabName += " for $ASDBName"
 				}
 
-				$htmlTable = Convert-TableToHtml $BlitzWhoTbl -CSSClass "RawActiveSessionsTab sortable" -DebugInfo:$DebugInfo
+				$htmlTable = Convert-TableToHtml $BlitzWhoTbl -CSSClass "active-sessions-raw-tab sortable" -DebugInfo:$DebugInfo
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n $HTMLBodyStart
 				<h1>$HtmlTabName</h1> $DarkModeDiv`n $SortableTable `n $htmlTable
@@ -3914,11 +3926,11 @@ finally {
 					$HtmlTabName += " for $ASDBName"
 				}
 				Add-QueryName $BlitzWhoAggTbl "Query" "query_text" "RunningNow"
-				$htmlTable = Convert-TableToHtml $BlitzWhoAggTbl -CSSClass "ActiveSessionsTab sortable" -AnchorFromHere -AnchorIDs "RunningNow" -ExclCols "query_text", "query_plan" -DebugInfo:$DebugInfo
+				$htmlTable = Convert-TableToHtml $BlitzWhoAggTbl -CSSClass "active-sessions-agg-tab sortable" -AnchorFromHere -AnchorIDs "RunningNow" -ExclCols "query_text", "query_plan" -DebugInfo:$DebugInfo
 				$htmlTable1 = Convert-QueryTableToHtml $BlitzWhoAggTbl -Cols "query", "query_text" -CSSClass "query-table" -AnchorToHere -AnchorID "RunningNow" -DebugInfo:$DebugInfo
 
 				$HighestElapsedTime = $BlitzWhoAggTbl | Select-Object -ExpandProperty "elapsed_time" -First 1
-				$BlockedSessionsCount = ($BlitzWhoAggTbl | Where-Object { $_.blocking_session_id -ne [System.DBNull]::Value }).Count
+				$BlockedSessionsCount = @($BlitzWhoAggTbl | Where-Object { $_.blocking_session_id -ne [System.DBNull]::Value }).Count
 
 				$html = $HTMLPre + @"
 				<title>$HtmlTabName</title>`n$HTMLBodyStart
