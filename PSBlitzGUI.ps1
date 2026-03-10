@@ -203,6 +203,11 @@ $y += 28
 $cZip = New-Chk "Create a zip archive of the output files" 10 $y
 $tabOpts.Controls.Add($cZip)
 
+$y += 28
+$cKeepOpen = New-Chk "Keep console window open when done" 10 $y
+$cKeepOpen.Checked = $true
+$tabOpts.Controls.Add($cKeepOpen)
+
 $y += 35
 $nDelay = New-Num 180 $y 80 1 300 10
 $tabOpts.Controls.AddRange(@((New-Lbl "BlitzWho delay (sec)" 10 $y 165), $nDelay))
@@ -408,6 +413,7 @@ $btnRun.Add_Click({
         if ($cInDepth.Checked) { [void]$cmd.Append(" -InDepth") }
         if ($cToHTML.Checked) { [void]$cmd.Append(" -ToHTML") }
         if ($cZip.Checked) { [void]$cmd.Append(" -ZipOutput") }
+        if ($cKeepOpen.Checked) { [void]$cmd.Append(" -KeepPSOpen") }
 
         if ($nDelay.Value -ne 10) {
             [void]$cmd.Append(" -BlitzWhoDelay $([int]$nDelay.Value)")

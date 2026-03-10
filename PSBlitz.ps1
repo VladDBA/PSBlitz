@@ -306,7 +306,9 @@ param(
 	[Parameter(Mandatory = $False)]
 	[string]$QueryStoreIntervalEnd,
 	[Parameter(Mandatory = $False)]
-	[int]$QueryStoreTop = 20
+	[int]$QueryStoreTop = 20,
+	[Parameter(Mandatory = $False)]
+	[switch]$KeepPSOpen = $False
 )
 
 ###Internal params
@@ -339,7 +341,7 @@ $storedHashes = @{
 	"spBlitzCache_NonSPLatest.sql"       = "4AABDCD8F4EF81D9592CF840A2C6C2983DB1B450CA067D93C61EA6AA487C1CC0"
 	"spBlitzFirst_NonSPLatest.sql"       = "0A9BDAC9D147264AADF85D70D5D3732864022BCE09B36C3C053AFB8244816919"
 	"spBlitzIndex_NonSPLatest.sql"       = "BAF2C95CD1DB45547161BD685A23643C54DC88E11C9E400AF4BF93947D719AC7"
-	"spBlitzLock_NonSPLatest.sql"        = "66EB8FA7BFA597A822F622F4CB86B7ED3E41AA81AF52F351B35CF33910804DC4"
+	"spBlitzLock_NonSPLatest.sql"        = "D71F64E86839D8AF07B0E6C85DD20226CC166E336B20F0B537DF03F76BC5E916"
 	"spBlitzWho_NonSPLatest.sql"         = "AC4C3BBF2576039E489875E22E46E7F726B37000D5C3761A7BC84027762D790C"
 	"GetBlitzWhoData.sql"                = "76C6BD414726E9DB911F83E9AB6442CF72DA18F0ADAD1A941AA816FFC4C3C0BD"
 	"GetInstanceInfo.sql"                = "29AA65809886BB2FC870B0DF49256850C4347562ABDDAD29E5BEC6D76C86036F"
@@ -4513,7 +4515,7 @@ finally {
 	Write-PSBlitzDebug "  If you want to report an issue, please use GitHub and read this first:"
 	Write-PSBlitzDebug "      >>>>>>>  https://github.com/VladDBA/PSBlitz/issues/216 <<<<<<<"
 
-	if ($InteractiveMode -eq 1) {
+	if (($InteractiveMode -eq 1) -or ($KeepPSOpen)) {
 		Read-Host -Prompt "Done. $ExitPrompt"
 	}
 	$SqlConnection.Close()
