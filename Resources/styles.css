@@ -45,7 +45,7 @@
     --row-even: rgba(255, 255, 255, 0.02);
     --row-hover: rgba(255, 255, 0, 0.12);
     --shadow: 0 0 20px rgba(0, 0, 0, 0.6);
-	--warning-bg: #b30000; /*#5b4a08;     darker gold for dark mode */
+	--warning-bg: #841b2d; 
 	--p1-bg: var(--warning-bg);
     --warning-text: #ffffff;  /* ensure high contrast on dark mode */
     --warning-border: rgba(255,255,255,0.06);
@@ -886,8 +886,8 @@ th.sortable:hover {
 	color: var(--warning-text);
 	background-color: var(--warning-bg);    
     border: 1px solid var(--warning-border);
-	padding-left: 3px;
-    padding-right: 3px; 
+	padding-left: 4px;
+    padding-right: 4px; 
     transition: background-color .15s linear, color .15s linear;
 }
 
@@ -895,8 +895,8 @@ th.sortable:hover {
 	background-color: var(--additional-bg);
     color: var(--additional-text);
     border: 1px solid var(--warning-border);
-	padding-left: 3px;
-    padding-right: 3px;
+	padding-left: 4px;
+    padding-right: 4px;
     transition: background-color .15s linear, color .15s linear;
 }
 
