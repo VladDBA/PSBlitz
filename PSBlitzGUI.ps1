@@ -87,7 +87,7 @@ function New-Txt {
             [User32Msg]::SendMessage($this.Handle, 0x00D3, [IntPtr]1, [IntPtr]4) | Out-Null
         })
     $t.Text = $Default
-    if ($Pw) { $t.UseSystemPasswordChar = $true }
+    if ($Pw) {  $t.PasswordChar = [char]0x25CF }
     return $t
 }
 
@@ -149,7 +149,7 @@ $noteLogin.Font = $SmallFont
 $noteLogin.ForeColor = $GrayColor
 $tabConn.Controls.Add($noteLogin)
 
-$y += 35
+$y += 55
 $tPass = New-Txt 155 $y 340 "" $true
 $tabConn.Controls.AddRange(@((New-Lbl "Password" 10 $y), $tPass))
 
@@ -210,7 +210,7 @@ $tabOpts.Controls.Add($cKeepOpen)
 
 $y += 35
 $nDelay = New-Num 180 $y 80 1 300 10
-$tabOpts.Controls.AddRange(@((New-Lbl "BlitzWho delay (sec)" 10 $y 165), $nDelay))
+$tabOpts.Controls.AddRange(@((New-Lbl "Session capture interval (sec)" 10 $y 165), $nDelay))
 
 $y += 35
 $tOutDir = New-Txt 180 $y 240

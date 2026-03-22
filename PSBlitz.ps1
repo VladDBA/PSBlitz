@@ -615,7 +615,7 @@ function Invoke-PSBlitzQuery {
 		[Parameter(Position = 3, Mandatory = $true)]
 		[int]$CmdTimeoutIn
 	)
-	$global:PSBlitzSet = New-Object System.Data.DataSet
+	$script:PSBlitzSet = New-Object System.Data.DataSet
 	$IBQConnection = New-Object System.Data.SqlClient.SqlConnection
 	$IBQConnection.ConnectionString = $ConnStringIn
 	$IBQCommand = $IBQConnection.CreateCommand()
@@ -627,7 +627,7 @@ function Invoke-PSBlitzQuery {
 	try {
 		$StepStart = Get-Date
 		$IBQConnection.Open()
-		$IBQAdapter.Fill($global:PSBlitzSet) | Out-Null -ErrorAction Stop
+		$IBQAdapter.Fill($script:PSBlitzSet) | Out-Null -ErrorAction Stop
 		$StepEnd = Get-Date
 		if ($StepNameIn -notlike "Query Store pre-check for*" ) {
 			Write-Host @GreenCheck
@@ -635,30 +635,30 @@ function Invoke-PSBlitzQuery {
 		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
 		$RunTime = [Math]::Round($StepRunTime, 2)
 		Write-PSBlitzDebug " - $RunTime seconds"
-		$global:StepOutcome = "Success"
+		$script:StepOutcome = "Success"
 		if (($StepNameIn -like "Plan Cache*") -or 
 			($StepNameIn -eq "Index info mode 1") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info") -or 
 			($StepNameIn -eq "Deadlock Info") -or ($StepNameIn -eq "Return session activity") -or ($StepNameIn -eq "Open Transacion Info") -or 
 			($StepNameIn -eq "Objects with dangerous SET options") -or ($StepNameIn -eq "Instance Health") -or 
 			($StepNameIn -eq "Happening now for 30 seconds") -or ($StepNameIn -like "Query Store check *")) {
-			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
-			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
+			$RecordsReturned = $script:PSBlitzSet.Tables[0].Rows.Count
+			Add-LogRow $StepNameIn $script:StepOutcome "$RecordsReturned records returned"
 		} elseif ('Stats Info', 'Index info mode 0', 'Index info mode 2', 'Index info mode 4' -contains $StepNameIn) {
-			$RecordsReturned = $global:PSBlitzSet.Tables[0].Rows.Count
-			Add-LogRow $StepNameIn $global:StepOutcome "$RecordsReturned records returned"
-			$TotalRecords = $global:PSBlitzSet.Tables[1].Rows[0]["RecordCount"]
+			$RecordsReturned = $script:PSBlitzSet.Tables[0].Rows.Count
+			Add-LogRow $StepNameIn $script:StepOutcome "$RecordsReturned records returned"
+			$TotalRecords = $script:PSBlitzSet.Tables[1].Rows[0]["RecordCount"]
 			if ($TotalRecords -gt $RecordsReturned) {
 				Add-LogRow "->$StepNameIn" "Record limit exceeded" "Result was limited to top $RecordsReturned records out of $TotalRecords"
 				Write-Host "  ->Record limit exceeded `n -> Result was limited to top $RecordsReturned records out of $TotalRecords" -Fore Yellow
 			}
 		} else {
-			Add-LogRow $StepNameIn $global:StepOutcome
+			Add-LogRow $StepNameIn $script:StepOutcome
 		}
 	} catch {
 		$StepEnd = Get-Date
 		Invoke-ErrMsg
-		$global:StepOutcome = "Failure"
-		Add-LogRow $StepNameIn $global:StepOutcome
+		$script:StepOutcome = "Failure"
+		Add-LogRow $StepNameIn $script:StepOutcome
 	} finally {
 		$IBQConnection.Close()
 		$IBQConnection.Dispose()
@@ -1060,8 +1060,8 @@ function Convert-TableToExcel {
 
 		foreach ($row in $DataTable) {
 			foreach ($col in $DataSetCols) {
-				[string]$global:DebugCol = $col
-				[string]$global:DebugValue = $DataTable.Rows[$RowNum][$col]
+				[string]$script:DebugCol = $col
+				[string]$script:DebugValue = $DataTable.Rows[$RowNum][$col]
 				if ($URLCols -contains $col) {
 					if ($DataTable.Rows[$RowNum][$col] -like "http*") {
 						$ExcelSheet.Hyperlinks.Add(
@@ -1094,8 +1094,8 @@ function Convert-TableToExcel {
 	} catch {
 		Invoke-ErrMsg
 		#Write-Host " Error converting table to Excel: $_" -ForegroundColor Red
-		Write-Host "  Debug Column: $global:DebugCol"
-		Write-Host "  Debug Value: $global:DebugValue"
+		Write-Host "  Debug Column: $script:DebugCol"
+		Write-Host "  Debug Value: $script:DebugValue"
 		if ($DebugInfo) {
 			Add-LogRow "->Write data to Excel worksheet" "Failure"
 		}
@@ -2115,9 +2115,9 @@ Write-Host "Checking instance uptime..." -NoNewline
 $Query = "SELECT CAST(DATEDIFF(HH, [sqlserver_start_time], GETDATE()) / 24.00 AS NUMERIC(23, 2)) AS [uptime_days]	"
 $Query = $Query + "`nFROM [sys].[dm_os_sys_info];"
 Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Uptime check" -ConnStringIn $ConnString -CmdTimeoutIn 100
-if ($global:StepOutcome -eq "Success") {
-	if ($global:PSBlitzSet.Tables[0].Rows[0]["uptime_days"] -lt 7.00) {
-		[string]$DaysUp = $global:PSBlitzSet.Tables[0].Rows[0]["uptime_days"]
+if ($script:StepOutcome -eq "Success") {
+	if ($script:PSBlitzSet.Tables[0].Rows[0]["uptime_days"] -lt 7.00) {
+		[string]$DaysUp = $script:PSBlitzSet.Tables[0].Rows[0]["uptime_days"]
 		Write-Host "Warning: Instance uptime is less than 7 days - $DaysUp" -Fore Red
 		Write-Host "->Diagnostics data might not be reliable with less than 7 days of uptime." -Fore Red
 	}
@@ -2207,13 +2207,13 @@ try {
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Instance Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		
-	if ($global:StepOutcome -eq "Success") {
-		$InstanceInfoTbl = $global:PSBlitzSet.Tables[0]
-		$ResourceInfoTbl = $global:PSBlitzSet.Tables[1]
-		$ConnectionsInfoTbl = $global:PSBlitzSet.Tables[2]
-		$SessOptTbl = $global:PSBlitzSet.Tables[3]
-		$PlanCacheTypeTbl = $global:PSBlitzSet.Tables[4]
-		$PlanCacheByDBTbl = $global:PSBlitzSet.Tables[5]
+	if ($script:StepOutcome -eq "Success") {
+		$InstanceInfoTbl = $script:PSBlitzSet.Tables[0]
+		$ResourceInfoTbl = $script:PSBlitzSet.Tables[1]
+		$ConnectionsInfoTbl = $script:PSBlitzSet.Tables[2]
+		$SessOptTbl = $script:PSBlitzSet.Tables[3]
+		$PlanCacheTypeTbl = $script:PSBlitzSet.Tables[4]
+		$PlanCacheByDBTbl = $script:PSBlitzSet.Tables[5]
 		
 		if ($ToHTML) {
 
@@ -2297,15 +2297,15 @@ $htmlTable6 `n<br>`n<h2>Session level SET options</h2> `n $htmlTable4 `n $HTMLBo
 	[string]$Query = $Query -replace '..PSBlitzReplace..', "$DirDate"
 	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "TempDB Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		
-	if ($global:StepOutcome -eq "Success") {
+	if ($script:StepOutcome -eq "Success") {
 		$TempDBTbl = New-Object System.Data.DataTable
-		$TempDBTbl = $global:PSBlitzSet.Tables[0]
+		$TempDBTbl = $script:PSBlitzSet.Tables[0]
 		
 		$TempTabTbl = New-Object System.Data.DataTable
-		$TempTabTbl = $global:PSBlitzSet.Tables[1]
+		$TempTabTbl = $script:PSBlitzSet.Tables[1]
 
 		$TempDBSessTbl = New-Object System.Data.DataTable
-		$TempDBSessTbl = $global:PSBlitzSet.Tables[2]
+		$TempDBSessTbl = $script:PSBlitzSet.Tables[2]
 
 		if ($ToHTML) {
 
@@ -2386,9 +2386,9 @@ $htmlTable4 `n $HTMLBodyEnd
 	Write-Host "... " -NoNewline
 	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Open Transacion Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 	
-	if ($global:StepOutcome -eq "Success") {
+	if ($script:StepOutcome -eq "Success") {
 		$AcTranTbl = New-Object System.Data.DataTable
-		$AcTranTbl = $global:PSBlitzSet.Tables[0]
+		$AcTranTbl = $script:PSBlitzSet.Tables[0]
 		[int]$RowsReturned = $AcTranTbl.Rows.Count
 		if ($RowsReturned -le 0) {
 			Write-Host " ->No open transactions found."
@@ -2443,14 +2443,14 @@ $HTMLBodyEnd
 		Write-Host " Retrieving database info for $ASDBName... " -NoNewline 
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Azure SQL DB Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		
-		if ($global:StepOutcome -eq "Success") {
-			$RsrcGovTbl = $global:PSBlitzSet.Tables[0]
-			$DBInfoTbl = $global:PSBlitzSet.Tables[1]
-			$RsrcUsageTbl = $global:PSBlitzSet.Tables[2]
-			$Top10WaitsTbl = $global:PSBlitzSet.Tables[3]
-			$DBFileInfoTbl = $global:PSBlitzSet.Tables[4]
-			$ObjImpUpgrTbl = $global:PSBlitzSet.Tables[5]
-			$DBConfigTbl = $global:PSBlitzSet.Tables[6]
+		if ($script:StepOutcome -eq "Success") {
+			$RsrcGovTbl = $script:PSBlitzSet.Tables[0]
+			$DBInfoTbl = $script:PSBlitzSet.Tables[1]
+			$RsrcUsageTbl = $script:PSBlitzSet.Tables[2]
+			$Top10WaitsTbl = $script:PSBlitzSet.Tables[3]
+			$DBFileInfoTbl = $script:PSBlitzSet.Tables[4]
+			$ObjImpUpgrTbl = $script:PSBlitzSet.Tables[5]
+			$DBConfigTbl = $script:PSBlitzSet.Tables[6]
 
 			if ($ToHTML) {
 				$tableName = "Azure SQL Database Info"
@@ -2569,13 +2569,13 @@ $SortableTable `n $htmlTable6 `n $JumpToTop `n $HTMLBodyEnd
 		}
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Database Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		
-		if ($global:StepOutcome -eq "Success") {
-			$DBInfoTbl = $global:PSBlitzSet.Tables[0]
-			$DBFileInfoTbl = $global:PSBlitzSet.Tables[1]
+		if ($script:StepOutcome -eq "Success") {
+			$DBInfoTbl = $script:PSBlitzSet.Tables[0]
+			$DBFileInfoTbl = $script:PSBlitzSet.Tables[1]
 			if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 				#the 3rd result set exists only for SQL Server 2016 and above
 				#$DBConfigTbl = New-Object System.Data.DataTable
-				$DBConfigTbl = $global:PSBlitzSet.Tables[2]
+				$DBConfigTbl = $script:PSBlitzSet.Tables[2]
 			} elseif (($MajorVers -lt 13) -and (!([string]::IsNullOrEmpty($CheckDB))) -and ($IsAzureSQLMI -eq $false)) {
 				Add-LogRow "->Database Scoped Config" "Skipped" "Major Version is $MajorVers"
 			}
@@ -2662,9 +2662,9 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 			$GetUsrDBObj = $true
 		}
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Instance Health" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
-		if ($global:StepOutcome -eq "Success") {
+		if ($script:StepOutcome -eq "Success") {
 			#$BlitzTbl = New-Object System.Data.DataTable
-			$BlitzTbl = $global:PSBlitzSet.Tables[0]
+			$BlitzTbl = $script:PSBlitzSet.Tables[0]
 
 			if ($ToHTML) {
 				$tableName = "Instance Health"
@@ -2720,8 +2720,8 @@ $($SearchTableDiv -replace $STDivReplace, "'InstanceHealthTable', 3" -replace 'o
 			$Query = $Query -replace "\(N'..PSBlitzReplace..'\)", "$InsertString"
 		}
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Objects with dangerous SET options" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
-		if ($global:StepOutcome -eq "Success") {
-			$DangerousSetTbl = $global:PSBlitzSet.Tables[0]
+		if ($script:StepOutcome -eq "Success") {
+			$DangerousSetTbl = $script:PSBlitzSet.Tables[0]
 			[int]$RowsReturned = $DangerousSetTbl.Rows.Count
 			if ($RowsReturned -le 0) {
 				Write-Host " ->No rows returned."
@@ -2756,8 +2756,8 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzFirst_NonSPLatest.sql"
 	[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Happening now for 30 seconds" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
-	if ($global:StepOutcome -eq "Success") {
-		$BlitzFirstTbl = $global:PSBlitzSet.Tables[0]
+	if ($script:StepOutcome -eq "Success") {
+		$BlitzFirstTbl = $script:PSBlitzSet.Tables[0]
 
 		if ($ToHTML) {			
 			$htmlTable = Convert-TableToHtml $BlitzFirstTbl -NoCaseChange -CSSClass "First30Tbl" -ExclCols "Finding", "URL" -HyperlinkCol "FindingHL" -DebugInfo:$DebugInfo
@@ -2789,10 +2789,10 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		[string]$Query = $Query -replace ";SET @SinceStartup = 0;", ";SET @SinceStartup = 1;"
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Waits since startup" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
-		if ($global:StepOutcome -eq "Success") {
-			$WaitsTbl = $global:PSBlitzSet.Tables[0]
-			$StorageTbl = $global:PSBlitzSet.Tables[1]
-			$PerfmonTbl = $global:PSBlitzSet.Tables[2]
+		if ($script:StepOutcome -eq "Success") {
+			$WaitsTbl = $script:PSBlitzSet.Tables[0]
+			$StorageTbl = $script:PSBlitzSet.Tables[1]
+			$PerfmonTbl = $script:PSBlitzSet.Tables[2]
 
 			if ($ToHTML) {
 				#Waits
@@ -2967,7 +2967,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			} else {
 				$AdditionalInfo = ""
 			}
-			$PreviousOutcome = $global:StepOutcome
+			$PreviousOutcome = $script:StepOutcome
 			Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Plan Cache $SortOrder  $AdditionalInfo" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
 
 			$SheetName = "Top Queries - "
@@ -3008,9 +3008,9 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				$ExcelWarnInitCol = 31
 			}
 	
-			if ($global:StepOutcome -eq "Success") {
-				$BlitzCacheTbl = $global:PSBlitzSet.Tables[0]
-				$BlitzCacheWarnTbl = $global:PSBlitzSet.Tables[1]
+			if ($script:StepOutcome -eq "Success") {
+				$BlitzCacheTbl = $script:PSBlitzSet.Tables[0]
+				$BlitzCacheWarnTbl = $script:PSBlitzSet.Tables[1]
 
 				Export-PlansAndDeadlocks $BlitzCacheTbl $PlanOutDir "Query Plan" "SQLPlan File" -FPrefix $FileSOrder -DebugInfo:$DebugInfo
 
@@ -3249,8 +3249,8 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			}
 
 			Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Query Store pre-check for $databaseName" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout 
-			if ($global:StepOutcome -eq "Success") {
-				$BlitzQSTbl = $global:PSBlitzSet.Tables[0]
+			if ($script:StepOutcome -eq "Success") {
+				$BlitzQSTbl = $script:PSBlitzSet.Tables[0]
 		
 				if ($BlitzQSTbl.Rows[0]["EligibleForBlitzQueryStore"] -eq "Yes") {
 					Write-Host @GreenCheck				
@@ -3302,10 +3302,10 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 
 					Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Query Store check for $databaseName - $SortOrder $AdditionalStepInfo" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout 
 
-					if ($global:StepOutcome -eq "Success") {
+					if ($script:StepOutcome -eq "Success") {
 			
-						$BlitzQSTbl = $global:PSBlitzSet.Tables[0]
-						#$BlitzQSSumTbl = $global:PSBlitzSet.Tables[1]
+						$BlitzQSTbl = $script:PSBlitzSet.Tables[0]
+						#$BlitzQSSumTbl = $script:PSBlitzSet.Tables[1]
 						$SortOrderFname = $SortOrder.Replace(" ", "_")
 
 						Export-PlansAndDeadlocks $BlitzQSTbl $PlanOutDir "query_plan" "sql_plan_file" -FPrefix "QueryStore_$SortOrderFname" -DebugInfo:$DebugInfo
@@ -3423,8 +3423,8 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		[string]$Query = $Query -replace $OldMode, $NewMode
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Index info mode $Mode" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
 		
-		if ($global:StepOutcome -eq "Success") {
-			$BlitzIxTbl = $global:PSBlitzSet.Tables[0]
+		if ($script:StepOutcome -eq "Success") {
+			$BlitzIxTbl = $script:PSBlitzSet.Tables[0]
 			if ("0", "4" -contains $Mode) {
 				#Export sample execution plans for missing indexes (SQL Server 2019 only)
 					
@@ -3546,10 +3546,10 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 		}
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Deadlock Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
 		
-		if ($global:StepOutcome -eq "Success") {
-			$TblLockDtl = $global:PSBlitzSet.Tables[0]
-			$TblLockPlans = $global:PSBlitzSet.Tables[1]
-			$TblLockOver = $global:PSBlitzSet.Tables[2]
+		if ($script:StepOutcome -eq "Success") {
+			$TblLockDtl = $script:PSBlitzSet.Tables[0]
+			$TblLockPlans = $script:PSBlitzSet.Tables[1]
+			$TblLockOver = $script:PSBlitzSet.Tables[2]
 			[int]$RowsReturned = $TblLockDtl.Rows.Count
 			if ($RowsReturned -le 0) {
 				Write-Host " ->No deadlocks found"
@@ -3674,8 +3674,8 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			}
 			Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Stats Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout
 		
-			if ($global:StepOutcome -eq "Success") {
-				$StatsTbl = $global:PSBlitzSet.Tables[0]
+			if ($script:StepOutcome -eq "Success") {
+				$StatsTbl = $script:PSBlitzSet.Tables[0]
 				[int]$RowsReturned = $StatsTbl.Rows.Count
 				if ($RowsReturned -le 0) {
 					Write-Host " ->No rows returned."
@@ -3736,14 +3736,14 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				[string]$Query = $Query -replace "..PSBlitzReplace.." , $CheckDB
 			}
 			Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Index Frag Info" -ConnStringIn $ConnString -CmdTimeoutIn $MaxTimeout	
-			if ($global:StepOutcome -eq "Success") {
-				$IndexTbl = $global:PSBlitzSet.Tables[0]
+			if ($script:StepOutcome -eq "Success") {
+				$IndexTbl = $script:PSBlitzSet.Tables[0]
 				$ColumnCount = $IndexTbl.Columns.Count
 				if ($ColumnCount -eq 1) {
 					Write-Host " ->Skipped due to database size."
 					Add-LogRow "Index Frag Info" "Skipped" "Skipped due to database size."
 				} else {
-					$IndexLckTbl = $global:PSBlitzSet.Tables[1]
+					$IndexLckTbl = $script:PSBlitzSet.Tables[1]
 					$RecordsReturned = $IndexTbl.Rows.Count
 					if ($RecordsReturned -le 0) {
 						Write-Host " ->No rows returned."
@@ -3820,8 +3820,8 @@ finally {
 		} else {
 			Write-Host " $TerminatingErrorMessage" -fore red
 			if (-not $ToHTML) {
-				Write-Host "  Debug Column: $global:DebugCol"
-				Write-Host "  Debug Value: $global:DebugValue"
+				Write-Host "  Debug Column: $script:DebugCol"
+				Write-Host "  Debug Value: $script:DebugValue"
 			}
 		}
 		#[string]$TerminatingErrorMessage = $error[0] | Select-Object -ExpandProperty Exception | Select-Object -ExpandProperty Message
@@ -3920,9 +3920,9 @@ finally {
 	}
 	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Return session activity" -ConnStringIn $ConnString -CmdTimeoutIn 800
 	
-	if ($global:StepOutcome -eq "Success") {
-		$BlitzWhoTbl = $global:PSBlitzSet.Tables[0]
-		$BlitzWhoAggTbl = $global:PSBlitzSet.Tables[1]
+	if ($script:StepOutcome -eq "Success") {
+		$BlitzWhoTbl = $script:PSBlitzSet.Tables[0]
+		$BlitzWhoAggTbl = $script:PSBlitzSet.Tables[1]
 		[int]$RowsReturned = $BlitzWhoTbl.Rows.Count
 		if ($RowsReturned -le 0) {
 			Write-Host " ->No active sessions"
