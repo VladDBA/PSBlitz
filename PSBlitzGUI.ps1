@@ -115,7 +115,7 @@ function New-Num {
 ###Main form
 $form = New-Object System.Windows.Forms.Form
 $form.Text = "PSBlitz $PSBlitzVersion"
-$form.Size = [System.Drawing.Size]::new(560, 660)
+$form.Size = [System.Drawing.Size]::new(560, 675)
 $form.StartPosition = [System.Windows.Forms.FormStartPosition]::CenterScreen
 $form.FormBorderStyle = [System.Windows.Forms.FormBorderStyle]::FixedDialog
 $form.MaximizeBox = $false
@@ -315,30 +315,30 @@ $btnHelp.Add_Click({
 PSBlitz $PSBlitzVersion  |  https://github.com/VladDBA/PSBlitz
 
 CONNECTION TAB
-  Server      Required. Accepts: HostName\Instance, HostName,Port,
-              HostName, or an Azure endpoint.
-  SQL Login   Leave blank for Windows integrated security.
-  Password    Required only when SQL Login is specified.
-  Database    Leave blank to run against the whole instance.
-              Specify a name to focus index, cache, and lock
-              checks on one database.
+  - Server        Required. Accepts: HostName\Instance, HostName,Port,
+                HostName, or an Azure endpoint.
+  - SQL Login     Leave blank for Windows integrated security.
+  - Password      Required only when SQL Login is specified.
+  - Database      Leave blank to run against the whole instance.
+                Specify a name to focus index, cache, and lock
+                checks on one database.
 
 OPTIONS TAB
-  In-depth check    Runs more thorough diagnostics (takes longer).
-  HTML output       Use when MS Office is not installed on this machine.
-  Zip archive       Packs all output files into a .zip.
-  BlitzWho delay    Seconds between session activity snapshots (default 10).
-  Output directory  Where to save the output folder (default: PSBlitz dir).
-  Skip Checks       Exclude specific diagnostic steps from the run.
+  - In-depth check        Runs more thorough diagnostics (takes longer).
+  - HTML output           Use when MS Office is not installed on this machine.
+  - Zip archive           Packs all output files into a .zip.
+  - Session capture interval    Seconds between session activity snapshots (default 10).
+  - Output directory     Where to save the output folder (default: PSBlitz dir).
+  - Skip Checks          Exclude specific diagnostic steps from the run.
 
 ADVANCED TAB
-  Cache top N        Queries returned from plan cache (default 10).
-  Cache minutes back Look-back window for plan cache (default: all cache).
-  QS top N           Queries returned from Query Store (default 20).
-  QS interval        Date/time range for Query Store queries.
-  Max timeout        Timeout in seconds for long steps (default 1000).
-  Conn timeout       SQL connection timeout in seconds (default 45).
-  Max user databases Index data limit threshold (default 50, HTML only).
+  - Cache top N          Queries returned from plan cache (default 10).
+  - Cache minutes back   Look-back window for plan cache (default: all cache).
+  - QS top N             Queries returned from Query Store (default 20).
+  - QS interval          Date/time range for Query Store queries.
+  - Max timeout          Timeout in seconds for long steps (default 1000).
+  - Conn timeout         SQL connection timeout in seconds (default 45).
+  - Max user databases   Index database limit threshold (default 50, HTML only).
 "@,
             "PSBlitz GUI - Help",
             [System.Windows.Forms.MessageBoxButtons]::OK,
@@ -361,6 +361,17 @@ $btnClose.Size = [System.Drawing.Size]::new(80, 32)
 $btnClose.Add_Click({ $form.Close() })
 $form.CancelButton = $btnClose
 $form.Controls.Add($btnClose)
+
+$lblCredit = New-Object System.Windows.Forms.LinkLabel
+$lblCredit.Text = "Made by VladDBA"
+$lblCredit.Location = [System.Drawing.Point]::new(10, 614)
+$lblCredit.Size = [System.Drawing.Size]::new(120, 16)
+$lblCredit.Font = $SmallFont
+$lblCredit.LinkColor = $BlueColor
+$lblCredit.Add_LinkClicked({
+    Start-Process "https://vladdba.com/"
+})
+$form.Controls.Add($lblCredit)
 
 $btnRun = New-Object System.Windows.Forms.Button
 $btnRun.Text = "Run PSBlitz"
