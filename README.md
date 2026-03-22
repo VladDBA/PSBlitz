@@ -176,6 +176,7 @@ Open PSBlitzOutput.xlsx (found in PSBlitz's Resources folder) click on the first
 |`-QueryStoreIntervalEnd`|The end date and time (format __yyyy-mm-dd HH:mm__) for the Query Store interval. If `-QueryStoreIntervalStart` is provided and `-QueryStoreIntervalEnd` is not provided, it defaults to the current date and time. <br>If provided, the script will validate the format and use it as the upper bound for the queries retrieved from the Query Store.|
 |`-OutputDir`| Used to provide a path where the output directory should be saved to. <br>Defaults to PSBlitz.ps1's directory if not specified or a non-existent path is provided.|
 |`-ToHTML`| Switch used to output the report as HTML instead of an Excel file. This is perfect when running PSBlitz from a machine that doesn't have Office installed.|
+|`-GUI`|Switch used to open a GUI form to provide input parameters instead of running it from the command line.|
 |`-ZipOutput`| Switch which will tell PSBlitz.ps1 to also create a zip archive of the output files.|
 |`-BlitzWhoDelay` | Used to sepcify the number of seconds between each active session data capture. <br>Defaults to 10 if not specified, meaning that active session data will be captured every 10 seconds.|
 |`-ConnTimeout`| Can be used to increased the timeout limit in seconds for connecting to SQL Server. <br>Defaults to 45 seconds if not specified.|
