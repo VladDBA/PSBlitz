@@ -90,9 +90,9 @@
 
  Copyright for sorttable.js is held by Stuart Langridge - http://www.kryogenix.org/code/browser/sorttable/
 
- Copyright for PSBlitz.ps1, GetStatsInfoForWholeDB.sql, GetOpenTransactions.sql, 
- GetIndexInfoForWholeDB.sql, GetInstanceInfo.sql, and GetTempDBUsageInfo.sql 
- is held by Vlad Drumea, 2026 as described below.
+Copyright for PSBlitz.ps1, GetStatsInfoForWholeDB.sql, GetOpenTransactions.sql, 
+GetIndexInfoForWholeDB.sql, GetInstanceInfo.sql, GetAzureSQLDBInfo.sql, GetTempDBUsageInfo.sql GetBlitzWhoData.sql, 
+dark-mode.js, PSBlitzGUI.ps1, and styles.css, is held by Vlad Drumea, 2026 as described below.
 
  Copyright (c) 2026 Vlad Drumea - https://vladdba.com/
 
