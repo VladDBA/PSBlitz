@@ -886,6 +886,8 @@ th.sortable:hover {
 	color: var(--warning-text);
 	background-color: var(--warning-bg);    
     border: 1px solid var(--warning-border);
+	padding-left: 3px;
+    padding-right: 3px; 
     transition: background-color .15s linear, color .15s linear;
 }
 
@@ -893,6 +895,8 @@ th.sortable:hover {
 	background-color: var(--additional-bg);
     color: var(--additional-text);
     border: 1px solid var(--warning-border);
+	padding-left: 3px;
+    padding-right: 3px;
     transition: background-color .15s linear, color .15s linear;
 }
 
