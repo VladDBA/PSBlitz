@@ -3294,7 +3294,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					$AdditionalStepInfo = $AdditionalStepInfo + ", Top $QueryStoreTop"
 				}
 				$OldSortOrder = "Avg CPU"
-				$SortOrders = @("Avg CPU", "Avg Duration", "Total CPU", "Total Duration")
+				$SortOrders = @("Avg CPU", "Total CPU", "Avg Duration", "Total Duration")
 				foreach ($SortOrder in $SortORders) { 
 					Write-Host " ->Top $QueryStoreTop queries by $SortOrder..." -NoNewline
 				
