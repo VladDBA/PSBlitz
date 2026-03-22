@@ -394,13 +394,13 @@ function Get-PSBlitzHelp {
 		the script will use integrated security
 -SQLPass		- the password for the SQL login provided via the -SQLLogin parameter,
 		omit if -SQLLogin was not used
--IsIndepth		- Y will run a more in-depth check against the instance/database, omit for a basic check
+-InDepth		- switch used to run a more in-depth check against the instance/database, omit for a basic check
 -CheckDB		- used to provide the name of a specific database to run some of the checks against, 
 		omit to run against the whole instance
 -OutputDir		- used to provide a path where the output directory should be saved to.
 		Defaults to PSBlitz.ps1's directory if not specified or a non-existent path is provided.
--ToHTML			- Y will output the report as HTML instead of an Excel file.
--ZipOutput		- Y to also create a zip archive of the output files.
+-ToHTML			- switch used output the report as HTML instead of an Excel file.
+-ZipOutput		- switch used to create a zip archive of the output files.
 -BlitzWhoDelay	- used to specify the number of seconds between each sp_BlitzWho execution.
 		Defaults to 10 if not specified
 -CacheTop       - used to specify if more/less than the default top 10 queries should be returned 
