@@ -2,6 +2,12 @@
  # General 
 */
 
+@media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    body, th, .warnings-desc, .additional-desc { transition: none; }
+}
+
+
 /* Dark mode: variables + overrides */
 :root {
     --bg: #ffffff;
@@ -332,9 +338,6 @@ th.sortable:hover {
 		text-align: right;
 	}
 	td:nth-child(n+27):nth-child(-n+28) {
-		text-align: right;
-	}
-	td:nth-child(n+30):nth-child(-n+32) {
 		text-align: right;
 	}
 	td:nth-child(n+30):nth-child(-n+32) {
@@ -702,9 +705,6 @@ th.sortable:hover {
 	td:nth-child(n+16):nth-child(-n+17) {
 		text-align: right;
 	}
-	td:nth-child(n+16):nth-child(-n+17) {
-		text-align: right;
-	}
 	td:nth-child(n+20):nth-child(-n+23) {
 		text-align: right;
 	}
@@ -1003,7 +1003,6 @@ input.SearchBox {
     display: inline-block;
 	cursor: pointer;
 	margin-top: 4px;
-    cursor: pointer;
     border-radius: 4px;
 	box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
