@@ -125,6 +125,7 @@
 .PARAMETER SQLPass
  The password for the SQL login provided via the -SQLLogin parameter, omit if -SQLLogin was not used.
 
+
 .PARAMETER InDepth
  Switch which tells PSBlitz.ps1 to run a more in-depth check against the instance/database. 
  Omit for default check.
@@ -173,6 +174,9 @@
 .PARAMETER ZipOutput
  Switch used to tell PSBlitz.ps1 to also create a zip archive of the output files.
 
+.PARAMETER GUI
+ Switch used to open a GUI form to provide input parameters instead of running it from the command line.
+
 .PARAMETER BlitzWhoDelay
  Used to specify the number of seconds between each sp_BlitzWho execution. Defaults to 10 if not specified.
 
@@ -209,6 +213,10 @@
  PS>.\PSBlitz.ps1 ?
  PS>.\PSBlitz.ps1 Help
  Print the help menu
+
+.EXAMPLE
+ PS>.\PSBlitz.ps1 -GUI
+ Open a GUI form to provide input parameters instead of running it from the command line.
 
 .EXAMPLE
  PS>.\PSBlitz.ps1 Server01\SQL01
@@ -308,7 +316,9 @@ param(
 	[Parameter(Mandatory = $False)]
 	[int]$QueryStoreTop = 20,
 	[Parameter(Mandatory = $False)]
-	[switch]$KeepPSOpen = $False
+	[switch]$KeepPSOpen = $False,
+	[Parameter(Mandatory = $False)]
+	[switch]$GUI = $False
 )
 
 ###Internal params
@@ -327,6 +337,9 @@ $ResourcesPath = Join-Path -Path $ScriptPath -ChildPath "Resources"
 $OrigExcelFName = "PSBlitzOutput.xlsx"
 $DefaultTimeout = 600
 $ExitPrompt = "Press Enter to end script execution."
+if($KeepPSOpen) {
+	$ExitPrompt = "Press Enter to close PowerShell."
+}
 
 $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql", "spBlitzCache_NonSPLatest.sql", 
 	"spBlitzFirst_NonSPLatest.sql",	"spBlitzIndex_NonSPLatest.sql", "spBlitzLock_NonSPLatest.sql",
@@ -1355,8 +1368,23 @@ $IsAzureSQLDB = $false
 $IsAzureSQLMI = $false
 $IsAzure = $false
 $IsGoogleCloudSQL = $false
-###Switch to interactive mode if $ServerName is empty
-if ([string]::IsNullOrEmpty($ServerName)) {
+###Switch to GUI or interactive mode if $ServerName is empty
+if (([string]::IsNullOrEmpty($ServerName)) -and ($GUI)) {
+	$GUIScript = Join-Path -Path $ScriptPath -ChildPath "PSBlitzGUI.ps1"
+	if (Test-Path -Path $GUIScript) {
+        $PSExe = if ($PSVersionTable.PSVersion.Major -ge 7) { "pwsh" } else { "powershell" }
+        Start-Process -FilePath $PSExe -NoNewWindow -ArgumentList @(
+            "-NoProfile",
+            "-ExecutionPolicy", "Bypass",
+            "-File", $GUIScript 
+        )
+        exit
+    } else {
+		Write-Host " GUI script not found at $GUIScript" -ForegroundColor Red
+		$GUI = $false
+	}
+}
+if (([string]::IsNullOrEmpty($ServerName)) -and (-not $GUI)) {
 	Write-Host "Running in interactive mode"
 	$InteractiveMode = 1
 	##Instance
