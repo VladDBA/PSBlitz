@@ -1,6 +1,11 @@
 /*
 	Part of PSBlitz - https://github.com/VladDBA/PSBlitz
 	License - https://github.com/VladDBA/PSBlitz/blob/main/LICENSE
+
+    Minimum permissions required:
+    VIEW SERVER PERFORMANCE STATE
+    VIEW SERVER SECURITY STATE
+    VIEW ANY DATABASE - for the second result set the user won't be able to get available space info from databases to which it doesn't have access
 */
 SET ANSI_NULLS ON;
 SET ANSI_PADDING ON;
@@ -15,7 +20,8 @@ DECLARE @DatabaseName NVARCHAR(128),
         @DBName       NVARCHAR(128),
         @ExecSQL      NVARCHAR(MAX),
         @SkipThis     BIT,
-        @LineFeed     NVARCHAR(5); 
+        @LineFeed     NVARCHAR(5),
+        @IsGoogleManagedInstance BIT; 
 
 
 SET @LineFeed = CHAR(13) + CHAR(10);
@@ -32,6 +38,11 @@ SELECT @SkipThis = CASE
                      AND CAST(ISNULL(SERVERPROPERTY('EngineEdition'), 0) AS TINYINT) IN (2,3,4)) THEN 1
                      ELSE 0
                    END;
+/*Detect GCP SQL Server Managed Instance*/
+IF (SELECT COUNT(1) FROM sys.server_principals WHERE [name] IN ('CustomerDbRootRole','sqlserver') ) = 2
+ BEGIN
+     SET @IsGoogleManagedInstance = 1;
+ END;
 
 /*Make sure temp tables don't exist*/
 IF OBJECT_ID(N'tempdb.dbo.#FSFiles', N'U') IS NOT NULL
@@ -240,8 +251,10 @@ DECLARE AvailableSpace CURSOR LOCAL STATIC READ_ONLY FORWARD_ONLY FOR
 SELECT [name]
 FROM   sys.[databases]
 WHERE  [state] = 0
-AND [user_access] = 0; 
-
+AND [user_access] = 0 
+/*skip model and gcloud_cloudsqladmin on GCP*/
+AND [database_id] <> CASE WHEN @IsGoogleManagedInstance = 1 THEN 3 /*SKIP MODEL*/ ELSE 0 END
+AND [name] <> CASE WHEN @IsGoogleManagedInstance = 1 THEN 'gcloud_cloudsqladmin' ELSE '' END;
 OPEN AvailableSpace; 
 
 FETCH NEXT FROM AvailableSpace INTO @DBName;
@@ -258,7 +271,12 @@ WHILE @@FETCH_STATUS = 0
                      + @LineFeed
                      + N'FROM   sys.[database_files] AS [f] WHERE [f].[type] <> 2'
 					 + @LineFeed + N'OPTION (RECOMPILE);';
-      EXEC (@ExecSQL);
+      BEGIN TRY 
+       EXEC (@ExecSQL);
+       END TRY
+       BEGIN CATCH
+       PRINT 'No permission on ' + @DBName;
+       END CATCH;
       FETCH NEXT FROM AvailableSpace INTO @DBName;
   END; 
 

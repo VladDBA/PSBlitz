@@ -6,6 +6,7 @@
 [![SQL Server](https://img.shields.io/badge/SQL%20Server-2014%2B-0078D4.svg)](https://learn.microsoft.com/en-us/sql/sql-server)
 [![Azure SQL DB](https://img.shields.io/badge/Azure%20SQL-Database-0078D4.svg)](https://learn.microsoft.com/en-us/azure/azure-sql/database/sql-database-paas-overview)
 [![Azure SQL MI](https://img.shields.io/badge/Azure%20SQL-Managed%20Instance-0078D4.svg)](https://learn.microsoft.com/en-us/azure/azure-sql/managed-instance/sql-managed-instance-paas-overview)
+[![Google Cloud SQL](https://img.shields.io/badge/Google%20Cloud-SQL-4285F4.svg)](https://cloud.google.com/sql)
 [![Code Signing](https://img.shields.io/badge/Code%20Signing-Verified-brightgreen.svg)](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -165,15 +166,18 @@ Open PSBlitzOutput.xlsx (found in PSBlitz's Resources folder) click on the first
 |`-ServerName`| The name of your SQL Server instance or Azure SQL DB connection info. <br><br> Accepted input format: <br> `HostName\InstanceID` for named instances. <br> `HostName,Port` when using a port number instead of an instance ID. <br> `HostName` for default instances. <br><br>For Azure SQL DB the format is: <br> `YourServer.database.windows.net,PortNumber:YourDatabase` if you want to specify the port number. <br> `YourServer.database.windows.net:YourDatabase` if you don't want to specify the port number. <br> If your Azure SQL DB instance doesn't use the `database.windows.net` portion (e.g.: it's configured to use an IP instead) then you should provide the database name via the `-CheckDB` parameter.<br><br>Other options:<br> If you provide `?` or `Help` as a value for `-ServerName`, the script will return a brief help menu. <br> If no value is provided, the script will go into interactive mode and prompt for the appropriate input |
 |`-SQLLogin`| The name of the SQL login used to run the script. If not provided, the script will use integrated security. |
 |`-SQLPass` | The password for the SQL login provided via the -SQLLogin parameter, omit if `-SQLLogin` was not used. |
-|`-IsIndepth` | Providing Y as a value will tell PSBlitz.ps1 to run a more in-depth check against the instance/database. Omit for default check. |
+|`-InDepth` | Switch which tells PSBlitz.ps1 to run a more in-depth check against the instance/database. Omit for default check. |
 |`-CheckDB` | Used to provide the name of a specific database against which sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock will be ran. Omit to run against the whole instance.<br><br>__For Azure SQL DB__<br>Can also be used to provide the name of the Azure SQL DB database if you haven't provided it as part of the <br>`-ServerName` paramter.<br>If the database name is not provided here, nor as part of the `-ServerName`, and the environment is detected as Azure SQL DB, then you'll be prompted to provide the database name.|
 |`-CacheTop`| Used to specify if more/less than the default top 10 queries should be returned for the sp_BlitzCache step. Only works for HTML output (`-ToHTM Y`). Has no effect on the `recent compilations` sort order. <br>Setting this parameter to 0 will skip the plan cache analysis step altogether.<br>Defaults to 10. |
+|`-QueryStoreTop`|Used to specify if more/less than the default top 20 queries should be returned for the 
+ Query Store step.Setting this parameter to 0 will skip the Query Store analysis step altogether.<br>Defaults to 20. |
 |`-CacheMinutesBack`| Used to specify how many minutes back to begin plan cache analysis. <br>Defaults to entire contents of the plan cache since instance startup.<br> In order to avoid missing the desired timeframe, the value is dynamically adjusted based on the runtime of PSBlitz up until the plan cache analysis point.|
 |`-QueryStoreIntervalStart`| The start date and time (format __yyyy-mm-dd HH:mm__) for the Query Store interval. If provided, the script will validate the format and use it as the lower bound for the queries retrieved from the Query Store. |
 |`-QueryStoreIntervalEnd`|The end date and time (format __yyyy-mm-dd HH:mm__) for the Query Store interval. If `-QueryStoreIntervalStart` is provided and `-QueryStoreIntervalEnd` is not provided, it defaults to the current date and time. <br>If provided, the script will validate the format and use it as the upper bound for the queries retrieved from the Query Store.|
 |`-OutputDir`| Used to provide a path where the output directory should be saved to. <br>Defaults to PSBlitz.ps1's directory if not specified or a non-existent path is provided.|
-|`-ToHTML`| Providing Y as a value will tell PSBlitz.ps1 to output the report as HTML instead of an Excel file. This is perfect when running PSBlitz from a machine that doesn't have Office installed.|
-|`-ZipOutput`| Providing Y as a value will tell PSBlitz.ps1 to also create a zip archive of the output files.<br>Defaults to N.|
+|`-ToHTML`| Switch used to output the report as HTML instead of an Excel file. This is perfect when running PSBlitz from a machine that doesn't have Office installed.|
+|`-GUI`|Switch used to open a GUI form to provide input parameters instead of running it from the command line.|
+|`-ZipOutput`| Switch which will tell PSBlitz.ps1 to also create a zip archive of the output files.|
 |`-BlitzWhoDelay` | Used to sepcify the number of seconds between each active session data capture. <br>Defaults to 10 if not specified, meaning that active session data will be captured every 10 seconds.|
 |`-ConnTimeout`| Can be used to increased the timeout limit in seconds for connecting to SQL Server. <br>Defaults to 45 seconds if not specified.|
 |`-MaxTimeout`| Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. <br>Defaults to 1000 (16.6 minutes).|
@@ -283,7 +287,9 @@ Execution plans file naming convention:
 ## Usage examples
 
 You can run PSBlitz.ps1 by simply right-clicking on the script and then clicking on "Run With PowerShell" which will execute the script in interactive mode, prompting you for the required input.\
-Note that parameters like `-DebugMode`, `-OutputDir`, `-CacheTop`, and `-MaxTimeout` are only available in command line mode.
+Note that parameters like `-DebugMode` and `-MaxTimeout` are only available in command line mode.
+
+As of version 6.0.0 you can also run PSBlitzUI.ps1 by simply right-clicking on the script and then clicking on "Run With PowerShell". This will open a GUI form to provide input parameters instead of running it from the command line.
 
 Otherwise you can navigate in PowerShell to the directory where the script is and execute it by providing parameters and appropriate values.
 
@@ -307,79 +313,85 @@ Otherwise you can navigate in PowerShell to the directory where the script is an
    Get-Help .\PSBlitz.ps1 -Full
    ```
 
-2. Run it against the whole instance (named instance SQL01), with default checks via integrated security
+2. Run in GUI mode
+
+    ```PowerShell
+    .\PSBlitz.ps1 -GUI
+    ```
+
+3. Run it against the whole instance (named instance SQL01), with default checks via integrated security
 
     ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01
     ```
 
-3. Run it against the whole instance listening on port 1433 on host Server01, with default checks via integrated security
+4. Run it against the whole instance listening on port 1433 on host Server01, with default checks via integrated security
 
     ```PowerShell
     .\PSBlitz.ps1 Server01,1433
     ```
 
-4. Run it against the whole instance, with in-depth checks via integrated security
+5. Run it against the whole instance, with in-depth checks via integrated security
 
     ```PowerSHell
     .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y
     ```
 
-5. Run it against the whole instance, with in-depth checks via integrated security, and have sp_BlitzWho execute every 5 seconds
+6. Run it against the whole instance, with in-depth checks via integrated security, and have sp_BlitzWho execute every 5 seconds
 
     ```PowerSHell
     .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y -BlitzWhoDelay 5
     ```
 
-6. Run it with in-depth checks, limit sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only, via integrated security
+7. Run it with in-depth checks, limit sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only, via integrated security
 
     ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y -CheckDB YourDatabase
     ```
 
-7. Run it against the whole instance, with default checks via SQL login and password
+8. Run it against the whole instance, with default checks via SQL login and password
 
     ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01 -SQLLogin DBA1 -SQLPass SuperSecurePassword
     ```
 
-8. Run it against a default instance residing on Server02, with in-depth checks via SQL login and password, while limmiting sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only
+9. Run it against a default instance residing on Server02, with in-depth checks via SQL login and password, while limmiting sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only
 
     ```PowerShell
     .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
     ```
 
-9. Run the same command as above, but increase execution timeout for sp_BlitzIndex, stats and index info retrieval, while also increasing delay between sp_BlitzWHo executions as well as getting more verbose console output and saving the output directory to C:\temp
+10. Run the same command as above, but increase execution timeout for sp_BlitzIndex, stats and index info retrieval, while also increasing delay between sp_BlitzWHo executions as well as getting more verbose console output and saving the output directory to C:\temp
 
     ```PowerShell
     .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase -MaxTimeout 1200 -BlitzWhoDelay 20 -DebugInfo -OutputDir C:\Temp
     ```
 
-10. Run PSBlitz but return the report as HTML instead of XLSX while also creating a zip archive of the output files.
+11. Run PSBlitz but return the report as HTML instead of XLSX while also creating a zip archive of the output files.
 
     ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01 -ToHTML Y -ZipOutput Y 
     ```
 
-11. Run it against the YourDatabase database hosted in Azure SQL DB at yourserver.database.windows.net port 1433 via SQL login and password
+12. Run it against the YourDatabase database hosted in Azure SQL DB at yourserver.database.windows.net port 1433 via SQL login and password
 
     ```PowerShell
     .\PSBlitz.ps1 yourserver.database.windows.net,1433:YourDatabase -SQLLogin DBA1 -SQLPass SuperSecurePassword
     ```
 
-12. Run it against the Azure SQL Managed Instance yourserver.database.windows.net
+13. Run it against the Azure SQL Managed Instance yourserver.database.windows.net
 
     ```PowerShell
     .\PSBlitz.ps1 yourserver.database.windows.net -SQLLogin DBA1 -SQLPass SuperSecurePassword
     ```
 
-13. Run it against the Azure SQL Managed Instance yourserver.database.windows.net with an in-depth check while limiting index, stats, plan cache, and database info to YourDatabase
+14. Run it against the Azure SQL Managed Instance yourserver.database.windows.net with an in-depth check while limiting index, stats, plan cache, and database info to YourDatabase
 
     ```PowerShell
     .\PSBlitz.ps1 yourserver.database.windows.net -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
     ```
 
-14. Run it against a default instance residing on Server02, with HTML output, in-depth checks via SQL login and password, while limmiting most checks to YourDatabase only, and also limiting the query information returned from the plan cache to the past 2 hours
+15. Run it against a default instance residing on Server02, with HTML output, in-depth checks via SQL login and password, while limmiting most checks to YourDatabase only, and also limiting the query information returned from the plan cache to the past 2 hours
 
     ```PowerShell
     .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -ToHTML Y -IsIndepth Y -CheckDB YourDatabase -CacheMinutesBack 120
@@ -423,6 +435,10 @@ For feature requests, open an issue with the enhancement label
 ![Screenshot1](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img001.png)
 ![Screenshot2](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img002.png)
 ![Screenshot4](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img004.png)
+
+### GUI
+
+![Screenshot6](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img006.png)
 
 ### Default check intro page
 

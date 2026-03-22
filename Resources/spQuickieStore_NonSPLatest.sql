@@ -70,7 +70,7 @@ DECLARE
 
 /*PSBlitz specific parameters/options*/
 ;SET @database_name = NULL;
-;SET @sort_order = 'cpu';
+;SET @sort_order = 'Avg CPU';
 ;SET @top = 20;
 ;SET @start_date = NULL;
 ;SET @end_date = NULL;
@@ -195,31 +195,11 @@ SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;
 
 BEGIN TRY
 /*
-If this column doesn't exist, you're not on a good version of SQL Server
-*/
-IF NOT EXISTS
-   (
-       SELECT
-           1/0
-       FROM sys.all_columns AS ac
-       WHERE ac.object_id = OBJECT_ID(N'sys.dm_exec_query_stats', N'V')
-       AND   ac.name = N'total_spills'
-   )
-BEGIN
-    RAISERROR('This procedure only runs on supported versions of SQL Server:
-* 2016 SP2+
-* 2017 CU3+
-* 2019+
-* Probably Azure?', 11, 1) WITH NOWAIT;
-    RETURN;
-END;
-
-/*
 These are for your outputs.
 */
 SELECT
-    @version = '5.6',
-    @version_date = '20250601';
+    @version = '6.3',
+    @version_date = '20260301';
 
 /*
 Helpful section! For help.
@@ -305,7 +285,7 @@ BEGIN
             CASE
                 ap.name
                 WHEN N'@database_name' THEN 'a database name with query store enabled'
-                WHEN N'@sort_order' THEN 'cpu, logical reads, physical reads, writes, duration, memory, tempdb, executions, recent, plan count by hashes, cpu waits, lock waits, locks waits, latch waits, latches waits, buffer latch waits, buffer latches waits, buffer io waits, log waits, log io waits, network waits, network io waits, parallel waits, parallelism waits, memory waits, total waits, rows'
+                WHEN N'@sort_order' THEN 'cpu, logical reads, physical reads, writes, duration, memory, tempdb, executions, recent, plan count by hashes, cpu waits, lock waits, locks waits, latch waits, latches waits, buffer latch waits, buffer latches waits, buffer io waits, log waits, log io waits, network waits, network io waits, parallel waits, parallelism waits, memory waits, total waits, rows, total cpu, total logical reads, total physical reads, total writes, total duration, total memory, total tempdb, total rows (avg/average prefix also accepted, e.g. avg cpu, average duration)'
                 WHEN N'@top' THEN 'a positive integer between 1 and 9,223,372,036,854,775,807'
                 WHEN N'@start_date' THEN 'January 1, 1753, through December 31, 9999'
                 WHEN N'@end_date' THEN 'January 1, 1753, through December 31, 9999'
@@ -501,7 +481,7 @@ BEGIN
     RAISERROR('
 MIT License
 
-Copyright 2025 Darling Data, LLC
+Copyright 2026 Darling Data, LLC
 
 https://www.erikdarling.com/
 
@@ -520,6 +500,23 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
     RETURN;
 END; /*End @help section*/
 
+
+/*
+Normalize Sort Order.
+Allow avg/average prefix for backwards compatibility,
+e.g. 'avg cpu' or 'average cpu' maps to 'cpu'.
+*/
+IF LOWER(@sort_order) LIKE 'average %'
+BEGIN
+    SELECT
+        @sort_order = LTRIM(SUBSTRING(@sort_order, 9, LEN(@sort_order)));
+END;
+
+IF LOWER(@sort_order) LIKE 'avg %'
+BEGIN
+    SELECT
+        @sort_order = LTRIM(SUBSTRING(@sort_order, 5, LEN(@sort_order)));
+END;
 
 /*
 Validate Sort Order.
@@ -554,7 +551,15 @@ IF @sort_order NOT IN
        'parallelism waits',
        'memory waits',
        'total waits',
-       'rows'
+       'rows',
+       'total cpu',
+       'total logical reads',
+       'total physical reads',
+       'total writes',
+       'total duration',
+       'total memory',
+       'total tempdb',
+       'total rows'
    )
 BEGIN
    RAISERROR('The sort order (%s) you chose is so out of this world that I''m using cpu instead', 10, 1, @sort_order) WITH NOWAIT;
@@ -1166,6 +1171,7 @@ CREATE TABLE
     is_trivial_plan bit NOT NULL,
     is_parallel_plan bit NOT NULL,
     is_forced_plan bit NOT NULL,
+    toggle_forcing nvarchar(300) NOT NULL,
     is_natively_compiled bit NOT NULL,
     force_failure_count bigint NOT NULL,
     last_force_failure_reason_desc nvarchar(128) NULL,
@@ -1551,6 +1557,21 @@ CREATE TABLE
 );
 
 /*
+Tuning In, Tuning Out
+*/
+CREATE TABLE
+    #database_automatic_tuning_configurations
+(
+    database_id integer NOT NULL,
+    [option] nvarchar(120) NULL,
+    option_value nvarchar(120) NULL,
+    [type] nvarchar(120) NULL,
+    type_value nvarchar(120) NULL,
+    details nvarchar(4000) NULL,
+    [state] integer NULL
+);
+
+/*
 Trouble Loves Me
 */
 CREATE TABLE
@@ -1626,11 +1647,13 @@ INSERT INTO
     column_id, metric_group, metric_type, column_name, column_source, is_conditional, condition_param, condition_value, expert_only, format_pattern
 )
 VALUES
+    (10, 'emergency_troubleshooting', 'toggle_forcing', 'toggle_forcing', 'qsp.toggle_forcing', 0, NULL, NULL, 1, NULL),
     (20, 'metadata', 'force_count', 'force_failure_count', 'qsp.force_failure_count', 0, NULL, NULL, 0, NULL),
     (30, 'metadata', 'force_reason', 'last_force_failure_reason_desc', 'qsp.last_force_failure_reason_desc', 0, NULL, NULL, 0, NULL),
     /* SQL 2022 specific columns */
     (40, 'sql_2022', 'feedback', 'has_query_feedback', 'CASE WHEN EXISTS (SELECT 1/0 FROM #query_store_plan_feedback AS qspf WHERE qspf.plan_id = qsp.plan_id) THEN ''Yes'' ELSE ''No'' END', 1, 'sql_2022_views', 1, 0, NULL),
     (50, 'sql_2022', 'hints', 'has_query_store_hints', 'CASE WHEN EXISTS (SELECT 1/0 FROM #query_store_query_hints AS qsqh WHERE qsqh.query_id = qsp.query_id) THEN ''Yes'' ELSE ''No'' END', 1, 'sql_2022_views', 1, 0, NULL),
+    (55, 'sql_2022', 'hints', 'set_query_store_hints', '''EXECUTE ''+ QUOTENAME(DB_NAME(qsp.database_id)) + ''.sys.sp_query_store_set_hints @query_id = '' + CONVERT(nvarchar(20), qsq.query_id) + '', @query_hints = N''''OPTION(older_hints_go_here, USE HINT(''''''''newer_hints_go_here''''''''))'''';''', 1, 'sql_2022_views', 1, 1, NULL),
     (60, 'sql_2022', 'variants', 'has_plan_variants', 'CASE WHEN EXISTS (SELECT 1/0 FROM #query_store_query_variant AS qsqv WHERE qsqv.query_variant_query_id = qsp.query_id) THEN ''Yes'' ELSE ''No'' END', 1, 'sql_2022_views', 1, 0, NULL),
     (70, 'sql_2022', 'replay', 'has_compile_replay_script', 'qsp.has_compile_replay_script', 1, 'sql_2022_views', 1, 0, NULL),
     (80, 'sql_2022', 'opt_forcing', 'is_optimized_plan_forcing_disabled', 'qsp.is_optimized_plan_forcing_disabled', 1, 'sql_2022_views', 1, 0, NULL),
@@ -1653,50 +1676,50 @@ VALUES
     (215, 'executions', 'count_hash', 'count_executions_by_query_hash', 'qht.total_executions', 1, 'include_query_hash_totals', 1, 0, 'N0'),
     /* Duration metrics (group together avg, total, last, min, max) */
     (300, 'duration', 'avg', 'avg_duration_ms', 'qsrs.avg_duration_ms', 0, NULL, NULL, 0, 'N0'),
-    (310, 'duration', 'total', 'total_duration_ms', 'qsrs.total_duration_ms', 0, NULL, NULL, 0, 'N0'),
-    (320, 'duration', 'last', 'last_duration_ms', 'qsrs.last_duration_ms', 0, NULL, NULL, 1, 'N0'),
-    (330, 'duration', 'min', 'min_duration_ms', 'qsrs.min_duration_ms', 0, NULL, NULL, 1, 'N0'),
-    (340, 'duration', 'max', 'max_duration_ms', 'qsrs.max_duration_ms', 0, NULL, NULL, 0, 'N0'),
+    (310, 'duration', 'last', 'last_duration_ms', 'qsrs.last_duration_ms', 0, NULL, NULL, 1, 'N0'),
+    (320, 'duration', 'min', 'min_duration_ms', 'qsrs.min_duration_ms', 0, NULL, NULL, 0, 'N0'),
+    (330, 'duration', 'max', 'max_duration_ms', 'qsrs.max_duration_ms', 0, NULL, NULL, 0, 'N0'),
+    (340, 'duration', 'total', 'total_duration_ms', 'qsrs.total_duration_ms', 0, NULL, NULL, 0, 'N0'),
     /* Hash totals for duration */
     (315, 'duration', 'total_hash', 'total_duration_ms_by_query_hash', 'qht.total_duration_ms', 1, 'include_query_hash_totals', 1, 0, 'N0'),
     /* CPU metrics */
     (400, 'cpu', 'avg', 'avg_cpu_time_ms', 'qsrs.avg_cpu_time_ms', 0, NULL, NULL, 0, 'N0'),
-    (410, 'cpu', 'total', 'total_cpu_time_ms', 'qsrs.total_cpu_time_ms', 0, NULL, NULL, 0, 'N0'),
-    (420, 'cpu', 'last', 'last_cpu_time_ms', 'qsrs.last_cpu_time_ms', 0, NULL, NULL, 1, 'N0'),
-    (430, 'cpu', 'min', 'min_cpu_time_ms', 'qsrs.min_cpu_time_ms', 0, NULL, NULL, 1, 'N0'),
-    (440, 'cpu', 'max', 'max_cpu_time_ms', 'qsrs.max_cpu_time_ms', 0, NULL, NULL, 0, 'N0'),
+    (410, 'cpu', 'last', 'last_cpu_time_ms', 'qsrs.last_cpu_time_ms', 0, NULL, NULL, 1, 'N0'),
+    (420, 'cpu', 'min', 'min_cpu_time_ms', 'qsrs.min_cpu_time_ms', 0, NULL, NULL, 0, 'N0'),
+    (430, 'cpu', 'max', 'max_cpu_time_ms', 'qsrs.max_cpu_time_ms', 0, NULL, NULL, 0, 'N0'),
+    (440, 'cpu', 'total', 'total_cpu_time_ms', 'qsrs.total_cpu_time_ms', 0, NULL, NULL, 0, 'N0'),
     /* Hash totals for CPU */
     (415, 'cpu', 'total_hash', 'total_cpu_time_ms_by_query_hash', 'qht.total_cpu_time_ms', 1, 'include_query_hash_totals', 1, 0, 'N0'),
     /* Logical IO Reads */
     (500, 'logical_io_reads', 'avg', 'avg_logical_io_reads_mb', 'qsrs.avg_logical_io_reads_mb', 0, NULL, NULL, 0, 'N0'),
-    (510, 'logical_io_reads', 'total', 'total_logical_io_reads_mb', 'qsrs.total_logical_io_reads_mb', 0, NULL, NULL, 0, 'N0'),
-    (520, 'logical_io_reads', 'last', 'last_logical_io_reads_mb', 'qsrs.last_logical_io_reads_mb', 0, NULL, NULL, 1, 'N0'),
-    (530, 'logical_io_reads', 'min', 'min_logical_io_reads_mb', 'qsrs.min_logical_io_reads_mb', 0, NULL, NULL, 1, 'N0'),
-    (540, 'logical_io_reads', 'max', 'max_logical_io_reads_mb', 'qsrs.max_logical_io_reads_mb', 0, NULL, NULL, 0, 'N0'),
+    (510, 'logical_io_reads', 'last', 'last_logical_io_reads_mb', 'qsrs.last_logical_io_reads_mb', 0, NULL, NULL, 1, 'N0'),
+    (520, 'logical_io_reads', 'min', 'min_logical_io_reads_mb', 'qsrs.min_logical_io_reads_mb', 0, NULL, NULL, 1, 'N0'),
+    (530, 'logical_io_reads', 'max', 'max_logical_io_reads_mb', 'qsrs.max_logical_io_reads_mb', 0, NULL, NULL, 0, 'N0'),
+    (540, 'logical_io_reads', 'total', 'total_logical_io_reads_mb', 'qsrs.total_logical_io_reads_mb', 0, NULL, NULL, 0, 'N0'),
     /* Hash totals for logical reads */
     (515, 'logical_io_reads', 'total_hash', 'total_logical_io_reads_mb_by_query_hash', 'qht.total_logical_reads_mb', 1, 'include_query_hash_totals', 1, 0, 'N0'),
     /* Logical IO Writes */
     (600, 'logical_io_writes', 'avg', 'avg_logical_io_writes_mb', 'qsrs.avg_logical_io_writes_mb', 0, NULL, NULL, 0, 'N0'),
-    (610, 'logical_io_writes', 'total', 'total_logical_io_writes_mb', 'qsrs.total_logical_io_writes_mb', 0, NULL, NULL, 0, 'N0'),
-    (620, 'logical_io_writes', 'last', 'last_logical_io_writes_mb', 'qsrs.last_logical_io_writes_mb', 0, NULL, NULL, 1, 'N0'),
-    (630, 'logical_io_writes', 'min', 'min_logical_io_writes_mb', 'qsrs.min_logical_io_writes_mb', 0, NULL, NULL, 1, 'N0'),
-    (640, 'logical_io_writes', 'max', 'max_logical_io_writes_mb', 'qsrs.max_logical_io_writes_mb', 0, NULL, NULL, 0, 'N0'),
+    (610, 'logical_io_writes', 'last', 'last_logical_io_writes_mb', 'qsrs.last_logical_io_writes_mb', 0, NULL, NULL, 1, 'N0'),
+    (620, 'logical_io_writes', 'min', 'min_logical_io_writes_mb', 'qsrs.min_logical_io_writes_mb', 0, NULL, NULL, 1, 'N0'),
+    (630, 'logical_io_writes', 'max', 'max_logical_io_writes_mb', 'qsrs.max_logical_io_writes_mb', 0, NULL, NULL, 0, 'N0'),
+    (640, 'logical_io_writes', 'total', 'total_logical_io_writes_mb', 'qsrs.total_logical_io_writes_mb', 0, NULL, NULL, 0, 'N0'),
     /* Hash totals for logical writes */
     (615, 'logical_io_writes', 'total_hash', 'total_logical_io_writes_mb_by_query_hash', 'qht.total_logical_writes_mb', 1, 'include_query_hash_totals', 1, 0, 'N0'),
     /* Physical IO Reads */
     (700, 'physical_io_reads', 'avg', 'avg_physical_io_reads_mb', 'qsrs.avg_physical_io_reads_mb', 0, NULL, NULL, 0, 'N0'),
-    (710, 'physical_io_reads', 'total', 'total_physical_io_reads_mb', 'qsrs.total_physical_io_reads_mb', 0, NULL, NULL, 0, 'N0'),
-    (720, 'physical_io_reads', 'last', 'last_physical_io_reads_mb', 'qsrs.last_physical_io_reads_mb', 0, NULL, NULL, 1, 'N0'),
-    (730, 'physical_io_reads', 'min', 'min_physical_io_reads_mb', 'qsrs.min_physical_io_reads_mb', 0, NULL, NULL, 1, 'N0'),
-    (740, 'physical_io_reads', 'max', 'max_physical_io_reads_mb', 'qsrs.max_physical_io_reads_mb', 0, NULL, NULL, 0, 'N0'),
+    (710, 'physical_io_reads', 'last', 'last_physical_io_reads_mb', 'qsrs.last_physical_io_reads_mb', 0, NULL, NULL, 1, 'N0'),
+    (720, 'physical_io_reads', 'min', 'min_physical_io_reads_mb', 'qsrs.min_physical_io_reads_mb', 0, NULL, NULL, 1, 'N0'),
+    (730, 'physical_io_reads', 'max', 'max_physical_io_reads_mb', 'qsrs.max_physical_io_reads_mb', 0, NULL, NULL, 0, 'N0'),
+    (740, 'physical_io_reads', 'total', 'total_physical_io_reads_mb', 'qsrs.total_physical_io_reads_mb', 0, NULL, NULL, 0, 'N0'),
     /* Hash totals for physical reads */
     (715, 'physical_io_reads', 'total_hash', 'total_physical_io_reads_mb_by_query_hash', 'qht.total_physical_reads_mb', 1, 'include_query_hash_totals', 1, 0, 'N0'),
     /* CLR Time */
     (800, 'clr_time', 'avg', 'avg_clr_time_ms', 'qsrs.avg_clr_time_ms', 0, NULL, NULL, 0, 'N0'),
-    (810, 'clr_time', 'total', 'total_clr_time_ms', 'qsrs.total_clr_time_ms', 0, NULL, NULL, 0, 'N0'),
-    (820, 'clr_time', 'last', 'last_clr_time_ms', 'qsrs.last_clr_time_ms', 0, NULL, NULL, 1, 'N0'),
-    (830, 'clr_time', 'min', 'min_clr_time_ms', 'qsrs.min_clr_time_ms', 0, NULL, NULL, 1, 'N0'),
-    (840, 'clr_time', 'max', 'max_clr_time_ms', 'qsrs.max_clr_time_ms', 0, NULL, NULL, 0, 'N0'),
+    (810, 'clr_time', 'last', 'last_clr_time_ms', 'qsrs.last_clr_time_ms', 0, NULL, NULL, 1, 'N0'),
+    (820, 'clr_time', 'min', 'min_clr_time_ms', 'qsrs.min_clr_time_ms', 0, NULL, NULL, 1, 'N0'),
+    (830, 'clr_time', 'max', 'max_clr_time_ms', 'qsrs.max_clr_time_ms', 0, NULL, NULL, 0, 'N0'),
+    (840, 'clr_time', 'total', 'total_clr_time_ms', 'qsrs.total_clr_time_ms', 0, NULL, NULL, 0, 'N0'),
     /* Hash totals for CLR time */
     (815, 'clr_time', 'total_hash', 'total_clr_time_ms_by_query_hash', 'qht.total_clr_time_ms', 1, 'include_query_hash_totals', 1, 0, 'N0'),
     /* DOP (Degree of Parallelism) */
@@ -1705,44 +1728,44 @@ VALUES
     (920, 'dop', 'max', 'max_dop', 'qsrs.max_dop', 0, NULL, NULL, 0, NULL),
     /* Memory metrics */
     (1000, 'memory', 'avg', 'avg_query_max_used_memory_mb', 'qsrs.avg_query_max_used_memory_mb', 0, NULL, NULL, 0, 'N0'),
-    (1010, 'memory', 'total', 'total_query_max_used_memory_mb', 'qsrs.total_query_max_used_memory_mb', 0, NULL, NULL, 0, 'N0'),
-    (1020, 'memory', 'last', 'last_query_max_used_memory_mb', 'qsrs.last_query_max_used_memory_mb', 0, NULL, NULL, 1, 'N0'),
-    (1030, 'memory', 'min', 'min_query_max_used_memory_mb', 'qsrs.min_query_max_used_memory_mb', 0, NULL, NULL, 1, 'N0'),
-    (1040, 'memory', 'max', 'max_query_max_used_memory_mb', 'qsrs.max_query_max_used_memory_mb', 0, NULL, NULL, 0, 'N0'),
+    (1010, 'memory', 'last', 'last_query_max_used_memory_mb', 'qsrs.last_query_max_used_memory_mb', 0, NULL, NULL, 1, 'N0'),
+    (1020, 'memory', 'min', 'min_query_max_used_memory_mb', 'qsrs.min_query_max_used_memory_mb', 0, NULL, NULL, 1, 'N0'),
+    (1030, 'memory', 'max', 'max_query_max_used_memory_mb', 'qsrs.max_query_max_used_memory_mb', 0, NULL, NULL, 0, 'N0'),
+    (1040, 'memory', 'total', 'total_query_max_used_memory_mb', 'qsrs.total_query_max_used_memory_mb', 0, NULL, NULL, 0, 'N0'),
     /* Hash totals for memory */
     (1015, 'memory', 'total_hash', 'total_query_max_used_memory_mb_by_query_hash', 'qht.total_memory_mb', 1, 'include_query_hash_totals', 1, 0, 'N0'),
     /* Row counts */
     (1100, 'rowcount', 'avg', 'avg_rowcount', 'qsrs.avg_rowcount', 0, NULL, NULL, 0, 'N0'),
-    (1110, 'rowcount', 'total', 'total_rowcount', 'qsrs.total_rowcount', 0, NULL, NULL, 0, 'N0'),
-    (1120, 'rowcount', 'last', 'last_rowcount', 'qsrs.last_rowcount', 0, NULL, NULL, 1, 'N0'),
-    (1130, 'rowcount', 'min', 'min_rowcount', 'qsrs.min_rowcount', 0, NULL, NULL, 1, 'N0'),
-    (1140, 'rowcount', 'max', 'max_rowcount', 'qsrs.max_rowcount', 0, NULL, NULL, 0, 'N0'),
+    (1110, 'rowcount', 'last', 'last_rowcount', 'qsrs.last_rowcount', 0, NULL, NULL, 1, 'N0'),
+    (1120, 'rowcount', 'min', 'min_rowcount', 'qsrs.min_rowcount', 0, NULL, NULL, 1, 'N0'),
+    (1130, 'rowcount', 'max', 'max_rowcount', 'qsrs.max_rowcount', 0, NULL, NULL, 0, 'N0'),
+    (1140, 'rowcount', 'total', 'total_rowcount', 'qsrs.total_rowcount', 0, NULL, NULL, 0, 'N0'),
     /* Hash totals for row counts */
     (1115, 'rowcount', 'total_hash', 'total_rowcount_by_query_hash', 'qht.total_rowcount', 1, 'include_query_hash_totals', 1, 0, 'N0'),
     /* New metrics for newer versions */
     /* Physical IO Reads (for newer versions) */
     (1200, 'num_physical_io_reads', 'avg', 'avg_num_physical_io_reads_mb', 'qsrs.avg_num_physical_io_reads_mb', 1, 'new', 1, 0, 'N0'),
-    (1210, 'num_physical_io_reads', 'total', 'total_num_physical_io_reads_mb', 'qsrs.total_num_physical_io_reads_mb', 1, 'new', 1, 0, 'N0'),
-    (1220, 'num_physical_io_reads', 'last', 'last_num_physical_io_reads_mb', 'qsrs.last_num_physical_io_reads_mb', 1, 'new', 1, 1, 'N0'),
-    (1230, 'num_physical_io_reads', 'min', 'min_num_physical_io_reads_mb', 'qsrs.min_num_physical_io_reads_mb', 1, 'new', 1, 1, 'N0'),
-    (1240, 'num_physical_io_reads', 'max', 'max_num_physical_io_reads_mb', 'qsrs.max_num_physical_io_reads_mb', 1, 'new', 1, 0, 'N0'),
+    (1210, 'num_physical_io_reads', 'last', 'last_num_physical_io_reads_mb', 'qsrs.last_num_physical_io_reads_mb', 1, 'new', 1, 1, 'N0'),
+    (1220, 'num_physical_io_reads', 'min', 'min_num_physical_io_reads_mb', 'qsrs.min_num_physical_io_reads_mb', 1, 'new', 1, 1, 'N0'),
+    (1230, 'num_physical_io_reads', 'max', 'max_num_physical_io_reads_mb', 'qsrs.max_num_physical_io_reads_mb', 1, 'new', 1, 0, 'N0'),
+    (1240, 'num_physical_io_reads', 'total', 'total_num_physical_io_reads_mb', 'qsrs.total_num_physical_io_reads_mb', 1, 'new', 1, 0, 'N0'),
     /* Hash totals for new physical IO reads */
     (1215, 'num_physical_io_reads', 'total_hash', 'total_num_physical_io_reads_mb_by_query_hash', 'qht.total_num_physical_io_reads', 1, 'new_with_hash_totals', 1, 0, 'N0'),
     /* Finish adding the remaining columns (log bytes and tempdb usage) */
     /* Log bytes used */
     (1300, 'log_bytes', 'avg', 'avg_log_bytes_used_mb', 'qsrs.avg_log_bytes_used_mb', 1, 'new', 1, 0, 'N0'),
-    (1310, 'log_bytes', 'total', 'total_log_bytes_used_mb', 'qsrs.total_log_bytes_used_mb', 1, 'new', 1, 0, 'N0'),
-    (1320, 'log_bytes', 'last', 'last_log_bytes_used_mb', 'qsrs.last_log_bytes_used_mb', 1, 'new', 1, 1, 'N0'),
-    (1330, 'log_bytes', 'min', 'min_log_bytes_used_mb', 'qsrs.min_log_bytes_used_mb', 1, 'new', 1, 1, 'N0'),
-    (1340, 'log_bytes', 'max', 'max_log_bytes_used_mb', 'qsrs.max_log_bytes_used_mb', 1, 'new', 1, 0, 'N0'),
+    (1310, 'log_bytes', 'last', 'last_log_bytes_used_mb', 'qsrs.last_log_bytes_used_mb', 1, 'new', 1, 1, 'N0'),
+    (1320, 'log_bytes', 'min', 'min_log_bytes_used_mb', 'qsrs.min_log_bytes_used_mb', 1, 'new', 1, 1, 'N0'),
+    (1330, 'log_bytes', 'max', 'max_log_bytes_used_mb', 'qsrs.max_log_bytes_used_mb', 1, 'new', 1, 0, 'N0'),
+    (1340, 'log_bytes', 'total', 'total_log_bytes_used_mb', 'qsrs.total_log_bytes_used_mb', 1, 'new', 1, 0, 'N0'),
     /* Hash totals for log bytes */
     (1315, 'log_bytes', 'total_hash', 'total_log_bytes_used_mb_by_query_hash', 'qht.total_log_bytes_used_mb', 1, 'new_with_hash_totals', 1, 0, 'N0'),
     /* TempDB usage  */
     (1400, 'tempdb', 'avg', 'avg_tempdb_space_used_mb', 'qsrs.avg_tempdb_space_used_mb', 1, 'new', 1, 0, 'N0'),
-    (1410, 'tempdb', 'total', 'total_tempdb_space_used_mb', 'qsrs.total_tempdb_space_used_mb', 1, 'new', 1, 0, 'N0'),
-    (1420, 'tempdb', 'last', 'last_tempdb_space_used_mb', 'qsrs.last_tempdb_space_used_mb', 1, 'new', 1, 1, 'N0'),
-    (1430, 'tempdb', 'min', 'min_tempdb_space_used_mb', 'qsrs.min_tempdb_space_used_mb', 1, 'new', 1, 1, 'N0'),
-    (1440, 'tempdb', 'max', 'max_tempdb_space_used_mb', 'qsrs.max_tempdb_space_used_mb', 1, 'new', 1, 0, 'N0'),
+    (1410, 'tempdb', 'last', 'last_tempdb_space_used_mb', 'qsrs.last_tempdb_space_used_mb', 1, 'new', 1, 1, 'N0'),
+    (1420, 'tempdb', 'min', 'min_tempdb_space_used_mb', 'qsrs.min_tempdb_space_used_mb', 1, 'new', 1, 1, 'N0'),
+    (1430, 'tempdb', 'max', 'max_tempdb_space_used_mb', 'qsrs.max_tempdb_space_used_mb', 1, 'new', 1, 0, 'N0'),
+    (1440, 'tempdb', 'total', 'total_tempdb_space_used_mb', 'qsrs.total_tempdb_space_used_mb', 1, 'new', 1, 0, 'N0'),
     /* Hash totals for tempdb */
     (1415, 'tempdb', 'total_hash', 'total_tempdb_space_used_mb_by_query_hash', 'qht.total_tempdb_space_used_mb', 1, 'new_with_hash_totals', 1, 0, 'N0'),
     /* Context settings and sorting columns  */
@@ -1822,6 +1845,14 @@ VALUES
                  WHEN 'executions' THEN 'qsrs.count_executions'
                  WHEN 'recent' THEN 'qsrs.last_execution_time'
                  WHEN 'rows' THEN 'qsrs.avg_rowcount'
+                 WHEN 'total cpu' THEN 'qsrs.total_cpu_time_ms'
+                 WHEN 'total logical reads' THEN 'qsrs.total_logical_io_reads_mb'
+                 WHEN 'total physical reads' THEN 'qsrs.total_physical_io_reads_mb'
+                 WHEN 'total writes' THEN 'qsrs.total_logical_io_writes_mb'
+                 WHEN 'total duration' THEN 'qsrs.total_duration_ms'
+                 WHEN 'total memory' THEN 'qsrs.total_query_max_used_memory_mb'
+                 WHEN 'total tempdb' THEN 'qsrs.total_tempdb_space_used_mb' /*This gets validated later*/
+                 WHEN 'total rows' THEN 'qsrs.total_rowcount'
                  WHEN 'plan count by hashes' THEN 'hashes.plan_hash_count_for_query_hash DESC, hashes.query_hash'
                  ELSE CASE WHEN @sort_order_is_a_wait = 1 THEN 'waits.total_query_wait_time_ms'
                  ELSE 'qsrs.avg_cpu_time_ms' END
@@ -2542,18 +2573,6 @@ TRUNCATE TABLE
     #ignore_sql_handles;
 
 TRUNCATE TABLE
-    #only_queries_with_hints;
-
-TRUNCATE TABLE
-    #only_queries_with_feedback;
-
-TRUNCATE TABLE
-    #only_queries_with_variants;
-
-TRUNCATE TABLE
-    #forced_plans_failures;
-
-TRUNCATE TABLE
     #query_hash_totals;
 
 
@@ -2877,8 +2896,14 @@ SELECT
         ISNULL(@only_queries_with_forced_plans, 0),
     @only_queries_with_forced_plan_failures =
         ISNULL(@only_queries_with_forced_plan_failures, 0),
+    @escape_brackets =
+        ISNULL(@escape_brackets, 0),
     @wait_filter =
         NULLIF(@wait_filter, ''),
+    @query_type =
+        NULLIF(@query_type, ''),
+    @execution_type_desc =
+        NULLIF(@execution_type_desc, ''),
     @format_output =
         ISNULL(@format_output, 1),
     @help =
@@ -3027,6 +3052,15 @@ BEGIN
             RETURN;
         END;
     END;
+
+    IF @get_all_databases = 1
+    BEGIN
+        FETCH NEXT
+        FROM @database_cursor
+        INTO @database_name;
+
+        CONTINUE;
+    END;
 END;
 
 /*
@@ -3039,33 +3073,6 @@ AND @engine NOT IN (5, 8)
 )
 BEGIN
     RAISERROR('Not all Azure offerings are supported, please try avoiding memes', 11, 1) WITH NOWAIT;
-    IF @debug = 1
-    BEGIN
-        GOTO DEBUG;
-    END;
-    ELSE
-    BEGIN
-        RETURN;
-    END;
-END;
-
-/*
-Database are you compatible?
-*/
-IF
-(
-    @azure = 1
-    AND EXISTS
-        (
-            SELECT
-                1/0
-             FROM sys.databases AS d
-             WHERE d.database_id = @database_id
-             AND   d.compatibility_level < 130
-        )
-)
-BEGIN
-    RAISERROR('Azure databases in compatibility levels under 130 are not supported', 11, 1) WITH NOWAIT;
     IF @debug = 1
     BEGIN
         GOTO DEBUG;
@@ -3163,6 +3170,15 @@ BEGIN
         BEGIN
             RETURN;
         END;
+    END;
+
+    IF @get_all_databases = 1
+    BEGIN
+        FETCH NEXT
+        FROM @database_cursor
+        INTO @database_name;
+
+        CONTINUE;
     END;
 END;
 
@@ -3345,7 +3361,7 @@ OPTION(RECOMPILE);' + @nc10;
 
         IF ROWCOUNT_BIG() = 0
         BEGIN
-            RAISERROR('No object_ids were found for %s in schema %s', 11, 1, @procedure_schema, @procedure_name) WITH NOWAIT;
+            RAISERROR('No object_ids were found for %s in schema %s', 11, 1, @procedure_name, @procedure_schema) WITH NOWAIT;
             RETURN;
         END;
 
@@ -3985,12 +4001,15 @@ BEGIN
        SELECT
            @where_clause += N'AND   DATEPART(WEEKDAY, qsrs.last_execution_time) BETWEEN 1 AND 5' + @nc10;
     END;/*df 1*/
-
-    IF @df = 7
+    ELSE IF @df = 7
     BEGIN
        SELECT
            @where_clause += N'AND   DATEPART(WEEKDAY, qsrs.last_execution_time) BETWEEN 2 AND 6' + @nc10;
     END;/*df 7*/
+    ELSE
+    BEGIN
+       RAISERROR('Warning: @workdays filter does not support @@DATEFIRST = %i, weekday filter skipped', 10, 1, @df) WITH NOWAIT;
+    END;
 
     IF  @work_start_utc IS NOT NULL
     AND @work_end_utc IS NOT NULL
@@ -4312,7 +4331,7 @@ BEGIN
             PRINT @dynamic_sql;
         END;
 
-        EXEC sys.sp_executesql
+        EXECUTE sys.sp_executesql
             @dynamic_sql,
           N'@split_sql nvarchar(max),
             @param_value nvarchar(4000)',
@@ -5259,7 +5278,7 @@ END
 GROUP BY
     qsws.plan_id
 HAVING
-    SUM(qsws.avg_query_wait_time_ms) > 1000.
+    SUM(qsws.avg_query_wait_time_ms) > 0
 ORDER BY
     SUM(qsws.avg_query_wait_time_ms) DESC
 OPTION(RECOMPILE, OPTIMIZE FOR (@top = 9223372036854775807));' + @nc10;
@@ -5350,6 +5369,7 @@ WHERE NOT EXISTS
           AND   qsqt.query_sql_text NOT LIKE N''%SELECT StatMan%''
           AND   qsqt.query_sql_text NOT LIKE N''DBCC%''
           AND   qsqt.query_sql_text NOT LIKE N''(@[_]msparam%''
+          AND   qsqt.query_sql_text NOT LIKE N''WAITFOR%''
       )
 OPTION(RECOMPILE);' + @nc10;
 
@@ -5638,7 +5658,7 @@ BEGIN
            SELECT
                qsq.query_hash,
                plan_hash_count_for_query_hash =
-                   COUNT(DISTINCT qsp.query_plan_hash)
+                   COUNT_BIG(DISTINCT qsp.query_plan_hash)
            FROM ' + @database_name_quoted + N'.sys.query_store_query AS qsq
            JOIN ' + @database_name_quoted + N'.sys.query_store_plan AS qsp
              ON qsq.query_id = qsp.query_id
@@ -6022,22 +6042,28 @@ BEGIN
             CONVERT
             (
                 float,
-                AVG
-                (' +
+                ' +
                 CASE @sort_order
-                     WHEN 'cpu' THEN N'qsrs.avg_cpu_time'
-                     WHEN 'logical reads' THEN N'qsrs.avg_logical_io_reads'
-                     WHEN 'physical reads' THEN N'qsrs.avg_physical_io_reads'
-                     WHEN 'writes' THEN N'qsrs.avg_logical_io_writes'
-                     WHEN 'duration' THEN N'qsrs.avg_duration'
-                     WHEN 'memory' THEN N'qsrs.avg_query_max_used_memory'
-                     WHEN 'tempdb' THEN CASE WHEN @new = 1 THEN N'qsrs.avg_tempdb_space_used' ELSE N'qsrs.avg_cpu_time' END
-                     WHEN 'executions' THEN N'qsrs.count_executions'
-                     WHEN 'rows' THEN N'qsrs.avg_rowcount'
-                     ELSE CASE WHEN @sort_order_is_a_wait = 1 THEN N'waits.total_query_wait_time_ms' ELSE N'qsrs.avg_cpu_time' END
+                     WHEN 'cpu' THEN N'AVG(qsrs.avg_cpu_time)'
+                     WHEN 'logical reads' THEN N'AVG(qsrs.avg_logical_io_reads)'
+                     WHEN 'physical reads' THEN N'AVG(qsrs.avg_physical_io_reads)'
+                     WHEN 'writes' THEN N'AVG(qsrs.avg_logical_io_writes)'
+                     WHEN 'duration' THEN N'AVG(qsrs.avg_duration)'
+                     WHEN 'memory' THEN N'AVG(qsrs.avg_query_max_used_memory)'
+                     WHEN 'tempdb' THEN CASE WHEN @new = 1 THEN N'AVG(qsrs.avg_tempdb_space_used)' ELSE N'AVG(qsrs.avg_cpu_time)' END
+                     WHEN 'executions' THEN N'AVG(qsrs.count_executions)'
+                     WHEN 'rows' THEN N'AVG(qsrs.avg_rowcount)'
+                     WHEN 'total cpu' THEN N'SUM(qsrs.avg_cpu_time * qsrs.count_executions)'
+                     WHEN 'total logical reads' THEN N'SUM(qsrs.avg_logical_io_reads * qsrs.count_executions)'
+                     WHEN 'total physical reads' THEN N'SUM(qsrs.avg_physical_io_reads * qsrs.count_executions)'
+                     WHEN 'total writes' THEN N'SUM(qsrs.avg_logical_io_writes * qsrs.count_executions)'
+                     WHEN 'total duration' THEN N'SUM(qsrs.avg_duration * qsrs.count_executions)'
+                     WHEN 'total memory' THEN N'SUM(qsrs.avg_query_max_used_memory * qsrs.count_executions)'
+                     WHEN 'total tempdb' THEN CASE WHEN @new = 1 THEN N'SUM(qsrs.avg_tempdb_space_used * qsrs.count_executions)' ELSE N'SUM(qsrs.avg_cpu_time * qsrs.count_executions)' END
+                     WHEN 'total rows' THEN N'SUM(qsrs.avg_rowcount * qsrs.count_executions)'
+                     ELSE CASE WHEN @sort_order_is_a_wait = 1 THEN N'AVG(waits.total_query_wait_time_ms)' ELSE N'AVG(qsrs.avg_cpu_time)' END
                 END
                 + N'
-                )
             )
     FROM ' + @database_name_quoted + N'.sys.query_store_query AS qsq
     JOIN ' + @database_name_quoted + N'.sys.query_store_plan AS qsp
@@ -6128,22 +6154,28 @@ BEGIN
             CONVERT
             (
                 float,
-                AVG
-                (' +
+                ' +
                 CASE @sort_order
-                     WHEN 'cpu' THEN N'qsrs.avg_cpu_time'
-                     WHEN 'logical reads' THEN N'qsrs.avg_logical_io_reads'
-                     WHEN 'physical reads' THEN N'qsrs.avg_physical_io_reads'
-                     WHEN 'writes' THEN N'qsrs.avg_logical_io_writes'
-                     WHEN 'duration' THEN N'qsrs.avg_duration'
-                     WHEN 'memory' THEN N'qsrs.avg_query_max_used_memory'
-                     WHEN 'tempdb' THEN CASE WHEN @new = 1 THEN N'qsrs.avg_tempdb_space_used' ELSE N'qsrs.avg_cpu_time' END
-                     WHEN 'executions' THEN N'qsrs.count_executions'
-                     WHEN 'rows' THEN N'qsrs.avg_rowcount'
-                     ELSE CASE WHEN @sort_order_is_a_wait = 1 THEN N'waits.total_query_wait_time_ms' ELSE N'qsrs.avg_cpu_time' END
+                     WHEN 'cpu' THEN N'AVG(qsrs.avg_cpu_time)'
+                     WHEN 'logical reads' THEN N'AVG(qsrs.avg_logical_io_reads)'
+                     WHEN 'physical reads' THEN N'AVG(qsrs.avg_physical_io_reads)'
+                     WHEN 'writes' THEN N'AVG(qsrs.avg_logical_io_writes)'
+                     WHEN 'duration' THEN N'AVG(qsrs.avg_duration)'
+                     WHEN 'memory' THEN N'AVG(qsrs.avg_query_max_used_memory)'
+                     WHEN 'tempdb' THEN CASE WHEN @new = 1 THEN N'AVG(qsrs.avg_tempdb_space_used)' ELSE N'AVG(qsrs.avg_cpu_time)' END
+                     WHEN 'executions' THEN N'AVG(qsrs.count_executions)'
+                     WHEN 'rows' THEN N'AVG(qsrs.avg_rowcount)'
+                     WHEN 'total cpu' THEN N'SUM(qsrs.avg_cpu_time * qsrs.count_executions)'
+                     WHEN 'total logical reads' THEN N'SUM(qsrs.avg_logical_io_reads * qsrs.count_executions)'
+                     WHEN 'total physical reads' THEN N'SUM(qsrs.avg_physical_io_reads * qsrs.count_executions)'
+                     WHEN 'total writes' THEN N'SUM(qsrs.avg_logical_io_writes * qsrs.count_executions)'
+                     WHEN 'total duration' THEN N'SUM(qsrs.avg_duration * qsrs.count_executions)'
+                     WHEN 'total memory' THEN N'SUM(qsrs.avg_query_max_used_memory * qsrs.count_executions)'
+                     WHEN 'total tempdb' THEN CASE WHEN @new = 1 THEN N'SUM(qsrs.avg_tempdb_space_used * qsrs.count_executions)' ELSE N'SUM(qsrs.avg_cpu_time * qsrs.count_executions)' END
+                     WHEN 'total rows' THEN N'SUM(qsrs.avg_rowcount * qsrs.count_executions)'
+                     ELSE CASE WHEN @sort_order_is_a_wait = 1 THEN N'AVG(waits.total_query_wait_time_ms)' ELSE N'AVG(qsrs.avg_cpu_time)' END
                 END
                 + N'
-               )
             )
     FROM ' + @database_name_quoted + N'.sys.query_store_query AS qsq
     JOIN ' + @database_name_quoted + N'.sys.query_store_plan AS qsp
@@ -6271,6 +6303,14 @@ BEGIN
                      WHEN 'tempdb' THEN CASE WHEN @new = 1 THEN N'(hashes_with_changes.change_since_regression_time_period * 8.) / 1024.' ELSE N'hashes_with_changes.change_since_regression_time_period / 1000.' END
                      WHEN 'executions' THEN N'hashes_with_changes.change_since_regression_time_period'
                      WHEN 'rows' THEN N'hashes_with_changes.change_since_regression_time_period'
+                     WHEN 'total cpu' THEN N'hashes_with_changes.change_since_regression_time_period / 1000.'
+                     WHEN 'total logical reads' THEN N'(hashes_with_changes.change_since_regression_time_period * 8.) / 1024.'
+                     WHEN 'total physical reads' THEN N'(hashes_with_changes.change_since_regression_time_period * 8.) / 1024.'
+                     WHEN 'total writes' THEN N'(hashes_with_changes.change_since_regression_time_period * 8.) / 1024.'
+                     WHEN 'total duration' THEN N'hashes_with_changes.change_since_regression_time_period / 1000.'
+                     WHEN 'total memory' THEN N'(hashes_with_changes.change_since_regression_time_period * 8.) / 1024.'
+                     WHEN 'total tempdb' THEN CASE WHEN @new = 1 THEN N'(hashes_with_changes.change_since_regression_time_period * 8.) / 1024.' ELSE N'hashes_with_changes.change_since_regression_time_period / 1000.' END
+                     WHEN 'total rows' THEN N'hashes_with_changes.change_since_regression_time_period'
                      ELSE CASE WHEN @sort_order_is_a_wait = 1 THEN N'hashes_with_changes.change_since_regression_time_period / 1000.' ELSE N'hashes_with_changes.change_since_regression_time_period / 1000.' END
                 END
             ELSE N'hashes_with_changes.change_since_regression_time_period' END
@@ -6481,6 +6521,14 @@ BEGIN
          WHEN 'executions' THEN N'qsrs.count_executions'
          WHEN 'recent' THEN N'qsrs.last_execution_time'
          WHEN 'rows' THEN N'qsrs.avg_rowcount'
+         WHEN 'total cpu' THEN N'qsrs.avg_cpu_time * qsrs.count_executions'
+         WHEN 'total logical reads' THEN N'qsrs.avg_logical_io_reads * qsrs.count_executions'
+         WHEN 'total physical reads' THEN N'qsrs.avg_physical_io_reads * qsrs.count_executions'
+         WHEN 'total writes' THEN N'qsrs.avg_logical_io_writes * qsrs.count_executions'
+         WHEN 'total duration' THEN N'qsrs.avg_duration * qsrs.count_executions'
+         WHEN 'total memory' THEN N'qsrs.avg_query_max_used_memory * qsrs.count_executions'
+         WHEN 'total tempdb' THEN CASE WHEN @new = 1 THEN N'qsrs.avg_tempdb_space_used * qsrs.count_executions' ELSE N'qsrs.avg_cpu_time * qsrs.count_executions' END
+         WHEN 'total rows' THEN N'qsrs.avg_rowcount * qsrs.count_executions'
          ELSE N'qsrs.avg_cpu_time'
     END +
     N') DESC
@@ -6606,10 +6654,10 @@ BEGIN
     MAX(((qsrs_with_lasts.partitioned_last_num_physical_io_reads * 8.) / 1024.)),
     MIN(((qsrs_with_lasts.min_num_physical_io_reads * 8.) / 1024.)),
     MAX(((qsrs_with_lasts.max_num_physical_io_reads * 8.) / 1024.)),
-    AVG((qsrs_with_lasts.avg_log_bytes_used / 100000000.)),
-    MAX((qsrs_with_lasts.partitioned_last_log_bytes_used / 100000000.)),
-    MIN((qsrs_with_lasts.min_log_bytes_used / 100000000.)),
-    MAX((qsrs_with_lasts.max_log_bytes_used / 100000000.)),
+    AVG((qsrs_with_lasts.avg_log_bytes_used / 1048576.)),
+    MAX((qsrs_with_lasts.partitioned_last_log_bytes_used / 1048576.)),
+    MIN((qsrs_with_lasts.min_log_bytes_used / 1048576.)),
+    MAX((qsrs_with_lasts.max_log_bytes_used / 1048576.)),
     AVG(((qsrs_with_lasts.avg_tempdb_space_used * 8) / 1024.)),
     MAX(((qsrs_with_lasts.partitioned_last_tempdb_space_used * 8) / 1024.)),
     MIN(((qsrs_with_lasts.min_tempdb_space_used * 8) / 1024.)),
@@ -6678,7 +6726,7 @@ FROM
                     qsrs.plan_id,
                     qsrs.execution_type
                 ORDER BY
-                    qsrs.runtime_stats_interval_id DESC
+                    qsrs.runtime_stats_interval_id ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             ),
         partitioned_last_duration =
@@ -6688,7 +6736,7 @@ FROM
                     qsrs.plan_id,
                     qsrs.execution_type
                 ORDER BY
-                    qsrs.runtime_stats_interval_id DESC
+                    qsrs.runtime_stats_interval_id ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             ),
         partitioned_last_cpu_time =
@@ -6698,7 +6746,7 @@ FROM
                     qsrs.plan_id,
                     qsrs.execution_type
                 ORDER BY
-                    qsrs.runtime_stats_interval_id DESC
+                    qsrs.runtime_stats_interval_id ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             ),
         partitioned_last_logical_io_reads =
@@ -6708,7 +6756,7 @@ FROM
                     qsrs.plan_id,
                     qsrs.execution_type
                 ORDER BY
-                    qsrs.runtime_stats_interval_id DESC
+                    qsrs.runtime_stats_interval_id ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             ),
         partitioned_last_logical_io_writes =
@@ -6718,7 +6766,7 @@ FROM
                     qsrs.plan_id,
                     qsrs.execution_type
                 ORDER BY
-                    qsrs.runtime_stats_interval_id DESC
+                    qsrs.runtime_stats_interval_id ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             ),
         partitioned_last_physical_io_reads =
@@ -6728,7 +6776,7 @@ FROM
                     qsrs.plan_id,
                     qsrs.execution_type
                 ORDER BY
-                    qsrs.runtime_stats_interval_id DESC
+                    qsrs.runtime_stats_interval_id ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             ),
         partitioned_last_clr_time =
@@ -6738,7 +6786,7 @@ FROM
                     qsrs.plan_id,
                     qsrs.execution_type
                 ORDER BY
-                    qsrs.runtime_stats_interval_id DESC
+                    qsrs.runtime_stats_interval_id ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             ),
         partitioned_last_dop =
@@ -6748,7 +6796,7 @@ FROM
                     qsrs.plan_id,
                     qsrs.execution_type
                 ORDER BY
-                    qsrs.runtime_stats_interval_id DESC
+                    qsrs.runtime_stats_interval_id ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             ),
         partitioned_last_query_max_used_memory =
@@ -6758,7 +6806,7 @@ FROM
                     qsrs.plan_id,
                     qsrs.execution_type
                 ORDER BY
-                    qsrs.runtime_stats_interval_id DESC
+                    qsrs.runtime_stats_interval_id ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             ),
         partitioned_last_rowcount =
@@ -6768,7 +6816,7 @@ FROM
                     qsrs.plan_id,
                     qsrs.execution_type
                 ORDER BY
-                    qsrs.runtime_stats_interval_id DESC
+                    qsrs.runtime_stats_interval_id ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             ),';
 
@@ -6783,7 +6831,7 @@ BEGIN
                     qsrs.plan_id,
                     qsrs.execution_type
                 ORDER BY
-                    qsrs.runtime_stats_interval_id DESC
+                    qsrs.runtime_stats_interval_id ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             ),
         partitioned_last_log_bytes_used =
@@ -6793,7 +6841,7 @@ BEGIN
                     qsrs.plan_id,
                     qsrs.execution_type
                 ORDER BY
-                    qsrs.runtime_stats_interval_id DESC
+                    qsrs.runtime_stats_interval_id ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             ),
         partitioned_last_tempdb_space_used =
@@ -6803,7 +6851,7 @@ BEGIN
                     qsrs.plan_id,
                     qsrs.execution_type
                 ORDER BY
-                    qsrs.runtime_stats_interval_id DESC
+                    qsrs.runtime_stats_interval_id ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             )';
 END;
@@ -6901,6 +6949,14 @@ SELECT
              WHEN 'executions' THEN N'qsrs.count_executions'
              WHEN 'recent' THEN N'qsrs.last_execution_time'
              WHEN 'rows' THEN N'qsrs.avg_rowcount'
+             WHEN 'total cpu' THEN N'qsrs.avg_cpu_time * qsrs.count_executions'
+             WHEN 'total logical reads' THEN N'qsrs.avg_logical_io_reads * qsrs.count_executions'
+             WHEN 'total physical reads' THEN N'qsrs.avg_physical_io_reads * qsrs.count_executions'
+             WHEN 'total writes' THEN N'qsrs.avg_logical_io_writes * qsrs.count_executions'
+             WHEN 'total duration' THEN N'qsrs.avg_duration * qsrs.count_executions'
+             WHEN 'total memory' THEN N'qsrs.avg_query_max_used_memory * qsrs.count_executions'
+             WHEN 'total tempdb' THEN CASE WHEN @new = 1 THEN N'qsrs.avg_tempdb_space_used * qsrs.count_executions' ELSE N'qsrs.avg_cpu_time * qsrs.count_executions' END
+             WHEN 'total rows' THEN N'qsrs.avg_rowcount * qsrs.count_executions'
              WHEN 'plan count by hashes' THEN N'hashes.plan_hash_count_for_query_hash DESC,
                 hashes.query_hash'
              ELSE CASE WHEN @sort_order_is_a_wait = 1 THEN N'waits.total_query_wait_time_ms' ELSE N'qsrs.avg_cpu_time' END
@@ -7058,6 +7114,14 @@ SELECT
     qsp.is_trivial_plan,
     qsp.is_parallel_plan,
     qsp.is_forced_plan,
+    toggle_forcing =
+        CASE
+            qsp.is_forced_plan
+            WHEN 1
+            THEN ''EXECUTE ' + @database_name_quoted + '.sys.sp_query_store_unforce_plan @query_id = '' + CONVERT(nvarchar(20), qsp.query_id) +  '', @plan_id = '' + CONVERT(nvarchar(20), qsp.plan_id) + '';''
+            WHEN 0
+            THEN ''EXECUTE ' + @database_name_quoted + '.sys.sp_query_store_force_plan @query_id = '' + CONVERT(nvarchar(20), qsp.query_id) +  '', @plan_id = '' + CONVERT(nvarchar(20), qsp.plan_id) + '', @disable_optimized_plan_forcing = ? ;''
+        END,
     qsp.is_natively_compiled,
     qsp.force_failure_count,
     qsp.last_force_failure_reason_desc,
@@ -7150,6 +7214,7 @@ WITH
     is_trivial_plan,
     is_parallel_plan,
     is_forced_plan,
+    toggle_forcing,
     is_natively_compiled,
     force_failure_count,
     last_force_failure_reason_desc,
@@ -7234,9 +7299,9 @@ SELECT
     (qsq.last_optimize_duration / 1000.),
     (qsq.avg_optimize_cpu_time / 1000.),
     (qsq.last_optimize_cpu_time / 1000.),
-    ((qsq.avg_compile_memory_kb * 8) / 1024.),
-    ((qsq.last_compile_memory_kb * 8) / 1024.),
-    ((qsq.max_compile_memory_kb * 8) / 1024.),
+    (qsq.avg_compile_memory_kb / 1024.),
+    (qsq.last_compile_memory_kb / 1024.),
+    (qsq.max_compile_memory_kb / 1024.),
     qsq.is_clouddb_internal_query
 FROM #query_store_plan AS qsp
 CROSS APPLY
@@ -7295,7 +7360,7 @@ WITH
 )
 EXECUTE sys.sp_executesql
     @sql,
-  N'@database_id int',
+  N'@database_id integer',
     @database_id;
 
 IF @troubleshoot_performance = 1
@@ -7351,7 +7416,7 @@ BEGIN
       WHEN 1
       THEN N',
         SUM(qsrs.count_executions * (qsrs.avg_num_physical_io_reads * 8)) / 1024.,
-        SUM(qsrs.count_executions * qsrs.avg_log_bytes_used) / 100000000.,
+        SUM(qsrs.count_executions * qsrs.avg_log_bytes_used) / 1048576.,
         SUM(qsrs.count_executions * (qsrs.avg_tempdb_space_used * 8)) / 1024.'
       ELSE N',
         NULL,
@@ -7404,7 +7469,7 @@ BEGIN
     )
     EXECUTE sys.sp_executesql
         @sql,
-      N'@database_id int',
+      N'@database_id integer',
         @database_id;
 
     IF @troubleshoot_performance = 1
@@ -7498,7 +7563,7 @@ WITH
 )
 EXECUTE sys.sp_executesql
     @sql,
-  N'@database_id int',
+  N'@database_id integer',
     @database_id;
 
 IF @troubleshoot_performance = 1
@@ -7610,7 +7675,7 @@ FROM
                 PARTITION BY
                     deqs.sql_handle
                 ORDER BY
-                    deqs.last_execution_time DESC
+                    deqs.last_execution_time ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             ),
         partitioned_last_used_grant_kb =
@@ -7619,7 +7684,7 @@ FROM
                 PARTITION BY
                     deqs.sql_handle
                 ORDER BY
-                    deqs.last_execution_time DESC
+                    deqs.last_execution_time ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             ),
         partitioned_last_ideal_grant_kb =
@@ -7628,7 +7693,7 @@ FROM
                 PARTITION BY
                     deqs.sql_handle
                 ORDER BY
-                    deqs.last_execution_time DESC
+                    deqs.last_execution_time ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             ),
        partitioned_last_reserved_threads =
@@ -7637,7 +7702,7 @@ FROM
                PARTITION BY
                    deqs.sql_handle
                ORDER BY
-                   deqs.last_execution_time DESC
+                   deqs.last_execution_time ASC
                ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
            ),
        partitioned_last_used_threads =
@@ -7646,7 +7711,7 @@ FROM
                PARTITION BY
                    deqs.sql_handle
                ORDER BY
-                   deqs.last_execution_time DESC
+                   deqs.last_execution_time ASC
                ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
            )
     FROM sys.dm_exec_query_stats AS deqs
@@ -7868,7 +7933,7 @@ WITH
 )
 EXECUTE sys.sp_executesql
     @sql,
-  N'@database_id int',
+  N'@database_id integer',
     @database_id;
 
 IF @troubleshoot_performance = 1
@@ -7956,7 +8021,7 @@ FROM
                     qsws.execution_type,
                     qsws.wait_category_desc
                 ORDER BY
-                    qsws.runtime_stats_interval_id DESC
+                    qsws.runtime_stats_interval_id ASC
                 ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING
             )
     FROM #query_store_runtime_stats AS qsrs
@@ -8003,7 +8068,7 @@ OPTION(RECOMPILE);' + @nc10;
     )
     EXECUTE sys.sp_executesql
         @sql,
-      N'@database_id int',
+      N'@database_id integer',
         @database_id;
 
     IF @troubleshoot_performance = 1
@@ -8094,7 +8159,7 @@ WITH
 )
 EXECUTE sys.sp_executesql
     @sql,
-  N'@database_id int',
+  N'@database_id integer',
     @database_id;
 
 IF @troubleshoot_performance = 1
@@ -8271,7 +8336,7 @@ OPTION(RECOMPILE);' + @nc10;
     )
     EXECUTE sys.sp_executesql
         @sql,
-      N'@database_id int',
+      N'@database_id integer',
         @database_id;
 
     IF @troubleshoot_performance = 1
@@ -8341,7 +8406,7 @@ OPTION(RECOMPILE);' + @nc10;
     )
     EXECUTE sys.sp_executesql
         @sql,
-      N'@database_id int',
+      N'@database_id integer',
         @database_id;
 
     IF @troubleshoot_performance = 1
@@ -8417,7 +8482,7 @@ OPTION(RECOMPILE);' + @nc10;
     )
     EXECUTE sys.sp_executesql
         @sql,
-      N'@database_id int',
+      N'@database_id integer',
         @database_id;
 
     IF @troubleshoot_performance = 1
@@ -8492,7 +8557,7 @@ OPTION(RECOMPILE);' + @nc10;
         )
         EXECUTE sys.sp_executesql
             @sql,
-          N'@database_id int',
+          N'@database_id integer',
             @database_id;
 
         IF @troubleshoot_performance = 1
@@ -8562,7 +8627,7 @@ OPTION(RECOMPILE);' + @nc10;
         )
         EXECUTE sys.sp_executesql
             @sql,
-          N'@database_id int',
+          N'@database_id integer',
             @database_id;
 
         IF @troubleshoot_performance = 1
@@ -8582,6 +8647,87 @@ OPTION(RECOMPILE);' + @nc10;
                 @current_table;
         END;
     END; /*End AG queries*/
+
+    /*database_automatic_tuning_configurations*/
+    SELECT
+        @current_table = 'inserting #database_automatic_tuning_configurations',
+        @sql = @isolation_level;
+
+    IF @troubleshoot_performance = 1
+    BEGIN
+        EXECUTE sys.sp_executesql
+            @troubleshoot_insert,
+          N'@current_table nvarchar(100)',
+            @current_table;
+
+        SET STATISTICS XML ON;
+    END;
+
+    SELECT
+        @sql += N'
+SELECT
+    @database_id,
+    datc.[option],
+    datc.option_value,
+    datc.[type],
+    type_value =
+        CONVERT
+        (
+            nvarchar(120),
+            datc.type_value
+        ),
+    datc.details,
+    datc.[state]
+FROM ' + @database_name_quoted + N'.sys.database_automatic_tuning_configurations AS datc
+WHERE EXISTS
+      (
+          SELECT
+              1/0
+          FROM #query_store_plan AS qsp
+          WHERE TRY_CAST(datc.type_value AS bigint) = qsp.query_id
+      )
+OPTION(RECOMPILE);' + @nc10;
+
+    IF @debug = 1
+    BEGIN
+        PRINT LEN(@sql);
+        PRINT @sql;
+    END;
+
+    INSERT
+        #database_automatic_tuning_configurations
+    WITH
+        (TABLOCK)
+    (
+        database_id,
+        [option],
+        option_value,
+        [type],
+        type_value,
+        details,
+        [state]
+    )
+    EXECUTE sys.sp_executesql
+        @sql,
+      N'@database_id integer',
+        @database_id;
+
+    IF @troubleshoot_performance = 1
+    BEGIN
+        SET STATISTICS XML OFF;
+
+        EXECUTE sys.sp_executesql
+            @troubleshoot_update,
+          N'@current_table nvarchar(100)',
+            @current_table;
+
+        EXECUTE sys.sp_executesql
+            @troubleshoot_info,
+          N'@sql nvarchar(max),
+            @current_table nvarchar(100)',
+            @sql,
+            @current_table;
+    END;
 END; /*End SQL 2022 views*/
 
 FETCH NEXT
@@ -8623,6 +8769,7 @@ FROM
             WHEN @include_plan_hashes IS NOT NULL
             OR   @ignore_plan_hashes IS NOT NULL
             OR   @sort_order = 'plan count by hashes'
+            OR   @expert_mode = 1
             THEN N'
         qsp.query_plan_hash,'
             ELSE N''
@@ -8777,7 +8924,7 @@ FROM
     (
         nvarchar(max),
         N'
-        FROM #query_store_runtime_stats AS qsrs'
+    FROM #query_store_runtime_stats AS qsrs'
     );
 
     /*
@@ -8996,6 +9143,14 @@ ORDER BY
                   WHEN 'executions' THEN N'x.count_executions'
                   WHEN 'recent' THEN N'x.last_execution_time'
                   WHEN 'rows' THEN N'x.avg_rowcount'
+                  WHEN 'total cpu' THEN N'x.total_cpu_time_ms'
+                  WHEN 'total logical reads' THEN N'x.total_logical_io_reads_mb'
+                  WHEN 'total physical reads' THEN N'x.total_physical_io_reads_mb'
+                  WHEN 'total writes' THEN N'x.total_logical_io_writes_mb'
+                  WHEN 'total duration' THEN N'x.total_duration_ms'
+                  WHEN 'total memory' THEN N'x.total_query_max_used_memory_mb'
+                  WHEN 'total tempdb' THEN CASE WHEN @new = 1 THEN N'x.total_tempdb_space_used_mb' ELSE N'x.total_cpu_time_ms' END
+                  WHEN 'total rows' THEN N'x.total_rowcount'
                   WHEN 'plan count by hashes' THEN N'x.plan_hash_count_for_query_hash DESC,
     x.query_hash_from_hash_counting'
                   ELSE CASE WHEN @sort_order_is_a_wait = 1 THEN N'x.total_wait_time_from_sort_order_ms' ELSE N'x.avg_cpu_time_ms' END
@@ -9008,34 +9163,42 @@ ORDER BY
          THEN
              CASE WHEN @regression_mode = 1
                   AND @regression_direction IN ('improved', 'better')
-                  THEN 'TRY_PARSE(replace(x.change_in_average_for_query_hash_since_regression_time_period, ''%'', '''') AS money) ASC,
+                  THEN 'TRY_PARSE(REPLACE(x.change_in_average_for_query_hash_since_regression_time_period, ''%'', '''') AS decimal(19,2)) ASC,
                         x.query_hash_from_regression_checking,
                         x.from_regression_baseline_time_period'
                   WHEN @regression_mode = 1
                   AND @regression_direction IN ('regressed', 'worse')
-                  THEN 'TRY_PARSE(replace(x.change_in_average_for_query_hash_since_regression_time_period, ''%'', '''') AS money) DESC,
+                  THEN 'TRY_PARSE(REPLACE(x.change_in_average_for_query_hash_since_regression_time_period, ''%'', '''') AS decimal(19,2)) DESC,
                         x.query_hash_from_regression_checking,
                         x.from_regression_baseline_time_period'
                   WHEN @regression_mode = 1
                   AND @regression_direction IN ('magnitude', 'absolute')
-                  THEN 'ABS(TRY_PARSE(replace(x.change_in_average_for_query_hash_since_regression_time_period, ''%'', '''') AS money)) DESC,
+                  THEN 'ABS(TRY_PARSE(REPLACE(x.change_in_average_for_query_hash_since_regression_time_period, ''%'', '''') AS decimal(19,2))) DESC,
                         x.query_hash_from_regression_checking,
                         x.from_regression_baseline_time_period'
              ELSE
              CASE @sort_order
-                  WHEN 'cpu' THEN N'TRY_PARSE(x.avg_cpu_time_ms AS money)'
-                  WHEN 'logical reads' THEN N'TRY_PARSE(x.avg_logical_io_reads_mb AS money)'
-                  WHEN 'physical reads' THEN N'TRY_PARSE(x.avg_physical_io_reads_mb AS money)'
-                  WHEN 'writes' THEN N'TRY_PARSE(x.avg_logical_io_writes_mb AS money)'
-                  WHEN 'duration' THEN N'TRY_PARSE(x.avg_duration_ms AS money)'
-                  WHEN 'memory' THEN N'TRY_PARSE(x.avg_query_max_used_memory_mb AS money)'
-                  WHEN 'tempdb' THEN CASE WHEN @new = 1 THEN N'TRY_PARSE(x.avg_tempdb_space_used_mb AS money)' ELSE N'TRY_PARSE(x.avg_cpu_time_ms AS money)' END
-                  WHEN 'executions' THEN N'TRY_PARSE(x.count_executions AS money)'
+                  WHEN 'cpu' THEN N'TRY_PARSE(x.avg_cpu_time_ms AS decimal(19,2))'
+                  WHEN 'logical reads' THEN N'TRY_PARSE(x.avg_logical_io_reads_mb AS decimal(19,2))'
+                  WHEN 'physical reads' THEN N'TRY_PARSE(x.avg_physical_io_reads_mb AS decimal(19,2))'
+                  WHEN 'writes' THEN N'TRY_PARSE(x.avg_logical_io_writes_mb AS decimal(19,2))'
+                  WHEN 'duration' THEN N'TRY_PARSE(x.avg_duration_ms AS decimal(19,2))'
+                  WHEN 'memory' THEN N'TRY_PARSE(x.avg_query_max_used_memory_mb AS decimal(19,2))'
+                  WHEN 'tempdb' THEN CASE WHEN @new = 1 THEN N'TRY_PARSE(x.avg_tempdb_space_used_mb AS decimal(19,2))' ELSE N'TRY_PARSE(x.avg_cpu_time_ms AS decimal(19,2))' END
+                  WHEN 'executions' THEN N'TRY_PARSE(x.count_executions AS decimal(19,2))'
                   WHEN 'recent' THEN N'x.last_execution_time'
-                  WHEN 'rows' THEN N'TRY_PARSE(x.avg_rowcount AS money)'
-                  WHEN 'plan count by hashes' THEN N'TRY_PARSE(x.plan_hash_count_for_query_hash AS money) DESC,
+                  WHEN 'rows' THEN N'TRY_PARSE(x.avg_rowcount AS decimal(19,2))'
+                  WHEN 'total cpu' THEN N'TRY_PARSE(x.total_cpu_time_ms AS decimal(19,2))'
+                  WHEN 'total logical reads' THEN N'TRY_PARSE(x.total_logical_io_reads_mb AS decimal(19,2))'
+                  WHEN 'total physical reads' THEN N'TRY_PARSE(x.total_physical_io_reads_mb AS decimal(19,2))'
+                  WHEN 'total writes' THEN N'TRY_PARSE(x.total_logical_io_writes_mb AS decimal(19,2))'
+                  WHEN 'total duration' THEN N'TRY_PARSE(x.total_duration_ms AS decimal(19,2))'
+                  WHEN 'total memory' THEN N'TRY_PARSE(x.total_query_max_used_memory_mb AS decimal(19,2))'
+                  WHEN 'total tempdb' THEN CASE WHEN @new = 1 THEN N'TRY_PARSE(x.total_tempdb_space_used_mb AS decimal(19,2))' ELSE N'TRY_PARSE(x.total_cpu_time_ms AS decimal(19,2))' END
+                  WHEN 'total rows' THEN N'TRY_PARSE(x.total_rowcount AS decimal(19,2))'
+                  WHEN 'plan count by hashes' THEN N'TRY_PARSE(x.plan_hash_count_for_query_hash AS decimal(19,2)) DESC,
     x.query_hash_from_hash_counting'
-                  ELSE CASE WHEN @sort_order_is_a_wait = 1 THEN N'TRY_PARSE(x.total_wait_time_from_sort_order_ms AS money)' ELSE N'TRY_PARSE(x.avg_cpu_time_ms AS money)' END
+                  ELSE CASE WHEN @sort_order_is_a_wait = 1 THEN N'TRY_PARSE(x.total_wait_time_from_sort_order_ms AS decimal(19,2))' ELSE N'TRY_PARSE(x.avg_cpu_time_ms AS decimal(19,2))' END
              END END
     END
              + N' DESC
@@ -9196,6 +9359,8 @@ BEGIN
                     qsqh.query_hint_id,
                     qsqh.query_id,
                     qsqh.query_hint_text,
+                    remove_hint =
+                        ''EXECUTE '' + QUOTENAME(DB_NAME(qsqh.database_id)) + ''.sys.sp_query_store_clear_hints @query_id = '' + CONVERT(nvarchar(20), qsqh.query_id) + '';'',
                     qsqh.last_query_hint_failure_reason_desc,
                     query_hint_failure_count = ' +
                     CASE
@@ -9318,6 +9483,34 @@ BEGIN
                 END;
             END;
         END; /*@ags_present*/
+
+        IF @expert_mode = 1
+        BEGIN
+            IF EXISTS
+               (
+                   SELECT
+                       1/0
+                   FROM #database_automatic_tuning_configurations AS datc
+               )
+            BEGIN
+                SELECT
+                    @current_table = 'selecting #database_automatic_tuning_configurations';
+
+                SELECT
+                    database_name =
+                        DB_NAME(datc.database_id),
+                    datc.[option],
+                    datc.option_value,
+                    datc.[type],
+                    datc.type_value,
+                    datc.details,
+                    datc.[state]
+                FROM #database_automatic_tuning_configurations AS datc
+                ORDER BY
+                    datc.[option]
+                OPTION(RECOMPILE);
+            END;
+        END;
     END; /*End 2022 views*/
 
     IF @expert_mode = 1
@@ -9571,12 +9764,11 @@ BEGIN
     IF @rc > 0
     BEGIN
         SELECT
-            @current_table = 'selecting resource stats';
-
-        SET @sql = N'';
+            @current_table = 'selecting resource stats',
+            @sql = @isolation_level;
 
         SELECT
-            @sql =
+            @sql +=
         CONVERT
         (
             nvarchar(max),
@@ -9797,12 +9989,11 @@ BEGIN
                 Wait stats by query
                 */
                 SELECT
-                    @current_table = 'selecting wait stats by query';
-
-                SET @sql = N'';
+                    @current_table = 'selecting wait stats by query',
+                    @sql = @isolation_level;
 
                 SELECT
-                    @sql =
+                    @sql +=
                 CONVERT
                 (
                     nvarchar(max),
@@ -9937,12 +10128,11 @@ BEGIN
                 Wait stats in total
                 */
                 SELECT
-                    @current_table = 'selecting wait stats in total';
-
-                SET @sql = N'';
+                    @current_table = 'selecting wait stats in total',
+                    @sql = @isolation_level;
 
                 SELECT
-                    @sql =
+                    @sql +=
                 CONVERT
                 (
                     nvarchar(max),
@@ -10117,7 +10307,7 @@ BEGIN
     BEGIN
         SELECT
             @current_table = 'selecting query store options',
-            @sql = N'';
+            @sql = @isolation_level;
 
         SELECT
             @sql +=
@@ -10490,7 +10680,7 @@ BEGIN
             @only_queries_with_hints,
         only_query_with_feedback =
             @only_queries_with_feedback,
-        only_query_with_hints =
+        only_query_with_variants =
             @only_queries_with_variants,
         only_queries_with_forced_plans =
             @only_queries_with_forced_plans,
@@ -11644,6 +11834,29 @@ BEGIN
                     result =
                         '#query_store_plan_forcing_locations is empty';
             END;
+        END;
+
+        IF EXISTS
+           (
+              SELECT
+                  1/0
+              FROM #database_automatic_tuning_configurations AS datc
+           )
+        BEGIN
+            SELECT
+                table_name =
+                    '#database_automatic_tuning_configurations',
+                datc.*
+            FROM #database_automatic_tuning_configurations AS datc
+            ORDER BY
+                datc.[option]
+            OPTION(RECOMPILE);
+        END;
+        ELSE
+        BEGIN
+            SELECT
+                result =
+                    '#database_automatic_tuning_configurations is empty';
         END;
 
         IF EXISTS
