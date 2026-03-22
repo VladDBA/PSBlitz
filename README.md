@@ -287,7 +287,9 @@ Execution plans file naming convention:
 ## Usage examples
 
 You can run PSBlitz.ps1 by simply right-clicking on the script and then clicking on "Run With PowerShell" which will execute the script in interactive mode, prompting you for the required input.\
-Note that parameters like `-DebugMode`, `-OutputDir`, `-CacheTop`, and `-MaxTimeout` are only available in command line mode.
+Note that parameters like `-DebugMode` and `-MaxTimeout` are only available in command line mode.
+
+As of version 6.0.0 you can also run PSBlitzUI.ps1 by simply right-clicking on the script and then clicking on "Run With PowerShell". This will open a GUI form to provide input parameters instead of running it from the command line.
 
 Otherwise you can navigate in PowerShell to the directory where the script is and execute it by providing parameters and appropriate values.
 
@@ -311,79 +313,85 @@ Otherwise you can navigate in PowerShell to the directory where the script is an
    Get-Help .\PSBlitz.ps1 -Full
    ```
 
-2. Run it against the whole instance (named instance SQL01), with default checks via integrated security
+2. Run in GUI mode
+
+    ```PowerShell
+    .\PSBlitz.ps1 -GUI
+    ```
+
+3. Run it against the whole instance (named instance SQL01), with default checks via integrated security
 
     ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01
     ```
 
-3. Run it against the whole instance listening on port 1433 on host Server01, with default checks via integrated security
+4. Run it against the whole instance listening on port 1433 on host Server01, with default checks via integrated security
 
     ```PowerShell
     .\PSBlitz.ps1 Server01,1433
     ```
 
-4. Run it against the whole instance, with in-depth checks via integrated security
+5. Run it against the whole instance, with in-depth checks via integrated security
 
     ```PowerSHell
     .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y
     ```
 
-5. Run it against the whole instance, with in-depth checks via integrated security, and have sp_BlitzWho execute every 5 seconds
+6. Run it against the whole instance, with in-depth checks via integrated security, and have sp_BlitzWho execute every 5 seconds
 
     ```PowerSHell
     .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y -BlitzWhoDelay 5
     ```
 
-6. Run it with in-depth checks, limit sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only, via integrated security
+7. Run it with in-depth checks, limit sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only, via integrated security
 
     ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y -CheckDB YourDatabase
     ```
 
-7. Run it against the whole instance, with default checks via SQL login and password
+8. Run it against the whole instance, with default checks via SQL login and password
 
     ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01 -SQLLogin DBA1 -SQLPass SuperSecurePassword
     ```
 
-8. Run it against a default instance residing on Server02, with in-depth checks via SQL login and password, while limmiting sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only
+9. Run it against a default instance residing on Server02, with in-depth checks via SQL login and password, while limmiting sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only
 
     ```PowerShell
     .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
     ```
 
-9. Run the same command as above, but increase execution timeout for sp_BlitzIndex, stats and index info retrieval, while also increasing delay between sp_BlitzWHo executions as well as getting more verbose console output and saving the output directory to C:\temp
+10. Run the same command as above, but increase execution timeout for sp_BlitzIndex, stats and index info retrieval, while also increasing delay between sp_BlitzWHo executions as well as getting more verbose console output and saving the output directory to C:\temp
 
     ```PowerShell
     .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase -MaxTimeout 1200 -BlitzWhoDelay 20 -DebugInfo -OutputDir C:\Temp
     ```
 
-10. Run PSBlitz but return the report as HTML instead of XLSX while also creating a zip archive of the output files.
+11. Run PSBlitz but return the report as HTML instead of XLSX while also creating a zip archive of the output files.
 
     ```PowerShell
     .\PSBlitz.ps1 Server01\SQL01 -ToHTML Y -ZipOutput Y 
     ```
 
-11. Run it against the YourDatabase database hosted in Azure SQL DB at yourserver.database.windows.net port 1433 via SQL login and password
+12. Run it against the YourDatabase database hosted in Azure SQL DB at yourserver.database.windows.net port 1433 via SQL login and password
 
     ```PowerShell
     .\PSBlitz.ps1 yourserver.database.windows.net,1433:YourDatabase -SQLLogin DBA1 -SQLPass SuperSecurePassword
     ```
 
-12. Run it against the Azure SQL Managed Instance yourserver.database.windows.net
+13. Run it against the Azure SQL Managed Instance yourserver.database.windows.net
 
     ```PowerShell
     .\PSBlitz.ps1 yourserver.database.windows.net -SQLLogin DBA1 -SQLPass SuperSecurePassword
     ```
 
-13. Run it against the Azure SQL Managed Instance yourserver.database.windows.net with an in-depth check while limiting index, stats, plan cache, and database info to YourDatabase
+14. Run it against the Azure SQL Managed Instance yourserver.database.windows.net with an in-depth check while limiting index, stats, plan cache, and database info to YourDatabase
 
     ```PowerShell
     .\PSBlitz.ps1 yourserver.database.windows.net -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
     ```
 
-14. Run it against a default instance residing on Server02, with HTML output, in-depth checks via SQL login and password, while limmiting most checks to YourDatabase only, and also limiting the query information returned from the plan cache to the past 2 hours
+15. Run it against a default instance residing on Server02, with HTML output, in-depth checks via SQL login and password, while limmiting most checks to YourDatabase only, and also limiting the query information returned from the plan cache to the past 2 hours
 
     ```PowerShell
     .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -ToHTML Y -IsIndepth Y -CheckDB YourDatabase -CacheMinutesBack 120
