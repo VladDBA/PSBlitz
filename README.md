@@ -334,19 +334,19 @@ Otherwise you can navigate in PowerShell to the directory where the script is an
 5. Run it against the whole instance, with in-depth checks via integrated security
 
     ```PowerSHell
-    .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y
+    .\PSBlitz.ps1 Server01\SQL01 -InDepth
     ```
 
 6. Run it against the whole instance, with in-depth checks via integrated security, and have sp_BlitzWho execute every 5 seconds
 
     ```PowerSHell
-    .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y -BlitzWhoDelay 5
+    .\PSBlitz.ps1 Server01\SQL01 -InDepth -BlitzWhoDelay 5
     ```
 
 7. Run it with in-depth checks, limit sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only, via integrated security
 
     ```PowerShell
-    .\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y -CheckDB YourDatabase
+    .\PSBlitz.ps1 Server01\SQL01 -InDepth -CheckDB YourDatabase
     ```
 
 8. Run it against the whole instance, with default checks via SQL login and password
@@ -358,19 +358,19 @@ Otherwise you can navigate in PowerShell to the directory where the script is an
 9. Run it against a default instance residing on Server02, with in-depth checks via SQL login and password, while limmiting sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only
 
     ```PowerShell
-    .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
+    .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -InDepth -CheckDB YourDatabase
     ```
 
 10. Run the same command as above, but increase execution timeout for sp_BlitzIndex, stats and index info retrieval, while also increasing delay between sp_BlitzWHo executions as well as getting more verbose console output and saving the output directory to C:\temp
 
     ```PowerShell
-    .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase -MaxTimeout 1200 -BlitzWhoDelay 20 -DebugInfo -OutputDir C:\Temp
+    .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -InDepth -CheckDB YourDatabase -MaxTimeout 1200 -BlitzWhoDelay 20 -DebugInfo -OutputDir C:\Temp
     ```
 
 11. Run PSBlitz but return the report as HTML instead of XLSX while also creating a zip archive of the output files.
 
     ```PowerShell
-    .\PSBlitz.ps1 Server01\SQL01 -ToHTML Y -ZipOutput Y 
+    .\PSBlitz.ps1 Server01\SQL01 -ToHTML -ZipOutput 
     ```
 
 12. Run it against the YourDatabase database hosted in Azure SQL DB at yourserver.database.windows.net port 1433 via SQL login and password
@@ -388,13 +388,13 @@ Otherwise you can navigate in PowerShell to the directory where the script is an
 14. Run it against the Azure SQL Managed Instance yourserver.database.windows.net with an in-depth check while limiting index, stats, plan cache, and database info to YourDatabase
 
     ```PowerShell
-    .\PSBlitz.ps1 yourserver.database.windows.net -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
+    .\PSBlitz.ps1 yourserver.database.windows.net -SQLLogin DBA1 -SQLPass SuperSecurePassword -InDepth -CheckDB YourDatabase
     ```
 
 15. Run it against a default instance residing on Server02, with HTML output, in-depth checks via SQL login and password, while limmiting most checks to YourDatabase only, and also limiting the query information returned from the plan cache to the past 2 hours
 
     ```PowerShell
-    .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -ToHTML Y -IsIndepth Y -CheckDB YourDatabase -CacheMinutesBack 120
+    .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -ToHTML -InDepth -CheckDB YourDatabase -CacheMinutesBack 120
     ```
 
 Note that `-ServerName` is a positional parameter, so you don't necessarily have to specify the parameter's name as long as the first thing after the script's name is the instance
