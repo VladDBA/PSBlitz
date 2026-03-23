@@ -227,11 +227,11 @@ dark-mode.js, PSBlitzGUI.ps1, and styles.css, is held by Vlad Drumea, 2026 as de
  Run it against the whole instance listening on port 1433 on host Server01, with default checks via integrated security
 
 .EXAMPLE
- PS>.\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y
+ PS>.\PSBlitz.ps1 Server01\SQL01 -InDepth
  Run it against the whole instance, with in-depth checks via integrated security
 
 .EXAMPLE
- PS>.\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y -CheckDB YourDatabase
+ PS>.\PSBlitz.ps1 Server01\SQL01 -InDepth -CheckDB YourDatabase
  Run it with in-depth checks, limit sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only, via integrated security
 
 .EXAMPLE
@@ -243,18 +243,18 @@ dark-mode.js, PSBlitzGUI.ps1, and styles.css, is held by Vlad Drumea, 2026 as de
  Run it against the YourDatabase database hosted in Azure SQL DB at myserver.database.windows.net port 1433 via SQL login and password
 
 .EXAMPLE
-  PS>.\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
+  PS>.\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -InDepth -CheckDB YourDatabase
   Run it against a default instance residing on Server02, with in-depth checks via SQL login and password, 
  while limmiting sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to YourDatabase only
 
 .EXAMPLE
- PS>.\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase -MaxTimeout 1200 -BlitzWhoDelay 20 -DebugInfo -OutputDir C:\Temp
+ PS>.\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -InDepth -CheckDB YourDatabase -MaxTimeout 1200 -BlitzWhoDelay 20 -DebugInfo -OutputDir C:\Temp
  Run the same command as above, but increase execution timeout for sp_BlitzIndex, stats and index info retrieval, 
  while also increasing delay between sp_BlitzWHo executions as well as getting more verbose console output 
  and saving the output directory to C:\temp
 
 .EXAMPLE
- PS>.\PSBlitz.ps1 Server01\SQL01 -ToHTML Y -ZipOutput Y
+ PS>.\PSBlitz.ps1 Server01\SQL01 -ToHTML -ZipOutput
  Run PSBlitz but output the report as HTML instead of XLSX while also creating a zip archive of the output files.
 
 .EXAMPLE
@@ -266,7 +266,7 @@ dark-mode.js, PSBlitzGUI.ps1, and styles.css, is held by Vlad Drumea, 2026 as de
  Run it against the Azure SQL Managed Instance yourserver.database.windows.net
 
 .EXAMPLE
- PS>.\PSBlitz.ps1 yourserver.database.windows.net -SQLLogin DBA1 -SQLPass SuperSecurePassword -IsIndepth Y -CheckDB YourDatabase
+ PS>.\PSBlitz.ps1 yourserver.database.windows.net -SQLLogin DBA1 -SQLPass SuperSecurePassword -InDepth -CheckDB YourDatabase
  Run it against the Azure SQL Managed Instance yourserver.database.windows.net with an in-depth check while limiting index, stats, plan cache, and database info to YourDatabase
 
 #>
@@ -324,7 +324,7 @@ param(
 ###Internal params
 #Version
 $Vers = "6.0.0"
-$VersDate = "2026-03-22"
+$VersDate = "2026-03-23"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -438,12 +438,12 @@ You can either run the script directly in PowerShell from its directory:
 	Write-Host "`n Run it against a default instance installed on Server01"
 	Write-Host ".\PSBlitz.ps1 Server01" -fore green
 	Write-Host "`n Run it against the whole instance, with in-depth checks via integrated security"
-	Write-Host ".\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y" -fore green
+	Write-Host ".\PSBlitz.ps1 Server01\SQL01 -InDepth" -fore green
 	Write-Host "`n Run it against the whole instance and output the report as HTML"
-	Write-Host ".\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y -ToHTML Y" -fore green
+	Write-Host ".\PSBlitz.ps1 Server01\SQL01 -InDepth -ToHTML" -fore green
 	Write-Host "`n Run it with in-depth checks, limit sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock to 
 YourDatabase only, via integrated security"
-	Write-Host ".\PSBlitz.ps1 Server01\SQL01 -IsIndepth Y -CheckDB YourDatabase" -fore green
+	Write-Host ".\PSBlitz.ps1 Server01\SQL01 -InDepth -CheckDB YourDatabase" -fore green
 	Write-Host "`n Run it against the whole instance, with default checks via SQL login and password"
 	Write-Host ".\PSBlitz.ps1 Server01\SQL01 -SQLLogin DBA1 -SQLPass SuperSecurePassword" -fore green
 	Write-Host "`n Run it against the YourDatabase database hosted in Azure SQL DB at myserver.database.windows.net port 1433 via SQL login and password"
@@ -2129,7 +2129,7 @@ if ($script:StepOutcome -eq "Success") {
 #####################################################################################
 $StepStart = Get-Date
 $StepEnd = Get-Date
-$ParametersUsed = "IsIndepth:$InDepth; CheckDB:$CheckDB;`n BlitzWhoDelay:$BlitzWhoDelay; MaxTimeout:$MaxTimeout"
+$ParametersUsed = "InDepth:$InDepth; CheckDB:$CheckDB;`n BlitzWhoDelay:$BlitzWhoDelay; MaxTimeout:$MaxTimeout"
 $ParametersUsed += ";`n ConnTimeout:$ConnTimeout; CacheTop:$CacheTop;`n ASDBName:$ASDBName; CacheMinutesBack:$CacheMinutesBack"
 $ParametersUsed += if ($IsQueryStoreInterval) { ";`n QueryStoreIntervalStart:$QueryStoreIntervalStart; QueryStoreIntervalEnd:$QueryStoreIntervalEnd" } else { "" }
 $ParametersUsed += ";`n QueryStoreTop:$QueryStoreTop"
