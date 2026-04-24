@@ -277,47 +277,33 @@ dark-mode.js, PSBlitzGUI.ps1, and styles.css, is held by Vlad Drumea, 2026 as de
 param(
 	[Parameter(Position = 0, Mandatory = $False)]
 	[string[]]$ServerName,
-	[Parameter(Mandatory = $False)]
 	[string]$SQLLogin,
-	[Parameter(Mandatory = $False)]
 	[string]$SQLPass,
-	[Parameter(Mandatory = $False)]
 	[switch]$InDepth,
-	[Parameter(Mandatory = $False)]
 	[string]$CheckDB,
-	[Parameter(Mandatory = $False)]
 	[string]$Help,
-	[Parameter(Mandatory = $False)]
+	[ValidateRange(1, 120)]
 	[int]$BlitzWhoDelay = 10,
-	[Parameter(Mandatory = $False)]
 	[switch]$DebugInfo,
-	[Parameter(Mandatory = $False)]
+	[ValidateRange(10, 3600)]
 	[int]$MaxTimeout = 1000,
-	[Parameter(Mandatory = $False)]
+	[ValidateRange(10, 100)]
 	[int]$ConnTimeout = 45,
-	[Parameter(Mandatory = $False)]
 	[string]$OutputDir,
-	[Parameter(Mandatory = $False)]
 	[switch]$ToHTML,
-	[Parameter(Mandatory = $False)]
 	[switch]$ZipOutput,
-	[Parameter(Mandatory = $False)]
+	[ValidateRange(0, 100)]
 	[int]$CacheTop = 10,
-	[Parameter(Mandatory = $False)]
+	[ValidateRange(0, 2880)]
 	[int]$CacheMinutesBack = 0,
-	[Parameter(Mandatory = $False)]
+	[ValidateRange(50, 300)]
 	[int]$MaxUsrDBs = 50,
-	[Parameter(Mandatory = $False)]
 	[string[]]$SkipChecks,
-	[Parameter(Mandatory = $False)]
 	[string]$QueryStoreIntervalStart,
-	[Parameter(Mandatory = $False)]
 	[string]$QueryStoreIntervalEnd,
-	[Parameter(Mandatory = $False)]
+	[ValidateRange(0, 100)]
 	[int]$QueryStoreTop = 20,
-	[Parameter(Mandatory = $False)]
 	[switch]$KeepPSOpen = $False,
-	[Parameter(Mandatory = $False)]
 	[switch]$GUI = $False
 )
 
@@ -337,7 +323,7 @@ $ResourcesPath = Join-Path -Path $ScriptPath -ChildPath "Resources"
 $OrigExcelFName = "PSBlitzOutput.xlsx"
 $DefaultTimeout = 600
 $ExitPrompt = "Press Enter to end script execution."
-if($KeepPSOpen) {
+if ($KeepPSOpen) {
 	$ExitPrompt = "Press Enter to close PowerShell."
 }
 
@@ -346,7 +332,7 @@ $ResourceList = @("PSBlitzOutput.xlsx", "spBlitz_NonSPLatest.sql", "spBlitzCache
 	"spBlitzWho_NonSPLatest.sql", "GetBlitzWhoData.sql", "GetInstanceInfo.sql", "GetTempDBUsageInfo.sql", 
 	"GetOpenTransactions.sql", "GetStatsInfoForWholeDB.sql", "GetIndexInfoForWholeDB.sql", "GetDbInfo.sql", 
 	"GetAzureSQLDBInfo.sql", "GetObjectsWithDangerousOptions.sql", "searchtable.js", "sorttable.js", "styles.css", 
-	"copy.js", "spQuickieStore_NonSPLatest.sql", "GetQSStatus.sql", "dark-mode.js")
+	"copy.js", "spQuickieStore_NonSPLatest.sql", "spBlitzBackups_NonSPLatest.sql", "GetQSStatus.sql", "dark-mode.js")
 
 ## we use these to make sure someone didn't modify the scripts in the Resources folder
 $storedHashes = @{
@@ -367,6 +353,7 @@ $storedHashes = @{
 	"GetObjectsWithDangerousOptions.sql" = "AFE74F2FE6D6077AEBF169CC16DE036B08980846E6795DC342372AB8C2A132A9"
 	"spQuickieStore_NonSPLatest.sql"     = "3084C1C5E42AC3FBCBD4100403C9475F4518572A71516EA06D2871D480A04280"
 	"GetQSStatus.sql"                    = "A0D6E7B1C6BC5B0ED5FDF6FD14C5927729F883CB491342F81DCD9BD48A4ACCFE"
+	"spBlitzBackups_NonSPLatest.sql"     = "EE6726CF56899859A5EB6B63BE4EF01C04C1C64DCD0756AA1A0AF9F84C64B8D9"
 }
 
 #Set path+name of the input Excel file
@@ -668,29 +655,17 @@ function Convert-TableToHtml {
 	param (
 		[Parameter(Position = 0, Mandatory = $true)]
 		[System.Data.DataTable] $DataTable,
-		[Parameter(Mandatory = $false)]
 		[switch] $DebugInfo,
-		[Parameter(Mandatory = $false)]
 		[switch] $HasURLs,
-		[Parameter(Mandatory = $false)]
 		[string] $HyperlinkCol = 'x',
-		[Parameter(Mandatory = $false)]
 		[string[]] $ExclCols,
-		[Parameter(Mandatory = $false)]
 		[string[]] $DateTimeCols,
-		[Parameter(Mandatory = $false)]
 		[string] $CSSClass,
-		[Parameter(Mandatory = $false)]
 		[string] $TblID,
-		[Parameter(Mandatory = $false)]
 		[switch] $NoCaseChange,
-		[Parameter(Mandatory = $false)]
 		[switch] $AnchorFromHere,
-		[Parameter(Mandatory = $false)]
 		[switch] $AnchorToHere,
-		[Parameter(Mandatory = $false)]
 		[string[]] $AnchorIDs,
-		[Parameter(Mandatory = $false)]
 		[string] $AnchorExt = '.query'
 	)
 
@@ -838,17 +813,11 @@ function Convert-QueryTableToHtml {
 	param (
 		[Parameter(Position = 0, Mandatory = $true)]
 		[System.Data.DataTable] $DataTable,
-		[Parameter(Mandatory = $false)]
 		[switch] $DebugInfo,
-		[Parameter(Mandatory = $false)]
 		[string[]] $Cols,
-		[Parameter(Mandatory = $false)]
 		[switch] $AnchorToHere,
-		[Parameter(Mandatory = $false)]
 		[string] $CSSClass,
-		[Parameter(Mandatory = $false)]
 		[string] $AnchorID,
-		[Parameter(Mandatory = $false)]
 		[string] $AnchorExt = '.query'
 	)
 	try {
@@ -1022,21 +991,13 @@ function Convert-TableToExcel {
 		[System.Data.DataTable]$DataTable,
 		[Parameter(Position = 1, Mandatory = $true)]
 		$ExcelSheet,
-		[Parameter(Mandatory = $false)]
 		[int]$StartRow = 1,
-		[Parameter(Mandatory = $false)]
 		[int]$StartCol = 1,
-		[Parameter(Mandatory = $false)]
 		[string[]]$ColumnOrder,
-		[Parameter(Mandatory = $false)]
 		[string[]]$ExclCols,
-		[Parameter(Mandatory = $false)]
 		[string[]]$URLCols,
-		[Parameter(Mandatory = $false)]
 		[switch]$DebugInfo,
-		[Parameter(Mandatory = $false)]
 		[int]$MapURLToColNum,
-		[Parameter(Mandatory = $false)]
 		[string]$URLTextCol
 	)
 
@@ -1158,9 +1119,7 @@ function Write-PSBlitzDebug {
 	param (
 		[Parameter(Mandatory = $true)]
 		[string]$Message,
-		[Parameter(Mandatory = $false)]
 		[string]$Color = "Yellow",
-		[Parameter(Mandatory = $false)]
 		[switch]$NoNewLine
 	)
 	if ($DebugInfo) {
@@ -1372,14 +1331,14 @@ $IsGoogleCloudSQL = $false
 if (([string]::IsNullOrEmpty($ServerName)) -and ($GUI)) {
 	$GUIScript = Join-Path -Path $ScriptPath -ChildPath "PSBlitzGUI.ps1"
 	if (Test-Path -Path $GUIScript) {
-        $PSExe = if ($PSVersionTable.PSVersion.Major -ge 7) { "pwsh" } else { "powershell" }
-        Start-Process -FilePath $PSExe -NoNewWindow -ArgumentList @(
-            "-NoProfile",
-            "-ExecutionPolicy", "Bypass",
-            "-File", $GUIScript 
-        )
-        exit
-    } else {
+		$PSExe = if ($PSVersionTable.PSVersion.Major -ge 7) { "pwsh" } else { "powershell" }
+		Start-Process -FilePath $PSExe -NoNewWindow -ArgumentList @(
+			"-NoProfile",
+			"-ExecutionPolicy", "Bypass",
+			"-File", $GUIScript 
+		)
+		exit
+	} else {
 		Write-Host " GUI script not found at $GUIScript" -ForegroundColor Red
 		$GUI = $false
 	}
@@ -2642,6 +2601,59 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 				Save-ExcelFile $ExcelFile
 			}
 			Invoke-ClearVariables DBInfoTbl, DBFileInfoTbl, PSBlitzSet
+		}
+	}
+
+	#####################################################################################
+	#						sp_BlitzBackups												#
+	#####################################################################################
+	if ((-not $IsAzureSQLDB) -and (-not $IsAzureSQLMI) -and (-not $IsGoogleCloudSQL)) {
+		Write-Host " Retrieving backup info... " -NoNewline
+		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzBackups_NonSPLatest.sql"
+		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
+		if (!([string]::IsNullOrEmpty($CheckDB))) {
+			[string]$Query = $Query -replace ";SET @CheckDatabaseName = N'';", ";SET @CheckDatabaseName = N'$CheckDB';"
+		}
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Backup Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
+		if ($script:StepOutcome -eq "Success") {
+			$RecoverabilityTbl = $script:PSBlitzSet.Tables[0]
+			$BackupsTbl = $script:PSBlitzSet.Tables[1]
+			$WarningTbl = $script:PSBlitzSet.Tables[2]
+			[int]$RowsReturned = $BackupsTbl.Rows.Count
+			if ($RowsReturned -le 0) {
+				Write-Host " ->No backup history found."
+			} else {
+				if ($ToHTML) {
+					$tableName = "Backup Info"
+					if (!([string]::IsNullOrEmpty($CheckDB))) {
+						$tableName += " for $CheckDB" 
+					}
+					if ($WarningTbl.Rows.Count -gt 0) {
+						$htmlTable = Convert-TableToHtml $WarningTbl -DebugInfo:$DebugInfo -NoCaseChange 
+						$WarnBlock = @" 
+					<h2>Backup Warnings</h2>`n<p><a href="#BackupDtl">Jump to Backup Details</a></p>
+					$htmlTable `n<br>`n
+"@
+
+					} else {
+						$WarnBlock = "<p>No warnings found.</p>"
+					}
+					$htmlTable1 = Convert-TableToHtml $BackupsTbl -CSSClass "backup-details sortable" -DebugInfo:$DebugInfo -NoCaseChange
+					$htmlTable2 = Convert-TableToHtml $RecoverabilityTbl -CSSClass "recoverability-info sortable" -DebugInfo:$DebugInfo -NoCaseChange
+
+					$html = $HTMLPre + @"
+		        <title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1> $DarkModeDiv
+				$WarnBlock
+				<h2 id="BackupDtl">Backup Details</h2>
+				$htmlTable1 `n $JumpToTop `n<br>`n<h2>Recoverability Info</h2>`n $htmlTable2 `n $JumpToTop `n 
+				$HTMLBodyEnd
+"@ 
+
+					#Save HTML file
+					Save-HtmlFile $html "BackupInfo.html" $HTMLOutDir $DebugInfo
+					Invoke-ClearVariables html, htmlTable, htmlTable1, htmlTable2, WarnBlock
+				}
+			}
 		}
 	}
 
@@ -4493,6 +4505,12 @@ finally {
 				$PageName = "Objects with dangerous SET options"
 				$Description = "A list of database objects created with dangerous SET options"
 				$QuerySource += "sys.sql_modules, sys.objects"
+			} elseif ($File.Name -like "BackupInfo*") {
+				$PageName = "Backup Information"
+				$Description = "Information about the latest backups for all databases on the instance."
+				$QuerySource += "Similar to sp_BlitzBackup;"
+			} else {
+				$PageName = $Description
 			}
 			$IndexContent += "`n<tr><td><a href=`"$RelativePath`">$PageName</a></td><td class=`"tooltip`" title=`"$QuerySource`">$Description</td>$Plans $DLGraphs $RLim</tr>"
 		}

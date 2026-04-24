@@ -268,6 +268,65 @@ th.sortable:hover {
 }
 
 /*
+ ## Recoverability Info
+*/
+.recoverability-info {
+	td {
+		vertical-align: top;
+	}
+	td:nth-child(n+2):nth-child(-n+7) {
+		text-align: right;
+	}
+	td:nth-child(9) {
+		text-align: right;
+	}
+	td:nth-child(n+11) {
+		text-align: right;
+	}
+
+	/*truncate wide/tall cells and only show additional text on hover */
+	td:nth-child(8) {
+          max-width: 22ch;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+       } 
+	td:nth-child(8):hover {
+            white-space: normal;
+             max-width: none;
+       }
+	
+	td:nth-child(10) {
+          max-width: 22ch;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+       } 
+	td:nth-child(10):hover {
+            white-space: normal;
+             max-width: none;
+       }
+}
+
+/*
+ ## Backup details
+*/
+.backup-details {
+    td:nth-child(2) {
+		text-align: center;
+	}
+	td:nth-child(n+3):nth-child(-n+15) {
+		text-align: right;
+	}
+	td:nth-child(n+16):nth-child(-n+17) {
+		text-align: center;
+	}
+	td:nth-child(n+18) {
+		text-align: right;
+	}
+}
+
+/*
  ## Session activity (agg and raw)
 */
 

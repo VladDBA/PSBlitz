@@ -431,17 +431,17 @@ For feature requests, open an issue with the enhancement label
 
 ## Screenshots
 
-![GIF](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/GIF_000.gif)
-![Screenshot1](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img001.png)
-![Screenshot2](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img002.png)
-![Screenshot4](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img004.png)
+![GIF](Screenshots/GIF_000.gif)
+![Screenshot1](Screenshots/Img001.png)
+![Screenshot2](Screenshots/Img002.png)
+![Screenshot4](Screenshots/Img004.png)
 
 ### GUI
 
-![Screenshot6](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img006.png)
+![Screenshot6](Screenshots/Img006.png)
 
 ### Default check intro page
 
-![Screenshot5](https://raw.githubusercontent.com/VladDBA/PSBlitz/main/Screenshots/Img005.png)
+![Screenshot5](Screenshots/Img005.png)
 
 [*Back to top*](#header1)
