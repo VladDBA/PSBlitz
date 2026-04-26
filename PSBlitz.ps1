@@ -340,7 +340,7 @@ $storedHashes = @{
 	"spBlitzCache_NonSPLatest.sql"       = "9106020B4522DEEED8F880644EDC54F802F62FEDA065B70D88DE5809AB6B8053"
 	"spBlitzFirst_NonSPLatest.sql"       = "AADCA23451E7541F6166BEC36DBE5BF70D50CBCA7E6FEF336D689395AD19B8BA"
 	"spBlitzIndex_NonSPLatest.sql"       = "90B0E2ACCD0F85FB9F01349E9363BA21269FBAFB6C318D6B0F9767677AD0F69F"
-	"spBlitzLock_NonSPLatest.sql"        = "981B7464FF1CA907FA97B795080FC090CCF4042AA7ECAF01F3AD38358D9EB639"
+	"spBlitzLock_NonSPLatest.sql"        = "8CAE24E093AB963DED3BBE71109A6E885A989F9F83C3C3EF13AA9E646D72E456"
 	"spBlitzWho_NonSPLatest.sql"         = "0784460C360D8BE8F6B183D61E38876DA4948562D8971C96EB76B8FCCC79C8CF"
 	"GetBlitzWhoData.sql"                = "76C6BD414726E9DB911F83E9AB6442CF72DA18F0ADAD1A941AA816FFC4C3C0BD"
 	"GetInstanceInfo.sql"                = "29AA65809886BB2FC870B0DF49256850C4347562ABDDAD29E5BEC6D76C86036F"
@@ -353,7 +353,7 @@ $storedHashes = @{
 	"GetObjectsWithDangerousOptions.sql" = "AFE74F2FE6D6077AEBF169CC16DE036B08980846E6795DC342372AB8C2A132A9"
 	"spQuickieStore_NonSPLatest.sql"     = "3084C1C5E42AC3FBCBD4100403C9475F4518572A71516EA06D2871D480A04280"
 	"GetQSStatus.sql"                    = "A0D6E7B1C6BC5B0ED5FDF6FD14C5927729F883CB491342F81DCD9BD48A4ACCFE"
-	"spBlitzBackups_NonSPLatest.sql"     = "EE6726CF56899859A5EB6B63BE4EF01C04C1C64DCD0756AA1A0AF9F84C64B8D9"
+	"spBlitzBackups_NonSPLatest.sql"     = "7CF890974B622C154CE29D37FDB9A6AFD7CDC8D801B678E3BF92E0AB017153E7"
 }
 
 #Set path+name of the input Excel file
@@ -732,9 +732,9 @@ function Convert-TableToHtml {
 			if ($CSSClass -like "*sortable*") {
 				$htmlTableOut = $htmlTableOut -replace "<th>", "<th class=`"sortable`">"
 			}
-			if ($CSSClass -eq "instance-health-tbl") {
+			if ( "bkp-warnings-tbl" , "instance-health-tbl" -contains $CSSClass) {
 				#Split Instance Health details after each dot to avoid wide table
-				$htmlTableOut = $htmlTableOut -replace '\.\s', ". `n"
+				$htmlTableOut = $htmlTableOut -replace '\.\s', ".`n"
 				#change background for Priority 1-50
 				$htmlTableOut = $htmlTableOut -replace '>([1-9]|[1-4][0-9]|50)<', ' class="instance-health-tbl-p1">$1<'
 			} elseif ($TblID -eq "setopt") {
@@ -868,7 +868,7 @@ function Convert-QueryTableToHtml {
 		} else {
 			$htmlTableOut = $htmlTableOut -replace '<table>', '<table style="white-space:pre-wrap; word-wrap:normal">'
 		}
-		#Lazy way to remove empty rows, will try to fix later 
+		#Lazy way to remove empty rows in open transactions check, will try to fix later 
 		$htmlTableOut = $htmlTableOut -replace "<tr><td></td><td></td></tr>", ""
 		if ($DebugInfo) {
 			$StepEnd = Get-Date
@@ -2629,23 +2629,26 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 						$tableName += " for $CheckDB" 
 					}
 					if ($WarningTbl.Rows.Count -gt 0) {
-						$htmlTable = Convert-TableToHtml $WarningTbl -DebugInfo:$DebugInfo -NoCaseChange 
+						$htmlTable = Convert-TableToHtml $WarningTbl -DebugInfo:$DebugInfo -NoCaseChange -CSSClass "bkp-warnings-tbl" -TblID "BkpWarningsTable"
 						$WarnBlock = @" 
-					<h2>Backup Warnings</h2>`n<p><a href="#BackupDtl">Jump to Backup Details</a></p>
+					<h2>Backup Warnings</h2>`n<p><a href="#Recoverability">Jump to Recoverability</a></p>
 					$htmlTable `n<br>`n
 "@
 
 					} else {
 						$WarnBlock = "<p>No warnings found.</p>"
 					}
-					$htmlTable1 = Convert-TableToHtml $BackupsTbl -CSSClass "backup-details sortable" -DebugInfo:$DebugInfo -NoCaseChange
-					$htmlTable2 = Convert-TableToHtml $RecoverabilityTbl -CSSClass "recoverability-info sortable" -DebugInfo:$DebugInfo -NoCaseChange
+					$htmlTable1 = Convert-TableToHtml $BackupsTbl -TblID "BackupDetailsTable" -CSSClass "backup-details sortable" -DebugInfo:$DebugInfo -NoCaseChange
+					$htmlTable2 = Convert-TableToHtml $RecoverabilityTbl -TblID "RecoverabilityTable" -CSSClass "recoverability-info sortable" -DebugInfo:$DebugInfo -NoCaseChange
 
 					$html = $HTMLPre + @"
 		        <title>$tableName</title>`n $HTMLBodyStart `n<h1 id="top">$tableName</h1> $DarkModeDiv
 				$WarnBlock
-				<h2 id="BackupDtl">Backup Details</h2>
-				$htmlTable1 `n $JumpToTop `n<br>`n<h2>Recoverability Info</h2>`n $htmlTable2 `n $JumpToTop `n 
+				<h2 id="Recoverability">Recoverability</h2>	
+				$(if($RecoverabilityTbl.Rows.Count -gt 10){ $SearchTableDiv -replace $STDivReplace,"'RecoverabilityTable', 0" -replace 'object', 'database'})			
+				$htmlTable2 `n $JumpToTop `n<h2 id="BackupDtl">Backup Details</h2> 
+				$(if($BackupsTbl.Rows.Count -gt 10){ $SearchTableDiv -replace $STDivReplace,"'BackupDetailsTable', 0" -replace 'object', 'database'})
+				$htmlTable1 `n $JumpToTop `n 
 				$HTMLBodyEnd
 "@ 
 

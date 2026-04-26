@@ -268,7 +268,7 @@ th.sortable:hover {
 }
 
 /*
- ## Recoverability Info
+ ## Backup info
 */
 .recoverability-info {
 	td {
@@ -276,6 +276,7 @@ th.sortable:hover {
 	}
 	td:nth-child(n+2):nth-child(-n+7) {
 		text-align: right;
+		white-space: nowrap;
 	}
 	td:nth-child(9) {
 		text-align: right;
@@ -308,21 +309,27 @@ th.sortable:hover {
        }
 }
 
-/*
- ## Backup details
-*/
+
 .backup-details {
     td:nth-child(2) {
 		text-align: center;
 	}
 	td:nth-child(n+3):nth-child(-n+15) {
 		text-align: right;
+		white-space: nowrap;
 	}
 	td:nth-child(n+16):nth-child(-n+17) {
 		text-align: center;
 	}
 	td:nth-child(n+18) {
 		text-align: right;
+	}
+}
+
+.bkp-warnings-tbl {
+	td:nth-child(4) {
+		white-space: pre-wrap;
+		word-wrap: normal;
 	}
 }
 
@@ -711,8 +718,9 @@ th.sortable:hover {
 		vertical-align: top;
 	}
 
-	td:nth-child(n+4):nth-child(-n+25) {
+	td:nth-child(n+4){
 		text-align: right;
+		white-space: nowrap;
 	}
 
 }

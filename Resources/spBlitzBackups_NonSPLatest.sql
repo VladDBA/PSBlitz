@@ -993,7 +993,7 @@ RAISERROR('Rules analysis starting', 0, 1) WITH NOWAIT;
 
 	SET @StringToExecute += N'SELECT 
 								4 AS CheckId,
-								100 AS [Priority],
+								200 AS [Priority],
 								b.database_name AS [Database Name],
 								''Snapshot backups'' AS [Finding],
 								''The database '' + QUOTENAME(b.database_name) + '' has had '' + CONVERT(VARCHAR(10), COUNT(*)) + '' snapshot backups. This message is purely informational.'' AS [Warning]
@@ -1013,7 +1013,7 @@ RAISERROR('Rules analysis starting', 0, 1) WITH NOWAIT;
 
 	SET @StringToExecute += N'SELECT 
 								5 AS CheckId,
-								100 AS [Priority],
+								150 AS [Priority],
 								b.database_name AS [Database Name],
 								''Read only state backups'' AS [Finding],
 								''The database '' + QUOTENAME(b.database_name) + '' has been backed up '' + CONVERT(VARCHAR(10), COUNT(*)) + '' times while in a read-only state. This can be normal if it''''s a secondary, but a bit odd otherwise.'' AS [Warning]
@@ -1033,7 +1033,7 @@ RAISERROR('Rules analysis starting', 0, 1) WITH NOWAIT;
 
 	SET @StringToExecute += N'SELECT 
 								6 AS CheckId,
-								100 AS [Priority],
+								50 AS [Priority],
 								b.database_name AS [Database Name],
 								''Single user mode backups'' AS [Finding],
 								''The database '' + QUOTENAME(b.database_name) + '' has been backed up '' + CONVERT(VARCHAR(10), COUNT(*)) + '' times while in single-user mode. This is really weird! Make sure your backup process doesn''''t include a mode change anywhere.'' AS [Warning]
@@ -1053,20 +1053,20 @@ RAISERROR('Rules analysis starting', 0, 1) WITH NOWAIT;
 
 	SET @StringToExecute += N'SELECT 
 								7 AS CheckId,
-								100 AS [Priority],
+								20 AS [Priority],
 								b.database_name AS [Database Name],
 								''No CHECKSUMS'' AS [Finding],
-								''The database '' + QUOTENAME(b.database_name) + '' has been backed up '' + CONVERT(VARCHAR(10), COUNT(*)) + '' times without CHECKSUMS in the past 30 days. CHECKSUMS can help alert you to corruption errors.'' AS [Warning]
+								''The database '' + QUOTENAME(b.database_name) + '' has been backed up '' + CONVERT(VARCHAR(10), COUNT(*)) + '' times without CHECKSUMS. CHECKSUMS can help alert you to corruption errors.'' AS [Warning]
 							FROM   ' + QUOTENAME(@MSDBName) + N'.dbo.backupset AS b
 							WHERE b.has_backup_checksums = 0
-							AND b.backup_finish_date >= DATEADD(DAY, -30, SYSDATETIME())
+							AND b.backup_finish_date >= @StartTime
 							GROUP BY b.database_name;' + @crlf;
 
 	IF @Debug = 1
 		PRINT @StringToExecute;
 
 		INSERT #Warnings ( CheckId, Priority, DatabaseName, Finding, Warning )
-		EXEC sys.sp_executesql @StringToExecute;
+		EXEC sys.sp_executesql @StringToExecute, N'@StartTime DATETIME2', @StartTime;
 	
 	/*Damaged is a Black Flag album. You don''t want your backups to be like a Black Flag album. */
 
@@ -1074,7 +1074,7 @@ RAISERROR('Rules analysis starting', 0, 1) WITH NOWAIT;
 
 	SET @StringToExecute += N'SELECT 
 								8 AS CheckId,
-								100 AS [Priority],
+								10 AS [Priority],
 								b.database_name AS [Database Name],
 								''Damaged backups'' AS [Finding],
 								''The database '' + QUOTENAME(b.database_name) + '' has had '' + CONVERT(VARCHAR(10), COUNT(*)) + '' damaged backups taken without stopping to throw an error. This is done by specifying CONTINUE_AFTER_ERROR in your BACKUP commands.'' AS [Warning]
@@ -1146,10 +1146,10 @@ IF @ProductVersionMajor >= 12
 
 	SET @StringToExecute += N'SELECT 
 		11 AS CheckId,
-		100 AS [Priority],
+		10 AS [Priority],
 		b.database_name AS [Database Name],
 		''Recovery model switched'' AS [Finding],
-		''The database '' + QUOTENAME(b.database_name) + '' has changed recovery models from between FULL and SIMPLE '' + CONVERT(VARCHAR(10), COUNT(DISTINCT b.recovery_model)) + '' times. This breaks the log chain and is generally a bad idea.'' AS [Warning]
+		''The database '' + QUOTENAME(b.database_name) + '' has changed recovery models between FULL and SIMPLE '' + CONVERT(VARCHAR(10), COUNT(DISTINCT b.recovery_model)) + '' times. This breaks the log chain and is generally a bad idea.'' AS [Warning]
 	FROM   ' + QUOTENAME(@MSDBName) + '.dbo.backupset AS b
 	WHERE b.recovery_model <> ''BULK-LOGGED''
 	GROUP BY b.database_name
@@ -1167,40 +1167,76 @@ IF @ProductVersionMajor >= 12
 
 	SET @StringToExecute += N'SELECT 
 		12 AS CheckId,
-		100 AS [Priority],
+		80 AS [Priority],
 		b.database_name AS [Database Name],
 		''Uncompressed backups'' AS [Finding],
-		''The database '' + QUOTENAME(b.database_name) + '' has had '' + CONVERT(VARCHAR(10), COUNT(*)) + '' uncompressed backups in the last 30 days. This is a free way to save time and space. And SPACETIME. If your version of SQL supports it.'' AS [Warning]
+		''The database '' + QUOTENAME(b.database_name) + '' has had '' + CONVERT(VARCHAR(10), COUNT(*)) + '' uncompressed backups. This is a free way to save time and space. And SPACETIME. If your version of SQL supports it.'' AS [Warning]
 	FROM   ' + QUOTENAME(@MSDBName) + '.dbo.backupset AS b
 	WHERE backup_size = compressed_backup_size AND type = ''D''
-	AND b.backup_finish_date >= DATEADD(DAY, -30, SYSDATETIME())
+	AND b.backup_finish_date >= @StartTime
 	GROUP BY b.database_name;' + @crlf;
 
 	IF @Debug = 1
 		PRINT @StringToExecute;
 
 		INSERT #Warnings ( CheckId, Priority, DatabaseName, Finding, Warning )
-		EXEC sys.sp_executesql @StringToExecute;
+		EXEC sys.sp_executesql @StringToExecute, N'@StartTime DATETIME2', @StartTime;
+
+	/*Looking for backups directed at the NUL device.*/
+	SET @StringToExecute =N'SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED;' + @crlf;
+
+	SET @StringToExecute += N'SELECT 
+		14 AS CheckId,
+		20 AS [Priority],
+		bs.database_name AS [Database Name],
+		''Backup to NUL device'' AS [Finding],
+		''The database '' + QUOTENAME(bs.database_name) + '' has had '' + CONVERT(VARCHAR(10), COUNT(*)) + '' backups to the NUL device, the latest one being on ''+
+		CONVERT(NVARCHAR(25),MAX(bs.backup_finish_date),120)+''. These backups do not exist.'' AS [Warning]
+	FROM   ' + QUOTENAME(@MSDBName) + '.dbo.backupset AS bs
+	INNER JOIN ' + QUOTENAME(@MSDBName) + '.dbo.backupmediafamily bmf ON bs.media_set_id = bmf.media_set_id
+	WHERE UPPER(bmf.physical_device_name)= N''NUL''
+	AND (bs.is_copy_only = 1 OR bs.recovery_model = N''SIMPLE'')
+	AND bs.backup_finish_date >= @StartTime
+	GROUP BY bs.database_name' + @crlf;
+	SET @StringToExecute += N'UNION' + @crlf + N'SELECT 
+		14 AS CheckId,
+		10 AS [Priority],
+		bs.database_name AS [Database Name],
+		''Backup to NUL device without COPY_ONLY'' AS [Finding],
+		''The database '' + QUOTENAME(bs.database_name) + '' is not in SIMPLE recovery model and has had '' + CONVERT(VARCHAR(10), COUNT(*)) + '' backups to the NUL device, the latest one being on ''+
+		CONVERT(NVARCHAR(25),MAX(bs.backup_finish_date),120)+''. These backups do not exist and they might mess up your current backup chain.'' AS [Warning]
+	FROM   ' + QUOTENAME(@MSDBName) + '.dbo.backupset AS bs
+	INNER JOIN ' + QUOTENAME(@MSDBName) + '.dbo.backupmediafamily bmf ON bs.media_set_id = bmf.media_set_id
+	WHERE UPPER(bmf.physical_device_name)= N''NUL''
+	AND bs.is_copy_only = 0 AND bs.recovery_model <> N''SIMPLE''
+	AND bs.backup_finish_date >= @StartTime
+	GROUP BY bs.database_name' + @crlf;
+
+	IF @Debug = 1
+		PRINT @StringToExecute;
+
+		INSERT #Warnings ( CheckId, Priority, DatabaseName, Finding, Warning )
+		EXEC sys.sp_executesql @StringToExecute, N'@StartTime DATETIME2', @StartTime;
 
 RAISERROR('Rules analysis starting on temp tables', 0, 1) WITH NOWAIT;
 
 		INSERT #Warnings ( CheckId, Priority, DatabaseName, Finding, Warning )
 		SELECT
 			13 AS CheckId,
-			100 AS Priority,
+			50 AS Priority,
 			r.DatabaseName as [DatabaseName],
 			'Big Diffs' AS [Finding],
-			'On average, Differential backups for this database are >=40% of the size of the average Full backup.' AS [Warning]
+			'On average, Differential backups for this database are >=40% of the size of the average Full backup. You might want to consider taking Differential backups more often.' AS [Warning]
 			FROM #Recoverability AS r
 			WHERE r.IsBigDiff = 1
 
 		INSERT #Warnings ( CheckId, Priority, DatabaseName, Finding, Warning )
 		SELECT
 			13 AS CheckId,
-			100 AS Priority,
+			50 AS Priority,
 			r.DatabaseName as [DatabaseName],
 			'Big Logs' AS [Finding],
-			'On average, Log backups for this database are >=20% of the size of the average Full backup.' AS [Warning]
+			'On average, Log backups for this database are >=20% of the size of the average Full backup. You might want to consider taking Log backups more often.' AS [Warning]
 			FROM #Recoverability AS r
 			WHERE r.IsBigLog = 1
 
