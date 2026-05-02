@@ -2655,8 +2655,40 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 					#Save HTML file
 					Save-HtmlFile $html "BackupInfo.html" $HTMLOutDir $DebugInfo
 					Invoke-ClearVariables html, htmlTable, htmlTable1, htmlTable2, WarnBlock
+				} else {
+					##Populating the "Backup Details" sheet
+					$ExcelSheet = $ExcelFile.Worksheets.Item("Backup Details")
+					#Specify at which row in the sheet to start adding the data
+					$ExcelStartRow = $DefaultStartRow
+					
+					Convert-TableToExcel $BackupsTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo
+
+					Save-ExcelFile $ExcelFile
+
+					
+					$ExcelSheet = $ExcelFile.Worksheets.Item("Recoverability")
+					#Specify at which row in the sheet to start adding the data
+					$ExcelStartRow = 3
+					#Specify with which column in the sheet to start
+					$ExcelColNum = 7
+					
+					Convert-TableToExcel $RecoverabilityTbl $ExcelSheet -StartRow $ExcelStartRow -StartCol $ExcelColNum -DebugInfo:$DebugInfo
+
+					##Saving file 
+					Save-ExcelFile $ExcelFile
+
+					$ExcelStartRow = 3
+					#Specify with which column in the sheet to start
+					$ExcelColNum = 1
+					
+					Convert-TableToExcel $WarningTbl $ExcelSheet -StartRow $ExcelStartRow -StartCol $ExcelColNum -DebugInfo:$DebugInfo
+
+					##Saving file 
+					Save-ExcelFile $ExcelFile
 				}
 			}
+			##Cleaning up variables
+			Invoke-ClearVariables RecoverabilityTbl, BackupsTbl, WarningTbl, PSBlitzSet		
 		}
 	}
 
