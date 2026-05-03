@@ -304,12 +304,13 @@ param(
 	[ValidateRange(0, 100)]
 	[int]$QueryStoreTop = 20,
 	[switch]$KeepPSOpen = $False,
-	[switch]$GUI = $False
+	[switch]$GUI = $False,
+	[switch]$ForceImportExcel = $False
 )
 
 ###Internal params
 #Version
-$Vers = "6.0.0"
+$Vers = "6.1.0"
 $VersDate = "2026-03-23"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
@@ -1019,29 +1020,60 @@ function Convert-TableToExcel {
 			$StepStart = Get-Date
 		}
 
-		foreach ($row in $DataTable) {
-			foreach ($col in $DataSetCols) {
-				[string]$script:DebugCol = $col
-				[string]$script:DebugValue = $DataTable.Rows[$RowNum][$col]
-				if ($URLCols -contains $col) {
-					if ($DataTable.Rows[$RowNum][$col] -like "http*") {
-						$ExcelSheet.Hyperlinks.Add(
-							$ExcelSheet.Cells.Item($ExcelStartRow, $MapURLToColNum),
-							$DataTable.Rows[$RowNum][$col],
-							"",
-							"Click for more info",
-							$DataTable.Rows[$RowNum][$URLTextCol]
-						) | Out-Null
+		if ($script:UseImportExcel) {
+			#if we have URL columns, we're doing this in a loop to add hyperlinks, otherwise we can just dump the whole table in one go which is much faster
+			if ($URLCols) {
+				foreach ($row in $DataTable) {
+					foreach ($col in $DataSetCols) {
+						[string]$script:DebugCol = $col
+						[string]$script:DebugValue = $DataTable.Rows[$RowNum][$col]
+						if ($URLCols -contains $col) {
+							if ($DataTable.Rows[$RowNum][$col] -like "http*") {
+								if ($DataTable.Rows[$RowNum][$col] -like "http*") {
+									$ExcelSheet.Cells[$ExcelStartRow, $MapURLToColNum].Hyperlink = [Uri]::new($DataTable.Rows[$RowNum][$col])
+									$ExcelSheet.Cells[$ExcelStartRow, $MapURLToColNum].Value = $DataTable.Rows[$RowNum][$URLTextCol]
+									$ExcelSheet.Cells[$ExcelStartRow, $MapURLToColNum].Style.Font.Color.SetColor([System.Drawing.Color]::FromArgb(0, 70, 130, 180))
+									$ExcelSheet.Cells[$ExcelStartRow, $MapURLToColNum].Style.Font.UnderLine = $true
+								}
+							} 
+						} else {
+							$ExcelSheet.Cells[$ExcelStartRow, $ExcelColNum].Value = $DataTable.Rows[$RowNum][$col]
+						}
+						$ExcelColNum += 1
 					}
-				} else {
-					$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DataTable.Rows[$RowNum][$col]
+					$ExcelStartRow += 1
+					$RowNum += 1
+					$ExcelColNum = $StartCol
 				}
-				$ExcelColNum += 1
+			} else {
+				$ExcelSheet.Cells[$ExcelStartRow, $ExcelColNum].LoadFromDataTable($DataTable.DefaultView.ToTable($false, [string[]]$DataSetCols), $false) | Out-Null
 			}
+		} else {
 
-			$ExcelStartRow += 1
-			$RowNum += 1
-			$ExcelColNum = $StartCol
+			foreach ($row in $DataTable) {
+				foreach ($col in $DataSetCols) {
+					[string]$script:DebugCol = $col
+					[string]$script:DebugValue = $DataTable.Rows[$RowNum][$col]
+					if ($URLCols -contains $col) {
+						if ($DataTable.Rows[$RowNum][$col] -like "http*") {
+							$ExcelSheet.Hyperlinks.Add(
+								$ExcelSheet.Cells.Item($ExcelStartRow, $MapURLToColNum),
+								$DataTable.Rows[$RowNum][$col],
+								"",
+								"Click for more info",
+								$DataTable.Rows[$RowNum][$URLTextCol]
+							) | Out-Null
+						}
+					} else {
+						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DataTable.Rows[$RowNum][$col]
+					}
+					$ExcelColNum += 1
+				}
+
+				$ExcelStartRow += 1
+				$RowNum += 1
+				$ExcelColNum = $StartCol
+			}
 		}
 		if ($DebugInfo) {
 			$StepEnd = Get-Date
@@ -1065,13 +1097,17 @@ function Convert-TableToExcel {
 
 function Save-ExcelFile {
 	param (
-		[Parameter(Position = 0, Mandatory = $true)]
+		[Parameter(Position = 0)]
 		$ExcelFile,
 		[Parameter(Position = 1, Mandatory = $false)]
 		[switch]$DebugInfo
 	)
 	try {
-		$ExcelFile.Save()
+		if ($script:UseImportExcel) {
+			$script:ExcelPackage.Save()
+		} else {
+			$ExcelFile.Save()
+		}
 		Write-PSBlitzDebug " ->Excel file saved successfully"
 	} catch {
 		Write-Host " Error saving Excel file: $_" -ForegroundColor Red
@@ -1128,6 +1164,18 @@ function Write-PSBlitzDebug {
 		} else {
 			Write-Host $Message -ForegroundColor $Color
 		}
+	}
+}
+
+#helper function to get the correct worksheet object based on whether we're using ImportExcel or Excel COM object 
+function Get-PSBlitzWorksheet {
+	param(
+		[string]$SheetName
+	)
+	if ($script:UseImportExcel) {
+		return $script:ExcelPackage.Workbook.Worksheets[$SheetName]
+	} else {
+		return $script:ExcelFile.Worksheets.Item($SheetName)
 	}
 }
 
@@ -1869,7 +1917,7 @@ if (!(Test-Path $XDLOutDir)) {
 }
 
 #Initiate Excel app here
-if (-not $ToHTML) {
+if ((-not $ToHTML) -and (-not $ForceImportExcel)) {
 	###Open Excel
 	if ($DebugInfo) {
 		$ErrorActionPreference = "Continue"
@@ -1880,14 +1928,35 @@ if (-not $ToHTML) {
 	}
 
 	try {
-		$ExcelApp = New-Object -ComObject Excel.Application	-ErrorAction Stop
+		$ExcelApp = New-Object -ComObject Excel.Application -ErrorAction Stop
+		$UseImportExcel = $false
 		Write-Host "PSBlitz is writing the report to Excel." -Fore Green
-		Write-Host " Warning: Do not open or close Excel during this execution of PSBlitz." -Fore Yellow	
+		Write-Host " Warning: Do not open or close Excel during this execution of PSBlitz." -Fore Yellow
 	} catch {
-		Write-Host "Could not open Excel." -fore Red
+		Write-Host "Could not open Excel COM." -Fore Yellow
+		Write-Host " ->Checking for ImportExcel module... " -NoNewline
+		if (Get-Module -Name ImportExcel -ListAvailable) {
+			Import-Module ImportExcel -ErrorAction SilentlyContinue
+			$UseImportExcel = $true
+			Write-Host "found. Using ImportExcel." -Fore Green
+		} else {
+			Write-Host "not found." -Fore Red
+			Write-Host "->Switching to HTML output."
+			$ToHTML = $true
+			$UseImportExcel = $false
+			$ErrorActionPreference = "Continue"
+		}
+	}
+} elseif ($ForceImportExcel) {
+	if (Get-Module -Name ImportExcel -ListAvailable) {
+		Import-Module ImportExcel -ErrorAction SilentlyContinue
+		$UseImportExcel = $true
+		Write-Host "Using ImportExcel module for Excel output." -Fore Green
+	} else {
+		Write-Host "ImportExcel module not found." -Fore Red
 		Write-Host "->Switching to HTML output."
 		$ToHTML = $true
-		$ErrorActionPreference = "Continue"
+		$UseImportExcel = $false
 	}
 }
 
@@ -2049,13 +2118,13 @@ if ($IsAzureSQLDB) {
 
 if (-not $ToHTML) {
 	###Open Excel FIle
-	if ($DebugInfo) {
-		$ExcelApp.visible = $True
+	if ($UseImportExcel) {
+		$ExcelPackage = Open-ExcelPackage -Path $OutExcelF
 	} else {
-		$ExcelApp.visible = $False
+		$ExcelApp.visible = if ($DebugInfo) { $True } else { $False }
+		$ExcelFile = $ExcelApp.Workbooks.Open("$OutExcelF")
+		$ExcelApp.DisplayAlerts = $False
 	}
-	$ExcelFile = $ExcelApp.Workbooks.Open("$OutExcelF")
-	$ExcelApp.DisplayAlerts = $False
 }
 ###Create log table
 $LogTbl = New-Object System.Data.DataTable
@@ -2219,7 +2288,7 @@ $htmlTable6 `n<br>`n<h2>Session level SET options</h2> `n $htmlTable4 `n $HTMLBo
 			Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3, htmlTable4
 		} else {
 			###Populating the "Instance Info" sheet
-			$ExcelSheet = $ExcelFile.Worksheets.Item("Instance Info")
+			$ExcelSheet = Get-PSBlitzWorksheet "Instance Info"
 			##Instance Info section
 			#Specify at which row in the sheet to start adding the data
 			$ExcelStartRow = 3
@@ -2308,7 +2377,7 @@ $htmlTable4 `n $HTMLBodyEnd
 
 		} else {
 			###Populating the "TempDB" sheet
-			$ExcelSheet = $ExcelFile.Worksheets.Item("TempDB")
+			$ExcelSheet = Get-PSBlitzWorksheet "TempDB"
 			##TempDB space usage section
 			#Specify at which row in the sheet to start adding the data
 			$ExcelStartRow = 3
@@ -2382,7 +2451,7 @@ $HTMLBodyEnd
 				Invoke-ClearVariables html, htmlTable1, htmlTable2, htmlTable3
 			} else {
 				##Populating the "Open Transactions" sheet
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Open Transactions")
+				$ExcelSheet = Get-PSBlitzWorksheet "Open Transactions"
 				Convert-TableToExcel $AcTranTbl $ExcelSheet -DebugInfo:$DebugInfo -StartRow $DefaultStartRow -ExclCols "current_query", "most_recent_query", "current_plan", "most_recent_plan"
 				##Saving file 
 				Save-ExcelFile $ExcelFile
@@ -2448,7 +2517,7 @@ $SortableTable `n $htmlTable6 `n $JumpToTop `n $HTMLBodyEnd
 				Invoke-ClearVariables html, htmlTable, htmlTable1, htmlTable2, htmlTable3, htmlTable4, htmlTable5, htmlTable6
 			} else {
 				#Populate the Azure SQL DB Resource Governance section
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Azure SQL DB Info")
+				$ExcelSheet = Get-PSBlitzWorksheet "Azure SQL DB Info"
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = 3
 				
@@ -2573,7 +2642,7 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 			} else {
 				##Populating the "Database Info" sheet with the database files data first because 
 				#it's narrower and leaves room to fit some of the database info
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Database Info")
+				$ExcelSheet = Get-PSBlitzWorksheet "Database Info"
 				#Specify at which row in the sheet to start adding the data
 				$ExcelStartRow = 3
 				
@@ -2589,7 +2658,7 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 
 				if ((($MajorVers -ge 13) -or ($IsAzureSQLMI)) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 					##Populating the DB Scoped Config sheet
-					$ExcelSheet = $ExcelFile.Worksheets.Item("DB Scoped Config")
+					$ExcelSheet = Get-PSBlitzWorksheet "DB Scoped Config"
 					#Specify at which row in the sheet to start adding the data
 					$ExcelStartRow = 2
 					#Specify with which column in the sheet to start
@@ -2657,7 +2726,7 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 					Invoke-ClearVariables html, htmlTable, htmlTable1, htmlTable2, WarnBlock
 				} else {
 					##Populating the "Backup Details" sheet
-					$ExcelSheet = $ExcelFile.Worksheets.Item("Backup Details")
+					$ExcelSheet = Get-PSBlitzWorksheet "Backup Details"
 					#Specify at which row in the sheet to start adding the data
 					$ExcelStartRow = $DefaultStartRow
 					
@@ -2666,7 +2735,7 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 					Save-ExcelFile $ExcelFile
 
 					
-					$ExcelSheet = $ExcelFile.Worksheets.Item("Recoverability")
+					$ExcelSheet = Get-PSBlitzWorksheet "Recoverability"
 					#Specify at which row in the sheet to start adding the data
 					$ExcelStartRow = 3
 					#Specify with which column in the sheet to start
@@ -2728,7 +2797,7 @@ $($SearchTableDiv -replace $STDivReplace, "'InstanceHealthTable', 3" -replace 'o
 				Invoke-ClearVariables html, htmlTable
 			} else {
 				##Populating the "sp_Blitz" sheet
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Instance Health")
+				$ExcelSheet = Get-PSBlitzWorksheet "Instance Health"
 					
 				Convert-TableToExcel $BlitzTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding" -ExclCols "FindingHL"
 
@@ -2784,7 +2853,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					Save-HtmlFile $html "DangerousSETOpt.html" $HTMLOutDir $DebugInfo
 					Invoke-ClearVariables html, htmlTable
 				} else {
-					$ExcelSheet = $ExcelFile.Worksheets.Item("Objects Dangerous SET")
+					$ExcelSheet = Get-PSBlitzWorksheet "Objects Dangerous SET"
 					
 					Convert-TableToExcel $DangerousSetTbl $ExcelSheet -StartRow 4 -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
 					##Saving file 
@@ -2819,7 +2888,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			Invoke-ClearVariables html, htmlTable
 		} else {
 			##Populating the "sp_BlitzFirst 30s" sheet
-			$ExcelSheet = $ExcelFile.Worksheets.Item("Happening Now")
+			$ExcelSheet = Get-PSBlitzWorksheet "Happening Now"
 			Convert-TableToExcel $BlitzFirstTbl $ExcelSheet -StartRow $DefaultStartRow -ExclCols "FindingHL" -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
 			##Saving file 
 			Save-ExcelFile $ExcelFile
@@ -2892,21 +2961,21 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				Invoke-ClearVariables html, htmlTable
 			} else { 
 				##Populating the "Wait Stats" sheet
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Wait Stats")					
+				$ExcelSheet = Get-PSBlitzWorksheet "Wait Stats"					
 				Convert-TableToExcel $WaitsTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 4 -URLTextCol "wait_type" -ExclCols "wait_typeHL"
 
 				##Saving file 
 				Save-ExcelFile $ExcelFile
 
 				## populating the "Storage" sheet
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Storage Stats")					
+				$ExcelSheet = Get-PSBlitzWorksheet "Storage Stats"					
 				Convert-TableToExcel $StorageTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -ExclCols "StallRank"
 
 				##Saving file 
 				Save-ExcelFile $ExcelFile
 
 				## populating the "Perfmon" sheet
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Perfmon Stats")
+				$ExcelSheet = Get-PSBlitzWorksheet "Perfmon Stats"
 				Convert-TableToExcel $PerfmonTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
 		
 				##Saving file 
@@ -3210,7 +3279,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 
 				} else {
 					#Specify worksheet
-					$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
+					$ExcelSheet = Get-PSBlitzWorksheet $SheetName
 					#Specify at which row in the sheet to start adding the data
 					$ExcelStartRow = 3
 					#$SortOrder containing avg or xpm will export data starting with row 16
@@ -3222,7 +3291,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					####Plan Cache warning
 					$SheetName = "Plan Cache Warnings"
 					#Specify worksheet
-					$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
+					$ExcelSheet = Get-PSBlitzWorksheet $SheetName
 
 					#Specify at which row in the sheet to start adding the data
 					$ExcelStartRow = 3
@@ -3395,7 +3464,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 								"Total CPU"      = @{ Sheet = "Query Store CPU"; Row = 27 }
 								"Total Duration" = @{ Sheet = "Query Store Duration"; Row = 27 }
 							}
-							$ExcelSheet = $ExcelFile.Worksheets.Item($QSSheetMap[$SortOrder].Sheet)
+							$ExcelSheet = Get-PSBlitzWorksheet $QSSheetMap[$SortOrder].Sheet
 							$ExcelStartRow = $QSSheetMap[$SortOrder].Row
 					
 							Convert-TableToExcel $BlitzQSTbl $ExcelSheet -StartRow $ExcelStartRow -DebugInfo:$DebugInfo -ExclCols "query", "query_plan", "n"
@@ -3547,7 +3616,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				}
 			
 				#Specify worksheet
-				$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
+				$ExcelSheet = Get-PSBlitzWorksheet $SheetName
 				if ("0", "4" -contains $Mode) {
 					Convert-TableToExcel $BlitzIxTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -ExclCols "Sample Query Plan", "FindingHL" -URLCols "URL" -MapURLToColNum 2 -URLTextCol "Finding"
 				} else {
@@ -3652,7 +3721,8 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				
 				} else {
 					## populating the "sp_BlitzLock Details" sheet
-					$ExcelSheet = $ExcelFile.Worksheets.Item("Deadlock Details")
+					$SheetName = "Deadlock Details"
+					$ExcelSheet = Get-PSBlitzWorksheet $SheetName
 
 					Convert-TableToExcel $TblLockDtl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -ExclCols "deadlock_graph", "query"
 
@@ -3660,7 +3730,8 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					Save-ExcelFile $ExcelFile
 
 					## populating the "sp_BlitzLock Overview" sheet
-					$ExcelSheet = $ExcelFile.Worksheets.Item("Deadlock Overview")
+					$SheetName = "Deadlock Overview"
+					$ExcelSheet = Get-PSBlitzWorksheet $SheetName
 
 					Convert-TableToExcel $TblLockOver $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
 
@@ -3668,7 +3739,8 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					Save-ExcelFile $ExcelFile
 
 					## populating the "sp_BlitzLock Plans" sheet
-					$ExcelSheet = $ExcelFile.Worksheets.Item("Deadlock Plans")
+					$SheetName = "Deadlock Plans"
+					$ExcelSheet = Get-PSBlitzWorksheet $SheetName
 				
 					Convert-TableToExcel $TblLockPlans $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo -ExclCols "query_plan", "query"
 
@@ -3749,8 +3821,8 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 						Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
 						Invoke-ClearVariables html, htmlTable			
 					} else {
-
-						$ExcelSheet = $ExcelFile.Worksheets.Item("Statistics Info")
+						$SheetName = "Statistics Info"
+						$ExcelSheet = Get-PSBlitzWorksheet $SheetName
 
 						Convert-TableToExcel $StatsTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
 						##Saving file
@@ -3830,7 +3902,8 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 							Save-HtmlFile $html $HtmlFileName $HTMLOutDir $DebugInfo
 							Invoke-ClearVariables html, htmlTable
 						} else {
-							$ExcelSheet = $ExcelFile.Worksheets.Item("Index Fragmentation")
+							$SheetName = "Index Fragmentation"
+							$ExcelSheet = Get-PSBlitzWorksheet $SheetName
 							Convert-TableToExcel $IndexTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
 							##Saving file
 							Save-ExcelFile $ExcelFile
@@ -4023,17 +4096,24 @@ finally {
 			} else {
 
 				###Populating the "sp_BlitzWho" sheet
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Session Activity - Raw")
+				$SheetName = "Session Activity - Raw"
+				$ExcelSheet = Get-PSBlitzWorksheet $SheetName
 				
 				##Saving file 
 				Convert-TableToExcel $BlitzWhoTbl $ExcelSheet -StartRow $DefaultStartRow -DebugInfo:$DebugInfo
-				$ExcelFile.Save()
+				Save-ExcelFile $ExcelFile
 
 				###Populating the "sp_BlitzWho Aggregate" sheet
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Session Activity - Aggregated")
+				$SheetName = "Session Activity - Aggregated"
+				$ExcelSheet = Get-PSBlitzWorksheet $SheetName
 				##Add session capture interval
-				$ExcelSheet.Cells.Item(1, 6) = $BtilzWhoStartTime
-				$ExcelSheet.Cells.Item(1, 8) = $BtilzWhoEndTime
+				if ($UseImportExcel) {
+					$ExcelSheet.Cells[1, 6].Value = $BtilzWhoStartTime
+					$ExcelSheet.Cells[1, 8].Value = $BtilzWhoEndTime
+				} else {
+					$ExcelSheet.Cells.Item(1, 6) = $BtilzWhoStartTime
+					$ExcelSheet.Cells.Item(1, 8) = $BtilzWhoEndTime
+				}
 				
 				Convert-TableToExcel $BlitzWhoAggTbl $ExcelSheet -ExclCols "query", "query_plan" -StartRow 3 -DebugInfo:$DebugInfo
 
@@ -4057,84 +4137,64 @@ finally {
 	if (-not $ToHTML) {
 		if (-not $InDepth) {
 			$DeleteSheets = @("Wait Stats", "Storage Stats", "Perfmon Stats", "Index Summary",
-				"Index Usage", "Extended Index Diagnostics", "Top Queries - Reads", "Top Queries - Executions", 
-				"Top Queries - Writes",	"Top Queries - Spills", "Top Queries - Mem & Recent Comp", "Intro")
-			foreach ($SheetName in $DeleteSheets) {
-				$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
-				#$ExcelSheet.Visible = $false
-				$ExcelSheet.Delete()
-			}
-			if ($IsAzureSQLDB) {
-				#Delete the "Database Info" and sp_Blitz rows in the Intro sheet
-				$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro ")
-				$ExcelSheetUpd.Cells.Item(13, 1).EntireRow.Delete() | Out-Null
-				$ExcelSheetUpd.Cells.Item(12, 1).EntireRow.Delete() | Out-Null
-				$ExcelSheetUpd.Cells.Item(11, 1).EntireRow.Delete() | Out-Null		
-				
-				$DeleteSheets = @("Database Info", "Instance Health", "DB Scoped Config")
-				foreach ($SheetName in $DeleteSheets) {
-					$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
-					$ExcelSheet.Delete()
-				}
-			} elseif ($IsAzureSQLDB -eq $false) {
-				if (($MajorVers -lt 13) -or ([string]::IsNullOrEmpty($CheckDB))) {
-					$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro ")
-					$ExcelSheetUpd.Cells.Item(12, 1).EntireRow.Delete() | Out-Null
-					$ExcelSheet = $ExcelFile.Worksheets.Item("DB Scoped Config")
-					$ExcelSheet.Delete()
-				}
-				#delete the Azure SQL DB Info row
-				$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro ")
-				$ExcelSheetUpd.Cells.Item(10, 1).EntireRow.Delete() | Out-Null
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Azure SQL DB Info")
-				$ExcelSheet.Delete()
-			}
+				"Index Usage", "Extended Index Diagnostics", "Top Queries - Reads", "Top Queries - Executions",
+				"Top Queries - Writes", "Top Queries - Spills", "Top Queries - Mem & Recent Comp", "Intro")
+			$IntroSheetName = "Intro "
 		} else {
 			#Delete unused sheet (yes, this sheet has a space in its name)
 			$DeleteSheets = @("Intro ", "Index Diagnostics")
-			foreach ($SheetName in $DeleteSheets) {
-				$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
-				$ExcelSheet.Delete()
-			}
+			$IntroSheetName = "Intro"
+		}
+		$ExcelSheetUpd = Get-PSBlitzWorksheet $IntroSheetName
 
-			if ($IsAzureSQLDB) {
-				#Delete the "Database Info" and sp_Blitz rows in the Intro sheet
-				$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro")
-				$ExcelSheetUpd.Cells.Item(13, 1).EntireRow.Delete() | Out-Null
-				$ExcelSheetUpd.Cells.Item(12, 1).EntireRow.Delete() | Out-Null
-				$ExcelSheetUpd.Cells.Item(11, 1).EntireRow.Delete() | Out-Null
-				$DeleteSheets = @("Database Info", "Instance Health", "DB Scoped Config")
-				foreach ($SheetName in $DeleteSheets) {
-					$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
-					$ExcelSheet.Delete()
-				}
-			} elseif ($IsAzureSQLDB -eq $false) {
-				if (($MajorVers -lt 13) -or ([string]::IsNullOrEmpty($CheckDB))) {
-					$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro")
+		if ($IsAzureSQLDB) {
+			$DeleteRows = @(15, 14, 13, 12, 11)
+			$DeleteSheets += @("Database Info", "Instance Health", "DB Scoped Config")
+		} elseif ($IsAzureSQLDB -eq $false) {
+			if (($MajorVers -lt 13) -or ([string]::IsNullOrEmpty($CheckDB))) {
+				if ($UseImportExcel) {
+					$ExcelSheetUpd.DeleteRow(12, 1)
+				} else {
 					$ExcelSheetUpd.Cells.Item(12, 1).EntireRow.Delete() | Out-Null
-					$ExcelSheet = $ExcelFile.Worksheets.Item("DB Scoped Config")
-					$ExcelSheet.Delete()
 				}
-				#delete the Azure SQL DB Info row
-				$ExcelSheetUpd = $ExcelFile.Worksheets.Item("Intro")
-				$ExcelSheetUpd.Cells.Item(10, 1).EntireRow.Delete() | Out-Null
-				$ExcelSheet = $ExcelFile.Worksheets.Item("Azure SQL DB Info")
-				$ExcelSheet.Delete()
+				$DeleteSheets += @("DB Scoped Config")
 			}
+			#delete the Azure SQL DB Info row
+			$DeleteRows = @(10)
+			$DeleteSheets += @("Azure SQL DB Info")
 		}
 
 		if (([string]::IsNullOrEmpty($CheckDB)) -and ([string]::IsNullOrEmpty($DBName)) -and ($IsAzureSQLDB -eq $false)) {
-			$DeleteSheets = @("Statistics Info", "Index Fragmentation")
+			$DeleteSheets += @("Statistics Info", "Index Fragmentation")
+		}
+		if ($UseImportExcel) {
 			foreach ($SheetName in $DeleteSheets) {
-				$ExcelSheet = $ExcelFile.Worksheets.Item($SheetName)
+					try {
+						$SheetName
+						if("Intro" , "Intro " -ccontains  $SheetName) {
+							$ExcelPackage.Workbook.Worksheets[$SheetName].Hidden = [OfficeOpenXml.eWorkSheetHidden]::VeryHidden
+						}else {
+						$ExcelPackage.Workbook.Worksheets.Delete($SheetName)
+						}
+					} catch { Write-Host "  Sheet delete error [$SheetName]: $_" -ForegroundColor Red }
+			}
+			foreach ($RowNum in $DeleteRows) {
+				$ExcelSheetUpd.DeleteRow($RowNum, 1)
+			}
+		} else {
+			foreach ($SheetName in $DeleteSheets) {
+				$ExcelSheet = Get-PSBlitzWorksheet $SheetName
 				$ExcelSheet.Delete()
+			}
+			foreach ($RowNum in $DeleteRows) {
+				$ExcelSheetUpd.Cells.Item($RowNum, 1).EntireRow.Delete() | Out-Null
 			}
 		}
 
 		##Insert log data in Excel
 		##Populating the "ExecutionLog" sheet
 		Write-PSBlitzDebug " Saving execution log for this run of PSBlitz..."
-		$ExcelSheet = $ExcelFile.Worksheets.Item("ExecutionLog")
+		$ExcelSheet = Get-PSBlitzWorksheet "ExecutionLog"
 
 		Convert-TableToExcel $LogTbl $ExcelSheet -StartRow 3 -DebugInfo:$DebugInfo
 		##Saving file 
@@ -4148,22 +4208,33 @@ finally {
 	$EndDate = Get-Date
 	if (-not $ToHTML) {
 		if ($InDepth) {
-			$ExcelSheet = $ExcelFile.Worksheets.Item("Intro")
+			$ExcelSheet = Get-PSBlitzWorksheet "Intro"
 		} else {
-			$ExcelSheet = $ExcelFile.Worksheets.Item("Intro ")
+			$ExcelSheet = Get-PSBlitzWorksheet "Intro "
 		}
-		$ExcelSheet.Cells.Item(5, 6) = $StartDate.ToString("yyyy-MM-dd HH:mm:ss")
-		$ExcelSheet.Cells.Item(6, 6) = $EndDate.ToString("yyyy-MM-dd HH:mm:ss")
-		$ExcelSheet.Cells.Item(6, 4) = $Vers
+		if ($UseImportExcel) {
+			$ExcelSheet.Cells[5, 6].Value = $StartDate.ToString("yyyy-MM-dd HH:mm:ss")
+			$ExcelSheet.Cells[6, 6].Value = $EndDate.ToString("yyyy-MM-dd HH:mm:ss")
+			$ExcelSheet.Cells[6, 4].Value = $Vers
+		} else {
+			$ExcelSheet.Cells.Item(5, 6) = $StartDate.ToString("yyyy-MM-dd HH:mm:ss")
+			$ExcelSheet.Cells.Item(6, 6) = $EndDate.ToString("yyyy-MM-dd HH:mm:ss")
+			$ExcelSheet.Cells.Item(6, 4) = $Vers
+		}
 
 		###Save and close Excel file and app
-		Save-ExcelFile $ExcelFile
-		Start-Sleep -Seconds 1
-		$ExcelFile.Close()
-		Start-Sleep -Seconds 1
-		$ExcelApp.Quit()
-		[System.Runtime.Interopservices.Marshal]::ReleaseComObject($ExcelApp) | Out-Null
-		Remove-Variable -Name ExcelApp
+		if ($UseImportExcel) {
+			$ExcelPackage.Save()
+			$ExcelPackage.Dispose()
+		} else {
+			Save-ExcelFile $ExcelFile
+			Start-Sleep -Seconds 1
+			$ExcelFile.Close()
+			Start-Sleep -Seconds 1
+			$ExcelApp.Quit()
+			[System.Runtime.Interopservices.Marshal]::ReleaseComObject($ExcelApp) | Out-Null
+			Remove-Variable -Name ExcelApp
+		}
 		###Rename output file 
 		if (!([string]::IsNullOrEmpty($CheckDB))) {
 			$OutExcelFName = "PSBlitzOutput_$InstName_$CheckDB.xlsx"
