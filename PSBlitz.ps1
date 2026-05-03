@@ -304,8 +304,7 @@ param(
 	[ValidateRange(0, 100)]
 	[int]$QueryStoreTop = 20,
 	[switch]$KeepPSOpen = $False,
-	[switch]$GUI = $False,
-	[switch]$ForceImportExcel = $False
+	[switch]$GUI = $False
 )
 
 ###Internal params
@@ -1917,46 +1916,30 @@ if (!(Test-Path $XDLOutDir)) {
 }
 
 #Initiate Excel app here
-if ((-not $ToHTML) -and (-not $ForceImportExcel)) {
-	###Open Excel
-	if ($DebugInfo) {
-		$ErrorActionPreference = "Continue"
-		Write-Host "Opening excel file" -fore yellow
-	} else {
-		#Do not display the occasional "out of memory" errors
-		$ErrorActionPreference = "SilentlyContinue"
-	}
-
-	try {
-		$ExcelApp = New-Object -ComObject Excel.Application -ErrorAction Stop
-		$UseImportExcel = $false
-		Write-Host "PSBlitz is writing the report to Excel." -Fore Green
-		Write-Host " Warning: Do not open or close Excel during this execution of PSBlitz." -Fore Yellow
-	} catch {
-		Write-Host "Could not open Excel COM." -Fore Yellow
-		Write-Host " ->Checking for ImportExcel module... " -NoNewline
-		if (Get-Module -Name ImportExcel -ListAvailable) {
-			Import-Module ImportExcel -ErrorAction SilentlyContinue
-			$UseImportExcel = $true
-			Write-Host "found. Using ImportExcel." -Fore Green
-		} else {
-			Write-Host "not found." -Fore Red
-			Write-Host "->Switching to HTML output."
-			$ToHTML = $true
-			$UseImportExcel = $false
-			$ErrorActionPreference = "Continue"
-		}
-	}
-} elseif ($ForceImportExcel) {
+if (-not $ToHTML) {
 	if (Get-Module -Name ImportExcel -ListAvailable) {
 		Import-Module ImportExcel -ErrorAction SilentlyContinue
 		$UseImportExcel = $true
 		Write-Host "Using ImportExcel module for Excel output." -Fore Green
 	} else {
-		Write-Host "ImportExcel module not found." -Fore Red
-		Write-Host "->Switching to HTML output."
-		$ToHTML = $true
-		$UseImportExcel = $false
+		if ($DebugInfo) {
+			$ErrorActionPreference = "Continue"
+			Write-Host "ImportExcel not found, trying Excel app..." -Fore Yellow
+		} else {
+			$ErrorActionPreference = "SilentlyContinue"
+		}
+		try {
+			$ExcelApp = New-Object -ComObject Excel.Application -ErrorAction Stop
+			$UseImportExcel = $false
+			Write-Host "PSBlitz is writing the Excel report using the Excel app." -Fore Green
+			Write-Host " Warning: Do not open or close Excel during this execution of PSBlitz." -Fore Yellow
+		} catch {
+			Write-Host "Could not open Excel app." -Fore Yellow
+			Write-Host "->Switching to HTML output."
+			$ToHTML = $true
+			$UseImportExcel = $false
+			$ErrorActionPreference = "Continue"
+		}
 	}
 }
 
@@ -4169,14 +4152,13 @@ finally {
 		}
 		if ($UseImportExcel) {
 			foreach ($SheetName in $DeleteSheets) {
-					try {
-						$SheetName
-						if("Intro" , "Intro " -ccontains  $SheetName) {
-							$ExcelPackage.Workbook.Worksheets[$SheetName].Hidden = [OfficeOpenXml.eWorkSheetHidden]::VeryHidden
-						}else {
+				try {
+					if ("Intro" , "Intro " -ccontains $SheetName) {
+						$ExcelPackage.Workbook.Worksheets[$SheetName].Hidden = [OfficeOpenXml.eWorkSheetHidden]::VeryHidden
+					} else {
 						$ExcelPackage.Workbook.Worksheets.Delete($SheetName)
-						}
-					} catch { Write-Host "  Sheet delete error [$SheetName]: $_" -ForegroundColor Red }
+					}
+				} catch { Write-Host "  Sheet delete error [$SheetName]: $_" -ForegroundColor Red }
 			}
 			foreach ($RowNum in $DeleteRows) {
 				$ExcelSheetUpd.DeleteRow($RowNum, 1)
