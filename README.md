@@ -17,6 +17,7 @@
 ## Navigation
 
 - [Intro](#intro)
+- [Notable Changes](#notable-changes)
 - [Features overview](#features-overview)
 - [Compatibility](#compatibility)
 - [Prerequisites](#prerequisites)
@@ -34,7 +35,9 @@
 ## Intro
 
 Since I'm a big fan of [Brent Ozar's](https://www.brentozar.com/) [SQL Server First Responder Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit) and I've found myself in many situations where I would have liked a quick way to easily export the output of sp_Blitz, sp_BlitzCache, sp_BlitzFirst, sp_BlitzIndex, sp_BlitzLock, and sp_BlitzWho to Excel, as well as saving to disk the execution plans identified by sp_BlitzCache and deadlock graphs from sp_BlitzLock, I've decided to put together a PowerShell script that does just that.\
-\
+
+### Notable changes
+
 As of version __3.0.0__, PSBlitz is also capable of exporting the report to HTML making Excel/Office no longer a hard requirement for running PSBlitz.\
 As of version __4.0.1__, PSBlitz is also compatible with Azure SQL DB and Azure SQL Managed Instance. \
 As of version __4.3.4__, PSBlitz can be executed using PowerShell on Linux, the output will default to HTML regardless of the option used.\
@@ -163,27 +166,29 @@ Open PSBlitzOutput.xlsx (found in PSBlitz's Resources folder) click on the first
 
 | Parameter | Description|
 |-----------|------------|
-|`-ServerName`| The name of your SQL Server instance or Azure SQL DB connection info. <br><br> Accepted input format: <br> `HostName\InstanceID` for named instances. <br> `HostName,Port` when using a port number instead of an instance ID. <br> `HostName` for default instances. <br><br>For Azure SQL DB the format is: <br> `YourServer.database.windows.net,PortNumber:YourDatabase` if you want to specify the port number. <br> `YourServer.database.windows.net:YourDatabase` if you don't want to specify the port number. <br> If your Azure SQL DB instance doesn't use the `database.windows.net` portion (e.g.: it's configured to use an IP instead) then you should provide the database name via the `-CheckDB` parameter.<br><br>Other options:<br> If you provide `?` or `Help` as a value for `-ServerName`, the script will return a brief help menu. <br> If no value is provided, the script will go into interactive mode and prompt for the appropriate input |
-|`-SQLLogin`| The name of the SQL login used to run the script. If not provided, the script will use integrated security. |
-|`-SQLPass` | The password for the SQL login provided via the -SQLLogin parameter, omit if `-SQLLogin` was not used. |
-|`-InDepth` | Switch which tells PSBlitz.ps1 to run a more in-depth check against the instance/database. Omit for default check. |
-|`-CheckDB` | Used to provide the name of a specific database against which sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock will be ran. Omit to run against the whole instance.<br><br>__For Azure SQL DB__<br>Can also be used to provide the name of the Azure SQL DB database if you haven't provided it as part of the <br>`-ServerName` paramter.<br>If the database name is not provided here, nor as part of the `-ServerName`, and the environment is detected as Azure SQL DB, then you'll be prompted to provide the database name.|
+|`-ServerName`|The name of your SQL Server instance or Azure SQL DB connection info. <br><br> Accepted input format: <br> `HostName\InstanceID` for named instances. <br> `HostName,Port` when using a port number instead of an instance ID. <br> `HostName` for default instances. <br><br>For Azure SQL DB the format is: <br> `YourServer.database.windows.net,PortNumber:YourDatabase` if you want to specify the port number. <br> `YourServer.database.windows.net:YourDatabase` if you don't want to specify the port number. <br> If your Azure SQL DB instance doesn't use the `database.windows.net` portion (e.g.: it's configured to use an IP instead) then you should provide the database name via the `-CheckDB` parameter.<br><br>Other options:<br> If you provide `?` or `Help` as a value for `-ServerName`, the script will return a brief help menu. <br> If no value is provided, the script will go into interactive mode and prompt for the appropriate input|
+|`-SQLLogin`|The name of the SQL login used to run the script. If not provided, the script will use integrated security. |
+|`-SQLPass`|The password for the SQL login provided via the -SQLLogin parameter, omit if `-SQLLogin` was not used. |
+|`-InDepth`|Switch which tells PSBlitz.ps1 to run a more in-depth check against the instance/database. Omit for default check. |
+|`-CheckDB`|Used to provide the name of a specific database against which sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock will be ran. Omit to run against the whole instance.<br><br>__For Azure SQL DB__<br>Can also be used to provide the name of the Azure SQL DB database if you haven't provided it as part of the <br>`-ServerName` paramter.<br>If the database name is not provided here, nor as part of the `-ServerName`, and the environment is detected as Azure SQL DB, then you'll be prompted to provide the database name.|
 |`-CacheTop`| Used to specify if more/less than the default top 10 queries should be returned for the sp_BlitzCache step. Only works for HTML output (`-ToHTM Y`). Has no effect on the `recent compilations` sort order. <br>Setting this parameter to 0 will skip the plan cache analysis step altogether.<br>Defaults to 10. |
 |`-QueryStoreTop`|Used to specify if more/less than the default top 20 queries should be returned for the 
  Query Store step.Setting this parameter to 0 will skip the Query Store analysis step altogether.<br>Defaults to 20. |
-|`-CacheMinutesBack`| Used to specify how many minutes back to begin plan cache analysis. <br>Defaults to entire contents of the plan cache since instance startup.<br> In order to avoid missing the desired timeframe, the value is dynamically adjusted based on the runtime of PSBlitz up until the plan cache analysis point.|
+|`-CacheMinutesBack`|Used to specify how many minutes back to begin plan cache analysis. <br>Defaults to entire contents of the plan cache since instance startup.<br> In order to avoid missing the desired timeframe, the value is dynamically adjusted based on the runtime of PSBlitz up until the plan cache analysis point.|
 |`-QueryStoreIntervalStart`| The start date and time (format __yyyy-mm-dd HH:mm__) for the Query Store interval. If provided, the script will validate the format and use it as the lower bound for the queries retrieved from the Query Store. |
 |`-QueryStoreIntervalEnd`|The end date and time (format __yyyy-mm-dd HH:mm__) for the Query Store interval. If `-QueryStoreIntervalStart` is provided and `-QueryStoreIntervalEnd` is not provided, it defaults to the current date and time. <br>If provided, the script will validate the format and use it as the upper bound for the queries retrieved from the Query Store.|
-|`-OutputDir`| Used to provide a path where the output directory should be saved to. <br>Defaults to PSBlitz.ps1's directory if not specified or a non-existent path is provided.|
-|`-ToHTML`| Switch used to output the report as HTML instead of an Excel file. This is perfect when running PSBlitz from a machine that doesn't have Office installed.|
+|`-OutputDir`|Used to provide a path where the output directory should be saved to. <br>Defaults to PSBlitz.ps1's directory if not specified or a non-existent path is provided.|
+|`-ToHTML`|Switch used to output the report as HTML instead of an Excel file. This is perfect when running PSBlitz from a machine that doesn't have Office installed.|
+|`-ForceExcelApp`|Switched used to force PSBlitz to write the report using the Excel app even if the ImportExcel PS module is installed.|
 |`-GUI`|Switch used to open a GUI form to provide input parameters instead of running it from the command line.|
 |`-ZipOutput`| Switch which will tell PSBlitz.ps1 to also create a zip archive of the output files.|
-|`-BlitzWhoDelay` | Used to sepcify the number of seconds between each active session data capture. <br>Defaults to 10 if not specified, meaning that active session data will be captured every 10 seconds.|
-|`-ConnTimeout`| Can be used to increased the timeout limit in seconds for connecting to SQL Server. <br>Defaults to 45 seconds if not specified.|
-|`-MaxTimeout`| Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. <br>Defaults to 1000 (16.6 minutes).|
-|`-MaxUsrDBs`| Can be used to tell PSBlitz to raise the limit of user databases based on which index-related info is limited to only the "loudest" database in the cache results. <br>Defaults to 50. <br>Only change it if you're using using HTML output and have enough RAM to handle the increased data that PS will have to process.|
-|`-SkipChecks`| Used to specify one or more (comma-separated) checks to skip.<br> Currently supports <br> `IndexFrag` - skip the index fragmentation check. <br> `StatsInfo` - skip the statistics information check. <br> `Deadlock` - skip the deadlock information cehck. <br> `PlanCache` - skips plan cache check. |
-|`-DebugInfo`| Switch used to get more information for debugging and troubleshooting purposes.|
+|`-BlitzWhoDelay`|Used to sepcify the number of seconds between each active session data capture. <br>Defaults to 10 if not specified, meaning that active session data will be captured every 10 seconds.|
+|`-ConnTimeout`|Can be used to increased the timeout limit in seconds for connecting to SQL Server. <br>Defaults to 45 seconds if not specified.|
+|`-MaxTimeout`|Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. <br>Defaults to 1000 (16.6 minutes).|
+|`-RetryOnTimeout`|Used to include timeout errors in the list of transient errors for which the retry logic kicks in.|
+|`-MaxUsrDBs`|Can be used to tell PSBlitz to raise the limit of user databases based on which index-related info is limited to only the "loudest" database in the cache results. <br>Defaults to 50. <br>Only change it if you're using using HTML output and have enough RAM to handle the increased data that PS will have to process.|
+|`-SkipChecks`|Used to specify one or more (comma-separated) checks to skip.<br> Currently supports <br> `IndexFrag` - skip the index fragmentation check. <br> `StatsInfo` - skip the statistics information check. <br> `Deadlock` - skip the deadlock information cehck. <br> `PlanCache` - skips plan cache check. |
+|`-DebugInfo`|Switch used to get more information for debugging and troubleshooting purposes.|
 
 [*Back to top*](#header1)
 

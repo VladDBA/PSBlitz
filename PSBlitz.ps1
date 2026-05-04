@@ -305,7 +305,8 @@ param(
 	[int]$QueryStoreTop = 20,
 	[switch]$KeepPSOpen = $False,
 	[switch]$GUI = $False,
-	[switch]$ForceExcelApp = $False
+	[switch]$ForceExcelApp = $False,
+	[switch]$RetryOnTimeout = $False
 )
 
 ###Internal params
@@ -601,55 +602,107 @@ function Invoke-PSBlitzQuery {
 		[Parameter(Position = 2, Mandatory = $true)]
 		[string]$ConnStringIn,
 		[Parameter(Position = 3, Mandatory = $true)]
-		[int]$CmdTimeoutIn
+		[int]$CmdTimeoutIn,
+		[Parameter(Position = 4)]
+		[int]$MaxRetries = 3,
+		[Parameter(Position = 5)]
+		[int]$RetryDelaySeconds = 5
 	)
-	$script:PSBlitzSet = New-Object System.Data.DataSet
-	$IBQConnection = New-Object System.Data.SqlClient.SqlConnection
-	$IBQConnection.ConnectionString = $ConnStringIn
-	$IBQCommand = $IBQConnection.CreateCommand()
-	$IBQCommand.CommandText = $QueryIn
-	$IBQCommand.CommandTimeout = $CmdTimeoutIn
-	$IBQAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
-	$IBQAdapter.SelectCommand = $IBQCommand
 
-	try {
-		$StepStart = Get-Date
-		$IBQConnection.Open()
-		$IBQAdapter.Fill($script:PSBlitzSet) | Out-Null -ErrorAction Stop
-		$StepEnd = Get-Date
-		if ($StepNameIn -notlike "Query Store pre-check for*" ) {
-			Write-Host @GreenCheck
-		}
-		$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
-		$RunTime = [Math]::Round($StepRunTime, 2)
-		Write-PSBlitzDebug " - $RunTime seconds"
-		$script:StepOutcome = "Success"
-		if (($StepNameIn -like "Plan Cache*") -or 
-			($StepNameIn -eq "Index info mode 1") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info") -or 
-			($StepNameIn -eq "Deadlock Info") -or ($StepNameIn -eq "Return session activity") -or ($StepNameIn -eq "Open Transacion Info") -or 
-			($StepNameIn -eq "Objects with dangerous SET options") -or ($StepNameIn -eq "Instance Health") -or 
-			($StepNameIn -eq "Happening now for 30 seconds") -or ($StepNameIn -like "Query Store check *")) {
-			$RecordsReturned = $script:PSBlitzSet.Tables[0].Rows.Count
-			Add-LogRow $StepNameIn $script:StepOutcome "$RecordsReturned records returned"
-		} elseif ('Stats Info', 'Index info mode 0', 'Index info mode 2', 'Index info mode 4' -contains $StepNameIn) {
-			$RecordsReturned = $script:PSBlitzSet.Tables[0].Rows.Count
-			Add-LogRow $StepNameIn $script:StepOutcome "$RecordsReturned records returned"
-			$TotalRecords = $script:PSBlitzSet.Tables[1].Rows[0]["RecordCount"]
-			if ($TotalRecords -gt $RecordsReturned) {
-				Add-LogRow "->$StepNameIn" "Record limit exceeded" "Result was limited to top $RecordsReturned records out of $TotalRecords"
-				Write-Host "  ->Record limit exceeded `n -> Result was limited to top $RecordsReturned records out of $TotalRecords" -Fore Yellow
+	$TransientErrors = @(
+		701,   # Out of memory
+		1205,  # Deadlock victim
+		1222,  # Lock request timeout
+		8645,  # Timeout waiting for memory resource
+		8651,  # Low memory condition
+		10928, # Azure resource limit
+		10929, # Azure resource limit
+		40143, # Azure transient
+		40197, # Azure transient
+		40501, # Azure service busy
+		40613  # Azure database unavailable
+	)
+
+	#retry on timeout only if explicitly requested, otherwise treat timeouts as regular failures without retries
+	if ($RetryOnTimeout) {
+		$TransientErrors += -2 
+	}
+
+	$script:PSBlitzSet = New-Object System.Data.DataSet
+	$AttemptCount = 0
+	$RetrySuccess = $false
+
+	while ($AttemptCount -le $MaxRetries -and -not $RetrySuccess) {
+		$AttemptCount++
+		$IBQConnection = New-Object System.Data.SqlClient.SqlConnection
+		$IBQConnection.ConnectionString = $ConnStringIn
+		$IBQCommand = $IBQConnection.CreateCommand()
+		$IBQCommand.CommandText = $QueryIn
+		$IBQCommand.CommandTimeout = $CmdTimeoutIn
+		$IBQAdapter = New-Object System.Data.SqlClient.SqlDataAdapter
+		$IBQAdapter.SelectCommand = $IBQCommand
+
+		try {
+			$StepStart = Get-Date
+			$IBQConnection.Open()
+			$IBQAdapter.Fill($script:PSBlitzSet) | Out-Null -ErrorAction Stop
+			$StepEnd = Get-Date
+			if ($StepNameIn -notlike "Query Store pre-check for*" ) {
+				Write-Host @GreenCheck
 			}
-		} else {
-			Add-LogRow $StepNameIn $script:StepOutcome
+			$StepRunTime = (New-TimeSpan -Start $StepStart -End $StepEnd).TotalSeconds
+			$RunTime = [Math]::Round($StepRunTime, 2)
+			Write-PSBlitzDebug " - $RunTime seconds"
+			$script:StepOutcome = "Success"
+			$RetrySuccess = $true
+			if (($StepNameIn -like "Plan Cache*") -or 
+				($StepNameIn -eq "Index info mode 1") -or ($StepNameIn -eq "Stats Info") -or ($StepNameIn -eq "Index Frag Info") -or 
+				($StepNameIn -eq "Deadlock Info") -or ($StepNameIn -eq "Return session activity") -or ($StepNameIn -eq "Open Transacion Info") -or 
+				($StepNameIn -eq "Objects with dangerous SET options") -or ($StepNameIn -eq "Instance Health") -or 
+				($StepNameIn -eq "Happening now for 30 seconds") -or ($StepNameIn -like "Query Store check *")) {
+				$RecordsReturned = $script:PSBlitzSet.Tables[0].Rows.Count
+				Add-LogRow $StepNameIn $script:StepOutcome "$RecordsReturned records returned"
+			} elseif ('Stats Info', 'Index info mode 0', 'Index info mode 2', 'Index info mode 4' -contains $StepNameIn) {
+				$RecordsReturned = $script:PSBlitzSet.Tables[0].Rows.Count
+				Add-LogRow $StepNameIn $script:StepOutcome "$RecordsReturned records returned"
+				$TotalRecords = $script:PSBlitzSet.Tables[1].Rows[0]["RecordCount"]
+				if ($TotalRecords -gt $RecordsReturned) {
+					Add-LogRow "->$StepNameIn" "Record limit exceeded" "Result was limited to top $RecordsReturned records out of $TotalRecords"
+					Write-Host "  ->Record limit exceeded `n -> Result was limited to top $RecordsReturned records out of $TotalRecords" -Fore Yellow
+				}
+			} else {
+				Add-LogRow $StepNameIn $script:StepOutcome
+			}
+		} catch {
+			$StepEnd = Get-Date
+			# Check if this is a transient error and retries remain
+			$SqlException = $_.Exception.InnerException
+			$IsTransient = $false
+			if ($SqlException -is [System.Data.SqlClient.SqlException]) {
+				foreach ($SqlError in $SqlException.Errors) {
+					if ($TransientErrors -contains $SqlError.Number) {
+						$IsTransient = $true
+						break
+					}
+				}
+			}
+
+			if ($IsTransient -and $AttemptCount -le $MaxRetries) {
+				Write-Host @RedX
+				Write-Host "  ->Transient error on attempt $AttemptCount/$MaxRetries. Retrying in $RetryDelaySeconds seconds..." -ForegroundColor Yellow -NoNewline
+				Write-PSBlitzDebug " - Attempt $AttemptCount failed (transient), retrying..."
+				Add-LogRow $StepNameIn "Transient error, retrying" "Attempt $AttemptCount of $MaxRetries"
+				Start-Sleep -Seconds $RetryDelaySeconds
+			} else {
+				Invoke-ErrMsg
+				$script:StepOutcome = "Failure"
+				Add-LogRow $StepNameIn $script:StepOutcome
+				break
+			}
+		} finally {
+			$IBQConnection.Close()
+			$IBQConnection.Dispose()
 		}
-	} catch {
-		$StepEnd = Get-Date
-		Invoke-ErrMsg
-		$script:StepOutcome = "Failure"
-		Add-LogRow $StepNameIn $script:StepOutcome
-	} finally {
-		$IBQConnection.Close()
-		$IBQConnection.Dispose()
 	}
 }
 function Convert-TableToHtml {
@@ -1689,7 +1742,6 @@ if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzu
 		}
 	}
 	if ($AzCheckSet.Tables[0].Rows.Count -eq 1) {
-		$AzCheckTbl = New-Object System.Data.DataTable
 		$AzCheckTbl = $AzCheckSet.Tables[0]
 		[int]$EngineEdition = $AzCheckTbl.Rows[0]["EngineEdition"]
 		[string]$Edition = $AzCheckTbl.Rows[0]["Edition"]
@@ -1794,7 +1846,6 @@ try {
 	}
 }
 if ($ConnCheckSet.Tables[0].Rows.Count -eq 1) {
-	$ConnChec = New-Object System.Data.DataTable
 	$ConnChec = $ConnCheckSet.Tables[0]
 	[int]$MajorVers = $ConnChec.Rows[0]["MajorVersion"]
 	Write-Host @GreenCheck
@@ -2328,13 +2379,8 @@ $htmlTable6 `n<br>`n<h2>Session level SET options</h2> `n $htmlTable4 `n $HTMLBo
 	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "TempDB Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		
 	if ($script:StepOutcome -eq "Success") {
-		$TempDBTbl = New-Object System.Data.DataTable
 		$TempDBTbl = $script:PSBlitzSet.Tables[0]
-		
-		$TempTabTbl = New-Object System.Data.DataTable
 		$TempTabTbl = $script:PSBlitzSet.Tables[1]
-
-		$TempDBSessTbl = New-Object System.Data.DataTable
 		$TempDBSessTbl = $script:PSBlitzSet.Tables[2]
 
 		if ($ToHTML) {
@@ -2417,7 +2463,6 @@ $htmlTable4 `n $HTMLBodyEnd
 	Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Open Transacion Info" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 	
 	if ($script:StepOutcome -eq "Success") {
-		$AcTranTbl = New-Object System.Data.DataTable
 		$AcTranTbl = $script:PSBlitzSet.Tables[0]
 		[int]$RowsReturned = $AcTranTbl.Rows.Count
 		if ($RowsReturned -le 0) {
@@ -2604,7 +2649,6 @@ $SortableTable `n $htmlTable6 `n $JumpToTop `n $HTMLBodyEnd
 			$DBFileInfoTbl = $script:PSBlitzSet.Tables[1]
 			if (($MajorVers -ge 13) -and (!([string]::IsNullOrEmpty($CheckDB)))) {
 				#the 3rd result set exists only for SQL Server 2016 and above
-				#$DBConfigTbl = New-Object System.Data.DataTable
 				$DBConfigTbl = $script:PSBlitzSet.Tables[2]
 			} elseif (($MajorVers -lt 13) -and (!([string]::IsNullOrEmpty($CheckDB))) -and ($IsAzureSQLMI -eq $false)) {
 				Add-LogRow "->Database Scoped Config" "Skipped" "Major Version is $MajorVers"
@@ -2781,7 +2825,6 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 		}
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Instance Health" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
 		if ($script:StepOutcome -eq "Success") {
-			#$BlitzTbl = New-Object System.Data.DataTable
 			$BlitzTbl = $script:PSBlitzSet.Tables[0]
 
 			if ($ToHTML) {
