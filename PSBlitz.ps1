@@ -304,7 +304,8 @@ param(
 	[ValidateRange(0, 100)]
 	[int]$QueryStoreTop = 20,
 	[switch]$KeepPSOpen = $False,
-	[switch]$GUI = $False
+	[switch]$GUI = $False,
+	[switch]$ForceExcelApp = $False
 )
 
 ###Internal params
@@ -1045,33 +1046,51 @@ function Convert-TableToExcel {
 					$ExcelColNum = $StartCol
 				}
 			} else {
+				#dump the table in one go
 				$ExcelSheet.Cells[$ExcelStartRow, $ExcelColNum].LoadFromDataTable($DataTable.DefaultView.ToTable($false, [string[]]$DataSetCols), $false) | Out-Null
 			}
 		} else {
-
-			foreach ($row in $DataTable) {
-				foreach ($col in $DataSetCols) {
-					[string]$script:DebugCol = $col
-					[string]$script:DebugValue = $DataTable.Rows[$RowNum][$col]
-					if ($URLCols -contains $col) {
-						if ($DataTable.Rows[$RowNum][$col] -like "http*") {
-							$ExcelSheet.Hyperlinks.Add(
-								$ExcelSheet.Cells.Item($ExcelStartRow, $MapURLToColNum),
-								$DataTable.Rows[$RowNum][$col],
-								"",
-								"Click for more info",
-								$DataTable.Rows[$RowNum][$URLTextCol]
-							) | Out-Null
+			if ($URLCols) {
+				#same cell by cell loading logic for COM object to add hyperlinks
+				foreach ($row in $DataTable) {
+					foreach ($col in $DataSetCols) {
+						[string]$script:DebugCol = $col
+						[string]$script:DebugValue = $DataTable.Rows[$RowNum][$col]
+						if ($URLCols -contains $col) {
+							if ($DataTable.Rows[$RowNum][$col] -like "http*") {
+								$ExcelSheet.Hyperlinks.Add(
+									$ExcelSheet.Cells.Item($ExcelStartRow, $MapURLToColNum),
+									$DataTable.Rows[$RowNum][$col],
+									"",
+									"Click for more info",
+									$DataTable.Rows[$RowNum][$URLTextCol]
+								) | Out-Null
+							}
+						} else {
+							$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DataTable.Rows[$RowNum][$col]
 						}
-					} else {
-						$ExcelSheet.Cells.Item($ExcelStartRow, $ExcelColNum) = $DataTable.Rows[$RowNum][$col]
+						$ExcelColNum += 1
 					}
-					$ExcelColNum += 1
+					$ExcelStartRow += 1
+					$RowNum += 1
+					$ExcelColNum = $StartCol
 				}
-
-				$ExcelStartRow += 1
-				$RowNum += 1
-				$ExcelColNum = $StartCol
+			} else {
+				#if we're not dealing with URLs, we can load the whole table into an array and dump it in one go which is much faster than cell by cell
+				$rowCount = $DataTable.Rows.Count
+				$colCount = $DataSetCols.Count
+				$dataArray = [object[, ]]::new($rowCount, $colCount)
+				for ($r = 0; $r -lt $rowCount; $r++) {
+					for ($c = 0; $c -lt $colCount; $c++) {
+						$dataArray[$r, $c] = $DataTable.Rows[$r][$DataSetCols[$c]]
+					}
+				}
+				$endRow = $ExcelStartRow + $rowCount - 1
+				$endCol = $StartCol + $colCount - 1
+				$ExcelSheet.Range(
+					$ExcelSheet.Cells.Item($ExcelStartRow, $StartCol),
+					$ExcelSheet.Cells.Item($endRow, $endCol)
+				).Value2 = $dataArray
 			}
 		}
 		if ($DebugInfo) {
@@ -1917,7 +1936,7 @@ if (!(Test-Path $XDLOutDir)) {
 
 #Initiate Excel app here
 if (-not $ToHTML) {
-	if (Get-Module -Name ImportExcel -ListAvailable) {
+	if ((-not $ForceExcelApp) -and (Get-Module -Name ImportExcel -ListAvailable)) {
 		Import-Module ImportExcel -ErrorAction SilentlyContinue
 		$UseImportExcel = $true
 		Write-Host "Using ImportExcel module for Excel output." -Fore Green
