@@ -2722,7 +2722,7 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 	#####################################################################################
 	#						sp_BlitzBackups												#
 	#####################################################################################
-	if ((-not $IsAzureSQLDB) -and (-not $IsAzureSQLMI) -and (-not $IsGoogleCloudSQL)) {
+	if ((-not $IsAzureSQLDB) -and (-not $IsAzureSQLMI)) {
 		Write-Host " Retrieving backup info... " -NoNewline
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzBackups_NonSPLatest.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
