@@ -186,6 +186,10 @@ dark-mode.js, PSBlitzGUI.ps1, and styles.css, is held by Vlad Drumea, 2026 as de
 .PARAMETER MaxTimeout
  Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. Defaults to 1000 (16.6 minutes)
 
+.PARAMETER RetryOnTimeout
+ Switch used to include timeout errors in the list of transient errors for which the retry logic kicks in.
+ If a check gets a timeout error and this switch is used, PSBlitz will retry the check up to 3 times with a delay of 5 seconds between retries.
+
 .PARAMETER MaxUsrDBs
  Can be used to tell PSBlitz to raise the limit of user databases based on which index-related info is 
  limited to only the "loudest" database in the cache results. Defaults to 50 - only change it if you're using using HTML output
@@ -195,6 +199,9 @@ dark-mode.js, PSBlitzGUI.ps1, and styles.css, is held by Vlad Drumea, 2026 as de
  Used to specify one or more (comma-separated) checks to skip. 
  Currently supports IndexFrag (skips index fragmentation check), StatsInfo (skips statistics info check), 
  Deadlock (skips deadlock check), PlanCache (skips plan cache check), QueryStore (skips Query Store check).
+
+.PARAMETER ForceExcelApp
+ Switched used to force PSBlitz to write the report using the Excel app even if the ImportExcel PS module is installed. 
 
 .PARAMETER DebugInfo
  Switch used to get more information for debugging and troubleshooting purposes.
@@ -1598,6 +1605,14 @@ if (([string]::IsNullOrEmpty($ServerName)) -and (-not $GUI)) {
 
 		##custom output dir
 		[string]$OutputDir = Read-Host -Prompt "Specify another existing directory path to save the output.(empty defaults to PSBlitz's path)"
+
+		##retry on timeout 
+		[string]$RetryTimeoutInput = Read-Host -Prompt "Retry on timeout errors for long running queries?(empty defaults to N)[Y/N]"
+		if ($RetryTimeoutInput -match '^(?i:y|yes)') {
+			$RetryOnTimeout = $true
+		} else {
+			$RetryOnTimeout = $false
+		}
 	}
 } else {
 	$InteractiveMode = 0
@@ -2722,7 +2737,7 @@ $SortableTable `n $htmlTable1 `n $JumpToTop `n $htmlBlock `n $HTMLBodyEnd
 	#####################################################################################
 	#						sp_BlitzBackups												#
 	#####################################################################################
-	if ((-not $IsAzureSQLDB) -and (-not $IsAzureSQLMI)) {
+	if (-not $IsAzureSQLDB) {
 		Write-Host " Retrieving backup info... " -NoNewline
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "spBlitzBackups_NonSPLatest.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
