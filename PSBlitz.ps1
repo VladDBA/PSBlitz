@@ -319,7 +319,7 @@ param(
 ###Internal params
 #Version
 $Vers = "6.1.0"
-$VersDate = "2026-05-05"
+$VersDate = "2026-05-25"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -2922,6 +2922,41 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			}
 			##Cleaning up variables
 			Invoke-ClearVariables DangerousSetTbl, PSBlitzSet	 	
+		}
+	}
+
+	#####################################################################################
+	#						Security Checks												#
+	#####################################################################################
+	if (-not $IsAzureSQLDB) {
+		Write-Host " Retrieving security checks info... " -NoNewline
+		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetSecurityChecks.sql"
+		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
+		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Security Checks" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
+		if ($script:StepOutcome -eq "Success") {
+			$SecChecksTbl = $script:PSBlitzSet.Tables[0]
+			[int]$RowsReturned = $SecChecksTbl.Rows.Count
+			if ($RowsReturned -le 0) {
+				Write-Host " ->No rows returned."
+			} else {
+				if ($ToHTML) {
+					$HtmlTabName = "Security Checks"
+					$htmlTable = Convert-TableToHtml $SecChecksTbl -TblID "SecurityChecksTable" -HyperlinkCol "FindingHL" -DebugInfo:$DebugInfo
+					$html = $HTMLPre + @" 
+<title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1 id="top">$HtmlTabName</h1> $DarkModeDiv
+$htmlTable `n $JumpToTop `n $HTMLBodyEnd
+"@
+					Save-HtmlFile $html "SecurityChecks.html" $HTMLOutDir $DebugInfo
+					Invoke-ClearVariables html, htmlTable
+				} else {
+					$ExcelSheet = Get-PSBlitzWorksheet "Security Checks"
+					Convert-TableToExcel $SecChecksTbl $ExcelSheet -StartRow 4 -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
+					##Saving file 
+					Save-ExcelFile $ExcelFile
+				}
+			}
+			##Cleaning up variables
+			Invoke-ClearVariables SecChecksTbl, PSBlitzSet		
 		}
 	}
 
