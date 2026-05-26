@@ -637,6 +637,60 @@ WHERE  [securityadmin] = 1
        AND [name] NOT LIKE N'NT SERVICE\%'
        AND [name] <> N'l_certSignSmDetach';
 
+/*dbcreator role members*/
+INSERT INTO #Results
+            ([Priority],
+             [Findings Group],
+             [Finding],
+             [Details],
+             [Recommendation],
+             [URL])
+SELECT 2,
+       'Excessive Privileges',
+       'dbcreator role member',
+       QUOTENAME([name])
+       + N' is a member of the dbcreator fixed server role.'
+       + @crlf
+       + N'Besides creating databases, members of the dbcreator fixed server role can alter, drop, and restore any database, including ones they do not own.'
+       + @crlf
+       + N'While this role doesn''t have as many privileges as sysadmin, it still represents a significant risk if misused or compromised.',
+       N'Review if ' + QUOTENAME([name])
+       + ' actually needs dbcreator level privileges.',
+       N'https://learn.microsoft.com/en-us/sql/relational-databases/security/authentication-access/server-level-roles?view=sql-server-ver17#fixed-server-level-roles'
+FROM   master.sys.[syslogins]
+WHERE  [dbcreator] = 1
+       AND [denylogin] = 0
+       AND [name] NOT LIKE N'NT SERVICE\%'
+       AND [name] <> N'l_certSignSmDetach';    
+
+/*##MS_DatabaseManager## role member*/
+INSERT INTO #Results
+            ([Priority],
+             [Findings Group],
+             [Finding],
+             [Details],
+             [Recommendation],
+             [URL])
+SELECT 2,
+        'Excessive Privileges',
+        '##MS_DatabaseManager## role member',
+        QUOTENAME([name])
+        + N' is a member of the ##MS_DatabaseManager## fixed server role.'
+        + @crlf
+        + N'Besides creating databases, members of the ##MS_DatabaseManager## fixed server role can alter any database, including ones they do not own.'
+        + @crlf
+        + N'While this role doesn''t have as many privileges as sysadmin, it still represents a significant risk if misused or compromised.'
+        + @crlf 
+        + N'Members of this role can potentially elevate their privileges under certain conditions.',
+        N'Review if ' + QUOTENAME([name])
+        + ' actually needs ##MS_DatabaseManager## level privileges.',
+        N'https://learn.microsoft.com/en-us/sql/relational-databases/security/authentication-access/server-level-roles?view=sql-server-ver17#fixed-server-level-roles-introduced-in-sql-server-2022'
+FROM   master.sys.[syslogins]
+WHERE  [##MS_DatabaseManager##] = 1
+       AND [denylogin] = 0
+       AND [name] NOT LIKE N'NT SERVICE\%'
+       AND [name] <> N'l_certSignSmDetach';
+
 /*CONTROL SERVER permission*/
 INSERT INTO #Results
             ([Priority],
