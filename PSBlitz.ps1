@@ -2940,8 +2940,10 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				Write-Host " ->No rows returned."
 			} else {
 				if ($ToHTML) {
+					$HighPrioritySecurityCount = ($SecChecksTbl | Where-Object { $_."Priority" -eq 1 }).Rows.Count
+					$MediumPrioritySecurityCount = ($SecChecksTbl | Where-Object { $_."Priority" -eq 2 }).Rows.Count
 					$HtmlTabName = "Security Checks"
-					$htmlTable = Convert-TableToHtml $SecChecksTbl -TblID "SecurityChecksTable" -HyperlinkCol "FindingHL" -DebugInfo:$DebugInfo
+					$htmlTable = Convert-TableToHtml $SecChecksTbl -TblID "SecurityChecksTable" -HyperlinkCol "FindingHL" -ExclCols "Finding", "URL" -CSSClass "security-info" -DebugInfo:$DebugInfo
 					$html = $HTMLPre + @" 
 <title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1 id="top">$HtmlTabName</h1> $DarkModeDiv
 $htmlTable `n $JumpToTop `n $HTMLBodyEnd
@@ -4709,7 +4711,17 @@ finally {
 				$PageName = "Backup Information"
 				$Description = "Information about the latest backups for all databases on the instance."
 				$QuerySource += "Similar to sp_BlitzBackup;"
-			} else {
+			} elseif ($File.Name -like "SecurityChecks*") {
+				$PageName = "Security Checks"
+				$Description = "Results of various security-related checks."
+				if ($HighPrioritySecurityCount -gt 0) {
+					$Description += "<br><span class=`"warnings-desc`">High priority findings: $HighPrioritySecurityCount</span>"
+				}
+				if ($MediumPrioritySecurityCount -gt 0) {
+					$Description += "<br><span class=`"additional-desc`">Medium priority findings: $MediumPrioritySecurityCount</span>"
+				}
+			}
+			else {
 				$PageName = $Description
 			}
 			$IndexContent += "`n<tr><td><a href=`"$RelativePath`">$PageName</a></td><td class=`"tooltip`" title=`"$QuerySource`">$Description</td>$Plans $DLGraphs $RLim</tr>"

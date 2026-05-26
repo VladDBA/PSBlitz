@@ -65,7 +65,7 @@ CREATE TABLE #Results
      [Recommendation] NVARCHAR(1000),
      [URL]            NVARCHAR(200),
      [FindingHL] AS ISNULL(N'<a href=''' + [URL]
-               + N''' target=''_blank''>' + [Finding] + N'</a>', N'')
+               + N''' target=''_blank''>' + [Finding] + N'</a>', [Finding])
   );
 
 /*Password candidates*/
@@ -546,12 +546,12 @@ IF ( @OS = 'windows' )
 /*sa state*/
 SELECT @sql = N'SELECT '
               + CASE
-                  WHEN [name] = N'sa' THEN N'1 AS [Priority], ''Excessive Privileges'' AS [Findings Group], N''The sa login is enabled'' AS Finding,'
+                  WHEN [name] = N'sa' THEN N'1 AS [Priority], ''Excessive Privileges'' AS [Findings Group], N''sa login is enabled'' AS Finding,'
                                            + N'N''The sa login is a well-known target for brute-force attacks because its name is predictable and it is always a member of the sysadmin role.'
                                            + @crlf
                                            + N'An attacker with sa access can do anything on the instance, including reading all data, dropping databases, or executing OS commands via xp_cmdshell.'' AS [Details],'
                                            + N'''Disable it so it can no longer be used as a login for connections. '
-                  ELSE N'2 AS [Priority], ''Weak Mitigation'' AS [Findings Group], N''The sa login is enabled and renamed'' AS Finding,'
+                  ELSE N'2 AS [Priority], ''Weak Mitigation'' AS [Findings Group], N''sa login is enabled and renamed'' AS Finding,'
                        + N'N''The sa login is identified by its fixed SID (0x01), not its name.'
                        + @crlf
                        + N'While renaming it obscures it, any login can query sys.sql_logins and find the account by SID.'' AS [Details],'
@@ -1733,11 +1733,11 @@ DEALLOCATE db_cursor;
 SELECT [Priority],
        [Findings Group],
        [Finding],
+       [FindingHL],
        [Database],
        [Details],
        [Recommendation],
-       [URL],
-       [FindingHL]
+       [URL]
 FROM   #Results
 ORDER  BY [Priority] ASC,
           [Id] ASC;

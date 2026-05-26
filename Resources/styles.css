@@ -333,6 +333,30 @@ th.sortable:hover {
 	}
 }
 
+
+/*
+ ## security info
+*/
+
+.security-info {
+	td {
+		vertical-align: top;
+	}
+	td:first-child {
+		text-align: center;
+	}
+	td:nth-child(n+2) {
+		text-align: left;
+	}
+	td:nth-child(2) {
+		white-space: nowrap;
+	}
+	td:nth-child(n+5) {
+		white-space: pre-wrap;
+		word-wrap: normal;
+	}
+}
+
 /*
  ## Session activity (agg and raw)
 */
