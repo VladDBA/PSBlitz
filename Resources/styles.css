@@ -26,6 +26,8 @@
 	--warning-bg: rgb(252, 252, 117);
     --warning-text: #b30000; /* light-mode warning text (red) */
 	--p1-bg: #FFB6C1;
+	--p2-bg: #FFD580;
+	--p3-bg: #FFFF99;
     --warning-border: rgba(0,0,0,0.08);
 	--additional-text: #000000;
 	--additional-bg: rgb(252, 252, 117);
@@ -47,6 +49,8 @@
     --shadow: 0 0 20px rgba(0, 0, 0, 0.6);
 	--warning-bg: #841b2d; 
 	--p1-bg: var(--warning-bg);
+	--p2-bg: #FFD580;
+	--p3-bg: #FFFF99;
     --warning-text: #ffffff;  /* ensure high contrast on dark mode */
     --warning-border: rgba(255,255,255,0.06);
 	--additional-text: #d1d5db;
@@ -265,6 +269,106 @@ th.sortable:hover {
 	td:nth-child(n+4):nth-child(-n+5) {
 		text-align: center;
 	}
+}
+
+/*
+ ## Backup info
+*/
+.recoverability-info {
+	td {
+		vertical-align: top;
+	}
+	td:nth-child(n+2):nth-child(-n+7) {
+		text-align: right;
+		white-space: nowrap;
+	}
+	td:nth-child(9) {
+		text-align: right;
+	}
+	td:nth-child(n+11) {
+		text-align: right;
+	}
+
+	/*truncate wide/tall cells and only show additional text on hover */
+	td:nth-child(8) {
+          max-width: 22ch;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+       } 
+	td:nth-child(8):hover {
+            white-space: normal;
+             max-width: none;
+       }
+	
+	td:nth-child(10) {
+          max-width: 22ch;
+          white-space: nowrap;
+          overflow: hidden;
+          text-overflow: ellipsis;
+       } 
+	td:nth-child(10):hover {
+            white-space: normal;
+             max-width: none;
+       }
+}
+
+
+.backup-details {
+    td:nth-child(2) {
+		text-align: center;
+	}
+	td:nth-child(n+3):nth-child(-n+15) {
+		text-align: right;
+		white-space: nowrap;
+	}
+	td:nth-child(n+16):nth-child(-n+17) {
+		text-align: center;
+	}
+	td:nth-child(n+18) {
+		text-align: right;
+	}
+}
+
+.bkp-warnings-tbl {
+	td:nth-child(4) {
+		white-space: pre-wrap;
+		word-wrap: normal;
+	}
+}
+
+
+/*
+ ## security info
+*/
+
+.security-info {
+	td {
+		vertical-align: top;
+	}
+	td:first-child {
+		text-align: center;
+	}
+	td:nth-child(n+2) {
+		text-align: left;
+	}
+	td:nth-child(2) {
+		white-space: nowrap;
+	}
+	td:nth-child(n+5) {
+		white-space: pre-wrap;
+		word-wrap: normal;
+	}
+}
+
+.instance-health-tbl-p2 {
+	background-color: var(--p2-bg);
+	color: #111111;
+}
+
+.instance-health-tbl-p3 {
+	background-color: var(--p3-bg);
+	color: #111111;
 }
 
 /*
@@ -652,8 +756,9 @@ th.sortable:hover {
 		vertical-align: top;
 	}
 
-	td:nth-child(n+4):nth-child(-n+25) {
+	td:nth-child(n+4){
 		text-align: right;
+		white-space: nowrap;
 	}
 
 }

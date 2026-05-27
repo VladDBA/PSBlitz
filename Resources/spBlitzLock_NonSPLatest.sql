@@ -4351,7 +4351,7 @@ BEGIN
                     /*ap.available_plans,*/
                     ap.database_name,
 					CAST('' AS VARCHAR(30)) AS query,
-                    query_text = REPLACE(REPLACE(ap.query_xml, N'<?query '+CAST(CHAR(10) AS NVARCHAR(1)),N''),CAST(CHAR(10) AS NVARCHAR(1))+N'   ?>',N''),
+                    query_text = REPLACE(REPLACE(ap.query_xml, N'<?query '+CAST(CHAR(10) AS NVARCHAR(1)),N''),N'   ?>',N''),
 					CAST('' AS VARCHAR(30)) AS sqlplan_file,
                     ap.query_plan,
                     CONVERT(VARCHAR(25),ap.creation_time,120) AS creation_time,
