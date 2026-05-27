@@ -319,7 +319,7 @@ param(
 ###Internal params
 #Version
 $Vers = "6.1.0"
-$VersDate = "2026-05-27"
+$VersDate = "2026-05-28"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -363,6 +363,7 @@ $storedHashes = @{
 	"spQuickieStore_NonSPLatest.sql"     = "3084C1C5E42AC3FBCBD4100403C9475F4518572A71516EA06D2871D480A04280"
 	"GetQSStatus.sql"                    = "A0D6E7B1C6BC5B0ED5FDF6FD14C5927729F883CB491342F81DCD9BD48A4ACCFE"
 	"spBlitzBackups_NonSPLatest.sql"     = "6B2C4BE1C32F223BDA06518EA6214F17B3DAF4090655910EA7D95B57605357F6"
+	"GetSecurityChecks.sql"              = "24E24997054C515B280D317BD3519F1DD812C3306716D5DC5D248A63ADAA20D4"
 }
 
 #Set path+name of the input Excel file
@@ -802,9 +803,9 @@ function Convert-TableToHtml {
 				#Change background color for OFF options
 				$htmlTableOut = $htmlTableOut -replace '>(OFF)<', ' class="instance-health-tbl-p1">$1<'
 			} elseif ($TblID -eq "SecurityChecksTable") {
-				$htmlTableOut = $htmlTableOut -replace 'td>1<','td class="instance-health-tbl-p1">1<'
-				$htmlTableOut = $htmlTableOut -replace 'td>2<','td class="instance-health-tbl-p2">2<'
-				$htmlTableOut = $htmlTableOut -replace 'td>3<','td class="instance-health-tbl-p3">3<'
+				$htmlTableOut = $htmlTableOut -replace 'td>1<', 'td class="instance-health-tbl-p1">1<'
+				$htmlTableOut = $htmlTableOut -replace 'td>2<', 'td class="instance-health-tbl-p2">2<'
+				$htmlTableOut = $htmlTableOut -replace 'td>3<', 'td class="instance-health-tbl-p3">3<'
 			}
 		} elseif ($CSSClass) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class=`"$CSSClass`">"
