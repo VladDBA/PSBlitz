@@ -3,6 +3,26 @@
 	License - https://github.com/VladDBA/PSBlitz/blob/main/LICENSE
     Script to run instance wide security check for misconfiguration that might be causing security issues. This is not an exhaustive list of all possible security misconfigurations, 
     but it covers some of the most common ones.
+    
+    Copyright (c) 2026 Vlad Drumea - <https://vladdba.com/>
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to deal
+    in the Software without restriction, including without limitation the rights
+    to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+    copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+    
+    The above copyright notice and this permission notice shall be included in all
+    copies or substantial portions of the Software.
+    
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+    SOFTWARE.
 */
 SET ANSI_NULLS ON;
 SET ANSI_PADDING ON;
@@ -361,7 +381,8 @@ IF ( @OS = 'windows' )
                       RAISERROR ('Could not create BUILTIN\Administrators login',1,1) WITH NOWAIT;
                   END CATCH;
               END;
-
+           IF ( @could_not_get_local_admins = 0 )
+             BEGIN
             INSERT @LocalAdmins
                    ([WinUserName],
                     [WinUserType],
@@ -371,6 +392,7 @@ IF ( @OS = 'windows' )
             EXECUTE xp_logininfo
               'BUILTIN\Administrators',
               'members';
+               END;
 
             ROLLBACK TRANSACTION;
         END; /*xp_cmdshell disabled*/
@@ -551,7 +573,7 @@ SELECT @sql = N'SELECT '
                                            + @crlf
                                            + N'An attacker with sa access can do anything on the instance, including reading all data, dropping databases, or executing OS commands via xp_cmdshell.'' AS [Details],'
                                            + N'''Disable it so it can no longer be used as a login for connections. '
-                  ELSE N'2 AS [Priority], ''Weak Mitigation'' AS [Findings Group], N''sa login is enabled and renamed'' AS Finding,'
+                  ELSE N'2 AS [Priority], ''Insufficient Hardening'' AS [Findings Group], N''sa login is enabled and renamed'' AS Finding,'
                        + N'N''The sa login is identified by its fixed SID (0x01), not its name.'
                        + @crlf
                        + N'While renaming it obscures it, any login can query sys.sql_logins and find the account by SID.'' AS [Details],'
@@ -664,32 +686,38 @@ WHERE  [dbcreator] = 1
        AND [name] <> N'l_certSignSmDetach';    
 
 /*##MS_DatabaseManager## role member*/
-INSERT INTO #Results
-            ([Priority],
-             [Findings Group],
-             [Finding],
-             [Details],
-             [Recommendation],
-             [URL])
-SELECT 2,
-        'Excessive Privileges',
-        '##MS_DatabaseManager## role member',
-        QUOTENAME([name])
-        + N' is a member of the ##MS_DatabaseManager## fixed server role.'
-        + @crlf
-        + N'Besides creating databases, members of the ##MS_DatabaseManager## fixed server role can alter any database, including ones they do not own.'
-        + @crlf
-        + N'While this role doesn''t have as many privileges as sysadmin, it still represents a significant risk if misused or compromised.'
-        + @crlf 
-        + N'Members of this role can potentially elevate their privileges under certain conditions.',
-        N'Review if ' + QUOTENAME([name])
-        + ' actually needs ##MS_DatabaseManager## level privileges.',
-        N'https://learn.microsoft.com/en-us/sql/relational-databases/security/authentication-access/server-level-roles?view=sql-server-ver17#fixed-server-level-roles-introduced-in-sql-server-2022'
-FROM   master.sys.[syslogins]
-WHERE  [##MS_DatabaseManager##] = 1
-       AND [denylogin] = 0
-       AND [name] NOT LIKE N'NT SERVICE\%'
-       AND [name] <> N'l_certSignSmDetach';
+IF @version >= 16
+   BEGIN
+       SET @sql = N'SELECT 2, ''Excessive Privileges'',
+               ''##MS_DatabaseManager## role member'', QUOTENAME([name])'
+               + N'+N'' is a member of the ##MS_DatabaseManager## fixed server role.'
+               + @crlf
+               + N'Besides creating databases, members of the ##MS_DatabaseManager## fixed server role can alter any database, including ones they do not own.'
+               + @crlf 
+               + N'Additionally, members of this role can potentially elevate their privileges under certain conditions.'','
+               + @crlf
+               + N'N''Review if '' + QUOTENAME([name]) + N'' actually needs ##MS_DatabaseManager## level privileges.'','
+               + @crlf
+               + N'N''https://learn.microsoft.com/en-us/sql/relational-databases/security/authentication-access/server-level-roles?view=sql-server-ver17#fixed-server-level-roles-introduced-in-sql-server-2022'''
+               + @crlf 
+               + N'FROM   master.sys.[syslogins]'
+               + @crlf 
+               + N'WHERE  [##MS_DatabaseManager##] = 1'
+               + @crlf 
+               + N'AND [denylogin] = 0'
+               + @crlf 
+               + N'AND [name] NOT LIKE N''NT SERVICE\%'''
+               + @crlf 
+               + N'AND [name] <> N''l_certSignSmDetach''';
+       INSERT INTO #Results
+                   ([Priority],
+                    [Findings Group],
+                    [Finding],
+                    [Details],
+                    [Recommendation],
+                    [URL])
+      EXEC sp_executesql   @sql;
+   END;
 
 /*CONTROL SERVER permission*/
 INSERT INTO #Results
@@ -700,7 +728,7 @@ INSERT INTO #Results
              [Recommendation],
              [URL])
 SELECT 1,
-       'Excessive Privileges',
+       'Privilege Escalation Path',
        N'Login with CONTROL SERVER permission',
        QUOTENAME([pri].[name])
        + N' has CONTROL SERVER permission, which is almost as powerful as being a sysadmin role member.'
@@ -726,7 +754,7 @@ INSERT INTO #Results
              [Recommendation],
              [URL])
 SELECT 1,
-       'Excessive Privileges',
+       'Privilege Escalation Path',
        N'Login with IMPERSONATE ANY LOGIN permission',
        QUOTENAME([pri].[name])
        + N' has IMPERSONATE ANY LOGIN permission, which allows them to impersonate any login on the instance.'
@@ -752,7 +780,7 @@ INSERT INTO #Results
              [Recommendation],
              [URL])
 SELECT 1,
-       'Excessive Privileges',
+       'Privilege Escalation Path',
        N'Login with IMPERSONATE permission on privileged logins',
        QUOTENAME([pri].[name])
        + N' has IMPERSONATE permission on '
@@ -878,7 +906,7 @@ EXEC master.dbo.xp_instance_regread
   @value      = @audit_level OUTPUT,
   @no_output  = 'no_output';
 
-IF @audit_level < 2
+IF ISNULL(@audit_level, 0) < 2
   BEGIN
       INSERT INTO #Results
                   ([Priority],
@@ -995,7 +1023,7 @@ INSERT INTO #Results
              [Recommendation],
              [URL])
 SELECT 1                                                                                                                                                AS [Priority],
-       'Linked Server'                                                                                                                                  AS [Findings Group],
+       'Linked Server Security'                                                                                                                                  AS [Findings Group],
        N'Linked server with [sa] as catch-all'                                                                                                          AS [Finding],
        N'Linked server ' + QUOTENAME([s].[name])
        + N' allows connections to "'
@@ -1021,7 +1049,7 @@ WHERE  [s].[is_linked] = 1
 /*non-sa catch-all*/
 UNION ALL
 SELECT 2,
-       'Linked Server',
+       'Linked Server Security',
        N'Linked server with catch-all',
        N'Linked server ' + QUOTENAME([s].[name])
        + N' allows connections to "'
@@ -1051,7 +1079,7 @@ WHERE  [s].[is_linked] = 1
 /*use self catch-all*/
 UNION ALL
 SELECT 2,
-       'Linked Server',
+       'Linked Server Security',
        N'Linked server using self-mapping',
        N'Linked server ' + QUOTENAME([s].[name])
        + N' allows connections to "'
@@ -1079,7 +1107,7 @@ WHERE  [s].[is_linked] = 1
 /*without a security context*/
 UNION ALL
 SELECT 3,
-       'Linked Server',
+       'Linked Server Security',
        N'Linked server without a security context',
        N'Linked server ' + QUOTENAME([s].[name])
        + N' allows connections to "'
@@ -1100,7 +1128,7 @@ WHERE  [s].[is_linked] = 1
 /*explicit mapping to remote login*/
 UNION ALL
 SELECT 3,
-       'Linked Server',
+       'Linked Server Security',
        N'Linked server with explicit mapping to remote login',
        N'Linked server ' + QUOTENAME([s].[name])
        + N' allows connections to "'
@@ -1132,7 +1160,7 @@ WHERE  [s].[is_linked] = 1
 /*using impersonation*/
 UNION ALL
 SELECT 3,
-       'Linked Server',
+       'Linked Server Security',
        N'Linked server using impersonation',
        N'Linked server ' + QUOTENAME([s].[name])
        + N' allows connections to "'
@@ -1169,7 +1197,7 @@ INSERT INTO #Results
              [Recommendation],
              [URL])
 SELECT 2,
-       'Instance Configuration',
+       'Attack Surface',
        N'Database Mail XPs enabled',
        N'Database Mail extended stored procedures are enabled. This allows SQL Server to send emails, which can be used for alerts, notifications, or by applications.'
        + @crlf
@@ -1240,7 +1268,7 @@ INSERT INTO #Results
              [Recommendation],
              [URL])
 SELECT 2,
-       'Instance Configuration',
+       'Attack Surface',
        N'Ad Hoc Distributed Queries enabled',
        N'OPENROWSET and OPENDATASOURCE with ad hoc distributed queries enabled allow SQL Server to read from external data sources, including local files.'
        + @crlf
@@ -1260,7 +1288,7 @@ INSERT INTO #Results
              [Recommendation],
              [URL])
 SELECT 2,
-       'Instance Configuration',
+       'Privilege Escalation Path',
        N'Cross-database ownership chaining enabled',
        N'Cross-database ownership chaining allows stored procedures and views in one database to access objects'
        + @crlf
@@ -1284,7 +1312,7 @@ INSERT INTO #Results
              [Recommendation],
              [URL])
 SELECT 2,
-       'Instance Configuration',
+       'Attack Surface',
        N'Startup stored procedure',
        N'Stored procedure [master].'
        + QUOTENAME(SCHEMA_NAME([schema_id])) + N'.'
@@ -1310,7 +1338,7 @@ INSERT INTO #Results
              [Recommendation],
              [URL])
 SELECT 2                            AS [Priority],
-       'Instance Configuration'     AS [Findings Group],
+       'Attack Surface'     AS [Findings Group],
        N'Agent job runs at startup' AS [Finding],
        N'Agent job "' + [j].[name]
        + N'" is configured to run automatically at SQL Server Agent startup.'
@@ -1338,7 +1366,7 @@ INSERT INTO #Results
              [Recommendation],
              [URL])
 SELECT 2,
-       'Instance Configuration',
+       'Attack Surface',
        N'Remote access enabled',
        N'The remote access configuration allows stored procedure calls between SQL Server instances.'
        + @crlf
@@ -1361,7 +1389,7 @@ INSERT INTO #Results
              [Recommendation],
              [URL])
 SELECT 1,
-       'Privilege Escalation',
+       'Privilege Escalation Path',
        N'Trustworthy database with sysadmin owner',
        [d].[name],
        N'Database ' + QUOTENAME([d].[name])
@@ -1391,7 +1419,7 @@ INSERT INTO #Results
              [Recommendation],
              [URL])
 SELECT 2,
-       'Privilege Escalation',
+       'Privilege Escalation Path',
        N'Trustworthy database with non-sysadmin owner',
        [d].[name],
        N'Database ' + QUOTENAME([d].[name])
@@ -1420,7 +1448,7 @@ INSERT INTO #Results
              [Recommendation],
              [URL])
 SELECT 2,
-       'Privilege Escalation',
+       'Privilege Escalation Path',
        N'Database owned by sysadmin',
        [d].[name],
        N'When a database is owned by a sysadmin login, db_owner members can impersonate the database owner within the database,'
@@ -1472,7 +1500,7 @@ INSERT INTO #Results
              [Recommendation],
              [URL])
 SELECT 1,
-       'Excessive Privileges',
+       'Privilege Escalation Path',
        N'High-privilege permission granted to public server role',
        N'The ' + [perm].[permission_name]
        + N' permission is granted to the public server role, which is a high-privilege permission.'
@@ -1768,20 +1796,20 @@ WHILE @@FETCH_STATUS = 0
                         N'Review the error message for details on what went wrong and address any issues with the dynamic SQL execution.');
             END CATCH;
         END;
+      FETCH NEXT FROM db_cursor INTO @safe_for_ppc, @db_name;
+  END;
 
-      /*update for master and msdb*/
+CLOSE db_cursor;
+
+DEALLOCATE db_cursor;
+
+/*update for master and msdb*/
       UPDATE #Results
       SET    [Priority] = 1,
              [Finding] = [Finding] + N' in system database'
       WHERE  [Database] IN ( N'master', N'msdb' )
              AND [Finding] IN ( N'db_owner role membership', N'Powerful database role membership', N'Nested roles' );
 
-      FETCH NEXT FROM db_cursor INTO @safe_for_ppc, @quoted_db_name;
-  END;
-
-CLOSE db_cursor;
-
-DEALLOCATE db_cursor;
 
 /*return result*/
 SELECT [Priority],
