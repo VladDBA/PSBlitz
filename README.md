@@ -104,6 +104,7 @@ You can find the all the scripts in the repository's [Resources](/Resources) dir
 - Wait stats - from sp_BlitzFirst
 - Currently running queries - from sp_BlitzWho
 - Instance health-related findings - from sp_Blitz
+- Instance security-related findings
 - tempdb size and usage information per object and session
 - Index-related issues and recommendations - from sp_BlitzIndex
 - Top 10 most resource intensive queries - from sp_BlitzCache
@@ -186,7 +187,7 @@ Open PSBlitzOutput.xlsx (found in PSBlitz's Resources folder) click on the first
 |`-MaxTimeout`|Can be used to set a higher timeout for sp_BlitzIndex and Stats and Index info retrieval. <br>Defaults to 1000 (16.6 minutes).|
 |`-RetryOnTimeout`|Used to include timeout errors in the list of transient errors for which the retry logic kicks in.|
 |`-MaxUsrDBs`|Can be used to tell PSBlitz to raise the limit of user databases based on which index-related info is limited to only the "loudest" database in the cache results. <br>Defaults to 50. <br>Only change it if you're using using HTML output and have enough RAM to handle the increased data that PS will have to process.|
-|`-SkipChecks`|Used to specify one or more (comma-separated) checks to skip.<br> Currently supports <br> `IndexFrag` - skip the index fragmentation check. <br> `StatsInfo` - skip the statistics information check. <br> `Deadlock` - skip the deadlock information cehck. <br> `PlanCache` - skips plan cache check.|
+|`-SkipChecks`|Used to specify one or more (comma-separated) checks to skip.<br> Currently supports <br> `IndexFrag` - skip the index fragmentation check. <br> `StatsInfo` - skip the statistics information check. <br> `Deadlock` - skip the deadlock information cehck. <br> `PlanCache` - skips plan cache check. <br> `QueryStore` - skip query store check. <br> `Security` - skip security check.|
 |`-DebugInfo`|Switch used to get more information for debugging and troubleshooting purposes.|
 
 [*Back to top*](#header1)

@@ -1526,7 +1526,8 @@ SELECT [d].[database_id],
 FROM   sys.[databases] [d]
        CROSS APPLY fn_my_permissions([d].name, 'DATABASE') AS [p]
 WHERE  [p].[permission_name] = 'SELECT'
-       AND LOWER([d].[name]) NOT IN ( N'dbatools', N'dbadmin', N'dbmaintenance', N'gcloud_cloudsqladmin', N'rdsadmin' )
+       AND LOWER([d].[name]) NOT IN ( N'dbatools', N'dbadmin', N'dbmaintenance', N'gcloud_cloudsqladmin',
+                                      N'rdsadmin', N'rdsadmininternal', N'ssisdb', N'tempdb')
        AND [d].[state] = 0;
 
 UPDATE #Databases

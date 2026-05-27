@@ -234,14 +234,15 @@ $y += 40
 $grpSkip = New-Object System.Windows.Forms.GroupBox
 $grpSkip.Text = "Skip Checks"
 $grpSkip.Location = [System.Drawing.Point]::new(10, $y)
-$grpSkip.Size = [System.Drawing.Size]::new(490, 115)
+$grpSkip.Size = [System.Drawing.Size]::new(490, 145)
 
 $cSkipFrag = New-Chk "Index Fragmentation" 10 22 215
 $cSkipStats = New-Chk "Statistics Info" 240 22 215
 $cSkipDead = New-Chk "Deadlocks" 10 52 215
 $cSkipCache = New-Chk "Plan Cache" 240 52 215
 $cSkipQS = New-Chk "Query Store" 10 82 215
-$grpSkip.Controls.AddRange(@($cSkipFrag, $cSkipStats, $cSkipDead, $cSkipCache, $cSkipQS))
+$cSkipSec = New-Chk "Security" 240 82 215
+$grpSkip.Controls.AddRange(@($cSkipFrag, $cSkipStats, $cSkipDead, $cSkipCache, $cSkipQS, $cSkipSec))
 $tabOpts.Controls.Add($grpSkip)
 
 # ---------------------------------------------------------------------------
@@ -303,6 +304,14 @@ $hMaxDBs.Font = $SmallFont
 $hMaxDBs.ForeColor = $GrayColor
 $tabAdv.Controls.AddRange(@((New-Lbl "Max user databases" 10 $y 185), $nMaxDBs, $hMaxDBs))
 
+$y += 35
+$cForceExcel = New-Chk "Force Excel app for output (ignore ImportExcel module)" 10 $y 490
+$tabAdv.Controls.Add($cForceExcel)
+
+$y += 28
+$cRetryTimeout = New-Chk "Retry on timeout (up to 3 retries with 5s delay)" 10 $y 490
+$tabAdv.Controls.Add($cRetryTimeout)
+
 # ---------------------------------------------------------------------------
 # Bottom bar: Help | [status] | Run PSBlitz | Close
 # ---------------------------------------------------------------------------
@@ -339,6 +348,8 @@ ADVANCED TAB
   - Max timeout          Timeout in seconds for long steps (default 1000).
   - Conn timeout         SQL connection timeout in seconds (default 45).
   - Max user databases   Index database limit threshold (default 50, HTML only).
+  - Force Excel app      Use Excel app for output even if ImportExcel module is installed.
+  - Retry on timeout     Retry timed-out checks up to 3 times with a 5-second delay.
 "@,
             "PSBlitz GUI - Help",
             [System.Windows.Forms.MessageBoxButtons]::OK,
@@ -442,6 +453,7 @@ $btnRun.Add_Click({
         if ($cSkipDead.Checked) { $skipItems.Add("Deadlock") }
         if ($cSkipCache.Checked) { $skipItems.Add("PlanCache") }
         if ($cSkipQS.Checked) { $skipItems.Add("QueryStore") }
+        if ($cSkipSec.Checked) { $skipItems.Add("Security") }
         if ($skipItems.Count -gt 0) {
             $quotedItems = $skipItems | ForEach-Object { "'$_'" }
             [void]$cmd.Append(" -SkipChecks $($quotedItems -join ',')")
@@ -476,6 +488,8 @@ $btnRun.Add_Click({
         if ($nMaxDBs.Value -ne 50) {
             [void]$cmd.Append(" -MaxUsrDBs $([int]$nMaxDBs.Value)")
         }
+        if ($cForceExcel.Checked) { [void]$cmd.Append(" -ForceExcelApp") }
+        if ($cRetryTimeout.Checked) { [void]$cmd.Append(" -RetryOnTimeout") }
 
         ###Encode and launch in a new console window
         $encoded = [Convert]::ToBase64String(

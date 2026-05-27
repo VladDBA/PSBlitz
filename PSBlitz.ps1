@@ -801,6 +801,10 @@ function Convert-TableToHtml {
 			} elseif ($TblID -eq "setopt") {
 				#Change background color for OFF options
 				$htmlTableOut = $htmlTableOut -replace '>(OFF)<', ' class="instance-health-tbl-p1">$1<'
+			} elseif ($TblID -eq "SecurityChecksTable") {
+				$htmlTableOut = $htmlTableOut -replace 'td>1<','td class="instance-health-tbl-p1">1<'
+				$htmlTableOut = $htmlTableOut -replace 'td>2<','td class="instance-health-tbl-p2">2<'
+				$htmlTableOut = $htmlTableOut -replace 'td>3<','td class="instance-health-tbl-p3">3<'
 			}
 		} elseif ($CSSClass) {
 			$htmlTableOut = $htmlTableOut -replace "<table>", "<table class=`"$CSSClass`">"
@@ -2915,7 +2919,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				} else {
 					$ExcelSheet = Get-PSBlitzWorksheet "Objects Dangerous SET"
 					
-					Convert-TableToExcel $DangerousSetTbl $ExcelSheet -StartRow 4 -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
+					Convert-TableToExcel $DangerousSetTbl $ExcelSheet -StartRow 4 -DebugInfo:$DebugInfo 
 					##Saving file 
 					Save-ExcelFile $ExcelFile
 				}
@@ -2928,8 +2932,8 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 	#####################################################################################
 	#						Security Checks												#
 	#####################################################################################
-	if (-not $IsAzureSQLDB) {
-		Write-Host " Retrieving security checks info... " -NoNewline
+	if ((-not $IsAzureSQLDB) -and ($SkipChecks -notcontains "Security")) {
+		Write-Host " Retrieving instance security information... " -NoNewline
 		$SqlScriptFilePath = Join-Path -Path $ResourcesPath -ChildPath "GetSecurityChecks.sql"
 		[string]$Query = [System.IO.File]::ReadAllText("$SqlScriptFilePath")
 		Invoke-PSBlitzQuery -QueryIn $Query -StepNameIn "Security Checks" -ConnStringIn $ConnString -CmdTimeoutIn $DefaultTimeout
@@ -2942,7 +2946,7 @@ $SortableTable `n $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 				if ($ToHTML) {
 					$HighPrioritySecurityCount = ($SecChecksTbl | Where-Object { $_."Priority" -eq 1 }).Rows.Count
 					$MediumPrioritySecurityCount = ($SecChecksTbl | Where-Object { $_."Priority" -eq 2 }).Rows.Count
-					$HtmlTabName = "Security Checks"
+					$HtmlTabName = "Instance Security"
 					$htmlTable = Convert-TableToHtml $SecChecksTbl -TblID "SecurityChecksTable" -HyperlinkCol "FindingHL" -ExclCols "Finding", "URL" -CSSClass "security-info" -DebugInfo:$DebugInfo
 					$html = $HTMLPre + @" 
 <title>$HtmlTabName</title>`n $HTMLBodyStart `n<h1 id="top">$HtmlTabName</h1> $DarkModeDiv
@@ -2951,8 +2955,8 @@ $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 					Save-HtmlFile $html "SecurityChecks.html" $HTMLOutDir $DebugInfo
 					Invoke-ClearVariables html, htmlTable
 				} else {
-					$ExcelSheet = Get-PSBlitzWorksheet "Security Checks"
-					Convert-TableToExcel $SecChecksTbl $ExcelSheet -StartRow 4 -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding"
+					$ExcelSheet = Get-PSBlitzWorksheet "Instance Security"
+					Convert-TableToExcel $SecChecksTbl $ExcelSheet -StartRow 3 -DebugInfo:$DebugInfo -URLCols "URL" -MapURLToColNum 3 -URLTextCol "Finding" -ExclCols "FindingHL"
 					##Saving file 
 					Save-ExcelFile $ExcelFile
 				}
@@ -2960,6 +2964,9 @@ $htmlTable `n $JumpToTop `n $HTMLBodyEnd
 			##Cleaning up variables
 			Invoke-ClearVariables SecChecksTbl, PSBlitzSet		
 		}
+	} else {
+		Write-Host " Instance security checks - skipped." 
+		Add-LogRow "Security Checks" "Skipped" "Azure SQL DB or skipped by user choice"
 	}
 
 	#####################################################################################
@@ -4245,8 +4252,8 @@ finally {
 		$ExcelSheetUpd = Get-PSBlitzWorksheet $IntroSheetName
 
 		if ($IsAzureSQLDB) {
-			$DeleteRows = @(15, 14, 13, 12, 11)
-			$DeleteSheets += @("Database Info", "Instance Health", "DB Scoped Config")
+			$DeleteRows = @(17, 15, 14, 13, 12, 11)
+			$DeleteSheets += @("Database Info", "Instance Health", "DB Scoped Config", "Instance Security")
 		} elseif ($IsAzureSQLDB -eq $false) {
 			if (($MajorVers -lt 13) -or ([string]::IsNullOrEmpty($CheckDB))) {
 				if ($UseImportExcel) {
@@ -4712,7 +4719,7 @@ finally {
 				$Description = "Information about the latest backups for all databases on the instance."
 				$QuerySource += "Similar to sp_BlitzBackup;"
 			} elseif ($File.Name -like "SecurityChecks*") {
-				$PageName = "Security Checks"
+				$PageName = "Instance Security"
 				$Description = "Results of various security-related checks."
 				if ($HighPrioritySecurityCount -gt 0) {
 					$Description += "<br><span class=`"warnings-desc`">High priority findings: $HighPrioritySecurityCount</span>"
@@ -4720,8 +4727,7 @@ finally {
 				if ($MediumPrioritySecurityCount -gt 0) {
 					$Description += "<br><span class=`"additional-desc`">Medium priority findings: $MediumPrioritySecurityCount</span>"
 				}
-			}
-			else {
+			} else {
 				$PageName = $Description
 			}
 			$IndexContent += "`n<tr><td><a href=`"$RelativePath`">$PageName</a></td><td class=`"tooltip`" title=`"$QuerySource`">$Description</td>$Plans $DLGraphs $RLim</tr>"

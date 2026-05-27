@@ -26,6 +26,8 @@
 	--warning-bg: rgb(252, 252, 117);
     --warning-text: #b30000; /* light-mode warning text (red) */
 	--p1-bg: #FFB6C1;
+	--p2-bg: #FFD580;
+	--p3-bg: #FFFF99;
     --warning-border: rgba(0,0,0,0.08);
 	--additional-text: #000000;
 	--additional-bg: rgb(252, 252, 117);
@@ -47,6 +49,8 @@
     --shadow: 0 0 20px rgba(0, 0, 0, 0.6);
 	--warning-bg: #841b2d; 
 	--p1-bg: var(--warning-bg);
+	--p2-bg: #FFD580;
+	--p3-bg: #FFFF99;
     --warning-text: #ffffff;  /* ensure high contrast on dark mode */
     --warning-border: rgba(255,255,255,0.06);
 	--additional-text: #d1d5db;
@@ -355,6 +359,16 @@ th.sortable:hover {
 		white-space: pre-wrap;
 		word-wrap: normal;
 	}
+}
+
+.instance-health-tbl-p2 {
+	background-color: var(--p2-bg);
+	color: #111111;
+}
+
+.instance-health-tbl-p3 {
+	background-color: var(--p3-bg);
+	color: #111111;
 }
 
 /*
