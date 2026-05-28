@@ -68,7 +68,7 @@ PSBlitz can be executed with:
     Unblock-File .\PSBlitz.ps1
     ```
 
-2. If you want the report to be in Excel format, then the MS Office suite needs to be installed on the machine where you're executing PSBlitz, otherwise use the HTML format.
+2. If you want the report to be in Excel format, then you'll need eithr the MS Office suite or the [ImportExcel PowerShell module](https://www.powershellgallery.com/packages/ImportExcel) installed on the machine where you're running PSBlitz from, otherwise use the HTML format.
 3. Sufficient permissions to query DMVs, server state, and get database objects' definitions.
 
 You __don't need__ to have any of the sp_Blitz stored procedures present on the instance that you're executing PSBlitz.ps1 for, all the scripts are contained in the `PSBlitz\Resources` directory in non-stored procedure format.
@@ -104,7 +104,7 @@ You can find the all the scripts in the repository's [Resources](/Resources) dir
 - Wait stats - from sp_BlitzFirst
 - Currently running queries - from sp_BlitzWho
 - Instance health-related findings - from sp_Blitz
-- Instance security-related findings
+- [Instance security-related findings](PSBlitz-Security-Check-Findings.md)
 - tempdb size and usage information per object and session
 - Index-related issues and recommendations - from sp_BlitzIndex
 - Top 10 most resource intensive queries - from sp_BlitzCache
