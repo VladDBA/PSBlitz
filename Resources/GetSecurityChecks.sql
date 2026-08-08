@@ -52,9 +52,11 @@ DECLARE @xp_cmdshell_init_state BIT,
         @db_name                NVARCHAR(128),
         @quoted_db_name         NVARCHAR(130),
         @safe_for_ppc           BIT,
-        @error_message           NVARCHAR(4000);
+        @ext_rest_endpoint_enabled BIT = 0,
+        @error_message           NVARCHAR(4000),
+        @engine_edition TINYINT = (SELECT CAST(SERVERPROPERTY('EngineEdition') AS TINYINT));
 
-IF ( @OS = 'huh?' )
+IF ( @OS = 'huh?' AND @engine_edition <> 8)
   BEGIN
       RAISERROR ('Cannot detect host OS',16,1) WITH NOWAIT;
 
@@ -284,7 +286,7 @@ IF ( @OS = 'windows' )
                   WHERE  LOWER([WinUserName]) = LOWER(@sql_agent_svc_account);
               END;
 
-            /*at this point we can start writing xp_cmdshell findings to */
+            /*at this point we can start writing xp_cmdshell findings to the results table*/
             SELECT @sql = N'SELECT ''Remote Code Execution'','
                           + CASE
                               WHEN 1 IN ( @sql_svc_is_admin, @sql_svc_is_localsystem )
@@ -362,6 +364,41 @@ IF ( @OS = 'windows' )
                          [URL])
             EXEC sp_executesql
               @sql;
+            /*if we a proxy account is set up then check if low-priv users have execute on xp_cmdshell*/
+            IF ( @has_proxy_account = 1 )
+              BEGIN
+                  INSERT INTO #Results
+                              ([Priority],
+                               [Database],
+                               [Findings Group],
+                               [Finding],
+                               [Details],
+                               [Recommendation],
+                               [URL])
+                  SELECT 1, DB_NAME(),
+                         'Excessive Privileges',
+                         N'Execute permission on xp_cmdshell',
+                         N'The database user ' + QUOTENAME([dp].[name]) 
+                         + N' has explicit EXECUTE permission on xp_cmdshell' 
+                         + CASE 
+                              WHEN [perm].[state] = 'W' THEN N' (WITH GRANT OPTION)' 
+                              ELSE N'.' 
+                           END
+                         + @crlf
+                         + N'Users with EXECUTE permission on xp_cmdshell will interact with the OS as ' + QUOTENAME(@proxy_win_user, N'"') + N'.'
+                         + @crlf
+                         + N'The only guardrail in this case is the level of privilege that the proxy account has at the OS level.',
+                         N'Revoke the EXECUTE permission on xp_cmdshell from '+ QUOTENAME([dp].[name]) + N' and, if xp_cmdshell is really needed,'
+                         + @crlf
+                         + N' ensure you have full control over the code that '+ QUOTENAME([dp].[name]) + N' can run via xp_cmdshell.',
+                         N'https://vladdba.com/xp-cmdshell'
+                  FROM [sys].[database_permissions] [perm]
+                       INNER JOIN [sys].[database_principals] [dp] 
+                             ON [perm].[grantee_principal_id] = [dp].[principal_id]
+                  WHERE [perm].[type] = 'EX'
+                    AND [perm].[state] IN ('G', 'W')
+                    AND OBJECT_NAME([perm].[major_id]) = N'xp_cmdshell';
+              END;
         END; /*xp_cmdshell enabled*/
 
       IF ( @xp_cmdshell_init_state = 0 )
@@ -683,7 +720,33 @@ FROM   master.sys.[syslogins]
 WHERE  [dbcreator] = 1
        AND [denylogin] = 0
        AND [name] NOT LIKE N'NT SERVICE\%'
-       AND [name] <> N'l_certSignSmDetach';    
+       AND [name] <> N'l_certSignSmDetach';
+       
+/*Serveradmin role member members */
+INSERT INTO #Results
+            ([Priority],
+             [Findings Group],
+             [Finding],
+             [Details],
+             [Recommendation],
+             [URL])
+SELECT 2,
+       'Excessive Privileges',
+       'serveradmin role member',
+       QUOTENAME([name])
+       + N' is a member of the serveradmin fixed server role.'
+       + @crlf
+       + N'Members of the serveradmin fixed server role can change server-wide configuration options and shut down the instance.'
+       + @crlf
+       + N'While this role doesn''t have as many privileges as sysadmin, it still represents a significant risk if misused or compromised.',
+       N'Review if ' + QUOTENAME([name])
+       + ' actually needs serveradmin level privileges.',
+       N'https://learn.microsoft.com/en-us/sql/relational-databases/security/authentication-access/server-level-roles?view=sql-server-ver17#fixed-server-level-roles'
+FROM  master.sys.[syslogins]
+WHERE  [serveradmin] = 1
+       AND [denylogin] = 0
+       AND [name] NOT LIKE N'NT SERVICE\%'
+       AND [name] <> N'l_certSignSmDetach';
 
 /*##MS_DatabaseManager## role member*/
 IF @version >= 16
@@ -813,18 +876,35 @@ WHERE  [perm].[state] IN ( 'G', 'W' )
        AND [perm].[type] = 'IM'
        AND [pri].[type] IN ( 'R', 'S', 'U', 'G' )
        AND
-       (
-         (
-           [l].[sysadmin] = 1
-            OR [l].[securityadmin] = 1
-          )
+       (( [l].[sysadmin] = 1
+            OR [l].[securityadmin] = 1 )
           OR
-         (
-           [perm2].[type] IN ( 'IAL', 'CL' )
+         ( [perm2].[type] IN ( 'IAL', 'CL' )
            AND [perm2].[state] IN ( 'G', 'W' )
-          )
-        )
-;
+          ));
+
+/*ALTER SETTINGS permission*/
+INSERT INTO #Results
+            ([Priority],
+             [Findings Group],
+             [Finding],
+             [Details],
+             [Recommendation],
+             [URL])
+SELECT 2, 'Excessive Privileges', N'Login with ALTER SETTINGS permission', QUOTENAME([pri].[name])
+       + N' has ALTER SETTINGS permission, which allows them to change server-level settings.'
+       + @crlf
+       + N'This permission can be used to modify the configuration of the SQL Server instance.',
+       N'Review if ' + QUOTENAME([pri].name)
+       + N' really needs ALTER SETTINGS level privileges. If not, revoke the permission.',
+       NULL
+FROM   sys.[server_principals] AS [pri]
+       INNER JOIN sys.[server_permissions] AS [perm]
+               ON [perm].[grantee_principal_id] = [pri].[principal_id]
+WHERE  [perm].[state] IN ( 'G', 'W' )
+       AND [perm].[class] = 100
+       AND [perm].[type] = 'ALST'
+       AND [pri].[type] IN ( 'R', 'S', 'U', 'G' );
 
 /*Weak passwords*/
 INSERT INTO #FoundPasswords
@@ -1379,6 +1459,35 @@ FROM   sys.[configurations]
 WHERE  [name] = N'remote access'
        AND [value_in_use] = 1;
 
+
+/* external rest endpoint enabled */
+IF (@version >= 17)
+  BEGIN
+      SELECT @ext_rest_endpoint_enabled = COUNT (1) FROM [sys].[configurations]
+      WHERE [name] = N'external rest endpoint enabled'
+           AND [value_in_use] = 1;
+      INSERT INTO #Results
+                  ([Priority],
+                   [Findings Group],
+                   [Finding],
+                   [Details],
+                   [Recommendation],
+                   [URL])
+      SELECT 2,
+             'Attack Surface',
+             N'External REST endpoint enabled',
+             N'The external REST endpoint feature is enabled, which allows SQL Server to interact with external REST APIs via sp_invoke_external_rest_endpoint.'
+             + @crlf
+             + N'This can be a security risk since sp_invoke_external_rest_endpoint can be used to exfiltrate data and even leverage it for command and control.',
+             N'Review if the external REST endpoint functionality is required. If not, disable it to reduce the attack surface.'
+             + @crlf
+             + N'If you do need it, ensure access to sp_invoke_external_rest_endpoint is limited to users that actually need it,'
+             + @crlf
+             + N' review the code that leverages it, have proper firwall rules set in place on the host that only allow access to known safe REST API endpoints, and actively monitor its usage.',
+             N'https://vladdba.com/sp_invoke_external_rest_endpoint'
+      WHERE @ext_rest_endpoint_enabled = 1;
+
+  END;
 /*trustworthy database with sysadmin owner*/
 INSERT INTO #Results
             ([Priority],
@@ -1545,6 +1654,8 @@ WHERE  [ID] IN (SELECT [database_id]
                                                AND [ar].[replica_server_name] = @@SERVERNAME
                                                AND sys.fn_hadr_is_primary_replica([adc].[database_name]) = 0));
 
+
+/*All database level checks are handled in this cursor*/
 DECLARE db_cursor CURSOR LOCAL STATIC READ_ONLY FORWARD_ONLY FOR
   SELECT [SFPPC],
          [DBName]
@@ -1666,7 +1777,7 @@ WHILE @@FETCH_STATUS = 0
                     + @crlf
                     + N'WHERE u.name NOT IN (''dbo'',''RSExecRole'') AND u.[type] = ''R'''
                     + @crlf
-                    + N'AND (r.principal_id >= 16384 AND r.principal_id <= 16393)  OPTION (RECOMPILE);';
+                    + N'AND (r.principal_id >= 16384 AND r.principal_id <= 16393) OPTION (RECOMPILE);';
       BEGIN TRY
       INSERT INTO #Results
                   ([Priority],
@@ -1768,7 +1879,7 @@ WHILE @@FETCH_STATUS = 0
                           + N'AND per.minor_id = 0' + @crlf
                           + N'AND permission_name IN (N''VIEW ANY COLUMN ENCRYPTION KEY DEFINITION'''
                           + @crlf
-                          + N',N''VIEW ANY COLUMN MASTER KEY DEFINITION''));';
+                          + N',N''VIEW ANY COLUMN MASTER KEY DEFINITION'')) OPTION (RECOMPILE);';
             BEGIN TRY
             INSERT INTO #Results
                         ([Priority],
@@ -1797,6 +1908,55 @@ WHILE @@FETCH_STATUS = 0
                         N'Review the error message for details on what went wrong and address any issues with the dynamic SQL execution.');
             END CATCH;
         END;
+
+      /* EXECUTE ANY EXTERNAL ENDPOINT permission granted to database user or role */
+      IF (@safe_for_ppc = 1 
+           AND @version >= 17 
+           AND @ext_rest_endpoint_enabled = 1)
+         BEGIN
+             SELECT @sql = CAST(N'USE ' + @quoted_db_name + N';' AS NVARCHAR(MAX)) + @crlf
+                          + N'SELECT 2, ''Excessive Privileges'','
+                          + @crlf
+                          + N'N''EXECUTE ANY EXTERNAL ENDPOINT permission granted to database user or role'','
+                          + @crlf + N'DB_NAME(), N''In ' + @quoted_db_name
+                          + N' the QUOTENAME([dp].[name]) principal has been granted the "EXECUTE ANY EXTERNAL ENDPOINT" permission'' + CASE WHEN [perm].[state] = ''W'' THEN N'' (WITH GRANT OPTION)'' ELSE '''' END + N''.'
+                          + @crlf + N'This permission allows the principal to execute sp_invoke_external_rest_endpoint, which can be leveraged to exfiltrate data or perform command and control operations.'','
+                          + @crlf + N'N''Review if the EXECUTE ANY EXTERNAL ENDPOINT permission is required for '' + QUOTENAME([dp].[name]) + N''. If not, revoke it.'
+                          + @crlf + N'If it is required, ensure that the principal is trusted and that its usage of sp_invoke_external_rest_endpoint is monitored and restricted to known safe endpoints.'','
+                          + @crlf + N'N''https://vladdba.com/sp_invoke_external_rest_endpoint'''
+                          + @crlf + N'FROM [sys].[database_permissions] [perm]'
+                          + @crlf + N'INNER JOIN [sys].[database_principals] [dp]'
+                          + @crlf + N'ON [perm].[grantee_principal_id] = [dp].[principal_id]'
+                          + @crlf + N'WHERE [perm].[type] = ''EAEE'' AND [perm].[state] IN (''G'',''W'') OPTION (RECOMPILE);'
+                BEGIN TRY
+                INSERT INTO #Results
+                            ([Priority],
+                             [Findings Group],
+                             [Finding],
+                             [Database],
+                             [Details],
+                             [Recommendation],
+                             [URL])
+                EXEC sp_executesql
+                  @sql;
+                END TRY
+                BEGIN CATCH
+                    SET @error_message = ERROR_MESSAGE();
+                    INSERT INTO #Results
+                                ([Priority],
+                                 [Findings Group],
+                                 [Finding],
+                                 [Database],
+                                 [Details],
+                                 [Recommendation])
+                    VALUES (50,
+                            'Check Failed',
+                            N'EXECUTE ANY EXTERNAL ENDPOINT permission granted to database user or role - failed',
+                            @db_name,
+                            @error_message,
+                            N'Review the error message for details on what went wrong and address any issues with the dynamic SQL execution.');
+                END CATCH;
+         END;
       FETCH NEXT FROM db_cursor INTO @safe_for_ppc, @db_name;
   END;
 
