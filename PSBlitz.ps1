@@ -318,8 +318,8 @@ param(
 
 ###Internal params
 #Version
-$Vers = "6.1.0"
-$VersDate = "2026-05-28"
+$Vers = "6.1.1"
+$VersDate = "2026-08-09"
 $TwoMonthsFromRelease = [datetime]::ParseExact("$VersDate", 'yyyy-MM-dd', $null).AddMonths(2)
 $NowDate = Get-Date
 #Get script path
@@ -363,7 +363,7 @@ $storedHashes = @{
 	"spQuickieStore_NonSPLatest.sql"     = "3084C1C5E42AC3FBCBD4100403C9475F4518572A71516EA06D2871D480A04280"
 	"GetQSStatus.sql"                    = "A0D6E7B1C6BC5B0ED5FDF6FD14C5927729F883CB491342F81DCD9BD48A4ACCFE"
 	"spBlitzBackups_NonSPLatest.sql"     = "6B2C4BE1C32F223BDA06518EA6214F17B3DAF4090655910EA7D95B57605357F6"
-	"GetSecurityChecks.sql"              = "24E24997054C515B280D317BD3519F1DD812C3306716D5DC5D248A63ADAA20D4"
+	"GetSecurityChecks.sql"              = "6A37636E802264AA9E64F8374A8C3795B8FDD114A76D660324AC1AB79CA25CE0"
 }
 
 #Set path+name of the input Excel file
