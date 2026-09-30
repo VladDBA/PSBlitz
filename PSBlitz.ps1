@@ -286,6 +286,9 @@ param(
 	[string[]]$ServerName,
 	[string]$SQLLogin,
 	[string]$SQLPass,
+	[switch]$AADAuth,
+	[string]$AADLogin,
+	[string]$TenantId,
 	[switch]$InDepth,
 	[string]$CheckDB,
 	[string]$Help,
@@ -360,7 +363,7 @@ $storedHashes = @{
 	"GetDbInfo.sql"                      = "EE4BAD7941FDC25819294D8653148AB66CFD07FD3EE66E73D7D68D09EFA8BE37"
 	"GetAzureSQLDBInfo.sql"              = "8A18348F7B87C2F5DA047B103E3BF4FEBB455E7498F0C93644DC2CD7E7255506"
 	"GetObjectsWithDangerousOptions.sql" = "AFE74F2FE6D6077AEBF169CC16DE036B08980846E6795DC342372AB8C2A132A9"
-	"spQuickieStore_NonSPLatest.sql"     = "3084C1C5E42AC3FBCBD4100403C9475F4518572A71516EA06D2871D480A04280"
+	"spQuickieStore_NonSPLatest.sql"     = "1AC6615709944BB77EBF136A0A9D55A1DB07CC4B04EA7785723BD5A9826704F6"
 	"GetQSStatus.sql"                    = "A0D6E7B1C6BC5B0ED5FDF6FD14C5927729F883CB491342F81DCD9BD48A4ACCFE"
 	"spBlitzBackups_NonSPLatest.sql"     = "6B2C4BE1C32F223BDA06518EA6214F17B3DAF4090655910EA7D95B57605357F6"
 	"GetSecurityChecks.sql"              = "6A37636E802264AA9E64F8374A8C3795B8FDD114A76D660324AC1AB79CA25CE0"
@@ -457,6 +460,39 @@ from Brent Ozar's FirstResponderKit (https://www.brentozar.com/first-aid/):
 }
 
 #Function to properly format XML contents for deadlock graphs and execution plans
+function Get-SqlAADToken {
+	param([string]$AccountId = "", [string]$Tenant = "")
+	if (-not (Get-Command Get-AzAccessToken -ErrorAction SilentlyContinue)) {
+		Write-Host " Az module not found. Install with: Install-Module Az -Scope CurrentUser" -Fore Red
+		exit 1
+	}
+	$azContext = Get-AzContext -ErrorAction SilentlyContinue
+	$needLogin = $true
+	if ($azContext) {
+		$tenantMatch = [string]::IsNullOrEmpty($Tenant) -or ($azContext.Tenant.Id -ieq $Tenant) -or ($azContext.Tenant.Domain -ieq $Tenant)
+		$accountMatch = [string]::IsNullOrEmpty($AccountId) -or ($azContext.Account.Id -ieq $AccountId)
+		if ($tenantMatch -and $accountMatch) {
+			$needLogin = $false
+		} else {
+			Write-Host " Context mismatch (account:'$($azContext.Account.Id)' tenant:'$($azContext.Tenant.Id)'); re-authenticating..." -Fore Yellow
+		}
+	}
+	if ($needLogin) {
+		$connectArgs = @{}
+		if (-not [string]::IsNullOrEmpty($AccountId)) { $connectArgs["AccountId"] = $AccountId }
+		if (-not [string]::IsNullOrEmpty($Tenant))   { $connectArgs["TenantId"]  = $Tenant   }
+		Connect-AzAccount @connectArgs | Out-Null
+	}
+	$tokenArgs = @{ ResourceUrl = "https://database.windows.net/"; ErrorAction = "Stop" }
+	if (-not [string]::IsNullOrEmpty($Tenant)) { $tokenArgs["TenantId"] = $Tenant }
+	$tokenResult = (Get-AzAccessToken @tokenArgs).Token
+	if ($tokenResult -is [System.Security.SecureString]) {
+		$BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($tokenResult)
+		return [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+	}
+	return $tokenResult
+}
+
 function Format-XML {
 	[CmdletBinding()]
 	param ([
@@ -644,6 +680,7 @@ function Invoke-PSBlitzQuery {
 		$AttemptCount++
 		$IBQConnection = New-Object System.Data.SqlClient.SqlConnection
 		$IBQConnection.ConnectionString = $ConnStringIn
+		if (-not [string]::IsNullOrEmpty($script:SqlAccessToken)) { $IBQConnection.AccessToken = $script:SqlAccessToken }
 		$IBQCommand = $IBQConnection.CreateCommand()
 		$IBQCommand.CommandText = $QueryIn
 		$IBQCommand.CommandTimeout = $CmdTimeoutIn
@@ -1348,9 +1385,10 @@ $InitScriptBlock = {
 }
 
 $MainScriptblock = {
-	param([string]$ConnStringIn , [string]$BlitzWhoIn, [string]$FlagTblCheckNameIn, [int]$BlitzWhoDelayIn)
+	param([string]$ConnStringIn , [string]$BlitzWhoIn, [string]$FlagTblCheckNameIn, [int]$BlitzWhoDelayIn, [string]$AccessTokenIn = "")
 	$SqlConnection = New-Object System.Data.SqlClient.SqlConnection
 	$SqlConnection.ConnectionString = $ConnStringIn
+	if (-not [string]::IsNullOrEmpty($AccessTokenIn)) { $SqlConnection.AccessToken = $AccessTokenIn }
 	[int]$SuccessCount = 0
 	[int]$FailedCount = 0
 	[int]$FlagCheckRetry = 0    
@@ -1555,11 +1593,20 @@ if (([string]::IsNullOrEmpty($ServerName)) -and (-not $GUI)) {
 		$CheckDB = Read-Host -Prompt "Name of the database you want to check (leave empty for all)"
 	}
 	
-	##SQL Login
-	$SQLLogin = Read-Host -Prompt "SQL login name (leave empty to use integrated security)"
-	if (!([string]::IsNullOrEmpty($SQLLogin))) {
-		##SQL Login pass
-		$SecSQLPass = Read-Host -Prompt "Password" -AsSecureString
+	##Auth type
+	[string]$AADAuthInput = Read-Host -Prompt "Use Azure AD (MFA) authentication?(empty defaults to N)[Y/N]"
+	if ($AADAuthInput -match '^(?i:y|yes)') {
+		$AADAuth = $true
+		$AADLogin = Read-Host -Prompt "Azure AD login UPN (e.g. user@domain.com - leave empty for current context)"
+		$TenantId = Read-Host -Prompt "Azure AD tenant ID or domain (e.g. contoso.com - leave empty to auto-detect)"
+	}
+	##SQL Login (skip when using AAD auth)
+	if (-not $AADAuth) {
+		$SQLLogin = Read-Host -Prompt "SQL login name (leave empty to use integrated security)"
+		if (!([string]::IsNullOrEmpty($SQLLogin))) {
+			##SQL Login pass
+			$SecSQLPass = Read-Host -Prompt "Password" -AsSecureString
+		}
 	}
 	##Indepth check 
 	[string]$InDepthInput = Read-Host -Prompt "Perform an in-depth check?(empty defaults to N)[Y/N]"
@@ -1705,6 +1752,10 @@ if (($InteractiveMode -eq 1) -and (!([string]::IsNullOrEmpty($SQLLogin))) ) {
 	$SQLPass = [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
 }
 
+if ($AADAuth) {
+	$script:SqlAccessToken = Get-SqlAADToken -AccountId $AADLogin -Tenant $TenantId
+}
+
 ###If release is older than 2 months print an info message
 if ($NowDate -ge $TwoMonthsFromRelease) {
 	Write-Host "Informational: This release of PSBlitz is two months old" -Fore Yellow
@@ -1716,12 +1767,15 @@ if ($NowDate -ge $TwoMonthsFromRelease) {
 if (($IsAzure -eq $false) -and ([string]::IsNullOrEmpty($ASDBName)) -and ($IsAzureSQLDB -eq $false)) {
 	$SqlConnection = New-Object System.Data.SqlClient.SqlConnection
 	$AppName = "PSBlitz " + $Vers
-	if (!([string]::IsNullOrEmpty($SQLLogin))) {
+	if ($AADAuth) {
+		$ConnString = "Server=$ServerName;Database=master;Encrypt=True;TrustServerCertificate=False;Connection Timeout=$ConnTimeout;Application Name=$AppName"
+	} elseif (!([string]::IsNullOrEmpty($SQLLogin))) {
 		$ConnString = "Server=$ServerName;Database=master;User Id=$SQLLogin;Password=$SQLPass;Connection Timeout=$ConnTimeout;Application Name=$AppName"
 	} else {
 		$ConnString = "Server=$ServerName;Database=master;trusted_connection=true;Connection Timeout=$ConnTimeout;Application Name=$AppName"
 	}
 	$SqlConnection.ConnectionString = $ConnString
+	if ($AADAuth) { $SqlConnection.AccessToken = $script:SqlAccessToken }
 
 	[int]$CmdTimeout = 100
 	Write-Host "Detecting environment type... " -NoNewline
@@ -1816,7 +1870,14 @@ if (!([string]::IsNullOrEmpty($CheckDB))) {
 ###Define connection
 $AppName = "PSBlitz " + $Vers
 $SqlConnection = New-Object System.Data.SqlClient.SqlConnection
-if (!([string]::IsNullOrEmpty($SQLLogin))) {
+if ($AADAuth) {
+	if ($IsAzureSQLDB) {
+		$ConnString = "Server=$ServerName;Database=$ASDBName;Encrypt=True;TrustServerCertificate=False;Connection Timeout=$ConnTimeout;Application Name=$AppName"
+	} else {
+		$ConnString = "Server=$ServerName;Database=master;Encrypt=True;TrustServerCertificate=False;Connection Timeout=$ConnTimeout;Application Name=$AppName"
+	}
+	$Auth = "AAD"
+} elseif (!([string]::IsNullOrEmpty($SQLLogin))) {
 	if ($IsAzureSQLDB) {
 		$ConnString = "Server=$ServerName;Database=$ASDBName;User Id=$SQLLogin;Password=$SQLPass;Connection Timeout=$ConnTimeout;Application Name=$AppName"
 	} else {
@@ -1832,6 +1893,7 @@ if (!([string]::IsNullOrEmpty($SQLLogin))) {
 	$Auth = "Trusted"
 }
 $SqlConnection.ConnectionString = $ConnString
+if ($AADAuth) { $SqlConnection.AccessToken = $script:SqlAccessToken }
 
 ###Test connection to instance
 [int]$CmdTimeout = 100
@@ -2279,7 +2341,7 @@ try {
 	$JobName = "BlitzWho"
 	Write-Host " Starting session activity collection process... " -NoNewline
 	
-	$Job = Start-Job -Name $JobName -InitializationScript $InitScriptBlock -ScriptBlock $MainScriptblock -ArgumentList $ConnString, $BlitzWhoRepl, $BlitzWhoFlagTblName, $BlitzWhoDelay
+	$Job = Start-Job -Name $JobName -InitializationScript $InitScriptBlock -ScriptBlock $MainScriptblock -ArgumentList $ConnString, $BlitzWhoRepl, $BlitzWhoFlagTblName, $BlitzWhoDelay, ([string]($script:SqlAccessToken))
 	$JobStatus = $Job | Select-Object -ExpandProperty State
 	if ($JobStatus -ne "Running") {
 		Write-Host @RedX
