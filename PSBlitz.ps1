@@ -883,6 +883,10 @@ function Convert-TableToHtml {
 				$htmlTableOut = $htmlTableOut -replace "<th>exphovertooltipxyz_", "<th class=`"tooltip sortable`" title=`"$ExpHoverToolTip`">"
 				$htmlTableOut = $htmlTableOut -replace "<th>", "<th class=`"sortable`">"
 			}
+			elseif ($CSSClass -like "*DBScopedConfTbl*" -or $CSSClass -like "*ASDBScopedConfTbl*") {
+				$htmlTableOut = $htmlTableOut -replace "<th>", "<th class=`"sortable`">"
+				$htmlTableOut = $htmlTableOut -replace '<td>No</td></tr>', '<td class="instance-health-tbl-p3">No</td></tr>'
+			}
 			elseif ($CSSClass -like "*sortable") {
 				$htmlTableOut = $htmlTableOut -replace "<th>", "<th class=`"sortable`">"
 			}
