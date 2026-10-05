@@ -154,6 +154,46 @@ $tPass = New-Txt 155 $y 340 "" $true
 $tabConn.Controls.AddRange(@((New-Lbl "Password" 10 $y), $tPass))
 
 $y += 35
+$cAADAuth = New-Chk "Use Azure AD (MFA) authentication" 10 $y 490
+$tabConn.Controls.Add($cAADAuth)
+$noteAAD = New-Lbl "Requires the Az PowerShell module (Install-Module Az)" 30 ($y + 22) 460 16
+$noteAAD.Font = $SmallFont
+$noteAAD.ForeColor = $GrayColor
+$tabConn.Controls.Add($noteAAD)
+
+$y += 44
+$tAADLogin = New-Txt 155 $y 340
+$tAADLogin.Enabled = $false
+$lblAADLogin = New-Lbl "AAD Login" 10 $y
+$noteAADLogin = New-Lbl "UPN of the Azure AD account (e.g. user@domain.com)" 155 ($y + 26) 340 16
+$noteAADLogin.Font = $SmallFont
+$noteAADLogin.ForeColor = $GrayColor
+$tabConn.Controls.AddRange(@($lblAADLogin, $tAADLogin, $noteAADLogin))
+
+$y += 35
+$tTenantId = New-Txt 155 $y 340
+$tTenantId.Enabled = $false
+$lblTenantId = New-Lbl "Tenant" 10 $y
+$noteTenantId = New-Lbl "Tenant ID or domain (e.g. contoso.com) - leave blank to auto-detect" 155 ($y + 26) 340 16
+$noteTenantId.Font = $SmallFont
+$noteTenantId.ForeColor = $GrayColor
+$tabConn.Controls.AddRange(@($lblTenantId, $tTenantId, $noteTenantId))
+
+$cAADAuth.Add_CheckedChanged({
+    $tLogin.Enabled = -not $cAADAuth.Checked
+    $tPass.Enabled = -not $cAADAuth.Checked
+    $tAADLogin.Enabled = $cAADAuth.Checked
+    $tTenantId.Enabled = $cAADAuth.Checked
+    if ($cAADAuth.Checked) {
+        $tLogin.Text = ""
+        $tPass.Text = ""
+    } else {
+        $tAADLogin.Text = ""
+        $tTenantId.Text = ""
+    }
+})
+
+$y += 52
 $tDB = New-Txt 155 $y 340
 $tabConn.Controls.AddRange(@((New-Lbl "Database" 10 $y), $tDB))
 
@@ -420,11 +460,23 @@ $btnRun.Add_Click({
         [void]$cmd.Append("& '$(EscSQ $PSBlitzScript)'")
         [void]$cmd.Append(" -ServerName '$(EscSQ $serverVal)'")
 
-        $loginVal = $tLogin.Text.Trim()
-        $passVal = $tPass.Text
-        if (-not [string]::IsNullOrWhiteSpace($loginVal)) {
-            [void]$cmd.Append(" -SQLLogin '$(EscSQ $loginVal)'")
-            [void]$cmd.Append(" -SQLPass '$(EscSQ $passVal)'")
+        if ($cAADAuth.Checked) {
+            [void]$cmd.Append(" -AADAuth")
+            $aadLoginVal = $tAADLogin.Text.Trim()
+            if (-not [string]::IsNullOrWhiteSpace($aadLoginVal)) {
+                [void]$cmd.Append(" -AADLogin '$(EscSQ $aadLoginVal)'")
+            }
+            $tenantVal = $tTenantId.Text.Trim()
+            if (-not [string]::IsNullOrWhiteSpace($tenantVal)) {
+                [void]$cmd.Append(" -TenantId '$(EscSQ $tenantVal)'")
+            }
+        } else {
+            $loginVal = $tLogin.Text.Trim()
+            $passVal = $tPass.Text
+            if (-not [string]::IsNullOrWhiteSpace($loginVal)) {
+                [void]$cmd.Append(" -SQLLogin '$(EscSQ $loginVal)'")
+                [void]$cmd.Append(" -SQLPass '$(EscSQ $passVal)'")
+            }
         }
 
         $dbVal = $tDB.Text.Trim()
