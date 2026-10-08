@@ -41,7 +41,8 @@ Since I'm a big fan of [Brent Ozar's](https://www.brentozar.com/) [SQL Server Fi
 As of version __3.0.0__, PSBlitz is also capable of exporting the report to HTML making Excel/Office no longer a hard requirement for running PSBlitz.\
 As of version __4.0.1__, PSBlitz is also compatible with Azure SQL DB and Azure SQL Managed Instance. \
 As of version __4.3.4__, PSBlitz can be executed using PowerShell on Linux, the output will default to HTML regardless of the option used.\
-As of version __5.3.0__, PSBlitz replaces the non-stred-procedure version of sp_BlitzQuery store with a modified, non-stored-procedure, version of sp_QuickieStore
+As of version __5.3.0__, PSBlitz replaces the non-stred-procedure version of sp_BlitzQuery store with a modified, non-stored-procedure, version of sp_QuickieStore.\
+As of version __6.2.0__, PSBlitz supports Microsoft Entra ID (Azure AD) authentication, including MFA, via the `-AADAuth` switch.
 
 ## Features overview
 
@@ -51,6 +52,7 @@ As of version __5.3.0__, PSBlitz replaces the non-stred-procedure version of sp_
 - Deadlock investigation
 - Azure SQL DB support
 - Cross-platform compatibility
+- Microsoft Entra ID (Azure AD) authentication with MFA support
 
 ## Compatibility
 
@@ -69,7 +71,12 @@ PSBlitz can be executed with:
     ```
 
 2. If you want the report to be in Excel format, then you'll need eithr the MS Office suite or the [ImportExcel PowerShell module](https://www.powershellgallery.com/packages/ImportExcel) installed on the machine where you're running PSBlitz from, otherwise use the HTML format.
-3. Sufficient permissions to query DMVs, server state, and get database objects' definitions.
+3. Sufficient permissions to query DMVs, server state, and get database objects' definitions. See [PERMISSIONS.md](PERMISSIONS.md) for the minimum permissions required to run PSBlitz without `sysadmin`.
+4. If you want to authenticate with Microsoft Entra MFA (`-AADAuth`), you'll need the [Az PowerShell module](https://www.powershellgallery.com/packages/Az) installed:
+
+    ```PowerShell
+    Install-Module Az -Scope CurrentUser
+    ```
 
 You __don't need__ to have any of the sp_Blitz stored procedures present on the instance that you're executing PSBlitz.ps1 for, all the scripts are contained in the `PSBlitz\Resources` directory in non-stored procedure format.
 
@@ -144,6 +151,7 @@ Exports the following files:
 ### Check targets
 
 - For the time being PSBlitz.ps1 can only run against SQL Server instances, Azure SQL DB, and Azure SQL Managed Instance, but not against Amazon RDS.
+- Microsoft Entra ID authentication (`-AADAuth`) requires the Az PowerShell module and a version of Az.Accounts that supports `Connect-AzAccount -AuthScope`.
 
 ### Excel
 
@@ -170,6 +178,9 @@ Open PSBlitzOutput.xlsx (found in PSBlitz's Resources folder) click on the first
 |`-ServerName`|The name of your SQL Server instance or Azure SQL DB connection info. <br><br> Accepted input format: <br> `HostName\InstanceID` for named instances. <br> `HostName,Port` when using a port number instead of an instance ID. <br> `HostName` for default instances. <br><br>For Azure SQL DB the format is: <br> `YourServer.database.windows.net,PortNumber:YourDatabase` if you want to specify the port number. <br> `YourServer.database.windows.net:YourDatabase` if you don't want to specify the port number. <br> If your Azure SQL DB instance doesn't use the `database.windows.net` portion (e.g.: it's configured to use an IP instead) then you should provide the database name via the `-CheckDB` parameter.<br><br>Other options:<br> If you provide `?` or `Help` as a value for `-ServerName`, the script will return a brief help menu. <br> If no value is provided, the script will go into interactive mode and prompt for the appropriate input|
 |`-SQLLogin`|The name of the SQL login used to run the script. If not provided, the script will use integrated security.|
 |`-SQLPass`|The password for the SQL login provided via the -SQLLogin parameter, omit if `-SQLLogin` was not used.|
+|`-AADAuth`|Switch used to authenticate with Microsoft Entra ID (Azure AD) instead of SQL login or integrated security. Supports MFA. Requires the Az PowerShell module.<br>If `-SQLLogin` is also provided, `-AADAuth` takes precedence.|
+|`-AADLogin`|The UPN of the Entra ID account to use (e.g.: `user@domain.com`). <br>If omitted, the current Az module context is used, or you'll be prompted to sign in. Only used with `-AADAuth`.|
+|`-TenantId`|The Entra ID tenant ID (GUID) or domain (e.g.: `contoso.com`) to authenticate against.<br> Use it when the account has access to multiple tenants or the default context is the wrong one.<br> If not provided, you'll be prompted to select a tenant from a list of available tenants.<br> Only used with `-AADAuth`.|
 |`-InDepth`|Switch which tells PSBlitz.ps1 to run a more in-depth check against the instance/database. Omit for default check.|
 |`-CheckDB`|Used to provide the name of a specific database against which sp_BlitzIndex, sp_BlitzCache, and sp_BlitzLock will be ran. Omit to run against the whole instance.<br><br>__For Azure SQL DB__<br>Can also be used to provide the name of the Azure SQL DB database if you haven't provided it as part of the <br>`-ServerName` paramter.<br>If the database name is not provided here, nor as part of the `-ServerName`, and the environment is detected as Azure SQL DB, then you'll be prompted to provide the database name.|
 |`-CacheTop`| Used to specify if more/less than the default top 10 queries should be returned for the sp_BlitzCache step. Only works for HTML output (`-ToHTM Y`). Has no effect on the `recent compilations` sort order. <br>Setting this parameter to 0 will skip the plan cache analysis step altogether.<br>Defaults to 10.|
@@ -189,6 +200,19 @@ Open PSBlitzOutput.xlsx (found in PSBlitz's Resources folder) click on the first
 |`-MaxUsrDBs`|Can be used to tell PSBlitz to raise the limit of user databases based on which index-related info is limited to only the "loudest" database in the cache results. <br>Defaults to 50. <br>Only change it if you're using using HTML output and have enough RAM to handle the increased data that PS will have to process.|
 |`-SkipChecks`|Used to specify one or more (comma-separated) checks to skip.<br> Currently supports <br> `IndexFrag` - skip the index fragmentation check. <br> `StatsInfo` - skip the statistics information check. <br> `Deadlock` - skip the deadlock information cehck. <br> `PlanCache` - skips plan cache check. <br> `QueryStore` - skip query store check. <br> `Security` - skip security check.|
 |`-DebugInfo`|Switch used to get more information for debugging and troubleshooting purposes.|
+
+[*Back to top*](#header1)
+
+## Microsoft Entra ID authentication
+
+When `-AADAuth` is used, PSBlitz gets an access token for `https://database.windows.net/` through the Az module and uses it for all connections to the target.
+
+- If a matching Az context (account and tenant) already exists, PSBlitz tries to reuse it silently.
+- If there's no matching context, or the cached context can't get a token for Azure SQL (for example because of MFA or conditional access), PSBlitz runs `Connect-AzAccount -AuthScope https://database.windows.net/` and you'll be prompted to sign in.
+- If `-TenantId` is not provided, PSBlitz stays in the tenant of the cached context, otherwise it uses the account's home tenant.
+- In interactive mode, PSBlitz asks whether to use Entra ID authentication, and if so, prompts for the account UPN and tenant (both optional).
+
+__Note:__ the access token is requested once, when PSBlitz starts, and is reused for the whole run, including the session activity collection. Entra ID access tokens are short-lived, so a very long run (for example an in-depth check on a large instance) might fail with login errors once the token expires.
 
 [*Back to top*](#header1)
 
@@ -401,6 +425,24 @@ Otherwise you can navigate in PowerShell to the directory where the script is an
     ```PowerShell
     .\PSBlitz.ps1 Server02 -SQLLogin DBA1 -SQLPass SuperSecurePassword -ToHTML -InDepth -CheckDB YourDatabase -CacheMinutesBack 120
     ```
+
+16. Run it against the YourDatabase database hosted in Azure SQL DB using Microsoft Entra ID authentication (MFA prompt if required)
+
+    ```PowerShell
+    .\PSBlitz.ps1 yourserver.database.windows.net,1433:YourDatabase -AADAuth
+    ```
+
+17. Same as above, but specify the account and tenant explicitly
+
+    ```PowerShell
+    .\PSBlitz.ps1 yourserver.database.windows.net,1433:YourDatabase -AADAuth -AADLogin 'user@domain.com' -TenantId '00000000-0000-0000-0000-000000000000'
+    ```
+
+18. Run it against an Azure SQL Managed Instance with an in-depth check via Microsoft Entra ID authentication
+
+    ```PowerShell
+    .\PSBlitz.ps1 yourserver.database.windows.net -AADAuth -InDepth
+    ```    
 
 Note that `-ServerName` is a positional parameter, so you don't necessarily have to specify the parameter's name as long as the first thing after the script's name is the instance
 

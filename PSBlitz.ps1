@@ -470,40 +470,58 @@ from Brent Ozar's FirstResponderKit (https://www.brentozar.com/first-aid/):
 "
 }
 
-#Function to properly format XML contents for deadlock graphs and execution plans
 function Get-SqlAADToken {
-	param([string]$AccountId = "", [string]$Tenant = "")
-	if (-not (Get-Command Get-AzAccessToken -ErrorAction SilentlyContinue)) {
-		Write-Host " Az module not found. Install with: Install-Module Az -Scope CurrentUser" -Fore Red
-		exit 1
-	}
-	$azContext = Get-AzContext -ErrorAction SilentlyContinue
-	$needLogin = $true
-	if ($azContext) {
-		$tenantMatch = [string]::IsNullOrEmpty($Tenant) -or ($azContext.Tenant.Id -ieq $Tenant) -or ($azContext.Tenant.Domain -ieq $Tenant)
-		$accountMatch = [string]::IsNullOrEmpty($AccountId) -or ($azContext.Account.Id -ieq $AccountId)
-		if ($tenantMatch -and $accountMatch) {
-			$needLogin = $false
-		} else {
-			Write-Host " Context mismatch (account:'$($azContext.Account.Id)' tenant:'$($azContext.Tenant.Id)'); re-authenticating..." -Fore Yellow
-		}
-	}
-	if ($needLogin) {
-		$connectArgs = @{}
-		if (-not [string]::IsNullOrEmpty($AccountId)) { $connectArgs["AccountId"] = $AccountId }
-		if (-not [string]::IsNullOrEmpty($Tenant)) { $connectArgs["TenantId"] = $Tenant }
-		Connect-AzAccount @connectArgs | Out-Null
-	}
-	$tokenArgs = @{ ResourceUrl = "https://database.windows.net/"; ErrorAction = "Stop" }
-	if (-not [string]::IsNullOrEmpty($Tenant)) { $tokenArgs["TenantId"] = $Tenant }
-	$tokenResult = (Get-AzAccessToken @tokenArgs).Token
-	if ($tokenResult -is [System.Security.SecureString]) {
-		$BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($tokenResult)
-		return [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
-	}
-	return $tokenResult
+    param([string]$AccountId = "", [string]$Tenant = "")
+    if (-not (Get-Command Get-AzAccessToken -ErrorAction SilentlyContinue)) {
+        Write-Host " Az module not found. Install with: Install-Module Az -Scope CurrentUser" -Fore Red
+        exit 1
+    }
+    $azContext = Get-AzContext -ErrorAction SilentlyContinue
+    $needLogin = $true
+    if ($azContext) {
+        $tenantMatch = [string]::IsNullOrEmpty($Tenant) -or ($azContext.Tenant.Id -ieq $Tenant) -or ($azContext.Tenant.Domain -ieq $Tenant)
+        $accountMatch = [string]::IsNullOrEmpty($AccountId) -or ($azContext.Account.Id -ieq $AccountId)
+        if ($tenantMatch -and $accountMatch) {
+            $needLogin = $false
+        } else {
+            Write-Host " Context mismatch (account:'$($azContext.Account.Id)' tenant:'$($azContext.Tenant.Id)'); re-authenticating..." -Fore Yellow
+        }
+    }
+    $splatToken = @{
+        ResourceUrl = "https://database.windows.net/"
+        ErrorAction = "Stop"
+    }
+    if (-not [string]::IsNullOrEmpty($Tenant)) { $splatToken["TenantId"] = $Tenant }
+    $tokenResult = $null
+    if (-not $needLogin) {
+        try {
+            $tokenResult = (Get-AzAccessToken @splatToken).Token
+        } catch {
+            # cached context was created without the SQL auth scope (e.g. MFA / conditional access)
+            $needLogin = $true
+        }
+    }
+    if ($needLogin) {
+        $splatConnect = @{
+            AuthScope = "https://database.windows.net/"
+        }
+        if (-not [string]::IsNullOrEmpty($AccountId)) { $splatConnect["AccountId"] = $AccountId }
+        if (-not [string]::IsNullOrEmpty($Tenant)) {
+            $splatConnect["TenantId"] = $Tenant
+        } elseif ($azContext) {
+            # stay in the cached context's tenant instead of falling back to the account's home tenant
+            $splatConnect["TenantId"] = $azContext.Tenant.Id
+        }
+        Connect-AzAccount @splatConnect | Out-Null
+        $tokenResult = (Get-AzAccessToken @splatToken).Token
+    }
+    if ($tokenResult -is [System.Security.SecureString]) {
+        $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($tokenResult)
+        return [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+    }
+    return $tokenResult
 }
-
+#Function to properly format XML contents for deadlock graphs and execution plans
 function Format-XML {
 	[CmdletBinding()]
 	param ([
@@ -703,7 +721,7 @@ function Invoke-PSBlitzQuery {
 			$IBQConnection.Open()
 			$IBQAdapter.Fill($script:PSBlitzSet) | Out-Null -ErrorAction Stop
 			$StepEnd = Get-Date
-			if (($StepNameIn -notlike "Query Store pre-check for*") -or ($StepNameIn -ne "Accessible databases check") -or
+			if (($StepNameIn -notlike "Query Store pre-check for*") -and ($StepNameIn -ne "Accessible databases check") -and
 				($StepNameIn -ne "tempdb permissions check")) {
 				Write-Host @GreenCheck
 			}
