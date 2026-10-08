@@ -125,6 +125,22 @@ dark-mode.js, PSBlitzGUI.ps1, and styles.css, is held by Vlad Drumea, 2026 as de
 .PARAMETER SQLPass
  The password for the SQL login provided via the -SQLLogin parameter, omit if -SQLLogin was not used.
 
+.PARAMETER AADAuth
+ Switch used to authenticate with Microsoft Entra ID (Azure AD) instead of a SQL login or integrated security.
+ Supports MFA. Requires the Az PowerShell module (Install-Module Az -Scope CurrentUser).
+ If -SQLLogin is also provided, -AADAuth takes precedence.
+
+.PARAMETER AADLogin
+ The UPN of the Microsoft Entra ID account to use (e.g. user@domain.com).
+ If omitted, the current Az module context is used, or you'll be prompted to sign in.
+ Only used with -AADAuth.
+
+.PARAMETER TenantId
+ The Microsoft Entra ID tenant ID (GUID) or domain (e.g. contoso.com) to authenticate against.
+ Use it when the account has access to multiple tenants or the default context is the wrong one.
+ If omitted, PSBlitz stays in the tenant of the cached Az context, otherwise the account's home tenant is used.
+ Only used with -AADAuth.
+ If not provided, you will be presented with a list of tenants to pick from.
 
 .PARAMETER InDepth
  Switch which tells PSBlitz.ps1 to run a more in-depth check against the instance/database. 
@@ -276,7 +292,15 @@ dark-mode.js, PSBlitzGUI.ps1, and styles.css, is held by Vlad Drumea, 2026 as de
  PS>.\PSBlitz.ps1 yourserver.database.windows.net -SQLLogin DBA1 -SQLPass SuperSecurePassword -InDepth -CheckDB YourDatabase
  Run it against the Azure SQL Managed Instance yourserver.database.windows.net with an in-depth check while limiting index, stats, plan cache, and database info to YourDatabase
 
-#>
+.EXAMPLE
+ PS>.\PSBlitz.ps1 yourserver.database.windows.net,1433:YourDatabase -AADAuth
+ Run it against the YourDatabase database hosted in Azure SQL DB using Microsoft Entra ID authentication (MFA prompt if required)
+
+.EXAMPLE
+ PS>.\PSBlitz.ps1 yourserver.database.windows.net,1433:YourDatabase -AADAuth -AADLogin 'user@domain.com' -TenantId '00000000-0000-0000-0000-000000000000'
+ Same as above, but specify the account and tenant explicitly
+
+ #>
 
 ###Input Params
 ##Params for running from command line
@@ -471,55 +495,58 @@ from Brent Ozar's FirstResponderKit (https://www.brentozar.com/first-aid/):
 }
 
 function Get-SqlAADToken {
-    param([string]$AccountId = "", [string]$Tenant = "")
-    if (-not (Get-Command Get-AzAccessToken -ErrorAction SilentlyContinue)) {
-        Write-Host " Az module not found. Install with: Install-Module Az -Scope CurrentUser" -Fore Red
-        exit 1
-    }
-    $azContext = Get-AzContext -ErrorAction SilentlyContinue
-    $needLogin = $true
-    if ($azContext) {
-        $tenantMatch = [string]::IsNullOrEmpty($Tenant) -or ($azContext.Tenant.Id -ieq $Tenant) -or ($azContext.Tenant.Domain -ieq $Tenant)
-        $accountMatch = [string]::IsNullOrEmpty($AccountId) -or ($azContext.Account.Id -ieq $AccountId)
-        if ($tenantMatch -and $accountMatch) {
-            $needLogin = $false
-        } else {
-            Write-Host " Context mismatch (account:'$($azContext.Account.Id)' tenant:'$($azContext.Tenant.Id)'); re-authenticating..." -Fore Yellow
-        }
-    }
-    $splatToken = @{
-        ResourceUrl = "https://database.windows.net/"
-        ErrorAction = "Stop"
-    }
-    if (-not [string]::IsNullOrEmpty($Tenant)) { $splatToken["TenantId"] = $Tenant }
-    $tokenResult = $null
-    if (-not $needLogin) {
-        try {
-            $tokenResult = (Get-AzAccessToken @splatToken).Token
-        } catch {
-            # cached context was created without the SQL auth scope (e.g. MFA / conditional access)
-            $needLogin = $true
-        }
-    }
-    if ($needLogin) {
-        $splatConnect = @{
-            AuthScope = "https://database.windows.net/"
-        }
-        if (-not [string]::IsNullOrEmpty($AccountId)) { $splatConnect["AccountId"] = $AccountId }
-        if (-not [string]::IsNullOrEmpty($Tenant)) {
-            $splatConnect["TenantId"] = $Tenant
-        } elseif ($azContext) {
-            # stay in the cached context's tenant instead of falling back to the account's home tenant
-            $splatConnect["TenantId"] = $azContext.Tenant.Id
-        }
-        Connect-AzAccount @splatConnect | Out-Null
-        $tokenResult = (Get-AzAccessToken @splatToken).Token
-    }
-    if ($tokenResult -is [System.Security.SecureString]) {
-        $BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($tokenResult)
-        return [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
-    }
-    return $tokenResult
+	param([string]$AccountId = "", [string]$Tenant = "")
+	if (-not (Get-Command Get-AzAccessToken -ErrorAction SilentlyContinue)) {
+		Write-Host " Az module not found. Install with: Install-Module Az -Scope CurrentUser" -Fore Red
+		if (($InteractiveMode -eq 1) -or ($KeepPSOpen)) {
+			Read-Host -Prompt "$ExitPrompt"
+		}
+		exit 1
+	}
+	$azContext = Get-AzContext -ErrorAction SilentlyContinue
+	$needLogin = $true
+	if ($azContext) {
+		$tenantMatch = [string]::IsNullOrEmpty($Tenant) -or ($azContext.Tenant.Id -ieq $Tenant) -or ($azContext.Tenant.Domain -ieq $Tenant)
+		$accountMatch = [string]::IsNullOrEmpty($AccountId) -or ($azContext.Account.Id -ieq $AccountId)
+		if ($tenantMatch -and $accountMatch) {
+			$needLogin = $false
+		} else {
+			Write-Host " Context mismatch (account:'$($azContext.Account.Id)' tenant:'$($azContext.Tenant.Id)'); re-authenticating..." -Fore Yellow
+		}
+	}
+	$splatToken = @{
+		ResourceUrl = "https://database.windows.net/"
+		ErrorAction = "Stop"
+	}
+	if (-not [string]::IsNullOrEmpty($Tenant)) { $splatToken["TenantId"] = $Tenant }
+	$tokenResult = $null
+	if (-not $needLogin) {
+		try {
+			$tokenResult = (Get-AzAccessToken @splatToken).Token
+		} catch {
+			# cached context was created without the SQL auth scope (e.g. MFA / conditional access)
+			$needLogin = $true
+		}
+	}
+	if ($needLogin) {
+		$splatConnect = @{
+			AuthScope = "https://database.windows.net/"
+		}
+		if (-not [string]::IsNullOrEmpty($AccountId)) { $splatConnect["AccountId"] = $AccountId }
+		if (-not [string]::IsNullOrEmpty($Tenant)) {
+			$splatConnect["TenantId"] = $Tenant
+		} elseif ($azContext) {
+			# stay in the cached context's tenant instead of falling back to the account's home tenant
+			$splatConnect["TenantId"] = $azContext.Tenant.Id
+		}
+		Connect-AzAccount @splatConnect | Out-Null
+		$tokenResult = (Get-AzAccessToken @splatToken).Token
+	}
+	if ($tokenResult -is [System.Security.SecureString]) {
+		$BSTR = [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($tokenResult)
+		return [System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)
+	}
+	return $tokenResult
 }
 #Function to properly format XML contents for deadlock graphs and execution plans
 function Format-XML {
