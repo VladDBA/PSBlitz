@@ -92,7 +92,8 @@ SELECT @SQL = CASE
                          WHEN /*If running on SQL Server 2016 SP1 or lower, don't retrieve physical_cpu_cores*/
                        ( CAST(SERVERPROPERTY('ProductMajorVersion') AS TINYINT) = 13
                          AND CAST(SERVERPROPERTY('ProductLevel') AS NVARCHAR(128)) IN ( N'RTM', N'SP1' ) )
-                        OR CAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'),0) AS TINYINT) < 13 THEN N'''-- N/A --'''
+                        OR (CAST(ISNULL(SERVERPROPERTY('ProductMajorVersion'),0) AS TINYINT) < 13 AND
+                             CAST(ISNULL(SERVERPROPERTY('EngineEdition'),0) AS TINYINT) <= 4 )THEN N'0'
                          ELSE N'( [socket_count] * [cores_per_socket] )'
                        END
                      + N' AS [physical_cpu_cores],' + @LineFeed
